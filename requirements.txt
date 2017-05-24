@@ -1,0 +1,8 @@
+numpy
+pandas
+pysam
+pybedtools
+parmap
+matplotlib
+seaborn
+pyyaml

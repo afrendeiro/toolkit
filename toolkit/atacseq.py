@@ -2,9 +2,9 @@
 
 
 import os
-from .general import Analysis, pickle_me
+from toolkit.general import Analysis, pickle_me
 from collections import Counter
-import cPickle as pickle
+import pickle
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
@@ -125,7 +125,7 @@ class ATACSeqAnalysis(Analysis):
     def measure_coverage(self, samples, sites=None, output_file=None):
         import multiprocessing
         import parmap
-        from .general import count_reads_in_intervals
+        from toolkit.general import count_reads_in_intervals
 
         missing = [s for s in samples if not os.path.exists(s.filtered)]
         if len(missing) > 0:
@@ -509,6 +509,7 @@ class ATACSeqAnalysis(Analysis):
 
     def plot_peak_characteristics(self, samples=None):
         def get_sample_reads(bam_file):
+            import pysam
             return pysam.AlignmentFile(bam_file).count()
 
         def get_peak_number(bed_file):
@@ -1384,7 +1385,7 @@ class ATACSeqAnalysis(Analysis):
         enrichments.to_csv(os.path.join(output_dir, "%s_regions.region_enrichment.csv" % prefix), index=True)
 
     def characterize_regions_function(self, df, output_dir, prefix, data_dir="data", universe_file=None):
-        from .general import bed_to_fasta, meme_ame, lola, enrichr, standard_scale
+        from toolkit.general import bed_to_fasta, meme_ame, lola, enrichr, standard_scale
 
         # use all sites as universe
         if universe_file is None:
@@ -1490,12 +1491,12 @@ def global_changes(samples, trait="knockout"):
     groups = [os.path.basename(re.sub(".merged.sorted.bam", "", x)) for x in glob.glob(output_dir + "/*.merged.sorted.bam")]
 
     for region in ["genebody", "tss"]:
-        print metagene_plot(
+        print(metagene_plot(
             [os.path.abspath(os.path.join(output_dir, group + ".merged.sorted.bam")) for group in groups],
             groups,
             os.path.abspath(os.path.join(output_dir, "%s.metaplot" % region)),
             region=region
-        )
+        ))
 
 
 def nucleosome_changes(analysis, samples):
@@ -1899,7 +1900,7 @@ def investigate_nucleosome_positions(self, samples, cluster=True):
 
 
 def phasograms(self, samples, max_dist=10000, rolling_window=50, plotting_window=(0, 500)):
-    from .general import detect_peaks
+    from toolkit.general import detect_peaks
 
     df = self.prj.sheet.df[self.prj.sheet.df["library"] == "ATAC-seq"]
     groups = list()
@@ -2166,3 +2167,162 @@ date
         handle.writelines(cmd)
 
     tk.slurm_submit_job(job_file)
+
+
+def piq_prepare_motifs(
+        motifs_file="data/external/jaspar_human_motifs.txt",
+        output_dir="footprinting",
+        piq_source_dir="/home/arendeiro/workspace/piq-single/",
+        motif_numbers=None):
+    """
+    Prepare motifs for footprinting (done once per genome).
+    """
+    import textwrap
+    from pypiper import NGSTk
+    tk = NGSTk()
+
+    motifs_dir = os.path.join(output_dir, "motifs")
+    jobs_dir = os.path.join(motifs_dir, "jobs")
+
+    for path in [output_dir, motifs_dir, jobs_dir]:
+        if not os.path.exists(path):
+            os.makedirs(path)
+
+    if motif_numbers is None:
+        n_motifs = open(motifs_file, "r").read().count(">")
+        motif_numbers = range(1, n_motifs + 1)
+
+    for motif in motif_numbers:
+        # skip if exists
+        a = os.path.exists(os.path.join(motifs_dir, "{}.pwmout.RData".format(motif)))
+        b = os.path.exists(os.path.join(motifs_dir, "{}.pwmout.rc.RData".format(motif)))
+        if a and b:
+            continue
+
+        # prepare job
+        log_file = os.path.join(jobs_dir, "piq_preparemotifs.motif{}.slurm.log".format(motif))
+        job_file = os.path.join(jobs_dir, "piq_preparemotifs.motif{}.slurm.sh".format(motif))
+        cmd = tk.slurm_header(
+            "piq_preparemotifs.{}".format(motif), log_file,
+            cpus_per_task=1, queue="shortq")
+
+        # change to PIQ dir (required in PIQ because of hard-coded links in code)
+        cmd += """cd {}\n\t\t""".format(piq_source_dir)
+
+        # Actual PIQ command
+        cmd += """Rscript {}/pwmmatch.exact.r""".format(piq_source_dir)
+        cmd += " {}/common.r".format(piq_source_dir)
+        cmd += " {}".format(os.path.abspath(motifs_file))
+        cmd += " " + str(motif)
+        cmd += """ {}\n""".format(motifs_dir)
+
+        # write job to file
+        with open(job_file, 'w') as handle:
+            handle.writelines(textwrap.dedent(cmd))
+
+        tk.slurm_submit_job(job_file)
+
+
+def piq_prepare_bams(
+        bam_files,
+        group_name,
+        output_dir="footprinting",
+        piq_source_dir="/home/arendeiro/workspace/piq-single/"):
+    """
+    Prepare group of bam files (can be one too) for footprinting.
+    """
+    import textwrap
+    from pypiper import NGSTk
+    tk = NGSTk()
+
+    cache_dir = os.path.join(output_dir, "piq_cache")
+    jobs_dir = os.path.join(cache_dir, "jobs")
+
+    for path in [output_dir, cache_dir, jobs_dir]:
+        if not os.path.exists(path):
+            os.makedirs(path)
+
+    merged_bam = os.path.join(cache_dir, "{}.merged.bam".format(group_name))
+    merged_cache = os.path.join(cache_dir, "{}.merged.RData".format(group_name))
+    log_file = os.path.join(jobs_dir, "piq_preparebams.{}.slurm.log".format(group_name))
+    job_file = os.path.join(jobs_dir, "piq_preparebams.{}.slurm.sh".format(group_name))
+
+    # Build job
+    cmd = tk.slurm_header(
+        "piq_preparebams.{}".format(group_name), log_file,
+        cpus_per_task=12, queue="longq", time="7-12:00:00", mem_per_cpu=4000
+    )
+
+    # merge all bam files
+    cmd += """sambamba merge -t 12 {0} {1}\n""".format(merged_bam, " ".join(bam_files))
+
+    # change to PIQ dir (required in PIQ because of hard-coded links in code)
+    cmd += """\t\tcd {}\n""".format(piq_source_dir)
+
+    # Actual PIQ command
+    cmd += """\t\tRscript {0}/bam2rdata.r {0}/common.r {1} {2}\n""".format(
+        piq_source_dir, merged_cache, " ".join(bam_files))
+
+    # slurm footer
+    cmd += tk.slurm_footer()
+
+    # write job to file
+    with open(job_file, 'w') as handle:
+        handle.writelines(textwrap.dedent(cmd))
+
+    tk.slurm_submit_job(job_file)
+
+
+def footprint(
+        group_name, motif_numbers,
+        output_dir="footprinting",
+        piq_source_dir="/home/arendeiro/workspace/piq-single/"):
+    import textwrap
+    from pypiper import NGSTk
+    tk = NGSTk()
+
+    motifs_dir = os.path.join(output_dir, "motifs")
+    cache_dir = os.path.join(output_dir, "piq_cache")
+    foots_dir = os.path.join(output_dir, "footprint_calls")
+    tmp_dir = os.path.join(foots_dir, "tmp_output")
+    jobs_dir = os.path.join(foots_dir, "jobs")
+    merged_cache = os.path.join(cache_dir, "{}.merged.RData".format(group_name))
+
+    for path in [output_dir, motifs_dir, cache_dir, foots_dir, tmp_dir, jobs_dir]:
+        if not os.path.exists(path):
+            os.makedirs(path)
+
+    for motif_number in motif_numbers:
+        if not os.path.exists(os.path.join(motifs_dir, "{}.pwmout.RData".format(motif_number))):
+            print("PIQ file for motif {} does not exist".format(motif_number))
+            continue
+
+        label = "{}.{}".format(group_name, motif_number)
+
+        t_dir = os.path.join(tmp_dir, label)
+        if not os.path.exists(t_dir):
+            os.mkdir(t_dir)
+        log_file = os.path.join(jobs_dir, "piq_footprinting.{}.motif{}.slurm.log".format(group_name, motif_number))
+        job_file = os.path.join(jobs_dir, "piq_footprinting.{}.motif{}.slurm.sh".format(group_name, motif_number))
+
+        # prepare slurm job header
+        cmd = tk.slurm_header(
+            "piq_footprinting.{}.motif{}".format(group_name, motif_number),
+            log_file, cpus_per_task=1, queue="shortq", mem_per_cpu=8000)
+
+        # change to PIQ dir (required in PIQ because of hard-coded links in code)
+        cmd += """cd {}\n""".format(piq_source_dir)
+
+        # Actual PIQ command
+        # footprint
+        cmd += """\t\tRscript {0}/pertf.r {0}/common.r {1} {2} {3} {4} {5}\n""".format(
+            piq_source_dir, motifs_dir, t_dir, foots_dir, merged_cache, motif_number)
+
+        # slurm footer
+        cmd += tk.slurm_footer()
+
+        # write job to file
+        with open(job_file, 'w') as handle:
+            handle.writelines(textwrap.dedent(cmd))
+
+        tk.slurm_submit_job(job_file)

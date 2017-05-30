@@ -535,3 +535,244 @@ def detect_peaks(x, mph=None, mpd=1, threshold=0, edge='rising',
         ind = np.sort(ind[~idel])
 
     return ind
+
+
+def sra_id2geo_id(sra_ids):
+    """Query SRA ID from GEO ID"""
+    import subprocess
+
+    cmd = """esearch -db sra -query {} | efetch -format docsum | xtract -pattern DocumentSummary -element Runs |  perl -ne '@mt = ($_ =~ /SRR\d+/g); print "@mt"'"""
+
+    geo_ids = list()
+    for id in sra_ids:
+        p, err = subprocess.Popen(cmd.format(id))
+        geo_ids.append(p.communicate())
+    return
+
+
+def sra2fastq(input_sra, output_dir):
+    cmd = """
+\t\tfastq-dump --split-3 --outdir {} {}
+    """.format(output_dir, input_sra)
+
+    return cmd
+
+
+def fastq2bam(input_fastq, output_bam, sample_name, input_fastq2=None):
+    cmd = """
+\t\tjava -Xmx4g -jar /cm/shared/apps/picard-tools/1.118/FastqToSam.jar"""
+    cmd += " FASTQ={0}".format(input_fastq)
+    cmd += " SAMPLE_NAME={0}".format(sample_name)
+    if input_fastq2 is not None:
+        cmd += " FASTQ2={0}".format(input_fastq2)
+    cmd += """ OUTPUT={0}""".format(output_bam)
+
+    return cmd
+
+
+def download_cram(link, output_dir):
+    cmd = """
+    cd {}
+    wget '{}'
+    cd -
+    """.format(output_dir, link)
+
+    return cmd
+
+
+def cram2bam(input_cram, output_bam):
+    cmd = """
+    samtools view -b -o {} {}
+    """.format(output_bam, input_cram)
+
+    return cmd
+
+
+def download_sra(link, output_dir):
+    cmd = """
+    cd {}
+    wget '{}'
+    cd -
+    """.format(output_dir, link)
+
+    return cmd
+
+
+def sra2bam_job(sra_id, base_path):
+    from pypiper import NGSTk
+    import textwrap
+    tk = NGSTk()
+
+    # Slurm header
+    job_file = os.path.join(base_path, "%s_sra2bam.sh" % sra_id)
+    log_file = os.path.join(base_path, "%s_sra2bam.log" % sra_id)
+
+    cmd = tk.slurm_header("-".join(["sra2bam", sra_id]), log_file, cpus_per_task=2)
+
+    # SRA to FASTQ
+    cmd += sra2fastq(os.path.join(base_path, sra_id + ".sra"), base_path)
+
+    # FASTQ to BAM
+    cmd += fastq2bam(
+        os.path.join(base_path, sra_id + "_1.fastq"),
+        os.path.join(base_path, sra_id + ".bam"),
+        sra_id,
+        os.path.join(base_path, sra_id + "_2.fastq"))
+
+    # Slurm footer
+    cmd += tk.slurm_footer() + "\n"
+
+    # Write job to file
+
+    with open(job_file, "w") as handle:
+        handle.write(textwrap.dedent(cmd))
+
+    # Submit
+    tk.slurm_submit_job(job_file)
+
+
+def link2bam_job(sample_name, link, base_path):
+    from pypiper import NGSTk
+    import textwrap
+    tk = NGSTk()
+
+    # Slurm header
+    job_file = os.path.join(base_path, "%s_link2bam.sh" % sample_name)
+    log_file = os.path.join(base_path, "%s_link2bam.log" % sample_name)
+
+    cmd = tk.slurm_header("-".join(["link2bam", sample_name]), log_file, cpus_per_task=2)
+
+    # Download CRAM
+    cmd += download_cram(
+        link,
+        base_path)
+
+    # CRAM to BAM
+    cmd += cram2bam(
+        os.path.join(base_path, sample_name + ".cram"),
+        os.path.join(base_path, sample_name + ".bam"))
+
+    # Slurm footer
+    cmd += tk.slurm_footer() + "\n"
+
+    # Write job to file
+
+    with open(job_file, "w") as handle:
+        handle.write(textwrap.dedent(cmd))
+
+    # Submit
+    tk.slurm_submit_job(job_file)
+
+
+def sralink2bam_job(sra_id, base_path):
+    from pypiper import NGSTk
+    import textwrap
+    tk = NGSTk()
+
+    # Slurm header
+    job_file = os.path.join(base_path, "%s_sra2bam.sh" % sra_id)
+    log_file = os.path.join(base_path, "%s_sra2bam.log" % sra_id)
+
+    cmd = tk.slurm_header("-".join(["sra2bam", sra_id]), log_file, cpus_per_task=2)
+
+    # SRA to FASTQ
+    cmd += sra2fastq(sra_id, base_path)
+
+    # FASTQ to BAM
+    cmd += fastq2bam(
+        os.path.join(base_path, sra_id + "_1.fastq"),
+        os.path.join(base_path, sra_id + ".bam"),
+        sra_id,
+        os.path.join(base_path, sra_id + "_2.fastq"))
+
+    # Slurm footer
+    cmd += tk.slurm_footer() + "\n"
+
+    # Write job to file
+
+    with open(job_file, "w") as handle:
+        handle.write(textwrap.dedent(cmd))
+
+    # Submit
+    tk.slurm_submit_job(job_file)
+    print(job_file)
+
+
+def series_matrix2csv(matrix_url, prefix=None):
+    """
+    matrix_url: gziped URL with GEO series matrix.
+    """
+    import gzip
+    import pandas as pd
+
+    os.system("wget {}".format(matrix_url))
+    filename = matrix_url.split("/")[-1]
+
+    with gzip.open(filename, 'rb') as f:
+        file_content = f.read()
+
+    # separate lines with only one field (project-related)
+    # from lines with >2 fields (sample-related)
+    prj_lines = dict()
+    sample_lines = dict()
+
+    for line in file_content.decode("utf-8").strip().split("\n"):
+        line = line.strip().split("\t")
+        if len(line) == 2:
+            prj_lines[line[0].replace("\"", "")] = line[1].replace("\"", "")
+        elif len(line) > 2:
+            sample_lines[line[0].replace("\"", "")] = [x.replace("\"", "") for x in line[1:]]
+
+    prj = pd.Series(prj_lines)
+    prj.index = prj.index.str.replace("!Series_", "")
+
+    samples = pd.DataFrame(sample_lines)
+    samples.columns = samples.columns.str.replace("!Sample_", "")
+
+    if prefix is not None:
+        prj.to_csv(os.path.join(prefix + ".project_annotation.csv"), index=True)
+        samples.to_csv(os.path.join(prefix + ".sample_annotation.csv"), index=False)
+
+    return prj, samples
+
+
+def subtract_principal_component(
+        X, pc=1, norm=False, plot=True, plot_name="PCA_based_batch_correction.svg", pcs_to_plot=6):
+    """
+    Given a matrix (n_samples, n_variables), remove `pc` from matrix.
+    """
+    import numpy as np
+    from sklearn.decomposition import PCA
+
+    # All regions
+    if norm:
+        from sklearn.preprocessing import StandardScaler
+        X = StandardScaler().fit_transform(X)
+
+    # PCA
+    pca = PCA()
+    X_hat = pca.fit_transform(X)
+
+    # Remove PC
+    X2 = X - np.outer(X_hat[:, pc], pca.components_[pc, :])
+
+    # plot
+    if plot:
+        import matplotlib.pyplot as plt
+        import seaborn as sns
+        X2_hat = pca.fit_transform(X2)
+        fig, axis = plt.subplots(pcs_to_plot, 2, figsize=(4 * 2, 4 * pcs_to_plot))
+        for pc in range(pcs_to_plot):
+            # before
+            for j, sample in enumerate(X.index):
+                axis[pc, 0].scatter(X_hat[j, pc], X_hat[j, pc + 1], s=50)
+            axis[pc, 0].set_xlabel("PC{}".format(pc + 1))
+            axis[pc, 0].set_ylabel("PC{}".format(pc + 2))
+            # after
+            for j, sample in enumerate(X2.index):
+                axis[pc, 1].scatter(X2_hat[j, pc], X2_hat[j, pc + 1], s=35, alpha=0.8)
+            axis[pc, 1].set_xlabel("PC{}".format(pc + 1))
+            axis[pc, 1].set_ylabel("PC{}".format(pc + 2))
+        fig.savefig(plot_name)
+
+    return X2

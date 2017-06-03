@@ -2,7 +2,7 @@
 
 
 import os
-from toolkit.general import Analysis, pickle_me
+from ngs_toolkit.general import Analysis, pickle_me
 from collections import Counter
 import pickle
 import matplotlib
@@ -18,35 +18,47 @@ pd.set_option("date_dayfirst", True)
 
 class ATACSeqAnalysis(Analysis):
     """
-    Class to hold functions and data from analysis.
+    Class to model analysis of ATAC-seq data.
     """
     def __init__(
             self,
             name="analysis",
-            data_dir=os.path.join(".", "data"),
-            results_dir=os.path.join(".", "results"),
-            pickle_file=None,
             samples=None,
             prj=None,
+            data_dir="data",
+            results_dir="results",
+            pickle_file=None,
             from_pickle=False,
             **kwargs):
         super(ATACSeqAnalysis, self).__init__(name, data_dir, results_dir, pickle_file, samples, prj, from_pickle, **kwargs)
 
     @pickle_me
-    def get_consensus_sites(self, samples, region_type="summits", extension=250):
-        """Get consensus (union) sites across samples"""
+    def get_consensus_sites(self, samples=None, region_type="summits", extension=250):
+        """
+        Get consensus (union) of enriched sites (peaks) across samples.
+        If `region_type` --> "summits, regions used will be peak summits which will be extended by `extension`
+        before union. Otherwise sample peaks will be used with no modification.
+        """
         import re
+
+        if samples is None:
+            samples = self.samples
 
         for i, sample in enumerate(samples):
             print(sample.name)
             # Get peaks
-            try:
-                if region_type == "summits":
-                    peaks = pybedtools.BedTool(re.sub("_peaks.narrowPeak", "_summits.bed", sample.peaks)).slop(b=extension, genome=sample.genome)
-                else:
+            if region_type == "summits":
+                try:
+                    f = re.sub("_peaks.narrowPeak", "_summits.bed", sample.peaks)
+                    peaks = pybedtools.BedTool(f).slop(b=extension, genome=sample.genome)
+                except ValueError:
+                    print("Summits for sample {} ({}) not found!".format(sample, f))
+                    continue
+            else:
+                try:
                     peaks = pybedtools.BedTool(sample.peaks)
-            except ValueError:
-                print("Peaks for sample {} not found!".format(sample))
+                except ValueError:
+                print("Peaks for sample {} ({}) not found!".format(sample, sample.peaks))
                 continue
             # Merge overlaping peaks within a sample
             peaks = peaks.merge()
@@ -68,16 +80,25 @@ class ATACSeqAnalysis(Analysis):
         # Read up again
         self.sites = pybedtools.BedTool(os.path.join(self.results_dir, self.name + "_peak_set.bed"))
 
-    @pickle_me
     def set_consensus_sites(self, bed_file, overwrite=True):
-        """Get consensus (union) sites across samples"""
+        """
+        Set consensus (union) sites across samples.
+        Will be stored in a `sites` attribute.
+        """
         self.sites = pybedtools.BedTool(bed_file)
         if overwrite:
             self.sites.saveas(os.path.join(self.results_dir, self.name + "_peak_set.bed"))
 
     @pickle_me
-    def calculate_peak_support(self, samples, region_type="peaks"):
+    def calculate_peak_support(self, samples=None, region_type="summits"):
+        """
+        Calculate a measure of support for each region in peak set
+        (i.e. ratio of samples containing a peak overlapping region in union set of peaks).
+        """
         import re
+
+        if samples is None:
+            samples = self.samples
 
         # calculate support (number of samples overlaping each merged peak)
         for i, sample in enumerate(samples):
@@ -102,9 +123,10 @@ class ATACSeqAnalysis(Analysis):
         support.to_csv(os.path.join(self.results_dir, self.name + "_peaks.binary_overlap_support.csv"), index=False)
 
         # get % of total consensus regions found per sample
-        # m = pd.melt(support, ["chrom", "start", "end"], var_name="sample_name")
-        # groupby
-        # n = m.groupby("sample_name").apply(lambda x: len(x[x["value"] == 1]))
+        # m = (
+        #     pd.melt(support, ["chrom", "start", "end"], var_name="sample_name")
+        #     .groupby("sample_name")
+        #     .apply(lambda x: len(x[x["value"] == 1])))
 
         # divide sum (of unique overlaps) by total to get support value between 0 and 1
         support["support"] = support[range(len(samples))].apply(lambda x: sum([i if i <= 1 else 1 for i in x]) / float(len(self.samples)), axis=1)
@@ -122,10 +144,16 @@ class ATACSeqAnalysis(Analysis):
         return self.support[[s.name for s in samples]].sum(1) != 0
 
     @pickle_me
-    def measure_coverage(self, samples, sites=None, output_file=None):
+    def measure_coverage(self, samples=None, sites=None, output_file=None):
+        """
+        Measure read coverage of each sample in each region in consensus sites.
+        """
         import multiprocessing
         import parmap
-        from toolkit.general import count_reads_in_intervals
+        from ngs_toolkit.general import count_reads_in_intervals
+
+        if samples is None:
+            samples = self.samples
 
         missing = [s for s in samples if not os.path.exists(s.filtered)]
         if len(missing) > 0:
@@ -183,35 +211,59 @@ class ATACSeqAnalysis(Analysis):
         else:
             return coverage
 
+    def get_matrix(self, matrix=None, samples=None, matrix_name="coverage"):
+        """
+        Return a matrix that is an attribute of self for the requested samples.
+        If `matrix_name` --> "coverage" (default) returns a raw coverage matrix for all samples in self.
+        """
+        # default to matrix to be normalized
+        if matrix is None:
+            to_norm = getattr(self, matrix_name)
+        else:
+            to_norm = matrix
+        # default to all samples in self with matching names in matrix
+        if samples is None:
+            to_norm = to_norm[[s.name for s in self.samples]]
+        else:
+            to_norm = to_norm[[s.name for s in samples]]
+
     @pickle_me
-    def normalize_coverage_quantiles(self, samples):
-        def normalize_quantiles_r(array):
-            # install R package
-            # source('http://bioconductor.org/biocLite.R')
-            # biocLite('preprocessCore')
+    def normalize_coverage_rpm(self, matrix=None, samples=None, mult_factor=1e6):
+        """
+        Normalization of matrix of (n_features, n_samples) by total in each sample.
+        """
+        to_norm = self.get_matrix(matrix=matrix, samples=samples, type="coverage")
+        # apply normalization over total
+        self.coverage_rpm = to_norm.apply(lambda x: np.log2(((1 + x) / (1 + x).sum()) * mult_factor), axis=1)
+        self.coverage_rpm = self.coverage_rpm.join(self.coverage[['chrom', 'start', 'end']])
+        self.coverage_rpm.to_csv(os.path.join(self.results_dir, self.name + "_peaks.coverage_rpm.csv"), index=True)
 
-            import rpy2.robjects as robjects
-            import rpy2.robjects.numpy2ri
-            rpy2.robjects.numpy2ri.activate()
+    @pickle_me
+    def normalize_coverage_quantiles(self, matrix=None, samples=None, implementation="R"):
+        """
+        Quantile normalization of matrix of (n_features, n_samples).
+        """
+        to_norm = self.get_matrix(matrix=matrix, samples=samples, type="coverage")
 
-            robjects.r('require("preprocessCore")')
-            normq = robjects.r('normalize.quantiles')
-            return np.array(normq(array))
-
-        # Quantifle normalization
-        to_norm = self.coverage[[s.name for s in samples]]
-
-        self.coverage_qnorm = pd.DataFrame(
-            normalize_quantiles_r(to_norm.values),
-            index=to_norm.index,
-            columns=to_norm.columns
-        )
+        if implementation == "R":
+            from ngs_toolkit.general import normalize_quantiles_r
+            self.coverage_qnorm = pd.DataFrame(
+                normalize_quantiles_r(to_norm.values),
+                index=to_norm.index,
+                columns=to_norm.columns
+            )
+        elif implementation == "Python":
+            from ngs_toolkit.general import normalize_quantiles_p
+            self.coverage_qnorm = normalize_quantiles_p(to_norm)
+        else:
+            raise ValueError("Implementation of quantile normalization must be one of 'R' of 'Python'")
         self.coverage_qnorm = self.coverage_qnorm.join(self.coverage[['chrom', 'start', 'end']])
         self.coverage_qnorm.to_csv(os.path.join(self.results_dir, self.name + "_peaks.coverage_qnorm.csv"), index=True)
 
     @pickle_me
     def get_peak_gccontent_length(self, bed_file=None, genome="hg19", fasta_file="/home/arendeiro/resources/genomes/{g}/{g}.fa"):
         """
+        Get length and GC content of features in BED file (peak locations).
         Bed file must be a 3-column BED!
         """
         if bed_file is None:
@@ -229,22 +281,26 @@ class ATACSeqAnalysis(Analysis):
         self.nuc.to_csv(os.path.join(self.results_dir, self.name + "_peaks.gccontent_length.csv"), index=True)
 
     @pickle_me
-    def normalize_gc_content(self, samples):
+    def normalize_gc_content(self, matrix=None, samples=None):
+        """
+        Quantile normalization of matrix of (n_features, n_samples) followed by GC content correction by regression.
+        """
+
         """
         # Run manually:
         library("cqn")
-        gc = read.csv("results/cll-time_course_peaks.gccontent_length.csv", sep=",", row.names=1)
-        cov = read.csv("results/cll-time_course_peaks.coverage_qnorm.csv", sep=",", row.names=1)
+        gc = read.csv("results/cll-time_course.pruned_samples_peaks.gccontent_length.csv", sep=",", row.names=1)
+        cov = read.csv("results/cll-time_course.pruned_samples_peaks.coverage_qnorm.csv", sep=",", row.names=1)
         cov2 = cov[, 1:(length(cov) - 3)]
 
         cqn_out = cqn(cov2, x=gc$gc_content, lengths=gc$length)
 
         y = cqn_out$y +cqn_out$offset
         y2 = cbind(y, cov[, c("chrom", "start", "end")])
-        write.csv(y2, "results/cll-time_course_peaks.coverage_gc_corrected.csv", sep=",")
+        write.csv(y2, "results/cll-time_course.pruned_samples_peaks.coverage_gc_corrected.csv", sep=",")
 
         # Fix R's stupid colnames replacement
-        sed -i 's/ATAC.seq_/ATAC-seq_/g' results/cll-time_course_peaks.coverage_gc_corrected.csv
+        sed -i 's/ATAC.seq_/ATAC-seq_/g' results/cll-time_course.pruned_samples_peaks.coverage_gc_corrected.csv
         """
         def cqn(cov, gc_content, lengths):
             # install R package
@@ -275,14 +331,15 @@ class ATACSeqAnalysis(Analysis):
 
             return y + offset
 
+        # Perform quantile normalization first
         if not hasattr(self, "nuc"):
             self.normalize_coverage_quantiles(samples)
 
+        # Get GC content and length of each feature
         if not hasattr(self, "nuc"):
             self.get_peak_gccontent_length()
 
-        to_norm = self.coverage_qnorm[[s.name for s in samples]]
-
+        to_norm = self.get_matrix(matrix=matrix, samples=samples, type="coverage")
         self.coverage_gc_corrected = (
             cqn(cov=to_norm, gc_content=self.nuc["gc_content"], lengths=self.nuc["length"])
             .join(self.coverage[['chrom', 'start', 'end']])
@@ -290,13 +347,30 @@ class ATACSeqAnalysis(Analysis):
 
         self.coverage_gc_corrected.to_csv(os.path.join(self.results_dir, self.name + "_peaks.coverage_gc_corrected.csv"), index=True)
 
-    def get_peak_gene_annotation(self):
+    @pickle_me
+    def normalize(self, method="quantile", matrix=None, samples=None):
+        """
+        Normalization of matrix of (n_features, n_samples).
+        Normalization methods available:
+            `quantile` --> Quantile normalization.
+            `total` --> Reads per total normalization.
+            `gc_content` --> Quantile normalization followed by GC content correction by regression.
+        """
+        if method == "quantile":
+            return self.normalize_coverage_quantiles(samples=samples, method=method)
+        elif method == "total":
+            return self.normalize_coverage_rpm(samples=samples, method=method)
+        elif method == "gc_content":
+            return self.normalize_gc_content(samples=samples, method=method)
+
+    def get_peak_gene_annotation(self, tss_file="refseq.refflat.tss.bed"):
         """
         Annotates peaks with closest gene.
-        Needs files downloaded by prepare_external_files.py
+        Needs `tss_file` file in `data_dir`/external.
+        This is a 5 column BED file with TSS positions (cols 1-3), gene names (col 4) and TSS strand (col 5).
         """
         # create bedtool with hg19 TSS positions
-        hg19_refseq_tss = pybedtools.BedTool(os.path.join(self.data_dir, "external", "refseq.refflat.tss.bed"))
+        hg19_refseq_tss = pybedtools.BedTool(os.path.join(self.data_dir, "external", tss_file))
         # get closest TSS of each cll peak
         gene_annotation = self.sites.closest(hg19_refseq_tss, d=True).to_dataframe()
         gene_annotation = gene_annotation[['chrom', 'start', 'end'] + gene_annotation.columns[-3:].tolist()]  # TODO: check this
@@ -345,8 +419,8 @@ class ATACSeqAnalysis(Analysis):
                 region_annotation_b = pd.concat([region_annotation_b, dfb])
 
         # sort
-        region_annotation.sort(['chrom', 'start', 'end'], inplace=True)
-        region_annotation_b.sort(['chrom', 'start', 'end'], inplace=True)
+        region_annotation.sort_values(['chrom', 'start', 'end'], inplace=True)
+        region_annotation_b.sort_values(['chrom', 'start', 'end'], inplace=True)
         # remove duplicates (there shouldn't be anyway)
         region_annotation = region_annotation.reset_index(drop=True).drop_duplicates()
         region_annotation_b = region_annotation_b.reset_index(drop=True).drop_duplicates()
@@ -1364,12 +1438,12 @@ class ATACSeqAnalysis(Analysis):
 
             # join data, sort by subset data
             both = pd.DataFrame([df_count, df_universe_count], index=['subset', 'all']).T
-            both = both.sort("subset")
+            both = both.sort_values("subset")
             both['region'] = both.index
             data = pd.melt(both, var_name="set", id_vars=['region']).replace(np.nan, 0)
 
             # sort for same order
-            data.sort('region', inplace=True)
+            data.sort_values('region', inplace=True)
 
             # g = sns.FacetGrid(col="region", data=data, col_wrap=3, sharey=True)
             # g.map(sns.barplot, "set", "value")
@@ -1385,7 +1459,7 @@ class ATACSeqAnalysis(Analysis):
         enrichments.to_csv(os.path.join(output_dir, "%s_regions.region_enrichment.csv" % prefix), index=True)
 
     def characterize_regions_function(self, df, output_dir, prefix, data_dir="data", universe_file=None):
-        from toolkit.general import bed_to_fasta, meme_ame, lola, enrichr, standard_scale
+        from ngs_toolkit.general import bed_to_fasta, meme_ame, lola, enrichr, standard_scale
 
         # use all sites as universe
         if universe_file is None:
@@ -1900,7 +1974,7 @@ def investigate_nucleosome_positions(self, samples, cluster=True):
 
 
 def phasograms(self, samples, max_dist=10000, rolling_window=50, plotting_window=(0, 500)):
-    from toolkit.general import detect_peaks
+    from ngs_toolkit.general import detect_peaks
 
     df = self.prj.sheet.df[self.prj.sheet.df["library"] == "ATAC-seq"]
     groups = list()
@@ -2181,6 +2255,7 @@ def piq_prepare_motifs(
     from pypiper import NGSTk
     tk = NGSTk()
 
+    output_dir = os.path.abspath(output_dir)
     motifs_dir = os.path.join(output_dir, "motifs")
     jobs_dir = os.path.join(motifs_dir, "jobs")
 
@@ -2204,7 +2279,7 @@ def piq_prepare_motifs(
         job_file = os.path.join(jobs_dir, "piq_preparemotifs.motif{}.slurm.sh".format(motif))
         cmd = tk.slurm_header(
             "piq_preparemotifs.{}".format(motif), log_file,
-            cpus_per_task=1, queue="shortq")
+            cpus_per_task=1, queue="shortq", mem_per_cpu=8000)
 
         # change to PIQ dir (required in PIQ because of hard-coded links in code)
         cmd += """cd {}\n\t\t""".format(piq_source_dir)
@@ -2235,6 +2310,7 @@ def piq_prepare_bams(
     from pypiper import NGSTk
     tk = NGSTk()
 
+    output_dir = os.path.abspath(output_dir)
     cache_dir = os.path.join(output_dir, "piq_cache")
     jobs_dir = os.path.join(cache_dir, "jobs")
 
@@ -2250,18 +2326,19 @@ def piq_prepare_bams(
     # Build job
     cmd = tk.slurm_header(
         "piq_preparebams.{}".format(group_name), log_file,
-        cpus_per_task=12, queue="longq", time="7-12:00:00", mem_per_cpu=4000
+        cpus_per_task=4, queue="mediumq", time="11:00:00", mem_per_cpu=8000
     )
 
     # merge all bam files
-    cmd += """sambamba merge -t 12 {0} {1}\n""".format(merged_bam, " ".join(bam_files))
+    if not os.path.exists(merged_bam):
+        cmd += """sambamba merge -t 12 {0} {1}\n\t\t""".format(merged_bam, " ".join(bam_files))
 
     # change to PIQ dir (required in PIQ because of hard-coded links in code)
-    cmd += """\t\tcd {}\n""".format(piq_source_dir)
+    cmd += """cd {}\n""".format(piq_source_dir)
 
     # Actual PIQ command
     cmd += """\t\tRscript {0}/bam2rdata.r {0}/common.r {1} {2}\n""".format(
-        piq_source_dir, merged_cache, " ".join(bam_files))
+        piq_source_dir, merged_cache, merged_bam)
 
     # slurm footer
     cmd += tk.slurm_footer()
@@ -2276,12 +2353,18 @@ def piq_prepare_bams(
 def footprint(
         group_name, motif_numbers,
         output_dir="footprinting",
-        piq_source_dir="/home/arendeiro/workspace/piq-single/"):
+        piq_source_dir="/home/arendeiro/workspace/piq-single/",
+        total_job_limit=250,
+        min_time_between_jobs=5,
+        refresh_time=10):
+    import subprocess
+    import time
     import textwrap
     from pypiper import NGSTk
     tk = NGSTk()
 
-    motifs_dir = os.path.join(output_dir, "motifs")
+    output_dir = os.path.abspath(output_dir)
+    motifs_dir = os.path.join(output_dir, "motifs/")  # slash is important - PIQ reasons
     cache_dir = os.path.join(output_dir, "piq_cache")
     foots_dir = os.path.join(output_dir, "footprint_calls")
     tmp_dir = os.path.join(foots_dir, "tmp_output")
@@ -2297,11 +2380,11 @@ def footprint(
             print("PIQ file for motif {} does not exist".format(motif_number))
             continue
 
-        label = "{}.{}".format(group_name, motif_number)
-
-        t_dir = os.path.join(tmp_dir, label)
-        if not os.path.exists(t_dir):
-            os.mkdir(t_dir)
+        t_dir = os.path.join(tmp_dir, group_name)
+        o_dir = os.path.join(foots_dir, group_name)
+        for path in [t_dir, o_dir]:
+            if not os.path.exists(path):
+                os.mkdir(path)
         log_file = os.path.join(jobs_dir, "piq_footprinting.{}.motif{}.slurm.log".format(group_name, motif_number))
         job_file = os.path.join(jobs_dir, "piq_footprinting.{}.motif{}.slurm.sh".format(group_name, motif_number))
 
@@ -2316,7 +2399,7 @@ def footprint(
         # Actual PIQ command
         # footprint
         cmd += """\t\tRscript {0}/pertf.r {0}/common.r {1} {2} {3} {4} {5}\n""".format(
-            piq_source_dir, motifs_dir, t_dir, foots_dir, merged_cache, motif_number)
+            piq_source_dir, motifs_dir, t_dir, o_dir, merged_cache, motif_number)
 
         # slurm footer
         cmd += tk.slurm_footer()
@@ -2325,4 +2408,248 @@ def footprint(
         with open(job_file, 'w') as handle:
             handle.writelines(textwrap.dedent(cmd))
 
+        # submit jobs slowly and keeping total numbe of jobs below a certain ammount
+        submit = (len(subprocess.check_output("squeue").split("\n")) - 1) < total_job_limit
+        while not submit:
+            time.sleep(refresh_time)
+            # print("Waited {}. Checking again...".format(refresh_time))
+            submit = (len(subprocess.check_output("squeue").split("\n")) - 1) < total_job_limit
+
         tk.slurm_submit_job(job_file)
+        print("Submitted job of group {}, motif {}.".format(group_name, motif_number))
+        time.sleep(min_time_between_jobs)
+
+
+def tfbs_to_gene(bed_file):
+    # read in gene body + promoter info
+    promoter_and_genesbody = pybedtools.BedTool("data/ensembl.promoter_and_genesbody.bed")
+    # read in TSS info
+    tss = pybedtools.BedTool("data/ensembl.tss.bed")
+    # columns
+    columns = ["chrom", "start", "end", "pwm", "shape", "strand", "score", "purity",
+               "chrom_gene", "start_gene", "end_gene", "gene", "transcript", "strand_gene"]
+
+    # Assign TFBS to gene if they overlap with gene body or promoter (5kb around TSS -> 2.5kb upstream)
+    gene_assignments = pybedtools.BedTool(os.path.join(bed_file)).intersect(promoter_and_genesbody, wa=True, wb=True).to_dataframe().reset_index()
+    gene_assignments.columns = columns
+
+    # For the remaining TFBSs, assign TFBS to closest TSS regardless of distance
+    # (distance is not so important for assignment because distance is a penalyzing effect during TF-gene interaction score calculation)
+    # 1. get genes not assigned previously
+    all_ = pybedtools.BedTool(os.path.join(bed_file)).to_dataframe().reset_index()
+    merged = pd.merge(all_, gene_assignments, how="left", on=['chrom', 'start', 'end'])
+    remaining = merged[merged['gene'].isnull()]
+    remaining.icol(range(1, 9)).to_csv(os.path.join("tmp_rest.bed"), sep="\t", index=False, header=False)
+
+    # 2. assign to nearest
+    closest_tss = pybedtools.BedTool(os.path.join("tmp_rest.bed")).closest(tss, d=True).to_dataframe().reset_index()
+    closest_tss.columns = columns + ['distance']
+
+    # put the two together
+    gene_assignments = pd.concat([gene_assignments, closest_tss])
+
+    # set overlapping distance to 0
+    gene_assignments.loc[gene_assignments['distance'].isnull(), 'distance'] = 0
+
+    return gene_assignments
+
+
+def piq_to_network(results_dir, motif_numbers):
+    """
+    Parse PIQ output, filter footprints.
+    Returns matrix with likelyhood score of each TF regulating each gene.
+    """
+    import re
+
+    # list results_dir
+    files = os.listdir(results_dir)
+    # get all cll peaks to filter data
+    all_peaks = pybedtools.BedTool("data/cll_peaks.bed")
+
+    # dataframe to store TFBS assignment to genes
+    assignments = pd.DataFrame()
+
+    # dataframe to store TF->gene interactions
+    interactions = pd.DataFrame()
+
+    # dataframe to store stats about the TFBS and the interactions
+    stats = pd.DataFrame()
+
+    # loop through motifs/TFs, filter and establish relationship between TF and gene
+    for motif in motif_numbers:
+        print motif
+        # get both forward and reverse complement PIQ output files
+        result_files = list()
+        for f in files:
+            m = re.match(r'%i-.*-calls\.csv$' % motif, f)
+            if hasattr(m, "string"):
+                result_files.append(m.string)
+
+        # make bed file from it
+        # concatenate files (forward and reverse complement are treated differently by PIQ)
+        for i, result_file in enumerate(result_files):
+            df = pd.read_csv(os.path.join(results_dir, result_file), index_col=0)
+            df.rename(columns={"coord": "start"}, inplace=True)
+            # fix coordinates
+            if "RC-calls.csv" not in result_file:
+                df["end"] = df["start"] + 1
+                df['strand'] = "+"
+            else:
+                df["end"] = df["start"]
+                df["start"] = df["start"] - 1
+                df['strand'] = "-"
+            # concatenate
+            if i == 0:
+                df2 = df
+            else:
+                df2 = pd.concat([df, df2])
+
+        # add total TFBS to stats
+        stats.loc[motif, "TFBS"] = len(df2)
+        stats.loc[motif, "TFBS_+"] = len(df2[df2['strand'] == "+"])
+        stats.loc[motif, "TFBS_-"] = len(df2[df2['strand'] == "-"])
+
+        # Filter for purity
+        footprints = df2[df2["purity"] > 0.7]
+        stats.loc[motif, "pur0.7"] = len(footprints)
+
+        # If less than 500 significant interactions, ignore TF
+        if len(footprints) < 500:
+            continue
+
+        footprints[['chr', 'start', 'end', 'pwm', 'shape', 'strand', 'score', 'purity']].to_csv(os.path.join("tmp.bed"), sep="\t", index=False, header=False)
+
+        # filter for motifs overlapping CLL peaks
+        footprints = pybedtools.BedTool(os.path.join("tmp.bed")).intersect(all_peaks, wa=True).to_dataframe()
+        footprints.columns = ['chr', 'start', 'end', 'pwm', 'shape', 'strand', 'score', 'purity']
+        footprints.to_csv(os.path.join("tmp.bed"), sep="\t", index=False, header=False)
+        stats.loc[motif, "overlap_cll"] = len(footprints)
+
+        # assign TFBS to gene
+        gene_assignments = tfbs_to_gene(os.path.join("tmp.bed"))
+        gene_assignments["TF"] = motif
+        stats.loc[motif, "gene_overlap_count"] = len(gene_assignments[gene_assignments['distance'] == 0])
+        stats.loc[motif, "dist_gene_median"] = gene_assignments['distance'].median()
+        stats.loc[motif, "dist_gene_std"] = gene_assignments['distance'].std()
+
+        # Get weighted values
+        # weigh with footprint purity and distance to tss
+        gene_assignments['interaction_score'] = gene_assignments.apply(lambda x: 2 * (x['purity'] - 0.5) * 10 ** -(x['distance'] / 1000000.), axis=1)
+        # sum scores for each gene
+        scores = gene_assignments.groupby(['gene'])['interaction_score'].apply(sum).reset_index()
+        scores["TF"] = motif
+
+        # add mean score for each gene
+        stats.loc[motif, "score_gene_mean"] = scores['interaction_score'].mean()
+        stats.loc[motif, "score_gene_std"] = scores['interaction_score'].std()
+        stats.loc[motif, "TF"] = motif
+
+        # add to dataframe with all TF-gene interactions
+        interactions = pd.concat([interactions, scores])
+        assignments = pd.concat([assignments, gene_assignments])
+
+    return (assignments, interactions, stats)
+
+
+def piq_to_change(results_dir1, results_dir2, motif_numbers):
+    """
+    Parse PIQ output, filter footprints.
+    Returns matrix with likelyhood score of each TF regulating each gene.
+    """
+    import re
+    from scipy.stats import mannwhitneyu
+
+    def get_purity(motif, results_dir, files):
+        # get all cll peaks to filter data
+        all_peaks = pybedtools.BedTool("data/cll_peaks.bed")
+        # get both forward and reverse complement PIQ output files
+        result_files = list()
+        for f in files:
+            m = re.match(r'%i-.*-calls\.all\.csv$' % motif, f)
+            if hasattr(m, "string"):
+                result_files.append(m.string)
+
+        if len(result_files) != 2:
+            return None
+        # make bed file from it
+        # concatenate files (forward and reverse complement are treated differently by PIQ)
+        for i, result_file in enumerate(result_files):
+            df = pd.read_csv(os.path.join(results_dir, result_file), index_col=0)
+            df.rename(columns={"coord": "start"}, inplace=True)
+            # fix coordinates
+            if "RC-calls.csv" not in result_file:
+                df["end"] = df["start"] + 1
+            else:
+                df["end"] = df["start"]
+                df["start"] = df["start"] - 1
+            # concatenate
+            if i == 0:
+                df2 = df
+            else:
+                df2 = pd.concat([df, df2])
+
+        # Filter for purity
+        df2[['chr', 'start', 'end', 'pwm', 'shape', 'score', 'purity']].to_csv(os.path.join("tmp.bed"), sep="\t", index=False, header=False)
+
+        # filter for motifs overlapping CLL peaks
+        footprints = pybedtools.BedTool(os.path.join("tmp.bed")).intersect(all_peaks, wa=True).to_dataframe()
+        footprints.columns = ["chrom", "start", "end", "pwm", "shape", "score", "purity"]
+
+        return footprints["purity"]
+
+    # list results_dir
+    files1 = os.listdir(results_dir1)
+    files2 = os.listdir(results_dir2)
+
+    # dict to store TF->gene interactions
+    fold_changes = list()
+
+    # loop through motifs/TFs, filter and establish relationship between TF and gene
+    for motif in motif_numbers:
+        print motif
+
+        pur1 = get_purity(motif, results_dir1, files1)
+        pur2 = get_purity(motif, results_dir2, files2)
+
+        if pur1 is None or pur2 is None:
+            continue
+
+        pur1 = pur1.apply(lambda x: x if x > 0.7 else 0)
+        pur2 = pur2.apply(lambda x: x if x > 0.7 else 0)
+
+        fold_changes.append((motif, pur1.mean(), pur2.mean(), mannwhitneyu(pur1, pur2)[1]))
+
+    return fold_changes
+
+
+def collect_networks(foots_dir, motif_numbers, label):
+    gene_assignments, interactions, stats = piq_to_network(foots_dir, motif_numbers)
+
+    # Write gene assignments to disk
+    gene_assignments.to_csv(os.path.join(foots_dir, label + ".piq.TF-gene_interactions.gene_assignments.tsv"), sep="\t", index=False)
+    # Write stats to disk
+    stats.to_csv(os.path.join(foots_dir, label + ".piq.TF-gene_interactions.stats.tsv"), sep="\t", index=False)
+
+    # Drop TFBS with no gene in the same chromosome (random chroms) - very rare cases
+    interactions = interactions[interactions['gene'] != '.']
+
+    # Get original TF name and gene symbol
+    interactions['TF'] = [number2tf[tf] for tf in interactions['TF']]
+    interactions['gene'] = [ensembl2gene[gene] for gene in interactions['gene']]
+
+    # Save all TF-gene interactions
+    interactions['interaction_type'] = "pd"
+    interactions.to_csv(os.path.join(foots_dir, label + ".piq.TF-gene_interactions.tsv"), sep="\t", index=False)
+
+    # Filter for TF-gene interactions stronger than 1
+    interactions_filtered = interactions[interactions['interaction_score'] >= 1]
+    interactions_filtered.to_csv(os.path.join(foots_dir, label + ".piq.TF-gene_interactions.filtered.tsv"), sep="\t", index=False)
+
+    # Filter for TF-> TF interactions
+    interactions_TF = interactions[interactions['gene'].isin(number2tf.values())]
+    interactions_TF.to_csv(os.path.join(foots_dir, label + ".piq.TF-TF_interactions.tsv"), sep="\t", index=False)
+
+    # Filter for TF-TF interactions stronger than 1
+    interactions_TF_filtered = interactions_TF[interactions_TF['interaction_score'] >= 1]
+    interactions_TF_filtered.to_csv(os.path.join(foots_dir, label + ".piq.TF-TF_interactions.filtered.tsv"), sep="\t", index=False)
+

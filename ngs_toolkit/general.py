@@ -6,12 +6,19 @@ import os
 def pickle_me(function):
     """
     Decorator for some methods of Analysis class.
+    Important: Pickled function cannot have positional arguments!
     """
-    import pickle
-
-    def wrapper(obj, *args, **kwargs):
+    def wrapper(obj, timestamp=False, *args, **kwargs):
+        import pickle
         function(obj, *args, **kwargs)
-        pickle.dump(obj, open(obj.pickle_file, 'wb'), protocol=pickle.HIGHEST_PROTOCOL)
+        if timestamp:
+            import time
+            import datetime
+            ts = datetime.datetime.fromtimestamp(time.time()).strftime('%Y%m%d-%H%M%S')
+            p = obj.pickle_file.replace(".pickle", ".{}.pickle".format(ts))
+        else:
+            p = obj.pickle_file
+        pickle.dump(obj, open(p, 'wb'), protocol=pickle.HIGHEST_PROTOCOL)
     return wrapper
 
 
@@ -22,11 +29,11 @@ class Analysis(object):
     def __init__(
             self,
             name="analysis",
-            data_dir=os.path.join(".", "data"),
-            results_dir=os.path.join(".", "results"),
-            pickle_file=None,
             samples=None,
             prj=None,
+            data_dir="data",
+            results_dir="results",
+            pickle_file=None,
             from_pickle=False,
             **kwargs):
         # parse kwargs with default
@@ -34,6 +41,7 @@ class Analysis(object):
         self.data_dir = data_dir
         self.results_dir = results_dir
         self.samples = samples
+        self.prj = prj
         if pickle_file is None:
             pickle_file = os.path.join(results_dir, "analysis.{}.pickle".format(name))
         self.pickle_file = pickle_file
@@ -97,6 +105,21 @@ def normalize_quantiles_r(array):
     robjects.r('require("preprocessCore")')
     normq = robjects.r('normalize.quantiles')
     return np.array(normq(array))
+
+
+def normalize_quantiles_p(df_input):
+    df = df_input.copy()
+    # compute rank
+    dic = {}
+    for col in df:
+        dic.update({col : sorted(df[col])})
+    sorted_df = pd.DataFrame(dic)
+    rank = sorted_df.mean(axis = 1).tolist()
+    # sort
+    for col in df:
+        t = np.searchsorted(np.sort(df[col]), df[col])
+        df[col] = [rank[i] for i in t]
+    return df
 
 
 def deseq_analysis(counts_matrix, experiment_matrix, variable, covariates, output_prefix, alpha=0.05):

@@ -21,8 +21,8 @@ requirements = open("requirements.txt").read().strip().split("\n")
 
 # setup
 setup(
-	name="toolkit",
-	packages=["toolkit"],
+	name="ngs_toolkit",
+	packages=["ngs_toolkit"],
 	version=version,
 	description="Toolkit for bioinformatics.",
 	long_description=open('README.md').read(),

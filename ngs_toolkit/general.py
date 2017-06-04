@@ -762,10 +762,12 @@ def series_matrix2csv(matrix_url, prefix=None):
 def subtract_principal_component(
         X, pc=1, norm=False, plot=True, plot_name="PCA_based_batch_correction.svg", pcs_to_plot=6):
     """
-    Given a matrix (n_samples, n_variables), remove `pc` from matrix.
+    Given a matrix (n_samples, n_variables), remove `pc` (1-based) from matrix.
     """
     import numpy as np
     from sklearn.decomposition import PCA
+
+    pc -= 1
 
     # All regions
     if norm:
@@ -798,4 +800,31 @@ def subtract_principal_component(
             axis[pc, 1].set_ylabel("PC{}".format(pc + 2))
         fig.savefig(plot_name)
 
+    return X2
+
+
+def subtract_principal_component_by_attribute(df, pc=1, attributes=["CLL"]):
+    """
+    Given a matrix (n_samples, n_variables), remove `pc` (1-based) from matrix.
+    """
+    import numpy as np
+    from sklearn.decomposition import PCA
+
+    pc -= 1
+
+    X2 = pd.DataFrame(index=df.index, columns=df.columns)
+    for attr in attributes:
+        print(attr)
+        sel = df.index[df.index.str.contains(attr)]
+        X = df.loc[sel, :]
+
+        # PCA
+        pca = PCA()
+        X_hat = pca.fit_transform(X)
+
+        # Remove PC
+        X2.loc[sel, :] = X - np.outer(X_hat[:, pc], pca.components_[pc, :])
+    for sample in df.index:
+        if X2.loc[sample, :].isnull().all():
+            X2.loc[sample, :] = df.loc[sample, :]
     return X2

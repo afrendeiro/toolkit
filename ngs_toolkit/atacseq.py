@@ -2,15 +2,17 @@
 
 
 import os
-from ngs_toolkit.general import Analysis, pickle_me
-from collections import Counter
 import pickle
+from collections import Counter
+
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import pybedtools
 import seaborn as sns
+
+from ngs_toolkit.general import Analysis, pickle_me
 
 # Set settings
 pd.set_option("date_dayfirst", True)
@@ -30,7 +32,15 @@ class ATACSeqAnalysis(Analysis):
             pickle_file=None,
             from_pickle=False,
             **kwargs):
-        super(ATACSeqAnalysis, self).__init__(name, data_dir, results_dir, pickle_file, samples, prj, from_pickle, **kwargs)
+        super(ATACSeqAnalysis, self).__init__(
+            name=name,
+            data_dir=data_dir,
+            results_dir=results_dir,
+            pickle_file=pickle_file,
+            samples=samples,
+            prj=prj,
+            from_pickle=from_pickle,
+            **kwargs)
 
     @pickle_me
     def get_consensus_sites(self, samples=None, region_type="summits", extension=250):
@@ -58,8 +68,8 @@ class ATACSeqAnalysis(Analysis):
                 try:
                     peaks = pybedtools.BedTool(sample.peaks)
                 except ValueError:
-                print("Peaks for sample {} ({}) not found!".format(sample, sample.peaks))
-                continue
+                    print("Peaks for sample {} ({}) not found!".format(sample, sample.peaks))
+                    continue
             # Merge overlaping peaks within a sample
             peaks = peaks.merge()
             if i == 0:
@@ -227,38 +237,53 @@ class ATACSeqAnalysis(Analysis):
         else:
             to_norm = to_norm[[s.name for s in samples]]
 
+        return to_norm
+
     @pickle_me
-    def normalize_coverage_rpm(self, matrix=None, samples=None, mult_factor=1e6):
+    def normalize_coverage_rpm(self, matrix=None, samples=None, mult_factor=1e6, save=True, assign=True):
         """
         Normalization of matrix of (n_features, n_samples) by total in each sample.
         """
-        to_norm = self.get_matrix(matrix=matrix, samples=samples, type="coverage")
+        to_norm = self.get_matrix(matrix=matrix, samples=samples, matrix_name="coverage")
         # apply normalization over total
-        self.coverage_rpm = to_norm.apply(lambda x: np.log2(((1 + x) / (1 + x).sum()) * mult_factor), axis=1)
-        self.coverage_rpm = self.coverage_rpm.join(self.coverage[['chrom', 'start', 'end']])
-        self.coverage_rpm.to_csv(os.path.join(self.results_dir, self.name + "_peaks.coverage_rpm.csv"), index=True)
+        coverage_rpm = np.log2(((1 + to_norm) / (1 + to_norm).sum()) * mult_factor)
+        coverage_rpm = coverage_rpm.join(self.coverage[['chrom', 'start', 'end']])
+        if save:
+            coverage_rpm.to_csv(os.path.join(self.results_dir, self.name + "_peaks.coverage_rpm.csv"), index=True)
+        if assign:
+            self.coverage_rpm = coverage_rpm
+
+        return coverage_rpm
 
     @pickle_me
-    def normalize_coverage_quantiles(self, matrix=None, samples=None, implementation="R"):
+    def normalize_coverage_quantiles(self, matrix=None, samples=None, implementation="R", save=True, assign=True):
         """
         Quantile normalization of matrix of (n_features, n_samples).
         """
-        to_norm = self.get_matrix(matrix=matrix, samples=samples, type="coverage")
+        if matrix is None:
+            to_norm = self.get_matrix(matrix=matrix, samples=samples, matrix_name="coverage")
+        else:
+            to_norm = matrix
 
         if implementation == "R":
             from ngs_toolkit.general import normalize_quantiles_r
-            self.coverage_qnorm = pd.DataFrame(
+            coverage_qnorm = pd.DataFrame(
                 normalize_quantiles_r(to_norm.values),
                 index=to_norm.index,
                 columns=to_norm.columns
             )
         elif implementation == "Python":
             from ngs_toolkit.general import normalize_quantiles_p
-            self.coverage_qnorm = normalize_quantiles_p(to_norm)
+            coverage_qnorm = normalize_quantiles_p(to_norm)
         else:
             raise ValueError("Implementation of quantile normalization must be one of 'R' of 'Python'")
-        self.coverage_qnorm = self.coverage_qnorm.join(self.coverage[['chrom', 'start', 'end']])
-        self.coverage_qnorm.to_csv(os.path.join(self.results_dir, self.name + "_peaks.coverage_qnorm.csv"), index=True)
+        coverage_qnorm = coverage_qnorm.join(self.coverage[['chrom', 'start', 'end']])
+        if save:
+            coverage_qnorm.to_csv(os.path.join(self.results_dir, self.name + "_peaks.coverage_qnorm.csv"), index=True)
+        if assign:
+            self.coverage_qnorm = coverage_qnorm
+
+        return coverage_qnorm
 
     @pickle_me
     def get_peak_gccontent_length(self, bed_file=None, genome="hg19", fasta_file="/home/arendeiro/resources/genomes/{g}/{g}.fa"):
@@ -280,8 +305,10 @@ class ATACSeqAnalysis(Analysis):
 
         self.nuc.to_csv(os.path.join(self.results_dir, self.name + "_peaks.gccontent_length.csv"), index=True)
 
+        return self.nuc
+
     @pickle_me
-    def normalize_gc_content(self, matrix=None, samples=None):
+    def normalize_gc_content(self, matrix=None, samples=None, save=True, assign=True):
         """
         Quantile normalization of matrix of (n_features, n_samples) followed by GC content correction by regression.
         """
@@ -339,16 +366,21 @@ class ATACSeqAnalysis(Analysis):
         if not hasattr(self, "nuc"):
             self.get_peak_gccontent_length()
 
-        to_norm = self.get_matrix(matrix=matrix, samples=samples, type="coverage")
-        self.coverage_gc_corrected = (
+        to_norm = self.get_matrix(matrix=matrix, samples=samples, matrix_name="coverage")
+        coverage_gc_corrected = (
             cqn(cov=to_norm, gc_content=self.nuc["gc_content"], lengths=self.nuc["length"])
             .join(self.coverage[['chrom', 'start', 'end']])
         )
 
-        self.coverage_gc_corrected.to_csv(os.path.join(self.results_dir, self.name + "_peaks.coverage_gc_corrected.csv"), index=True)
+        if save:
+            coverage_gc_corrected.to_csv(os.path.join(self.results_dir, self.name + "_peaks.coverage_gc_corrected.csv"), index=True)
+        if assign:
+            self.coverage_gc_corrected = coverage_gc_corrected
+
+        return coverage_gc_corrected
 
     @pickle_me
-    def normalize(self, method="quantile", matrix=None, samples=None):
+    def normalize(self, method="quantile", matrix=None, samples=None, save=True, assign=True):
         """
         Normalization of matrix of (n_features, n_samples).
         Normalization methods available:
@@ -357,11 +389,11 @@ class ATACSeqAnalysis(Analysis):
             `gc_content` --> Quantile normalization followed by GC content correction by regression.
         """
         if method == "quantile":
-            return self.normalize_coverage_quantiles(samples=samples, method=method)
+            return self.normalize_coverage_quantiles(matrix=matrix, samples=samples, save=save, assign=assign)
         elif method == "total":
-            return self.normalize_coverage_rpm(samples=samples, method=method)
+            return self.normalize_coverage_rpm(matrix=matrix, samples=samples, save=save, assign=assign)
         elif method == "gc_content":
-            return self.normalize_gc_content(samples=samples, method=method)
+            return self.normalize_gc_content(matrix=matrix, samples=samples, save=save, assign=assign)
 
     def get_peak_gene_annotation(self, tss_file="refseq.refflat.tss.bed"):
         """
@@ -509,14 +541,26 @@ class ATACSeqAnalysis(Analysis):
     @pickle_me
     def annotate_with_sample_metadata(
             self,
-            attributes=[
-                "sample_name",
-                "patient_id", "timepoint", "cell_type", "compartment", "response",
-                "patient_gender", "ighv_mutation_status", "CD38_cells_percentage",
-                "del11q", "del13q", "del17p", "tri12", "cll_cells_%", "cell_number", "batch"],
-            numerical_attributes=["CD38_cells_percentage", "cll_cells_%", "cell_number"]):
+            quant_matrix="coverage_annotated",
+            attributes=None,
+            numerical_attributes=None,
+            save=True,
+            assign=True):
+        """
+        Annotate matrix (n_regions, n_samples) with sample metadata (creates MultiIndex on columns).
+        Desired attributes to be annotated can be passed as a iterable to `attributes` - this defaults
+        to all attributes in the original sample annotation sheet of the analysis Project.
+        Numerical attributes can be pass as a iterable to `numerical_attributes`.
+        """
+        if attributes is None:
+            attributes = self.prj.sheet.df.columns
 
-        samples = [s for s in self.samples if s.name in self.coverage_annotated.columns]
+        matrix = getattr(self, quant_matrix)
+
+        if type(matrix.columns) is pd.core.indexes.multi.MultiIndex:
+             matrix.columns = matrix.columns.get_level_values("sample_name")
+
+        samples = [s for s in self.samples if s.name in matrix.columns.tolist()]
 
         attrs = list()
         for attr in attributes:
@@ -526,17 +570,22 @@ class ATACSeqAnalysis(Analysis):
                     l.append(getattr(sample, attr))
                 except AttributeError:
                     l.append(np.nan)
-            if attr in numerical_attributes:
-                l = [float(x) for x in l]
+            if numerical_attributes is not None:
+                if attr in numerical_attributes:
+                    l = [float(x) for x in l]
             attrs.append(l)
 
         # Generate multiindex columns
         index = pd.MultiIndex.from_arrays(attrs, names=attributes)
-        self.accessibility = self.coverage_annotated[[s.name for s in samples]]
-        self.accessibility.columns = index
+        accessibility = matrix[[s.name for s in samples]]
+        accessibility.columns = index
 
         # Save
-        self.accessibility.to_csv(os.path.join(self.results_dir, self.name + ".accessibility.annotated_metadata.csv"), index=True)
+        if save:
+            accessibility.to_csv(os.path.join(self.results_dir, self.name + ".accessibility.annotated_metadata.csv"), index=True)
+        if assign:
+            self.accessibility = accessibility
+        return accessibility
 
     def get_level_colors(self, index=None, levels=None, pallete="Paired", cmap="RdBu_r", nan_color=(0.662745, 0.662745, 0.662745, 0.5)):
         if index is None:
@@ -946,12 +995,10 @@ class ATACSeqAnalysis(Analysis):
         plt.savefig(os.path.join(self.results_dir, self.name + ".norm_counts_per_sample.support_vs_qv2.filtered.svg"), bbox_inches="tight")
 
     def unsupervised(
-            self, samples, attributes=[
-                "patient_id", "timepoint", "cell_type", "compartment", "response",
-                "patient_gender", "ighv_mutation_status", "CD38_cells_percentage",
-                "del11q", "del13q", "del17p", "tri12", "cll_cells_%", "cell_number", "batch"],
-            exclude=[]):
+            self, quant_matrix="accessibility", samples=None, attributes_to_plot=["sample_name"], plot_prefix="all_sites"):
         """
+        Apply unsupervised clustering (clustering of correlations) and dimentionality reduction methods (MDS, PCA) on matrix.
+        Colours and labels samples by attributes in `attributes_to_plot`.
         """
         from sklearn.decomposition import PCA
         from sklearn.manifold import MDS
@@ -961,35 +1008,28 @@ class ATACSeqAnalysis(Analysis):
         from scipy.stats import kruskal
         from scipy.stats import pearsonr
 
-        color_dataframe = pd.DataFrame(self.get_level_colors(levels=attributes), index=attributes, columns=[s.name for s in self.samples])
+        matrix = getattr(self, quant_matrix)
 
-        # exclude samples if needed
-        samples = [s for s in samples if s.name not in exclude]
-        color_dataframe = color_dataframe[[s.name for s in samples]]
+        if samples is None:
+            samples = [s for s in self.samples if s.name in matrix.columns]
+
+        color_dataframe = pd.DataFrame(self.get_level_colors(index=matrix.columns, levels=attributes_to_plot), index=attributes_to_plot, columns=[s.name for s in samples])
+        # # exclude samples if needed
+        # color_dataframe = color_dataframe[[s.name for s in samples]]
         sample_display_names = color_dataframe.columns.str.replace("ATAC-seq_", "")
 
-        # exclude attributes if needed
-        to_plot = attributes[:]
-        to_exclude = ["sample_name"]
-        for attr in to_exclude:
-            try:
-                to_plot.pop(to_plot.index(attr))
-            except:
-                continue
-
-        color_dataframe = color_dataframe.ix[to_plot]
-
         # All regions
-        X = self.accessibility[[s.name for s in samples if s.name not in exclude]]
+        names = matrix.columns if type(matrix.columns) is not pd.core.indexes.multi.MultiIndex else matrix.columns.get_level_values("sample_name")
+        X = matrix[[s.name for s in samples if s.name in names]]
 
         # Pairwise correlations
         g = sns.clustermap(
-            X.corr(), xticklabels=False, yticklabels=sample_display_names, annot=True,
+            X.astype(float).corr(), xticklabels=False, yticklabels=sample_display_names, annot=True,
             cmap="Spectral_r", figsize=(15, 15), cbar_kws={"label": "Pearson correlation"}, row_colors=color_dataframe.values.tolist())
         g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize='xx-small')
         g.ax_heatmap.set_xlabel(None, visible=False)
         g.ax_heatmap.set_ylabel(None, visible=False)
-        g.fig.savefig(os.path.join(self.results_dir, "{}.all_sites.corr.clustermap.svg".format(self.name)), bbox_inches='tight')
+        g.fig.savefig(os.path.join(self.results_dir, "{}.{}.corr.clustermap.svg".format(self.name, plot_prefix)), bbox_inches='tight')
 
         # MDS
         mds = MDS(n_jobs=-1)
@@ -998,16 +1038,16 @@ class ATACSeqAnalysis(Analysis):
         x = pd.DataFrame(x_new)
         xx = x.apply(lambda j: (j - j.mean()) / j.std(), axis=0)
 
-        fig, axis = plt.subplots(1, len(to_plot), figsize=(4 * len(to_plot), 4 * 1))
+        fig, axis = plt.subplots(1, len(attributes_to_plot), figsize=(4 * len(attributes_to_plot), 4 * 1))
         axis = axis.flatten()
-        for i, attr in enumerate(to_plot):
+        for i, attr in enumerate(attributes_to_plot):
             for j in range(len(xx)):
                 try:
-                    label = getattr(samples[j], to_plot[i])
+                    label = getattr(samples[j], attributes_to_plot[i])
                 except AttributeError:
                     label = np.nan
                 axis[i].scatter(xx.ix[j][0], xx.ix[j][1], s=50, color=color_dataframe.ix[attr][j], label=label)
-            axis[i].set_title(to_plot[i])
+            axis[i].set_title(attributes_to_plot[i])
             axis[i].set_xlabel("MDS 1")
             axis[i].set_ylabel("MDS 2")
             axis[i].set_xticklabels(axis[i].get_xticklabels(), visible=False)
@@ -1019,38 +1059,37 @@ class ATACSeqAnalysis(Analysis):
             if any([type(c) in [str, unicode] for c in by_label.keys()]) and len(by_label) <= 20:
                 if not any([re.match("^\d", c) for c in by_label.keys()]):
                     axis[i].legend(by_label.values(), by_label.keys())
-        fig.savefig(os.path.join(self.results_dir, "{}.all_sites.mds.svg".format(self.name)), bbox_inches="tight")
+        fig.savefig(os.path.join(self.results_dir, "{}.{}.mds.svg".format(self.name, plot_prefix)), bbox_inches="tight")
 
         # PCA
         pca = PCA()
         x_new = pca.fit_transform(X.T)
         # transform again
-        x = pd.DataFrame(x_new)
-        xx = x.apply(lambda j: (j - j.mean()) / j.std(), axis=0)
+        xx = pd.DataFrame(x_new)
 
         # plot % explained variance per PC
         fig, axis = plt.subplots(1)
         axis.plot(
             range(1, len(pca.explained_variance_) + 1),  # all PCs
             (pca.explained_variance_ / pca.explained_variance_.sum()) * 100, 'o-')  # % of total variance
-        axis.axvline(len(to_plot), linestyle='--')
+        axis.axvline(len(attributes_to_plot), linestyle='--')
         axis.set_xlabel("PC")
         axis.set_ylabel("% variance")
         sns.despine(fig)
-        fig.savefig(os.path.join(self.results_dir, "{}.all_sites.pca.explained_variance.svg".format(self.name)), bbox_inches='tight')
+        fig.savefig(os.path.join(self.results_dir, "{}.{}.pca.explained_variance.svg".format(self.name, plot_prefix)), bbox_inches='tight')
 
         # plot
         pcs = min(xx.shape[0] - 1, 8)
-        fig, axis = plt.subplots(pcs, len(to_plot), figsize=(4 * len(to_plot), 4 * pcs))
+        fig, axis = plt.subplots(pcs, len(attributes_to_plot), figsize=(4 * len(attributes_to_plot), 4 * pcs))
         for pc in range(pcs):
-            for i, attr in enumerate(to_plot):
+            for i, attr in enumerate(attributes_to_plot):
                 for j in range(len(xx)):
                     try:
-                        label = getattr(samples[j], to_plot[i])
+                        label = getattr(samples[j], attributes_to_plot[i])
                     except AttributeError:
                         label = np.nan
                     axis[pc, i].scatter(xx.ix[j][pc], xx.ix[j][pc + 1], s=50, color=color_dataframe.ix[attr][j], label=label)
-                axis[pc, i].set_title(to_plot[i])
+                axis[pc, i].set_title(attributes_to_plot[i])
                 axis[pc, i].set_xlabel("PC {}".format(pc + 1))
                 axis[pc, i].set_ylabel("PC {}".format(pc + 2))
                 axis[pc, i].set_xticklabels(axis[pc, i].get_xticklabels(), visible=False)
@@ -1062,7 +1101,7 @@ class ATACSeqAnalysis(Analysis):
                 if any([type(c) in [str, unicode] for c in by_label.keys()]) and len(by_label) <= 20:
                     # if not any([re.match("^\d", c) for c in by_label.keys()]):
                     axis[pc, i].legend(by_label.values(), by_label.keys())
-        fig.savefig(os.path.join(self.results_dir, "{}.all_sites.pca.svg".format(self.name)), bbox_inches="tight")
+        fig.savefig(os.path.join(self.results_dir, "{}.{}.pca.svg".format(self.name, plot_prefix)), bbox_inches="tight")
 
         # Get PC1 loadings
         # import math
@@ -1074,7 +1113,7 @@ class ATACSeqAnalysis(Analysis):
         # # Test association of PCs with attributes
         associations = list()
         for pc in range(pcs):
-            for attr in attributes[1:]:
+            for attr in attributes_to_plot:
                 print("PC {}; Attribute {}.".format(pc + 1, attr))
                 sel_samples = [s for s in samples if hasattr(s, attr)]
                 sel_samples = [s for s in sel_samples if not pd.isnull(getattr(s, attr))]
@@ -1119,7 +1158,7 @@ class ATACSeqAnalysis(Analysis):
         associations = pd.DataFrame(associations, columns=["pc", "attribute", "variable_type", "group_1", "group_2", "p_value"])
 
         # write
-        associations.to_csv(os.path.join(self.results_dir, "{}.all_sites.pca.variable_principle_components_association.csv".format(self.name)), index=False)
+        associations.to_csv(os.path.join(self.results_dir, "{}.{}.pca.variable_principle_components_association.csv".format(self.name, plot_prefix)), index=False)
 
         # Plot
         # associations[associations['p_value'] < 0.05].drop(['group_1', 'group_2'], axis=1).drop_duplicates()
@@ -1129,63 +1168,63 @@ class ATACSeqAnalysis(Analysis):
         # heatmap of -log p-values
         g = sns.clustermap(-np.log10(pivot), row_cluster=False, annot=True, cbar_kws={"label": "-log10(p_value) of association"})
         g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=45, ha="right")
-        g.fig.savefig(os.path.join(self.results_dir, "{}.all_sites.pca.variable_principle_components_association.svg".format(self.name)), bbox_inches="tight")
+        g.fig.savefig(os.path.join(self.results_dir, "{}.{}.pca.variable_principle_components_association.svg".format(self.name, plot_prefix)), bbox_inches="tight")
 
         # heatmap of masked significant
         g = sns.clustermap((pivot < 0.05).astype(int), row_cluster=False, cbar_kws={"label": "significant association"})
         g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=45, ha="right")
-        g.fig.savefig(os.path.join(self.results_dir, "{}.all_sites.pca.variable_principle_components_association.masked.svg".format(self.name)), bbox_inches="tight")
+        g.fig.savefig(os.path.join(self.results_dir, "{}.{}.pca.variable_principle_components_association.masked.svg".format(self.name, plot_prefix)), bbox_inches="tight")
 
-        # Each cell type separately
-        for cell_type in set([s.cell_type for s in samples]):
-            print(cell_type)
-            Xt = X.loc[:, X.columns.get_level_values("cell_type") == cell_type]
-            sel_samples = [s for s in samples if s.name in Xt.columns.get_level_values("sample_name")]
+        # # Each cell type separately
+        # for cell_type in set([s.cell_type for s in samples]):
+        #     print(cell_type)
+        #     Xt = X.loc[:, X.columns.get_level_values("cell_type") == cell_type]
+        #     sel_samples = [s for s in samples if s.name in Xt.columns.get_level_values("sample_name")]
 
-            to_plot = [q for q in attributes if q != "cell_type"]
+        #     to_plot = [q for q in attributes if q != "cell_type"]
 
-            color_dataframe = pd.DataFrame(self.get_level_colors(levels=to_plot, index=Xt.columns), index=to_plot, columns=Xt.columns.get_level_values("sample_name"))
-            sample_display_names = color_dataframe.columns.str.replace("ATAC-seq_", "").str.replace("_hg19", "")
+        #     color_dataframe = pd.DataFrame(self.get_level_colors(levels=to_plot, index=Xt.columns), index=to_plot, columns=Xt.columns.get_level_values("sample_name"))
+        #     sample_display_names = color_dataframe.columns.str.replace("ATAC-seq_", "").str.replace("_hg19", "")
 
-            # Pairwise correlations
-            g = sns.clustermap(
-                Xt.corr(), xticklabels=False, yticklabels=sample_display_names, annot=True,
-                cmap="Spectral_r", figsize=(15, 15), cbar_kws={"label": "Pearson correlation"}, row_colors=color_dataframe.values.tolist())
-            g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0)
-            g.ax_heatmap.set_xlabel(None, visible=False)
-            g.ax_heatmap.set_ylabel(None, visible=False)
-            g.fig.savefig(os.path.join(self.results_dir, "{}.all_sites.{}.corr.clustermap.svg".format(self.name, cell_type)), bbox_inches='tight')
+        #     # Pairwise correlations
+        #     g = sns.clustermap(
+        #         Xt.corr(), xticklabels=False, yticklabels=sample_display_names, annot=True,
+        #         cmap="Spectral_r", figsize=(15, 15), cbar_kws={"label": "Pearson correlation"}, row_colors=color_dataframe.values.tolist())
+        #     g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0)
+        #     g.ax_heatmap.set_xlabel(None, visible=False)
+        #     g.ax_heatmap.set_ylabel(None, visible=False)
+        #     g.fig.savefig(os.path.join(self.results_dir, "{}.{}.{}.corr.clustermap.svg".format(self.name, cell_type)), bbox_inches='tight')
 
-            # PCA
-            pca = PCA()
-            x_new = pca.fit_transform(Xt.T)
-            # transform again
-            x = pd.DataFrame(x_new)
-            xx = x.apply(lambda j: (j - j.mean()) / j.std(), axis=0)
+        #     # PCA
+        #     pca = PCA()
+        #     x_new = pca.fit_transform(Xt.T)
+        #     # transform again
+        #     x = pd.DataFrame(x_new)
+        #     xx = x.apply(lambda j: (j - j.mean()) / j.std(), axis=0)
 
-            # plot
-            pcs = min(xx.shape[0] - 1, 6)
-            fig, axis = plt.subplots(pcs, len(to_plot), figsize=(4 * len(to_plot), 4 * pcs))
-            for pc in range(pcs):
-                for i, attr in enumerate(to_plot):
-                    for j in range(len(xx)):
-                        try:
-                            label = getattr(sel_samples[j], to_plot[i])
-                        except AttributeError:
-                            label = np.nan
-                        axis[pc, i].scatter(xx.ix[j][pc], xx.ix[j][pc + 1], s=50, color=color_dataframe.ix[attr][j], label=label)
-                    axis[pc, i].set_title(to_plot[i])
-                    axis[pc, i].set_xlabel("PC {}".format(pc + 1))
-                    axis[pc, i].set_ylabel("PC {}".format(pc + 2))
-                    axis[pc, i].set_xticklabels(axis[pc, i].get_xticklabels(), visible=False)
-                    axis[pc, i].set_yticklabels(axis[pc, i].get_yticklabels(), visible=False)
+        #     # plot
+        #     pcs = min(xx.shape[0] - 1, 6)
+        #     fig, axis = plt.subplots(pcs, len(to_plot), figsize=(4 * len(to_plot), 4 * pcs))
+        #     for pc in range(pcs):
+        #         for i, attr in enumerate(to_plot):
+        #             for j in range(len(xx)):
+        #                 try:
+        #                     label = getattr(sel_samples[j], to_plot[i])
+        #                 except AttributeError:
+        #                     label = np.nan
+        #                 axis[pc, i].scatter(xx.ix[j][pc], xx.ix[j][pc + 1], s=50, color=color_dataframe.ix[attr][j], label=label)
+        #             axis[pc, i].set_title(to_plot[i])
+        #             axis[pc, i].set_xlabel("PC {}".format(pc + 1))
+        #             axis[pc, i].set_ylabel("PC {}".format(pc + 2))
+        #             axis[pc, i].set_xticklabels(axis[pc, i].get_xticklabels(), visible=False)
+        #             axis[pc, i].set_yticklabels(axis[pc, i].get_yticklabels(), visible=False)
 
-                    # Unique legend labels
-                    handles, labels = axis[pc, i].get_legend_handles_labels()
-                    by_label = OrderedDict(zip(labels, handles))
-                    if any([type(c) in [str, unicode] for c in by_label.keys()]) and len(by_label) <= 20:
-                        axis[pc, i].legend(by_label.values(), by_label.keys())
-            fig.savefig(os.path.join(self.results_dir, "{}.all_sites.pca.{}.svg".format(self.name, cell_type)), bbox_inches="tight")
+        #             # Unique legend labels
+        #             handles, labels = axis[pc, i].get_legend_handles_labels()
+        #             by_label = OrderedDict(zip(labels, handles))
+        #             if any([type(c) in [str, unicode] for c in by_label.keys()]) and len(by_label) <= 20:
+        #                 axis[pc, i].legend(by_label.values(), by_label.keys())
+        #     fig.savefig(os.path.join(self.results_dir, "{}.{}.pca.{}.svg".format(self.name, cell_type)), bbox_inches="tight")
 
     def unsupervised_enrichment(self, samples, variables=["IL10_status", "subset", "replicate", "batch"]):
         """
@@ -2652,4 +2691,3 @@ def collect_networks(foots_dir, motif_numbers, label):
     # Filter for TF-TF interactions stronger than 1
     interactions_TF_filtered = interactions_TF[interactions_TF['interaction_score'] >= 1]
     interactions_TF_filtered.to_csv(os.path.join(foots_dir, label + ".piq.TF-TF_interactions.filtered.tsv"), sep="\t", index=False)
-

@@ -538,7 +538,6 @@ class ATACSeqAnalysis(Analysis):
         # Save
         self.coverage_annotated.to_csv(os.path.join(self.results_dir, self.name + "_peaks.coverage_qnorm.annotated.csv"), index=True)
 
-    @pickle_me
     def annotate_with_sample_metadata(
             self,
             quant_matrix="coverage_annotated",
@@ -1011,20 +1010,19 @@ class ATACSeqAnalysis(Analysis):
         matrix = getattr(self, quant_matrix)
 
         if samples is None:
-            samples = [s for s in self.samples if s.name in matrix.columns]
+            samples = [s for s in self.samples if s.name in matrix.columns.get_level_values("sample_name")]
 
         color_dataframe = pd.DataFrame(self.get_level_colors(index=matrix.columns, levels=attributes_to_plot), index=attributes_to_plot, columns=[s.name for s in samples])
         # # exclude samples if needed
         # color_dataframe = color_dataframe[[s.name for s in samples]]
-        sample_display_names = color_dataframe.columns.str.replace("ATAC-seq_", "")
+        # sample_display_names = color_dataframe.columns.str.replace("ATAC-seq_", "")
 
-        # All regions
-        names = matrix.columns if type(matrix.columns) is not pd.core.indexes.multi.MultiIndex else matrix.columns.get_level_values("sample_name")
-        X = matrix[[s.name for s in samples if s.name in names]]
+        # All regions, matching samples (provided samples in matrix)
+        X = matrix.loc[:, matrix.columns.get_level_values("sample_name").isin([s.name for s in samples])]
 
         # Pairwise correlations
         g = sns.clustermap(
-            X.astype(float).corr(), xticklabels=False, yticklabels=sample_display_names, annot=True,
+            X.astype(float).corr(), xticklabels=False, annot=True,  # yticklabels=sample_display_names, 
             cmap="Spectral_r", figsize=(15, 15), cbar_kws={"label": "Pearson correlation"}, row_colors=color_dataframe.values.tolist())
         g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize='xx-small')
         g.ax_heatmap.set_xlabel(None, visible=False)

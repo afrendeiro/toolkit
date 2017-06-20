@@ -135,18 +135,11 @@ def deseq_analysis(counts_matrix, experiment_matrix, variable, covariates, outpu
             library(DESeq2)
 
             alpha = 0.05
-            output_prefix = "results/deseq_expression_knockout/deseq_expression_knockout"
-            countData = read.csv("results/deseq_expression_knockout/counts_matrix.csv", sep=",", row.names=1)
-            colData = read.csv("results/deseq_expression_knockout/experiment_matrix.csv", sep=",")
-            variable = "knockout"
-            covariates = "replicate + "
-
-            colData$knockout = as.character(colData$knockout)
-            colData[colData$clone == "GFP", "knockout"] = "WT_GFP"
-            colData$knockout = as.factor(colData$knockout)
-
-            colData$replicate = as.factor(colData$replicate)
-            colData$clone = as.factor(colData$clone)
+            output_prefix = "results/ibrutinib_treatment_expression/ibrutinib_treatment_expression"
+            countData = read.csv("results/ibrutinib_treatment_expression/counts_matrix.csv", sep=",", row.names=1)
+            colData = read.csv("results/ibrutinib_treatment_expression/experiment_matrix.csv", sep=",", row.names=1)
+            variable = "timepoint_name"
+            covariates = "atac_seq_batch + "
 
             design = as.formula((paste("~", covariates, variable)))
             print(design)
@@ -192,7 +185,7 @@ def deseq_analysis(counts_matrix, experiment_matrix, variable, covariates, outpu
                 print(contrast)
 
                 # get results
-                res <- results(dds, contrast=contrast, alpha=alpha, independentFiltering=TRUE, parallel=TRUE)
+                res <- results(dds, contrast=contrast, alpha=alpha, independentFiltering=FALSE, parallel=TRUE)
                 res <- as.data.frame(res)
 
                 # append group means

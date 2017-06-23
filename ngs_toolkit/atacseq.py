@@ -1043,6 +1043,8 @@ class ATACSeqAnalysis(Analysis):
         """
         Apply unsupervised clustering (clustering of correlations) and dimentionality reduction methods (MDS, PCA) on matrix.
         Colours and labels samples by attributes in `attributes_to_plot`.
+
+        Plots will be prefixed with `plot_prefix`.
         """
         from sklearn.decomposition import PCA
         from sklearn.manifold import MDS
@@ -2342,7 +2344,14 @@ def piq_prepare_motifs(
         piq_source_dir="/home/arendeiro/workspace/piq-single/",
         motif_numbers=None):
     """
-    Prepare motifs for footprinting (done once per genome).
+    Prepare motifs for footprinting with PIQ.
+    This is typically done only once per genome.
+
+    `motifs_file` is a JASPAR-format file with PWMs of motifs.
+    `output_dir` is a root directory to use for the output of a footprint analysis.
+    `piq_source_dir` is the root directory of the PIQ code.
+    `motif_numbers` is a range of integers enumerating the TF motifs from
+    the `motifs_file` to prepare. This is by default, all in the file.
     """
     import textwrap
     from pypiper import NGSTk
@@ -2397,11 +2406,21 @@ def piq_prepare_bams(
         output_dir="footprinting",
         piq_source_dir="/home/arendeiro/workspace/piq-single/"):
     """
-    Prepare group of bam files (can be one too) for footprinting.
+    Prepare single or group of BAM files for footprinting.
+
+    `bam_files` is a string path to a BAM file or a list of the same.
+    `group_name` is a label matching the one given to `piq_prepare_bams`.
+    `output_dir` is a root directory to use for the output of a footprint analysis.
+    `piq_source_dir` is the root directory of the PIQ code.
+
+    This will launch jobs for each motif.
     """
     import textwrap
     from pypiper import NGSTk
     tk = NGSTk()
+
+    if type(bam_files) is str:
+        bam_files = [bam_files]
 
     output_dir = os.path.abspath(output_dir)
     cache_dir = os.path.join(output_dir, "piq_cache")
@@ -2450,10 +2469,27 @@ def footprint(
         total_job_limit=250,
         min_time_between_jobs=5,
         refresh_time=10):
+    """
+    Perform TF footprinting with PIQ.
+
+    `group_name` is a label matching the one given to `piq_prepare_bams`.
+    `motif_numbers` is a range of integers enumerating the TF motifs from
+    the motif file given to `piq_prepare_motifs` to footprint.
+    `output_dir` is a root directory to use for the input/output of a footprint analysis.
+    `piq_source_dir` is the root directory of the PIQ code.
+
+    This will launch jobs in `min_time_between_jobs` (seconds) intervals
+    until the whole job queue has `total_job_limit` jobs
+    and retry after `refresh_time` (seconds).
+    """
+    import os
+    import pybedtools
+    import pandas as pd
     import subprocess
     import time
     import textwrap
     from pypiper import NGSTk
+
     tk = NGSTk()
 
     output_dir = os.path.abspath(output_dir)
@@ -2513,30 +2549,64 @@ def footprint(
         time.sleep(min_time_between_jobs)
 
 
-def tfbs_to_gene(bed_file):
+def tfbs_to_gene(
+        bed_file,
+        tss_file="data/external/ensembl.tss.bed",
+        promoter_and_genesbody_file="data/external/ensembl.promoter_and_genesbody.bed"
+    ):
+    """
+    Assign a TF binding site (output of PIQ footprinting) to a gene.
+    TFBS are assigned to a gene if they overlap with their promoter or genebody,
+    else to the nearest TSS (regardless of the distance).
+    This distance can be used later to weight the interaction e.g. in combination
+    with the confidence measures of the footprint (binding).
+
+    `bed_file` is a PIQ output 8-column BED file:
+    chrom, start, end, pwm, shape, strand, score, purity.
+
+    `tss_file` and `promoter_and_genesbody_file` are 6-column BED files:
+    chrom, start, end, gene_id, transcript_id, strand.
+
+    Returns TFBS-gene assignment matrix.
+    """
+    import os
+    import pybedtools
+    import pandas as pd
+
     # read in gene body + promoter info
-    promoter_and_genesbody = pybedtools.BedTool("data/ensembl.promoter_and_genesbody.bed")
+    promoter_and_genesbody = pybedtools.BedTool(promoter_and_genesbody_file)
     # read in TSS info
-    tss = pybedtools.BedTool("data/ensembl.tss.bed")
+    tss = pybedtools.BedTool(tss_file)
     # columns
     columns = ["chrom", "start", "end", "pwm", "shape", "strand", "score", "purity",
                "chrom_gene", "start_gene", "end_gene", "gene", "transcript", "strand_gene"]
 
     # Assign TFBS to gene if they overlap with gene body or promoter (5kb around TSS -> 2.5kb upstream)
-    gene_assignments = pybedtools.BedTool(os.path.join(bed_file)).intersect(promoter_and_genesbody, wa=True, wb=True).to_dataframe().reset_index()
-    gene_assignments.columns = columns
+    gene_assignments = (
+        pybedtools.BedTool(os.path.join(bed_file))
+        .intersect(promoter_and_genesbody, wa=True, wb=True)
+        .to_dataframe(names=columns))
 
     # For the remaining TFBSs, assign TFBS to closest TSS regardless of distance
     # (distance is not so important for assignment because distance is a penalyzing effect during TF-gene interaction score calculation)
     # 1. get genes not assigned previously
-    all_ = pybedtools.BedTool(os.path.join(bed_file)).to_dataframe().reset_index()
-    merged = pd.merge(all_, gene_assignments, how="left", on=['chrom', 'start', 'end'])
+    all_ = (
+        pybedtools.BedTool(os.path.join(bed_file))
+        .to_dataframe(names=columns[:8]))
+
+    merged = pd.merge(all_, gene_assignments, how="left")
     remaining = merged[merged['gene'].isnull()]
-    remaining.icol(range(1, 9)).to_csv(os.path.join("tmp_rest.bed"), sep="\t", index=False, header=False)
 
     # 2. assign to nearest
-    closest_tss = pybedtools.BedTool(os.path.join("tmp_rest.bed")).closest(tss, d=True).to_dataframe().reset_index()
-    closest_tss.columns = columns + ['distance']
+    closest_tss = (
+        pybedtools.BedTool(
+            remaining.iloc[:, range(all_.shape[1])]
+            .to_string(index=False, header=False)
+            .replace(" ", "\t"),
+            from_string=True,
+        )
+        .closest(tss, d=True)
+        .to_dataframe(names=columns + ['distance']))
 
     # put the two together
     gene_assignments = pd.concat([gene_assignments, closest_tss])
@@ -2547,17 +2617,45 @@ def tfbs_to_gene(bed_file):
     return gene_assignments
 
 
-def piq_to_network(results_dir, motif_numbers):
+def piq_to_network(
+        group_name,
+        motif_numbers,
+        peak_universe_file,
+        output_dir="footprinting"):
     """
-    Parse PIQ output, filter footprints.
-    Returns matrix with likelyhood score of each TF regulating each gene.
+    Parse PIQ output, filter footprints and score TF-gene interactions.
+    Returns matrix with score of each TF regulating each gene.
+
+    `group_name` is a label matching the one given to `piq_prepare_bams`.
+    `motif_numbers` is a range of integers enumerating the TF motifs from
+    the motif file given to `piq_prepare_motifs` to footprint.
+    `peak_universe_file` is a 3-column BED file with high confidence genomic locations
+    to filter interactions for (generally a peak set).
+    `output_dir` is a root directory to use for the input/output of a footprint analysis.
+
+    Records in `peak_universe_file` are recommended to be enlarged (e.g. up to 500bp in each direction).
     """
     import re
+    import os
+    import pybedtools
+    import pandas as pd
+
+    output_dir = os.path.abspath(output_dir)
+    foots_dir = os.path.join(output_dir, "footprint_calls")
+    group_foot_dir = os.path.join(foots_dir, group_name)
+
+    for path in [output_dir, foots_dir, group_foot_dir]:
+        if not os.path.exists(path):
+            os.makedirs(path)
 
     # list results_dir
-    files = os.listdir(results_dir)
-    # get all cll peaks to filter data
-    all_peaks = pybedtools.BedTool("data/cll_peaks.bed")
+    files = os.listdir(group_foot_dir)
+
+    if len(files) == 0:
+        print("There are not footprint calls for group '{}' in '{}'".format(group_name, group_foot_dir))
+
+    # use universe set of ATAC-seq peaks to filter data
+    all_peaks = pybedtools.BedTool(peak_universe_file)
 
     # dataframe to store TFBS assignment to genes
     assignments = pd.DataFrame()
@@ -2570,7 +2668,7 @@ def piq_to_network(results_dir, motif_numbers):
 
     # loop through motifs/TFs, filter and establish relationship between TF and gene
     for motif in motif_numbers:
-        print motif
+        print("Gathering footprint calls of motif '{}' for group '{}'".format(motif, group_name))
         # get both forward and reverse complement PIQ output files
         result_files = list()
         for f in files:
@@ -2581,7 +2679,7 @@ def piq_to_network(results_dir, motif_numbers):
         # make bed file from it
         # concatenate files (forward and reverse complement are treated differently by PIQ)
         for i, result_file in enumerate(result_files):
-            df = pd.read_csv(os.path.join(results_dir, result_file), index_col=0)
+            df = pd.read_csv(os.path.join(group_foot_dir, result_file), index_col=0)
             df.rename(columns={"coord": "start"}, inplace=True)
             # fix coordinates
             if "RC-calls.csv" not in result_file:
@@ -2607,21 +2705,30 @@ def piq_to_network(results_dir, motif_numbers):
         stats.loc[motif, "pur0.7"] = len(footprints)
 
         # If less than 500 significant interactions, ignore TF
-        if len(footprints) < 500:
+        if footprints.shape[0] < 500:
             continue
 
-        footprints[['chr', 'start', 'end', 'pwm', 'shape', 'strand', 'score', 'purity']].to_csv(os.path.join("tmp.bed"), sep="\t", index=False, header=False)
-
         # filter for motifs overlapping CLL peaks
-        footprints = pybedtools.BedTool(os.path.join("tmp.bed")).intersect(all_peaks, wa=True).to_dataframe()
+        footprints = (
+            pybedtools.BedTool(
+                (
+                    footprints[['chr', 'start', 'end', 'pwm', 'shape', 'strand', 'score', 'purity']]
+                    .to_string(header=None, index=False)
+                    .replace(' ', '\t')
+                ),
+                from_string=True)
+            .intersect(all_peaks, wa=True)
+            .to_dataframe()
+        )
         footprints.columns = ['chr', 'start', 'end', 'pwm', 'shape', 'strand', 'score', 'purity']
         footprints.to_csv(os.path.join("tmp.bed"), sep="\t", index=False, header=False)
-        stats.loc[motif, "overlap_cll"] = len(footprints)
+        stats.loc[motif, "overlap_universe"] = footprints.shape[0]
 
         # assign TFBS to gene
         gene_assignments = tfbs_to_gene(os.path.join("tmp.bed"))
-        gene_assignments["TF"] = motif
+        gene_assignments.loc[:, "TF"] = motif
         stats.loc[motif, "gene_overlap_count"] = len(gene_assignments[gene_assignments['distance'] == 0])
+        stats.loc[motif, "dist_gene_mean"] = gene_assignments['distance'].mean()
         stats.loc[motif, "dist_gene_median"] = gene_assignments['distance'].median()
         stats.loc[motif, "dist_gene_std"] = gene_assignments['distance'].std()
 
@@ -2630,118 +2737,149 @@ def piq_to_network(results_dir, motif_numbers):
         gene_assignments['interaction_score'] = gene_assignments.apply(lambda x: 2 * (x['purity'] - 0.5) * 10 ** -(x['distance'] / 1000000.), axis=1)
         # sum scores for each gene
         scores = gene_assignments.groupby(['gene'])['interaction_score'].apply(sum).reset_index()
-        scores["TF"] = motif
+        scores.loc[:, "TF"] = motif
+
+        # filter out potentially not assigned bindings
+        scores = scores[scores["gene"] != "."]
 
         # add mean score for each gene
         stats.loc[motif, "score_gene_mean"] = scores['interaction_score'].mean()
         stats.loc[motif, "score_gene_std"] = scores['interaction_score'].std()
         stats.loc[motif, "TF"] = motif
 
+        # save
+        scores.to_csv(os.path.join(group_foot_dir, "scores.motif{}.csv".format(motif)), index=False)
+        gene_assignments.to_csv(os.path.join(group_foot_dir, "gene_assignments.motif{}.csv".format(motif)), index=False)
+
         # add to dataframe with all TF-gene interactions
-        interactions = pd.concat([interactions, scores])
-        assignments = pd.concat([assignments, gene_assignments])
+        interactions = interactions.append(scores, ignore_index=True)
+        assignments = assignments.append(gene_assignments, ignore_index=True)
+
+    # save
+    assignments.to_csv(os.path.join(group_foot_dir, "assignments.all_motifs.csv".format(motif)), index=False)
+    interactions.to_csv(os.path.join(group_foot_dir, "interactions.all_motifs.csv".format(motif)), index=False)
+    stats.to_csv(os.path.join(group_foot_dir, "stats.all_motifs.csv".format(motif)), index=False)
 
     return (assignments, interactions, stats)
 
 
-def piq_to_change(results_dir1, results_dir2, motif_numbers):
+def differential_interactions(
+        group_name1, group_name2,
+        output_dir="footprinting",
+        motifs_mapping="data/external/jaspar_human_motifs.id_mapping.txt"):
     """
-    Parse PIQ output, filter footprints.
-    Returns matrix with likelyhood score of each TF regulating each gene.
+    Compare TF-gene interactions between two sets of groups (e.g. KO and WT)
+    and visualize differences.
     """
     import re
     from scipy.stats import mannwhitneyu
+    from statsmodels.sandbox.stats.multicomp import multipletests
 
-    def get_purity(motif, results_dir, files):
-        # get all cll peaks to filter data
-        all_peaks = pybedtools.BedTool("data/cll_peaks.bed")
-        # get both forward and reverse complement PIQ output files
-        result_files = list()
-        for f in files:
-            m = re.match(r'%i-.*-calls\.all\.csv$' % motif, f)
-            if hasattr(m, "string"):
-                result_files.append(m.string)
+    def add_xy_line(axis):
+        lims = [np.min([axis.get_xlim(), axis.get_ylim()]), np.max([axis.get_xlim(), axis.get_ylim()])]
+        axis.plot(lims, lims, '--', alpha=0.5, zorder=0)
+        axis.set_aspect('equal')
+        axis.set_xlim(lims)
+        axis.set_ylim(lims)
 
-        if len(result_files) != 2:
-            return None
-        # make bed file from it
-        # concatenate files (forward and reverse complement are treated differently by PIQ)
-        for i, result_file in enumerate(result_files):
-            df = pd.read_csv(os.path.join(results_dir, result_file), index_col=0)
-            df.rename(columns={"coord": "start"}, inplace=True)
-            # fix coordinates
-            if "RC-calls.csv" not in result_file:
-                df["end"] = df["start"] + 1
-            else:
-                df["end"] = df["start"]
-                df["start"] = df["start"] - 1
-            # concatenate
-            if i == 0:
-                df2 = df
-            else:
-                df2 = pd.concat([df, df2])
+    if group_name1 == group_name2:
+        print("The two groups are the same! Skipping...")
+        return
 
-        # Filter for purity
-        df2[['chr', 'start', 'end', 'pwm', 'shape', 'score', 'purity']].to_csv(os.path.join("tmp.bed"), sep="\t", index=False, header=False)
+    comparison_name = "{}-{}".format(group_name1, group_name2)
 
-        # filter for motifs overlapping CLL peaks
-        footprints = pybedtools.BedTool(os.path.join("tmp.bed")).intersect(all_peaks, wa=True).to_dataframe()
-        footprints.columns = ["chrom", "start", "end", "pwm", "shape", "score", "purity"]
+    output_dir = os.path.abspath(output_dir)
+    foots_dir = os.path.join(output_dir, "footprint_calls")
+    diff_dir = os.path.join(output_dir, "differential_calls")
 
-        return footprints["purity"]
+    for path in [output_dir, foots_dir, diff_dir]:
+        if not os.path.exists(path):
+            os.makedirs(path)
 
-    # list results_dir
-    files1 = os.listdir(results_dir1)
-    files2 = os.listdir(results_dir2)
+    f1 = pd.read_csv(os.path.join(foots_dir, group_name1, "interactions.all_motifs.csv"))
+    f2 = pd.read_csv(os.path.join(foots_dir, group_name2, "interactions.all_motifs.csv"))
 
-    # dict to store TF->gene interactions
-    fold_changes = list()
+    # Global changes in TFs
+    # are the TFs binding differently globally on average?
+    tf_stats = f1.groupby("TF")['interaction_score'].mean().to_frame(name=group_name1)
+    tf_stats = tf_stats.join(
+        f2.groupby("TF")['interaction_score'].mean().to_frame(name=group_name2).squeeze(),
+        how="outer")
 
-    # loop through motifs/TFs, filter and establish relationship between TF and gene
-    for motif in motif_numbers:
-        print motif
+    # calculate some tf_stats
+    for tf in tf_stats.index:
+        a = f1.loc[f1['TF'] == tf, "interaction_score"]
+        b = f2.loc[f2['TF'] == tf, "interaction_score"]
+        tf_stats.loc[tf, "group1_log_interactions"] = np.log((a.shape[0] / float(f1.shape[0])) * 1e3)
+        tf_stats.loc[tf, "group2_log_interactions"] = np.log((b.shape[0] / float(f2.shape[0])) * 1e3)
+        tf_stats.loc[tf, "p_value"] = mannwhitneyu(a, b)[1]
+    tf_stats.loc[:, "q_value"] = multipletests(tf_stats.loc[:, "p_value"], method="fdr_bh")[1]
+    tf_stats.loc[:, "log_fold_change"] = np.log2(tf_stats.loc[:, group_name1] / tf_stats.loc[:, group_name2])
+    tf_stats.loc[:, "a"] = (1 / 2.) * np.log2(tf_stats.loc[:, group_name1] * tf_stats.loc[:, group_name2])
 
-        pur1 = get_purity(motif, results_dir1, files1)
-        pur2 = get_purity(motif, results_dir2, files2)
+    # annotate TF ids with names
+    annot = pd.read_table(motifs_mapping, header=None, names=['tf', "jaspar_id", "tf_name"]).set_index('tf')
+    tf_stats = tf_stats.join(annot).set_index("tf_name")
 
-        if pur1 is None or pur2 is None:
-            continue
+    # save summary
+    tf_stats.to_csv(os.path.join(diff_dir, "tf_differential_binding.{}.csv".format(comparison_name)))
 
-        pur1 = pur1.apply(lambda x: x if x > 0.7 else 0)
-        pur2 = pur2.apply(lambda x: x if x > 0.7 else 0)
+    # Scatter
+    fig, axis = plt.subplots(1, figsize=(4, 4))
+    axis.scatter(
+        tf_stats.loc[:, "group1_log_interactions"],
+        tf_stats.loc[:, "group2_log_interactions"],
+        alpha=0.5,
+        rasterized=True)
+    add_xy_line(axis)
+    axis.set_xlabel("{} interactions (log)".format(group_name1))
+    axis.set_ylabel("{} interactions (log)".format(group_name2))
+    sns.despine(fig)
+    fig.savefig(
+        os.path.join(diff_dir, "tf_differential_binding.{}.scatter.log_interactions.svg".format(comparison_name)),
+        bbox_inches="tight", dpi=300)
 
-        fold_changes.append((motif, pur1.mean(), pur2.mean(), mannwhitneyu(pur1, pur2)[1]))
+    fig, axis = plt.subplots(1, figsize=(4, 4))
+    axis.scatter(
+        tf_stats.loc[:, group_name1],
+        tf_stats.loc[:, group_name2],
+        alpha=0.5,
+        rasterized=True)
+    add_xy_line(axis)
+    axis.set_xlabel("{} interactions mean".format(group_name1))
+    axis.set_ylabel("{} interactions mean".format(group_name2))
+    sns.despine(fig)
+    fig.savefig(
+        os.path.join(diff_dir, "tf_differential_binding.{}.scatter.mean_interactions.svg".format(comparison_name)),
+        bbox_inches="tight", dpi=300)
 
-    return fold_changes
+    # MA
+    fig, axis = plt.subplots(1, figsize=(4, 4))
+    axis.scatter(
+        tf_stats.loc[:, "a"],
+        tf_stats.loc[:, "log_fold_change"],
+        alpha=0.5,
+        rasterized=True)
+    axis.axhline(0, linestyle="--", alpha=0.5, zorder=0)
+    axis.set_xlabel("Intensity (A)".format(group_name1))
+    axis.set_ylabel("Log2 fold change ({} / {})".format(group_name1, group_name2))
+    sns.despine(fig)
+    fig.savefig(
+        os.path.join(diff_dir, "tf_differential_binding.{}.ma.svg".format(comparison_name)),
+        bbox_inches="tight", dpi=300)
 
+    # Volcano
+    fig, axis = plt.subplots(1, figsize=(4, 4))
+    axis.scatter(
+        tf_stats.loc[:, "log_fold_change"],
+        -np.log(tf_stats.loc[:, "p_value"]),
+        alpha=0.5,
+        rasterized=True)
+    axis.axvline(0, linestyle="--", alpha=0.5, zorder=0)
+    axis.set_xlabel("Log2 fold change ({} / {})".format(group_name1, group_name2))
+    axis.set_ylabel("-log p-value")
+    sns.despine(fig)
+    fig.savefig(
+        os.path.join(diff_dir, "tf_differential_binding.{}.volcano.svg".format(comparison_name)),
+        bbox_inches="tight", dpi=300)
 
-def collect_networks(foots_dir, motif_numbers, label):
-    gene_assignments, interactions, stats = piq_to_network(foots_dir, motif_numbers)
-
-    # Write gene assignments to disk
-    gene_assignments.to_csv(os.path.join(foots_dir, label + ".piq.TF-gene_interactions.gene_assignments.tsv"), sep="\t", index=False)
-    # Write stats to disk
-    stats.to_csv(os.path.join(foots_dir, label + ".piq.TF-gene_interactions.stats.tsv"), sep="\t", index=False)
-
-    # Drop TFBS with no gene in the same chromosome (random chroms) - very rare cases
-    interactions = interactions[interactions['gene'] != '.']
-
-    # Get original TF name and gene symbol
-    interactions['TF'] = [number2tf[tf] for tf in interactions['TF']]
-    interactions['gene'] = [ensembl2gene[gene] for gene in interactions['gene']]
-
-    # Save all TF-gene interactions
-    interactions['interaction_type'] = "pd"
-    interactions.to_csv(os.path.join(foots_dir, label + ".piq.TF-gene_interactions.tsv"), sep="\t", index=False)
-
-    # Filter for TF-gene interactions stronger than 1
-    interactions_filtered = interactions[interactions['interaction_score'] >= 1]
-    interactions_filtered.to_csv(os.path.join(foots_dir, label + ".piq.TF-gene_interactions.filtered.tsv"), sep="\t", index=False)
-
-    # Filter for TF-> TF interactions
-    interactions_TF = interactions[interactions['gene'].isin(number2tf.values())]
-    interactions_TF.to_csv(os.path.join(foots_dir, label + ".piq.TF-TF_interactions.tsv"), sep="\t", index=False)
-
-    # Filter for TF-TF interactions stronger than 1
-    interactions_TF_filtered = interactions_TF[interactions_TF['interaction_score'] >= 1]
-    interactions_TF_filtered.to_csv(os.path.join(foots_dir, label + ".piq.TF-TF_interactions.filtered.tsv"), sep="\t", index=False)

@@ -1553,7 +1553,7 @@ class ATACSeqAnalysis(Analysis):
          - MEME suite (AME)
          - LOLA
         """
-        from ngs_toolkit.general import bed_to_fasta, meme_ame, lola, enrichr, standard_scale
+        from ngs_toolkit.general import bed_to_fasta, meme_ame, homer_motif, lola, enrichr, standard_scale
 
         # use all sites as universe
         if universe_file is None:
@@ -1564,17 +1564,31 @@ class ATACSeqAnalysis(Analysis):
             os.makedirs(output_dir)
 
         # save to bed
-        bed_file = os.path.join(output_dir, "%s_regions.bed" % prefix)
+        bed_file = os.path.join(output_dir, "{}_regions.bed".format(prefix))
         df[['chrom', 'start', 'end']].to_csv(bed_file, sep="\t", header=False, index=False)
         # save as tsv
-        tsv_file = os.path.join(output_dir, "%s_regions.tsv" % prefix)
+        tsv_file = os.path.join(output_dir, "{}_regions.tsv".format(prefix))
         df[['chrom', 'start', 'end']].reset_index().to_csv(tsv_file, sep="\t", header=False, index=False)
 
         # export gene names
-        df['gene_name'].str.split(",").apply(pd.Series, 1).stack().drop_duplicates().to_csv(os.path.join(output_dir, "%s_genes.symbols.txt" % prefix), index=False)
+        (df['gene_name']
+        .str.split(",")
+        .apply(pd.Series, 1)
+        .stack()
+        .drop_duplicates()
+        .to_csv(
+            os.path.join(output_dir, "{}_genes.symbols.txt".format(prefix)),
+            index=False))
         if "ensembl_gene_id" in df.columns:
             # export ensembl gene names
-            df['ensembl_gene_id'].str.split(",").apply(pd.Series, 1).stack().drop_duplicates().to_csv(os.path.join(output_dir, "%s_genes.ensembl.txt" % prefix), index=False)
+            (df['ensembl_gene_id']
+            .str.split(",")
+            .apply(pd.Series, 1)
+            .stack()
+            .drop_duplicates()
+            .to_csv(
+                os.path.join(output_dir, "{}_genes.ensembl.txt".format(prefix)),
+                index=False))
 
         # export gene symbols with scaled absolute fold change
         if "log2FoldChange" in df.columns:
@@ -1595,26 +1609,27 @@ class ATACSeqAnalysis(Analysis):
             d = d[['score']].join(a)
             # reduce various ranks to mean per gene
             d = d.groupby('gene_name').mean().reset_index()
-            d.to_csv(os.path.join(output_dir, "%s_genes.symbols.score.csv" % prefix), index=False)
+            d.to_csv(os.path.join(output_dir, "{}_genes.symbols.score.csv".format(prefix)), index=False)
 
         # Motifs
         # de novo motif finding - enrichment
-        fasta_file = os.path.join(output_dir, "%s_regions.fa" % prefix)
+        fasta_file = os.path.join(output_dir, "{}_regions.fa".format(prefix))
         bed_to_fasta(bed_file, fasta_file)
 
         meme_ame(fasta_file, output_dir)
+        homer_motif(bed_file, output_dir)
 
         # Lola
         try:
             lola(bed_file, universe_file, output_dir)
         except:
-            print("LOLA analysis for %s failed!" % prefix)
+            print("LOLA analysis for {} failed!".format(prefix))
 
         # Enrichr
         results = enrichr(df[['chrom', 'start', 'end', "gene_name"]])
 
         # Save
-        results.to_csv(os.path.join(output_dir, "%s_regions.enrichr.csv" % prefix), index=False, encoding='utf-8')
+        results.to_csv(os.path.join(output_dir, "{}_regions.enrichr.csv".format(prefix)), index=False, encoding='utf-8')
 
 
 def metagene_plot(bams, labels, output_prefix, region="genebody", genome="hg19"):

@@ -122,120 +122,444 @@ def normalize_quantiles_p(df_input):
     return df
 
 
-def deseq_analysis(counts_matrix, experiment_matrix, variable, covariates, output_prefix, alpha=0.05):
+def deseq_analysis(
+        count_matrix, experiment_matrix, comparison_table, formula,
+        output_dir, output_prefix,
+        overwrite=True, alpha=0.05):
     """
+    Perform differential comparisons with DESeq2.
     """
     import pandas as pd
-    import rpy2.robjects as robj
-    from rpy2.robjects import pandas2ri
+    from rpy2.robjects import numpy2ri, pandas2ri
+    import rpy2.robjects as robjects
+    numpy2ri.activate()
     pandas2ri.activate()
 
-    run = robj.r("""
-        run = function(countData, colData, variable, covariates, output_prefix, alpha) {
-            library(DESeq2)
+    def r2pandas_df(r_df):
+        df = pd.DataFrame(np.asarray(r_df)).T
+        df.columns = [str(x) for x in r_df.colnames]
+        df.index = [str(x) for x in r_df.rownames]
+        return df
 
-            alpha = 0.05
-            output_prefix = "results/ibrutinib_treatment_expression/ibrutinib_treatment_expression"
-            countData = read.csv("results/ibrutinib_treatment_expression/counts_matrix.csv", sep=",", row.names=1)
-            colData = read.csv("results/ibrutinib_treatment_expression/experiment_matrix.csv", sep=",", row.names=1)
-            variable = "timepoint_name"
-            covariates = "atac_seq_batch + "
+    robjects.r('require("DESeq2")')
+    _as_formula = robjects.r('as.formula')
+    _DESeqDataSetFromMatrix = robjects.r('DESeqDataSetFromMatrix')
+    _DESeq = robjects.r('DESeq')
+    _results = robjects.r('results')
+    _as_data_frame = robjects.r('as.data.frame')
 
-            design = as.formula((paste("~", covariates, variable)))
-            print(design)
-            dds <- DESeqDataSetFromMatrix(
-                countData = countData, colData = colData,
-                design)
+    # order experiment and count matrices in same way
+    experiment_matrix = experiment_matrix.set_index("sample_name").loc[count_matrix.columns, :]
 
-            dds <- DESeq(dds, parallel=TRUE)
-            save(dds, file=paste0(output_prefix, ".deseq_dds_object.Rdata"))
-            # load(paste0(output_prefix, ".deseq_dds_object.Rdata"))
+    # save the matrices just in case
+    count_matrix.to_csv(os.path.join(output_dir, output_prefix + ".count_matrix.tsv"), sep="\t")
+    experiment_matrix.to_csv(os.path.join(output_dir, output_prefix + ".experiment_matrix.tsv"), sep="\t")
+    comparison_table.to_csv(os.path.join(output_dir, output_prefix + ".comparison_table.tsv"), sep="\t")
 
-            # Get group means
-            # get groups with one sample and set mean to the value of that sample
-            single_levels = names(table(colData[, variable])[table(colData[, variable]) == 1])
-            single_levels_values = sapply(
-                single_levels,
-                function(lvl) counts(dds, normalized=TRUE)[, dds[, variable] == lvl]
-            )
-            # all others, get sample means
-            multiple_levels = names(table(colData[, variable])[table(colData[, variable]) > 1])
-            multiple_levels_values = sapply(
-                multiple_levels,
-                function(lvl) rowMeans(counts(dds, normalized=TRUE)[, colData[, variable] == lvl])
-            )
-            group_means = cbind(single_levels_values, multiple_levels_values)
-            rownames(group_means) = rownames(countData)
-            write.table(group_means, paste0(output_prefix, ".", variable, ".group_means.csv"), sep=",")
+    # Run DESeq analysis
+    dds = _DESeqDataSetFromMatrix(
+        countData=count_matrix.astype(int),
+        colData=experiment_matrix,
+        design=_as_formula(formula))
+    dds = _DESeq(dds, parallel=True)
+    # _save(dds, file=os.path.join(output_dir, output_prefix + ".deseq_dds_object.Rdata"))
 
-            # pairwise combinations
-            knockouts = sort(unique(colData[, variable]), descending=FALSE)
-
-            # keep track of output files
-            result_files = list()
-
-            for (i in 1:length(knockouts)) {
-
-                cond1 = as.character(knockouts[i])
-                cond2 = "WT"
-                if (cond1 == cond2){
-                    next
-                }
-                contrast = c(variable, cond1, cond2)
-                print(contrast)
-
-                # get results
-                res <- results(dds, contrast=contrast, alpha=alpha, independentFiltering=FALSE, parallel=TRUE)
-                res <- as.data.frame(res)
-
-                # append group means
-                res <- cbind(group_means, res)
-
-                # append to results
-                comparison_name = paste(cond1, cond2, sep="-")
-                output_name = paste0(output_prefix, ".", variable, ".", comparison_name, ".csv")
-                res["comparison"] = comparison_name
-
-                # coherce to character
-                res = data.frame(lapply(res, as.character), stringsAsFactors=FALSE)
-
-                # add index
-                rownames(res) = rownames(countData)
-
-                write.table(res, output_name, sep=",")
-                result_files[i] = output_name
-            }
-        }
-
-    """)
-
-    # replace names
-    counts_matrix.columns = ["S" + str(i) for i in range(len(counts_matrix.columns))]
-    experiment_matrix.index = ["S" + str(i) for i in range(len(experiment_matrix.index))]
-    experiment_matrix.index.name = "sample"
-
-    # save to disk just in case
-    counts_matrix.to_csv(os.path.join(os.path.dirname(output_prefix), "counts_matrix.csv"), index=True)
-    experiment_matrix.to_csv(os.path.join(os.path.dirname(output_prefix), "experiment_matrix.csv"), index=True)
-
-    result_files = run(counts_matrix, experiment_matrix, variable, " + ".join(covariates) + " + " if len(covariates) > 0 else "", output_prefix, alpha)
-
-    # concatenate all files
-    import glob
-    # result_files = glob.glob(output_prefix + ".*-WT.csv")
-    result_files = glob.glob(output_prefix + "*-*.csv")
     results = pd.DataFrame()
-    for result_file in result_files:
-        df = pd.read_csv(result_file)
-        # df.index = counts_matrix.index
+    for comp in comparison_table["comparison_name"].drop_duplicates().sort_values():
+        out_file = os.path.join(output_dir, output_prefix + ".deseq_result.{}.csv".format(comp))
+        if not overwrite and os.path.exists(out_file):
+            continue
+        print("Doing comparison '{}'".format(comp))
+        a = comparison_table.loc[
+            (comparison_table["comparison_name"] == comp) &
+            (comparison_table["comparison_side"] >= 1),
+            "sample_group"].drop_duplicates().squeeze()
+        b = comparison_table.loc[
+            (comparison_table["comparison_name"] == comp) &
+            (comparison_table["comparison_side"] <= 0),
+            "sample_group"].drop_duplicates().squeeze()
 
-        results = results.append(df)
+        contrast = ["sample_group" + a, "sample_group" + b]
+        res = _as_data_frame(_results(dds, contrast=contrast, alpha=alpha, independentFiltering=False, parallel=True))
+
+        # convert to pandas dataframe
+        res2 = r2pandas_df(res)
+        res2.loc[:, "comparison_name"] = comp
+
+        # save
+        res2.to_csv(out_file)
+        # append
+        results = results.append(res2.reset_index(), ignore_index=True)
 
     # save all
-    results.to_csv(os.path.join(output_prefix + ".%s.csv" % variable), index=True)
+    results.to_csv(os.path.join(output_dir, output_prefix + ".deseq_result.all_comparisons.csv"), index=False)
 
     # return
     return results
+
+
+def differential_analysis(
+        analysis,
+        comparison_table,
+        data_type="ATAC-seq",
+        samples=None,
+        covariates=None,
+        output_dir="results/differential_analysis_{data_type}",
+        output_prefix="differential_analysis",
+        alpha=0.05,
+        overwrite=True):
+    """
+    Discover differential regions/genes across samples that are associated with a certain trait.
+
+    `comparison_table` is a dataframe with 'comparison_name', 'comparison_side' and 'sample_name', 'sample_group' columns.
+    """
+    # Check comparisons
+    # check comparison table has required columns
+    req_attrs = ['comparison_name', 'comparison_side', 'sample_name', 'sample_group']
+    if not all([x in comparison_table.columns for x in req_attrs]):
+        raise AssertionError("Given comparison table does not have all of '{}' columns.".format("', '".join(req_attrs)))
+    # check all comparisons have samples in two sides
+    if not all(comparison_table.groupby("comparison_name")["comparison_side"].nunique() == 2):
+        raise AssertionError("All comparisons must have samples in each side of the comparison.")
+    # check if any comparison and sample group has samples disagreeing in their side
+    if not all(comparison_table.groupby(['comparison_name', "sample_group"])['comparison_side'].nunique() == 1):
+        raise AssertionError("Samples in same comparison and group must agree on their side of the comparison.")
+
+    # Handle samples under analysis
+    if samples is None:
+        samples = analysis.samples
+    samples = [s for s in samples if s.name in comparison_table['sample_name'].tolist()]
+
+    # Make output dir
+    if "{data_type}" in output_dir:
+        output_dir = output_dir.format(data_type=data_type)
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
+    # Get matrix and samples
+    if data_type == "ATAC-seq":
+        count_matrix = analysis.coverage
+    elif data_type == "RNA-seq":
+        count_matrix = analysis.expression_matrix_counts
+    else:
+        raise AssertionError("Given data type does not match 'ATAC-seq' or 'RNA-seq'.")
+
+    if samples is None:
+        samples = analysis.samples
+    samples = [s for s in samples if 
+        (s.name in comparison_table['sample_name'].tolist()) &
+        (s.name in count_matrix.columns)
+    ]
+    count_matrix = count_matrix[[s.name for s in samples]]
+
+    # Get experiment matrix
+    # by getting any other relevant covariates as required
+    if covariates is not None:
+        sample_table = pd.DataFrame([s.as_series() for s in samples])
+        # check all covariates are in the samples and none is null
+        if not all([x in sample_table.columns for x in covariates]):
+            raise AssertionError("Not all of the specified covariate variables are in the selected samples.")
+        if sample_table[covariates].isnull().any().any():
+            raise AssertionError("None of the selected samples can have a Null value in the specified covariate variables.")
+    
+        # add covariates to comparison table
+        comparison_table = comparison_table.set_index("sample_name").join(sample_table.set_index("sample_name")[covariates]).reset_index()
+
+    # Make table for DESeq2
+    experiment_matrix = comparison_table[
+        ["sample_name", "sample_group"] + (covariates if covariates is not None else [])
+    ].drop_duplicates()
+
+    # Make formula for DESeq2
+    formula = "~ {}sample_group".format(" + ".join(covariates) + " + " if covariates is not None else "")
+
+    # Run DESeq2 analysis
+    results = deseq_analysis(
+        count_matrix, experiment_matrix, comparison_table,
+        formula, output_dir, output_prefix, alpha=alpha, overwrite=overwrite)
+
+    return results
+
+
+def plot_differential(
+        analysis,
+        results,
+        comparison_table,
+        samples=None,
+        data_type="ATAC-seq",
+        alpha=0.05,
+        corrected_p_value=True,
+        fold_change=None,
+        output_dir="results/differential_analysis_{data_type}",
+        output_prefix="differential_analysis"):
+    """
+    Discover differential regions across samples that are associated with a certain trait.
+    """
+    req_attrs = ["log2FoldChange", "pvalue", "padj", "comparison_name"]
+    if not all([x in results.columns for x in req_attrs]):
+        raise AssertionError("Results dataframe must have '{}' columns.".format(", ".join(req_attrs)))
+
+    # Extract significant based on p-value and fold-change
+    if fold_change is not None:
+        fc = (abs(results["log2FoldChange"]) > fold_change)
+    else:
+        fc = [True] * results.shape[0]
+    if corrected_p_value:
+        p_var = "padj"
+    else:
+        p_var = "pvalue"
+    results.loc[(results[p_var] < alpha) & fc, "diff"] = True
+    results.loc[:, "diff"] = results.loc[:, "diff"].fillna(False)
+
+    # Annotate direction of change
+    results.loc[:, "direction"] = results.loc[:, "log2FoldChange"].apply(lambda x: "up" if x >= 0 else "down")
+
+    if results.loc[:, "diff"].sum() < 1:
+        print("No significantly different regions found in any comparison.")
+        return
+
+    # Make output dir
+    if "{data_type}" in output_dir:
+        output_dir = output_dir.format(data_type=data_type)
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
+    # Get matrix and samples
+    if data_type == "ATAC-seq":
+        matrix = analysis.accessibility
+        results.index.name = "region"
+        var_name = "region"
+        quantity = "Accessibility"
+        unit = "RPM"
+    elif data_type == "RNA-seq":
+        matrix = analysis.expression
+        results.index.name = "gene_name"
+        var_name = "gene"
+        quantity = "Expression"
+        unit = "TPM"
+    else:
+        raise AssertionError("Given data type does not match 'ATAC-seq' or 'RNA-seq'.")
+
+    if samples is None:
+        samples = analysis.samples
+    samples = [s for s in samples if 
+        (s.name in comparison_table['sample_name'].tolist()) &
+        (s.name in matrix.columns)
+    ]
+    matrix = matrix[[s.name for s in samples]]
+
+    # PLOTS
+    comparisons = sorted(results["comparison_name"].drop_duplicates())
+    n_side = int(np.ceil(np.sqrt(len(comparisons))))
+
+    # P-value distributions
+    fig, axis = plt.subplots(1, 1, figsize=(4, 4))
+    sns.distplot(results["pvalue"].dropna(), kde=False, ax=axis)
+    axis.set_xlabel("P-value")
+    axis.set_ylabel("Frequency")
+    sns.despine(fig)
+    fig.savefig(os.path.join(output_dir, output_prefix + ".pvalue_distribution.svg"), bbox_inches="tight")
+    # per comparison
+    g = sns.FacetGrid(data=results, col="comparison_name", col_wrap=n_side)
+    g.map(sns.distplot, "pvalue", kde=False)
+    for ax in g.axes:
+        ax.set_xlabel("P-value")
+        ax.set_ylabel("Frequency")
+    sns.despine(g.fig)
+    g.fig.savefig(os.path.join(output_dir, output_prefix + ".pvalue_distribution.per_comparison.svg"), bbox_inches="tight")
+
+    # Number of differential vars
+    n_vars = float(matrix.shape[0])
+    total_diff = results.groupby(["comparison_name"])['diff'].sum().sort_values(ascending=False)
+    split_diff = results.groupby(["comparison_name", "direction"])['diff'].sum().sort_values(ascending=False)
+    fig, axis = plt.subplots(2, 2, figsize=(4 * 2, 4* 2))
+    sns.barplot(total_diff.values, total_diff.index, orient="h", ax=axis[0][0])
+    sns.barplot((total_diff.values / n_vars) * 100, total_diff.index, orient="h", ax=axis[0][1])
+    sns.barplot(split_diff.values, split_diff.index, orient="h", ax=axis[1][0])
+    sns.barplot((split_diff.values / n_vars) * 100, split_diff.index, orient="h", ax=axis[1][1])
+    axis[0][0].set_xlabel("N. diff")
+    axis[0][1].set_xlabel("N. diff (% of total)")
+    axis[1][0].set_xlabel("N. diff")
+    axis[1][1].set_xlabel("N. diff (% of total)")
+    fig.savefig(os.path.join(output_dir, output_prefix + ".number_differential.svg"), bbox_inches="tight")
+
+    # Pairwise scatter plots
+    fig, axes = plt.subplots(n_side, n_side, figsize=(n_side * 4, n_side * 4), sharex=True, sharey=True)
+    if n_side > 1 or n_side > 1:
+        axes = iter(axes.flatten())
+    else:
+        axes = iter([axes])
+    for comparison in comparisons:
+        c = comparison_table[comparison_table["comparison_name"] == comparison]
+        a = c.loc[c['comparison_side'] >= 1, "sample_name"]
+        b = c.loc[c['comparison_side'] <= 0, "sample_name"]
+
+        a = matrix[[s.name for s in samples if s.name in a.tolist() and s.library == data_type]].mean(axis=1)
+        b = matrix[[s.name for s in samples if s.name in b.tolist() and s.library == data_type]].mean(axis=1)
+
+        # Hexbin plot
+        ax = axes.next()
+        ax.hexbin(b, a, alpha=0.85, color="black", edgecolors="white", linewidths=0, bins='log', mincnt=1, rasterized=True)
+
+        # Scatter for significant
+        diff_vars = results[(results["comparison_name"] == comparison) & (results["diff"] == True)].index
+        if diff_vars.shape[0] > 0:
+            ax.scatter(b.loc[diff_vars], a.loc[diff_vars], alpha=0.1, color="red", s=2)
+        ax.set_title(comparison)
+        ax.set_xlabel("Down")
+        ax.set_ylabel("Up")
+        # x = y square
+        lims = [np.min([ax.get_xlim(), ax.get_ylim()]), np.max([ax.get_xlim(), ax.get_ylim()])]
+        ax.plot(lims, lims, linestyle='--', alpha=0.5, zorder=0, color="black")
+        ax.set_aspect('equal')
+        ax.set_xlim(lims)
+        ax.set_ylim(lims)
+    for ax in axes:
+        ax.set_visible(False)
+    sns.despine(fig)
+    fig.savefig(os.path.join(output_dir, output_prefix + ".scatter_plots.svg"), bbox_inches="tight", dpi=300)
+
+    # Volcano plots
+    fig, axes = plt.subplots(n_side, n_side, figsize=(n_side * 4, n_side * 4), sharex=False, sharey=False)
+    if n_side > 1 or n_side > 1:
+        axes = iter(axes.flatten())
+    else:
+        axes = iter([axes])
+    for comparison in comparisons:
+        t = results.loc[results["comparison_name"] == comparison, :]
+
+        # Hexbin plot
+        ax = axes.next()
+        ax.hexbin(
+            t["log2FoldChange"], -np.log10(t["pvalue"]),
+            alpha=0.85, color="black", edgecolors="white", linewidths=0, bins='log', mincnt=1, rasterized=True)
+
+        # Scatter for significant
+        diff_vars = t[t["diff"] == True].index
+        if diff_vars.shape[0] > 0:
+            ax.scatter(t.loc[diff_vars, "log2FoldChange"], -np.log10(t.loc[diff_vars, "pvalue"]), alpha=0.1, color="red", s=2)
+        ax.set_title(comparison)
+        ax.set_xlabel("log2(Fold-change)")
+        ax.set_ylabel("-log10(P-value)")
+        ax.axvline(0, linestyle='--', alpha=0.5, zorder=0, color="black")
+        l = np.max([abs(i) for i in ax.get_xlim()])
+        ax.set_xlim(-l, l)
+
+        # Add lines of significance
+        ax.axhline(-np.log10(t.loc[t["diff"] == True, p_var].max()), linestyle='--', alpha=0.5, zorder=0, color="black")
+        if fold_change is not None:
+            ax.axvline(-fold_change, linestyle='--', alpha=0.5, zorder=0, color="black")
+            ax.axvline(fold_change, linestyle='--', alpha=0.5, zorder=0, color="black")
+    for ax in axes:
+        ax.set_visible(False)
+    sns.despine(fig)
+    fig.savefig(os.path.join(output_dir, output_prefix + ".volcano_plots.svg"), bbox_inches="tight", dpi=300)
+
+    # MA plots
+    fig, axes = plt.subplots(n_side, n_side, figsize=(n_side * 4, n_side * 4), sharex=False, sharey=False)
+    if n_side > 1 or n_side > 1:
+        axes = iter(axes.flatten())
+    else:
+        axes = iter([axes])
+    for comparison in comparisons:
+        t = results.loc[results["comparison_name"] == comparison, :]
+
+        # Hexbin plot
+        ax = axes.next()
+        ax.hexbin(
+            np.log10(t["baseMean"]), t["log2FoldChange"],
+            alpha=0.85, color="black", edgecolors="white", linewidths=0, bins='log', mincnt=1, rasterized=True)
+
+        # Scatter for significant
+        diff_vars = t[t["diff"] == True].index
+        if diff_vars.shape[0] > 0:
+            ax.scatter(np.log10(t.loc[diff_vars, "baseMean"]), t.loc[diff_vars, "log2FoldChange"], alpha=0.1, color="red", s=2)
+        ax.set_title(comparison)
+        ax.set_xlabel("Amplitude")
+        ax.set_ylabel("log2(Fold-change)")
+        ax.axhline(0, linestyle='--', alpha=0.5, zorder=0, color="black")
+        l = np.max([abs(i) for i in ax.get_ylim()])
+        ax.set_ylim(-l, l)
+
+        # Add lines of significance
+        if fold_change is not None:
+            ax.axhline(-fold_change, linestyle='--', alpha=0.5, zorder=0, color="black")
+            ax.axhline(fold_change, linestyle='--', alpha=0.5, zorder=0, color="black")
+    for ax in axes:
+        ax.set_visible(False)
+    sns.despine(fig)
+    fig.savefig(os.path.join(output_dir, output_prefix + ".ma_plots.svg"), bbox_inches="tight", dpi=300)
+
+    # Observe values of variables across all comparisons
+    all_diff = results[results["diff"] == True].index.drop_duplicates()
+    if type(matrix.columns) is pd.MultiIndex:
+        sample_cols = matrix.columns.get_level_values("sample_name").tolist()
+    else:
+        sample_cols = matrix.columns.tolist()
+    groups = pd.DataFrame()
+    for sample_group in comparison_table["sample_group"].drop_duplicates():
+        c = comparison_table.loc[comparison_table["sample_group"] == sample_group, "sample_name"].drop_duplicates()
+        groups.loc[:, sample_group] = matrix[[d for d in c if d in sample_cols]].mean(axis=1)
+
+    # Heatmaps
+    # Comparison level
+    g = sns.clustermap(
+        groups.corr(),
+        xticklabels=False, cbar_kws={"label": "Pearson correlation\non differential {}".format(var_name)},
+        cmap="Spectral_r", metric="correlation", rasterized=True)
+    g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0)
+    g.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.groups.clustermap.corr.svg".format(var_name)), bbox_inches="tight", dpi=300, metric="correlation")
+
+    g = sns.clustermap(
+        groups.loc[all_diff, :],
+        yticklabels=False, cbar_kws={"label": "{} of\ndifferential {}".format(quantity, var_name)},
+         cmap="BuGn", metric="correlation", rasterized=True)
+    g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90)
+    g.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.groups.clustermap.svg".format(var_name)), bbox_inches="tight", dpi=300)
+
+    g = sns.clustermap(
+        groups.loc[all_diff, :],
+        yticklabels=False, z_score=0, cbar_kws={"label": "Z-score of {}\non differential {}".format(quantity, var_name)},
+        metric="correlation", rasterized=True)
+    g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90)
+    g.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.groups.clustermap.z0.svg".format(var_name)), bbox_inches="tight", dpi=300)
+
+    # Fold-changes and P-values
+    # pivot table of genes vs comparisons
+    fold_changes = pd.pivot_table(results.loc[all_diff, :].reset_index(), index=results.index.name, columns="comparison_name", values="log2FoldChange")
+    p_values = -np.log10(pd.pivot_table(results.loc[all_diff, :].reset_index(), index=results.index.name, columns="comparison_name", values="padj"))
+
+    # fold
+    if fold_changes.shape[1] > 1:
+        g = sns.clustermap(fold_changes.corr(),
+            xticklabels=False, cbar_kws={"label": "Pearson correlation\non fold-changes"},
+            cmap="Spectral_r", vmin=0, vmax=1, metric="correlation", rasterized=True)
+        g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0)
+        g.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.groups.fold_changes.clustermap.corr.svg".format(var_name)), bbox_inches="tight", dpi=300, metric="correlation")
+
+        g = sns.clustermap(fold_changes.loc[all_diff, :],
+            yticklabels=False, cbar_kws={"label": "Fold-change of\ndifferential {}".format(var_name)},
+            vmin=-4, vmax=4, metric="correlation", rasterized=True)
+        g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90)
+        g.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.groups.fold_changes.clustermap.svg".format(var_name)), bbox_inches="tight", dpi=300)
+
+    # Sample level
+    g = sns.clustermap(matrix.loc[all_diff, :].corr(),
+        xticklabels=False, cbar_kws={"label": "Pearson correlation\non differential {}"},
+        cmap="Spectral_r", metric="correlation", rasterized=True)
+    g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0)
+    g.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.samples.clustermap.corr.svg".format(var_name)), bbox_inches="tight", dpi=300)
+
+    g = sns.clustermap(matrix.loc[all_diff, :],
+        yticklabels=False, cbar_kws={"label": "{} of\ndifferential {}".format(quantity, var_name)},
+        cmap="BuGn", vmin=0, metric="correlation", rasterized=True)
+    g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90)
+    g.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.samples.clustermap.svg".format(var_name)), bbox_inches="tight", dpi=300)
+
+    g = sns.clustermap(matrix.loc[all_diff, :],
+        yticklabels=False, z_score=0, cbar_kws={"label": "Z-score of {}\non differential {}".format(quantity, var_name)}, metric="correlation", rasterized=True)
+    g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90)
+    g.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.samples.clustermap.z0.svg".format(var_name)), bbox_inches="tight", dpi=300)
 
 
 def lola(bed_files, universe_file, output_folder):

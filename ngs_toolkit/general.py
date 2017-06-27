@@ -281,6 +281,119 @@ def differential_analysis(
     return results
 
 
+def differential_overlap(
+        differential,
+        data_type="ATAC-seq",
+        output_dir="results/differential_analysis_{data_type}",
+        output_prefix="differential_analysis"
+    ):
+    """
+    Visualize intersection of sets of differential regions/genes.
+    """
+    import itertools
+
+    if "{data_type}" in output_dir:
+        output_dir = output_dir.format(data_type=data_type)
+
+    if data_type == "ATAC-seq":
+        unit = "region"
+    elif data_type == "RNA-seq":
+        unit = "gene"
+
+    if "direction" not in differential.columns:
+        differential["direction"] = differential["log2FoldChange"].apply(lambda x: "up" if x > 0 else "down")
+
+    differential.index.name = "index"
+    differential["intersect"] = 1
+    piv = pd.pivot_table(differential.reset_index(), index='index', columns=['comparison_name', 'direction'], values='intersect', fill_value=0)
+
+    intersections = pd.DataFrame(columns=["group1", "group2", "dir1", "dir2", "size1", "size2", "intersection", "union"])
+    for ((k1, dir1), i1), ((k2, dir2), i2) in itertools.permutations(piv.T.groupby(level=['comparison_name', 'direction']).groups.items(), 2):
+        print(k1, k2)
+        i1 = set(piv[i1][piv[i1] == 1].dropna().index)
+        i2 = set(piv[i2][piv[i2] == 1].dropna().index)
+        intersections = intersections.append(
+            pd.Series(
+                [k1, k2, dir1, dir2, len(i1), len(i2), len(i1.intersection(i2)), len(i1.union(i2))],
+                index=["group1", "group2", "dir1", "dir2", "size1", "size2", "intersection", "union"]
+            ),
+            ignore_index=True
+        )
+    # convert to %
+    intersections['intersection'] = intersections['intersection'].astype(float)
+    intersections['intersection_perc'] = ((intersections['intersection'] / intersections['size2']) * 100.).astype(float)
+
+    # save
+    intersections.to_csv(os.path.join(output_dir, output_prefix + ".differential_overlap.csv"), index=False)
+
+    # make pivot tables
+    piv_up = pd.pivot_table(
+        intersections[(intersections['dir1'] == "up") & (intersections['dir2'] == "up")],
+        index="group1", columns="group2", values="intersection_perc").fillna(0)
+    piv_down = pd.pivot_table(
+        intersections[(intersections['dir1'] == "down") & (intersections['dir2'] == "down")],
+        index="group1", columns="group2", values="intersection_perc").fillna(0)
+    np.fill_diagonal(piv_up.values, np.nan)
+    np.fill_diagonal(piv_down.values, np.nan)
+
+    # heatmaps
+    fig, axis = plt.subplots(1, 2, figsize=(8 * 2, 8))
+    sns.heatmap(piv_down, square=True, cmap="summer", cbar_kws={"label": "Concordant {}s (% of group 2)".format(unit)}, ax=axis[0])
+    sns.heatmap(piv_up, square=True, cmap="summer", cbar_kws={"label": "Concordant {}s (% of group 2)".format(unit)}, ax=axis[1])
+    axis[0].set_title("Downregulated {}s".format(unit))
+    axis[1].set_title("Upregulated {}s".format(unit))
+    axis[0].set_xticklabels(axis[0].get_xticklabels(), rotation=90, ha="right")
+    axis[1].set_xticklabels(axis[1].get_xticklabels(), rotation=90, ha="right")
+    axis[0].set_yticklabels(axis[0].get_yticklabels(), rotation=0, ha="right")
+    axis[1].set_yticklabels(axis[1].get_yticklabels(), rotation=0, ha="right")
+    fig.savefig(os.path.join(output_dir, output_prefix + ".differential_overlap.up_down_split.svg"), bbox_inches="tight")
+
+    # combined heatmap
+    # with upregulated {}s in upper square matrix and downredulated in down square
+    piv_combined = pd.DataFrame(np.triu(piv_up), index=piv_up.index, columns=piv_up.columns).replace(0, np.nan)
+    piv_combined.update(pd.DataFrame(np.tril(piv_down), index=piv_down.index, columns=piv_down.columns).replace(0, np.nan))
+    piv_combined = piv_combined.fillna(0)
+    np.fill_diagonal(piv_combined.values, np.nan)
+
+    fig, axis = plt.subplots(1, figsize=(8, 8))
+    sns.heatmap(piv_combined, square=True, cmap="summer", cbar_kws={"label": "Concordant {}s (% of group 2)".format(unit)}, ax=axis)
+    axis.set_xticklabels(axis.get_xticklabels(), rotation=90, ha="right")
+    axis.set_yticklabels(axis.get_yticklabels(), rotation=0, ha="right")
+    fig.savefig(os.path.join(output_dir, output_prefix + ".differential_overlap.up_down_together.svg"), bbox_inches="tight")
+
+    # Observe disagreement between knockouts
+    # (overlap of down-regulated with up-regulated and vice-versa)
+    piv_up = pd.pivot_table(
+        intersections[(intersections['dir1'] == "up") & (intersections['dir2'] == "down")],
+        index="group1", columns="group2", values="intersection")
+    piv_down = pd.pivot_table(
+        intersections[(intersections['dir1'] == "down") & (intersections['dir2'] == "up")],
+        index="group1", columns="group2", values="intersection")
+
+    piv_disagree = pd.concat([piv_up, piv_down]).groupby(level=0).max()
+
+    fig, axis = plt.subplots(1, 2, figsize=(16, 8))
+    sns.heatmap(piv_disagree, square=True, cmap="Greens", cbar_kws={"label": "Discordant {}s".format(unit).format(unit)}, ax=axis[0])
+    sns.heatmap(np.log2(1 + piv_disagree), square=True, cmap="Greens", cbar_kws={"label": "Discordant {}s (log2)".format(unit)}, ax=axis[1])
+
+    norm = matplotlib.colors.Normalize(vmin=0, vmax=piv_disagree.max().max())
+    cmap = plt.get_cmap("Greens")
+    log_norm = matplotlib.colors.Normalize(vmin=0, vmax=np.log2(1 + piv_disagree).max().max())
+    for i, g1 in enumerate(piv_disagree.columns):
+        for j, g2 in enumerate(piv_disagree.index):
+            axis[0].scatter(
+                len(piv_disagree.index) - (j + 0.5), len(piv_disagree.index) - (i + 0.5),
+                s=(100 ** (norm(piv_disagree.loc[g1, g2]))) - 1, color=cmap(norm(piv_disagree.loc[g1, g2])), marker="o")
+            axis[1].scatter(
+                len(piv_disagree.index) - (j + 0.5), len(piv_disagree.index) - (i + 0.5),
+                s=(100 ** (log_norm(np.log2(1 + piv_disagree).loc[g1, g2]))) - 1, color=cmap(log_norm(np.log2(1 + piv_disagree).loc[g1, g2])), marker="o")
+
+    for ax in axis:
+        ax.set_xticklabels(ax.get_xticklabels(), rotation=90, ha="right")
+        ax.set_yticklabels(ax.get_yticklabels(), rotation=0, ha="right")
+    fig.savefig(os.path.join(output_dir, output_prefix + ".differential_overlap.disagreement.svg"), bbox_inches="tight")
+
+
 def plot_differential(
         analysis,
         results,
@@ -557,7 +670,8 @@ def plot_differential(
     g.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.samples.clustermap.svg".format(var_name)), bbox_inches="tight", dpi=300)
 
     g = sns.clustermap(matrix.loc[all_diff, :],
-        yticklabels=False, z_score=0, cbar_kws={"label": "Z-score of {}\non differential {}".format(quantity, var_name)}, metric="correlation", rasterized=True)
+        yticklabels=False, z_score=0, cbar_kws={"label": "Z-score of {}\non differential {}".format(quantity, var_name)},
+        metric="correlation", rasterized=True)
     g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90)
     g.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.samples.clustermap.z0.svg".format(var_name)), bbox_inches="tight", dpi=300)
 
@@ -737,6 +851,406 @@ def enrichr(dataframe, gene_set_libraries=None, kind="genes"):
         results = results.append(res, ignore_index=True)
 
     return results
+
+
+def differential_enrichment(
+        analysis,
+        differential,
+        data_type="ATAC-seq",
+        output_dir="results/differential_analysis_{data_type}",
+        output_prefix="differential_analysis",
+        max_diff=1000,
+        sort_var="pvalue",
+        as_job=True
+    ):
+    """
+    Given a dataframe of the results of differential analysis
+    (containing "comparison_name" and "log2FoldChange" columns),
+    will get enrichment of gene sets, regions and TF motifs according
+    to the `data_type`.
+
+    At most will use `max_diff` regions/genes in each comparison sorted by `sort_var`.
+    """
+    if data_type == "ATAC-seq":
+        from ngs_toolkit.atacseq import characterize_regions_function
+        matrix = analysis.coverage_annotated
+        lola_enr = pd.DataFrame()
+        meme_enr = pd.DataFrame()
+        pathway_enr = pd.DataFrame()
+    elif data_type == "RNA-seq":
+        from ngs_toolkit.general import enrichr
+        matrix = analysis.expression
+        pathway_enr = pd.DataFrame()
+    else:
+        raise AssertionError("`data_type` must match one of 'ATAC-seq' or 'RNA-seq'.")
+
+    if "{data_type}" in output_dir:
+        output_dir = output_dir.format(data_type=data_type)
+
+    # Examine each region cluster
+    max_diff = 1000
+    for comp in differential['comparison_name'].drop_duplicates():
+        # Separate in up/down-regulated genes
+        for f, direction, top in [(np.less, "down", "head"), (np.greater, "up", "tail")]:
+            diff = differential.loc[
+                (differential["comparison_name"] == comp) &
+                (f(differential["log2FoldChange"], 0)), :].index
+
+            # Handle extremes of regions
+            if diff.shape[0] < 1:
+                continue
+            if diff.shape[0] > max_diff:
+                diff = (
+                    getattr(
+                        differential[
+                            (differential["comparison_name"] == comp) &
+                            (f(differential["log2FoldChange"], 0))]
+                        [sort_var].sort_values(), top)
+                    (max_diff).index)
+
+            # Add data_type specific info
+            comparison_df = matrix.loc[diff, :]
+
+            # Characterize
+            comparison_dir = os.path.join(output_dir, "{}.{}".format(comp, direction))
+            if not os.path.exists(comparison_dir):
+                os.makedirs(comparison_dir)
+
+            if data_type == "RNA-seq":
+                print("Doing genes of comparison '{}', direction '{}'.".format(comp, direction))
+                comparison_df.index.name = "gene_name"
+                if not os.path.exists(os.path.join(comparison_dir, output_prefix + ".enrichr.csv")):
+                    comparison_df.reset_index()[['gene_name']].drop_duplicates().to_csv(os.path.join(comparison_dir, output_prefix + ".gene_symbols.txt"), header=None, index=False)
+                    enr = enrichr(comparison_df.reset_index())
+                    enr.to_csv(os.path.join(comparison_dir, output_prefix + ".enrichr.csv"), index=False)
+                else:
+                    enr = pd.read_csv(os.path.join(comparison_dir, output_prefix + ".enrichr.csv"))
+                    enr["comparison_name"] = prefix
+                    pathway_enr = pathway_enr.append(enr, ignore_index=True)
+            else:
+                print("Doing regions of comparison '{}', direction '{}'.".format(comp, direction))
+                # run
+                characterize_regions_function(analysis, comparison_df, output_dir=comparison_dir, prefix=output_prefix)
+                # read/parse
+                motifs = parse_ame(comparison_dir)
+                lola = pd.read_csv(os.path.join(comparison_dir, "allEnrichments.txt"), sep="\t")
+                enr = pd.read_csv(os.path.join(comparison_dir, output_prefix + "_regions.enrichr.csv"), index=False, encoding='utf-8')
+                # label
+                for d in [lola, enr, motifs]:
+                    d["comparison_name"] = comp
+                    d["direction"] = direction
+                    d["label"] = "{}.{}".format(comp, direction)
+                # append
+                meme_enr = meme_enr.append(motifs, ignore_index=True)
+                lola_enr = lola_enr.append(lola, ignore_index=True)
+                pathway_enr = pathway_enr.append(enr, ignore_index=True)
+
+    # write combined enrichments
+    pathway_enr.to_csv(
+        os.path.join(output_dir, output_prefix + ".enrichr.csv"), index=False)
+    if data_type == "ATAC-seq":
+        meme_enr.to_csv(
+            os.path.join(output_dir, output_prefix + ".meme_ame.csv"), index=False)
+        lola.to_csv(
+            os.path.join(output_dir, output_prefix + ".lola.csv"), index=False)
+
+    # # Run LOLA
+    # for F in `find results -name "*_regions.bed"`
+    # do
+    # DIR=`dirname $F`
+    # if [ ! -f $F/allEnrichments.txt ]; then
+    # sbatch -J lola.$F -o $F.lola.log -p shortq -c 8 --mem 24000 \
+    # --wrap "Rscript ~/jobs/run_LOLA.R $F ~/cll-time_course/results/cll-time_course_peak_set.bed hg19"
+    # fi
+    # done
+
+    # # Run AME
+    # for F in `find results -name "*_regions.fa"`
+    # do
+    # DIR=`dirname $F`
+    # if [ ! -f $DIR/ame.html ]; then
+    # echo $F $DIR
+    # sbatch -J "meme_ame.${F}" -o "${F}.meme_ame.log" -p shortq -c 1 --mem 4000 \
+    # --wrap "fasta-dinucleotide-shuffle -c 1 -f "$F" > "$F".shuffled.fa; \
+    # ame --bgformat 1 --scoring avg --method ranksum --pvalue-report-threshold 0.05 \
+    # --control "$F".shuffled.fa -o "$DIR" "$F" ~/resources/motifs/motif_databases/HUMAN/HOCOMOCOv10.meme"
+    # fi
+    # done
+
+    # # Run Enrichr
+    # for F in `find results -name "*symbols.txt"`
+    # do
+    # if [ ! -f $F.enrichr.csv ]; then
+    # echo $F
+    # sbatch -J enrichr.$F -o $F.enrichr.log -p shortq -c 1 --mem 4000 \
+    # --wrap "python ~/jobs/run_Enrichr.py --input-file "$F" --output-file "$F".enrichr.csv"
+    # fi
+    # done
+
+
+def collect_differential_enrichment(
+        differential,
+        data_type="ATAC-seq",
+        output_dir="results/differential_analysis_{data_type}",
+        output_prefix="differential_analysis",
+        permissive=True):
+    """
+    Collect the results of enrichment analysis ran after a differential analysis.
+    `differential` is a dataframe of the various comparisons with columns "comparison_name" and "direction".
+
+    If `permissive`, will skip non-existing files, giving a warning.
+    """
+    from ngs_toolkit.general import parse_ame
+
+    if data_type not in ["ATAC-seq", "RNA-seq"]:
+        raise AssertionError("`data_type` must match one of 'ATAC-seq' or 'RNA-seq'.")
+
+    if "{data_type}" in output_dir:
+        output_dir = output_dir.format(data_type=data_type)
+
+    error_msg = "{} results for comparison '{}', direction '{}' were not found!"
+
+    lola_enr = pd.DataFrame()
+    meme_enr = pd.DataFrame()
+    pathway_enr = pd.DataFrame()
+    # Examine each region cluster
+    for comp in differential['comparison_name'].drop_duplicates():
+        # Separate in up/down-regulated genes
+        for f, direction, top in [(np.less, "down", "head"), (np.greater, "up", "tail")]:
+            comparison_dir = os.path.join(output_dir, "{}.{}".format(comp, direction))
+
+            if data_type == "RNA-seq":
+                # print("Collecting enrichments of comparison '{}', direction '{}'.".format(comp, direction))
+                try:
+                    enr = pd.read_csv(os.path.join(comparison_dir, output_prefix + ".gene_symbols.txt.enrichr.csv"))
+                except IOError as e:
+                    if permissive:
+                        print(error_msg.format("Enrichr", comp, direction))
+                    else:
+                        raise e
+                else:
+                    enr["comparison_name"] = comp
+                    enr["direction"] = direction
+                    pathway_enr = pathway_enr.append(enr, ignore_index=True)
+            elif data_type == "ATAC-seq":
+                # print("Collecting enrichments of comparison '{}', direction '{}'.".format(comp, direction))
+                # read/parse
+                try:
+                    motifs = parse_ame(comparison_dir).reset_index()
+                    motifs.columns = ["TF", "p_value"]
+                except IOError as e:
+                    if permissive:
+                        print(error_msg.format("Motif", comp, direction))
+                    else:
+                        raise e
+                else:
+                    motifs["comparison_name"] = comp
+                    motifs["direction"] = direction
+                    meme_enr = meme_enr.append(motifs, ignore_index=True)
+
+                # LOLA
+                try:
+                    lola = pd.read_csv(os.path.join(comparison_dir, "allEnrichments.txt"), sep="\t")
+                except IOError as e:
+                    if permissive:
+                        print(error_msg.format("LOLA", comp, direction))
+                    else:
+                        raise e
+                else:
+                    lola["comparison_name"] = comp
+                    lola["direction"] = direction
+                    lola_enr = lola_enr.append(lola, ignore_index=True)
+
+                # ENRICHR
+                try:
+                    enr = pd.read_csv(os.path.join(comparison_dir, output_prefix + "_genes.symbols.txt.enrichr.csv"))
+                except IOError as e:
+                    if permissive:
+                        print(error_msg.format("Enrichr", comp, direction))
+                    else:
+                        raise e
+                else:
+                    enr["comparison_name"] = comp
+                    enr["direction"] = direction
+                    pathway_enr = pathway_enr.append(enr, ignore_index=True)
+    # write combined enrichments
+    pathway_enr.to_csv(
+        os.path.join(output_dir, output_prefix + ".enrichr.csv"), index=False)
+    if data_type == "ATAC-seq":
+        meme_enr.to_csv(
+            os.path.join(output_dir, output_prefix + ".meme_ame.csv"), index=False)
+        lola_enr.to_csv(
+            os.path.join(output_dir, output_prefix + ".lola.csv"), index=False)
+
+
+def plot_differential_enrichment(
+        enrichment_table,
+        enrichment_type,
+        data_type="ATAC-seq",
+        direction_dependent=True,
+        output_dir="results/differential_analysis_{data_type}",
+        output_prefix="differential_analysis",
+        top_n=5, method="groups"):
+    """
+    Given a table of enrichment terms across several comparisons, produce
+    plots illustrating these enrichments in the various comparisons.
+
+    `enrichment_type` is one of 'lola', 'enrichr', 'motif'.
+    """
+    if enrichment_type not in ["lola", "enrichr", "motif"]:
+        raise AssertionError("`enrichment_type` must be one of 'lola', 'enrichr', 'motif'.")
+
+    if "{data_type}" in output_dir:
+        output_dir = output_dir.format(data_type=data_type)
+
+    if "direction" in enrichment_table.columns and direction_dependent:
+        enrichment_table["comparison_name"] = enrichment_table["comparison_name"].astype(str) + " " + enrichment_table["direction"].astype(str)
+
+    if enrichment_type == "lola":
+        # get a unique label for each lola region set
+        enrichment_table["label"] = (
+            enrichment_table["description"].astype(str) + ", " +
+            enrichment_table["cellType"].astype(str) + ", " +
+            enrichment_table["tissue"].astype(str) + ", " +
+            enrichment_table["antibody"].astype(str) + ", " +
+            enrichment_table["treatment"].astype(str))
+        enrichment_table["label"] = (
+            enrichment_table["label"]
+            .str.replace("nan", "").str.replace("None", "")
+            .str.replace(", , ", "").str.replace(", $", ""))
+
+        # Plot top_n terms of each comparison in barplots
+        top_data = enrichment_table.set_index("label").groupby("comparison_name")["pValueLog"].nlargest(n_top).reset_index()
+
+        n = len(enrichment_table["comparison_name"].drop_duplicates())
+        n_side = int(np.ceil(np.sqrt(n)))
+        g = sns.FacetGrid(data=top_data, col="comparison_name", col_wrap=n_side, sharex=False, sharey=False)
+        g.map(sns.barplot, "pValueLog", "label", orient="horizontal")
+        g.savefig(os.path.join(output_dir, output_prefix + ".lola.barplot.top_{}.svg".format(top_n)), bbox_inches="tight", dpi=300)
+
+        # Plot heatmaps of terms for each comparison
+        if len(enrichment_table["comparison_name"].drop_duplicates()) < 2:
+            return
+
+        # pivot table
+        lola_pivot = pd.pivot_table(enrichment_table,
+            values="pValueLog", columns="comparison_name", index="label").fillna(0)
+
+        # plot correlation
+        g = sns.clustermap(lola_pivot.corr(), cbar_kws={"label": "Correlation of enrichemnt\nof differential regions"})
+        g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90)
+        g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0)
+        g.fig.savefig(os.path.join(output_dir, output_prefix + ".lola.correlation.svg"), bbox_inches="tight", dpi=300)
+
+        top = enrichment_table.set_index('label').groupby("comparison_name")['pValueLog'].nlargest(top_n)
+        top_terms = top.index.get_level_values('label').unique()
+
+        # plot clustered heatmap
+        g = sns.clustermap(lola_pivot.loc[top_terms, :], figsize=(20, 12), cbar_kws={"label": "-log10(p-value) of enrichment\nof differential regions"}, metric="correlation")
+        g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90, ha="right")
+        g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0)
+        g.fig.savefig(os.path.join(output_dir, output_prefix + ".lola.cluster_specific.svg"), bbox_inches="tight", dpi=300)
+
+        # plot clustered heatmap
+        g = sns.clustermap(lola_pivot.loc[top_terms, :], figsize=(20, 12), z_score=1, cbar_kws={"label": "Z-score of enrichment\nof differential regions"}, metric="correlation")
+        g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90, ha="right")
+        g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0)
+        g.fig.savefig(os.path.join(output_dir, output_prefix + ".lola.cluster_specific.z_score.svg"), bbox_inches="tight", dpi=300)
+
+    if enrichment_type == "motif":
+        enrichment_table["log_p_value"] = (-np.log10(enrichment_table["p_value"])).replace({np.inf: 300})
+        # Plot top_n terms of each comparison in barplots
+        top_data = enrichment_table.set_index("TF").groupby("comparison_name")["log_p_value"].nlargest(n_top).reset_index()
+
+        n = len(enrichment_table["comparison_name"].drop_duplicates())
+        n_side = int(np.ceil(np.sqrt(n)))
+        g = sns.FacetGrid(data=top_data, col="comparison_name", col_wrap=n_side, sharex=False, sharey=False)
+        g.map(sns.barplot, "log_p_value", "TF", orient="horizontal")
+        g.savefig(os.path.join(output_dir, output_prefix + ".motifs.barplot.top_{}.svg".format(top_n)), bbox_inches="tight", dpi=300)
+
+        # Plot heatmaps of terms for each comparison
+        if len(enrichment_table["comparison_name"].drop_duplicates()) < 2:
+            return
+
+        # pivot table
+        motifs_pivot = pd.pivot_table(enrichment_table,
+            values="log_p_value", columns="comparison_name", index="TF").fillna(0)
+
+        # plot correlation
+        g = sns.clustermap(motifs_pivot.corr(), cbar_kws={"label": "Correlation of enrichemnt\nof differential regions"})
+        g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90)
+        g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0)
+        g.fig.savefig(os.path.join(output_dir, output_prefix + ".motifs.correlation.svg"), bbox_inches="tight", dpi=300)
+
+        top = enrichment_table.set_index('TF').groupby("comparison_name")['log_p_value'].nlargest(top_n)
+        top_terms = top.index.get_level_values('TF').unique()
+
+        # plot clustered heatmap
+        g = sns.clustermap(motifs_pivot.loc[top_terms, :], figsize=(20, 12), cbar_kws={"label": "-log10(p-value) of enrichment\nof differential regions"}, metric="correlation")
+        g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90, ha="right")
+        g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0)
+        g.fig.savefig(os.path.join(output_dir, output_prefix + ".motifs.cluster_specific.svg"), bbox_inches="tight", dpi=300)
+
+        # plot clustered heatmap
+        g = sns.clustermap(motifs_pivot.loc[top_terms, :], figsize=(20, 12), z_score=1, cbar_kws={"label": "Z-score of enrichment\nof differential regions"}, metric="correlation")
+        g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90, ha="right")
+        g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0)
+        g.fig.savefig(os.path.join(output_dir, output_prefix + ".motifs.cluster_specific.z_score.svg"), bbox_inches="tight", dpi=300)
+
+    if enrichment_type == "enrichr":
+        # enrichment_table["description"] = enrichment_table["description"].str.decode("utf-8")
+        enrichment_table["log_p_value"] = (-np.log10(enrichment_table["p_value"])).replace({np.inf: 300})
+
+        for gene_set_library in enrichment_table["gene_set_library"].unique():
+            print(gene_set_library)
+            if gene_set_library == "Epigenomics_Roadmap_HM_ChIP-seq":
+                continue
+
+            # Plot top_n terms of each comparison in barplots
+            top_data = (
+                enrichment_table[enrichment_table["gene_set_library"] == gene_set_library]
+                .set_index("description")
+                .groupby("comparison_name")
+                ["log_p_value"]
+                .nlargest(n_top)
+                .reset_index())
+
+            n = len(enrichment_table["comparison_name"].drop_duplicates())
+            n_side = int(np.ceil(np.sqrt(n)))
+            g = sns.FacetGrid(data=top_data, col="comparison_name", col_wrap=n_side, sharey=False, sharex=False)
+            g.map(sns.barplot, "log_p_value", "description", orient="horizontal")
+            g.savefig(os.path.join(output_dir, output_prefix + ".enrichr.{}.barplot.top_{}.svg".format(gene_set_library, top_n)), bbox_inches="tight", dpi=300)
+
+            # Plot heatmaps of terms for each comparison
+            if len(enrichment_table["comparison_name"].drop_duplicates()) < 2:
+                return
+
+            # pivot table
+            enrichr_pivot = pd.pivot_table(
+                enrichment_table[enrichment_table["gene_set_library"] == gene_set_library],
+                values="log_p_value", columns="description", index="comparison_name").fillna(0)
+
+            # plot correlation
+            g = sns.clustermap(enrichr_pivot.T.corr(), cbar_kws={"label": "Correlation of enrichemnt\nof differential genes"})
+            g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90)
+            g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0)
+            g.fig.savefig(os.path.join(output_dir, output_prefix + ".enrichr.{}.correlation.svg".format(gene_set_library)), bbox_inches="tight", dpi=300)
+
+            top = enrichment_table[enrichment_table["gene_set_library"] == gene_set_library].set_index('description').groupby("comparison_name")['p_value'].nsmallest(top_n)
+            top_terms = top.index.get_level_values('description').unique()
+            # top_terms = top_terms[top_terms.isin(lola_pivot.columns[lola_pivot.sum() > 5])]
+
+            # plot clustered heatmap
+            g = sns.clustermap(enrichr_pivot[list(set(top_terms))], figsize=(20, 12), cbar_kws={"label": "-log10(p-value) of enrichment\nof differential genes"}, metric="correlation")
+            g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90, ha="right", fontsize=4)
+            g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0)
+            g.fig.savefig(os.path.join(output_dir, output_prefix + ".enrichr.{}.cluster_specific.svg".format(gene_set_library)), bbox_inches="tight", dpi=300)
+
+            # plot clustered heatmap
+            g = sns.clustermap(enrichr_pivot[list(set(top_terms))], figsize=(20, 12), z_score=1, cbar_kws={"label": "Z-score of enrichment\nof differential genes"}, metric="correlation")
+            g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90, ha="right", fontsize=4)
+            g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0)
+            g.fig.savefig(os.path.join(output_dir, output_prefix + ".enrichr.{}.cluster_specific.z_score.svg".format(gene_set_library)), bbox_inches="tight", dpi=300)
 
 
 def standard_scale(x):

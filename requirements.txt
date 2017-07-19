@@ -1,8 +1,9 @@
 numpy
-pandas
+pandas>=0.20.2
 pysam
 pybedtools
 parmap
 matplotlib
 seaborn
 pyyaml
+rpy2>=2.8.6

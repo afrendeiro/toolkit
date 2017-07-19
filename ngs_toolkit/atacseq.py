@@ -12,7 +12,7 @@ import pandas as pd
 import pybedtools
 import seaborn as sns
 
-from ngs_toolkit.general import Analysis
+from .general import Analysis
 
 # Set settings
 pd.set_option("date_dayfirst", True)
@@ -402,12 +402,12 @@ class ATACSeqAnalysis(Analysis):
         """
         Annotates peaks with closest gene.
         Needs `tss_file` file in `data_dir`/external.
-        This is a 5 column BED file with TSS positions (cols 1-3), gene names (col 4) and TSS strand (col 5).
+        This is a 5 column BED file with TSS positions (cols 1-3), gene names (col 4) and TSS strand (col 5) exclusively!
         """
         # create bedtool with hg19 TSS positions
-        hg19_refseq_tss = pybedtools.BedTool(os.path.join(self.data_dir, "external", tss_file))
+        tss = pybedtools.BedTool(os.path.join(self.data_dir, "external", tss_file))
         # get closest TSS of each cll peak
-        gene_annotation = self.sites.closest(hg19_refseq_tss, d=True).to_dataframe()
+        gene_annotation = self.sites.closest(tss, d=True).to_dataframe()
         gene_annotation = gene_annotation[['chrom', 'start', 'end'] + gene_annotation.columns[-3:].tolist()]  # TODO: check this
         gene_annotation.columns = ['chrom', 'start', 'end', 'gene_name', "strand", 'distance']
 
@@ -1553,7 +1553,7 @@ class ATACSeqAnalysis(Analysis):
          - MEME suite (AME)
          - LOLA
         """
-        from ngs_toolkit.general import bed_to_fasta, meme_ame, homer_motif, lola, enrichr, standard_scale
+        # from ngs_toolkit.general import bed_to_fasta, meme_ame, homer_motifs, lola, enrichr, standard_scale
 
         # use all sites as universe
         if universe_file is None:
@@ -1617,7 +1617,7 @@ class ATACSeqAnalysis(Analysis):
         bed_to_fasta(bed_file, fasta_file)
 
         meme_ame(fasta_file, output_dir)
-        homer_motif(bed_file, output_dir)
+        homer_motifs(bed_file, output_dir)
 
         # Lola
         try:

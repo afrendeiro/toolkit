@@ -2,7 +2,6 @@
 import os
 from ngs_toolkit.general import Analysis, pickle_me
 from collections import Counter
-import cPickle as pickle
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
@@ -351,7 +350,7 @@ class RNASeqAnalysis(Analysis):
                     label = getattr(samples[j], attributes_to_plot[i])
                 except AttributeError:
                     label = np.nan
-                axis[i].scatter(xx.ix[j][0], xx.ix[j][1], s=50, color=color_dataframe.ix[attr][j], label=label)
+                axis[i].scatter(xx.loc[j, 0], xx.loc[j, 1], s=50, color=color_dataframe.loc[attr].iloc[j], label=label)
             axis[i].set_title(attributes_to_plot[i])
             axis[i].set_xlabel("MDS 1")
             axis[i].set_ylabel("MDS 2")
@@ -362,8 +361,8 @@ class RNASeqAnalysis(Analysis):
             handles, labels = axis[i].get_legend_handles_labels()
             by_label = OrderedDict(zip(labels, handles))
             if any([type(c) in [str, unicode] for c in by_label.keys()]) and len(by_label) <= 20:
-                if not any([re.match("^\d", c) for c in by_label.keys()]):
-                    axis[i].legend(by_label.values(), by_label.keys())
+                # if not any([re.match("^\d", c) for c in by_label.keys()]):
+                axis[i].legend(by_label.values(), by_label.keys())
         fig.savefig(os.path.join(self.results_dir, "{}.{}.mds.svg".format(self.name, plot_prefix)), bbox_inches="tight")
 
         # PCA
@@ -393,7 +392,7 @@ class RNASeqAnalysis(Analysis):
                         label = getattr(samples[j], attributes_to_plot[i])
                     except AttributeError:
                         label = np.nan
-                    axis[pc, i].scatter(xx.ix[j][pc], xx.ix[j][pc + 1], s=50, color=color_dataframe.ix[attr][j], label=label)
+                    axis[pc, i].scatter(xx.loc[j, pc], xx.loc[j, pc + 1], s=50, color=color_dataframe.loc[attr].iloc[j], label=label)
                 axis[pc, i].set_title(attributes_to_plot[i])
                 axis[pc, i].set_xlabel("PC {}".format(pc + 1))
                 axis[pc, i].set_ylabel("PC {}".format(pc + 2))

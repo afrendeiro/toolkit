@@ -883,7 +883,7 @@ def differential_enrichment(
         output_prefix="differential_analysis",
         max_diff=1000,
         sort_var="pvalue",
-        as_job=True
+        run_enrichments=False
     ):
     """
     Given a dataframe of the results of differential analysis
@@ -896,7 +896,7 @@ def differential_enrichment(
     import pandas as pd
 
     if data_type == "ATAC-seq":
-        # from ngs_toolkit.atacseq import characterize_regions_function
+        from ngs_toolkit.atacseq import characterize_regions_function
         matrix = analysis.coverage_annotated
         lola_enr = pd.DataFrame()
         meme_enr = pd.DataFrame()
@@ -943,40 +943,56 @@ def differential_enrichment(
             if data_type == "RNA-seq":
                 print("Doing genes of comparison '{}', direction '{}'.".format(comp, direction))
                 comparison_df.index.name = "gene_name"
-                if not os.path.exists(os.path.join(comparison_dir, output_prefix + ".enrichr.csv")):
-                    comparison_df.reset_index()[['gene_name']].drop_duplicates().to_csv(os.path.join(comparison_dir, output_prefix + ".gene_symbols.txt"), header=None, index=False)
-                    enr = enrichr(comparison_df.reset_index())
-                    enr.to_csv(os.path.join(comparison_dir, output_prefix + ".enrichr.csv"), index=False)
-                else:
-                    enr = pd.read_csv(os.path.join(comparison_dir, output_prefix + ".enrichr.csv"))
-                    enr["comparison_name"] = comp
-                    pathway_enr = pathway_enr.append(enr, ignore_index=True)
+                # write gene names to file
+                (comparison_df
+                .reset_index()[['gene_name']]
+                .drop_duplicates()
+                .sort_values()
+                .to_csv(os.path.join(comparison_dir, output_prefix + ".gene_symbols.txt"), header=None, index=False))
+
+                if run_enrichments:
+                    if not os.path.exists(os.path.join(comparison_dir, output_prefix + ".enrichr.csv")):
+                        
+                        enr = enrichr(comparison_df.reset_index())
+                        enr.to_csv(os.path.join(comparison_dir, output_prefix + ".enrichr.csv"), index=False)
+                    else:
+                        enr = pd.read_csv(os.path.join(comparison_dir, output_prefix + ".enrichr.csv"))
+                        enr["comparison_name"] = comp
+                        pathway_enr = pathway_enr.append(enr, ignore_index=True)
             else:
                 print("Doing regions of comparison '{}', direction '{}'.".format(comp, direction))
-                # run
-                characterize_regions_function(analysis, comparison_df, output_dir=comparison_dir, prefix=output_prefix)
-                # read/parse
-                motifs = parse_ame(comparison_dir)
-                lola = pd.read_csv(os.path.join(comparison_dir, "allEnrichments.txt"), sep="\t")
-                enr = pd.read_csv(os.path.join(comparison_dir, output_prefix + "_regions.enrichr.csv"), index=False, encoding='utf-8')
-                # label
-                for d in [lola, enr, motifs]:
-                    d["comparison_name"] = comp
-                    d["direction"] = direction
-                    d["label"] = "{}.{}".format(comp, direction)
-                # append
-                meme_enr = meme_enr.append(motifs, ignore_index=True)
-                lola_enr = lola_enr.append(lola, ignore_index=True)
-                pathway_enr = pathway_enr.append(enr, ignore_index=True)
 
-    # write combined enrichments
-    pathway_enr.to_csv(
-        os.path.join(output_dir, output_prefix + ".enrichr.csv"), index=False)
-    if data_type == "ATAC-seq":
-        meme_enr.to_csv(
-            os.path.join(output_dir, output_prefix + ".meme_ame.csv"), index=False)
-        lola.to_csv(
-            os.path.join(output_dir, output_prefix + ".lola.csv"), index=False)
+                # do the suite of enrichment analysis
+                # if `run_enrichments` if True
+                characterize_regions_function(
+                    analysis, comparison_df,
+                    output_dir=comparison_dir, prefix=output_prefix, run=run_enrichments)
+
+                # collect enrichments
+                if run_enrichments:
+                    # read/parse
+                    motifs = parse_ame(comparison_dir)
+                    lola = pd.read_csv(os.path.join(comparison_dir, "allEnrichments.txt"), sep="\t")
+                    enr = pd.read_csv(os.path.join(comparison_dir, output_prefix + "_regions.enrichr.csv"), index=False, encoding='utf-8')
+                    # label
+                    for d in [lola, enr, motifs]:
+                        d["comparison_name"] = comp
+                        d["direction"] = direction
+                        d["label"] = "{}.{}".format(comp, direction)
+                    # append
+                    meme_enr = meme_enr.append(motifs, ignore_index=True)
+                    lola_enr = lola_enr.append(lola, ignore_index=True)
+                    pathway_enr = pathway_enr.append(enr, ignore_index=True)
+
+    if run_enrichments:
+        # write combined enrichments
+        pathway_enr.to_csv(
+            os.path.join(output_dir, output_prefix + ".enrichr.csv"), index=False)
+        if data_type == "ATAC-seq":
+            meme_enr.to_csv(
+                os.path.join(output_dir, output_prefix + ".meme_ame.csv"), index=False)
+            lola.to_csv(
+                os.path.join(output_dir, output_prefix + ".lola.csv"), index=False)
 
     # PROJECT_NAME=breg
     # GENOME=mm10
@@ -1008,7 +1024,7 @@ def differential_enrichment(
     # for F in `find results -name "*_regions.bed"`
     # do
     # DIR=`dirname $F`
-    # # if [ ! -f ${DIR}/ame.html ]; then
+    # # if [ ! -f ${DIR}/homerResults ]; then
     # echo $DIR $F
     # sbatch -J "homer.${F}" -o "${F}.homer.log" -p shortq -c 8 --mem 20000 \
     # --wrap "findMotifsGenome.pl ${F} ${GENOME}r ${DIR} -size 1000 -h -p 2 -len 8,10,12,14 -noknown"

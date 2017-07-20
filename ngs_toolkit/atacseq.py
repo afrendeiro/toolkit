@@ -1542,7 +1542,7 @@ class ATACSeqAnalysis(Analysis):
         # save
         enrichments.to_csv(os.path.join(output_dir, "%s_regions.region_enrichment.csv" % prefix), index=True)
 
-    def characterize_regions_function(self, df, output_dir, prefix, universe_file=None):
+    def characterize_regions_function(self, df, output_dir, prefix, universe_file=None, run=True):
         """
         Performs a range of functional enrichments of a set of regions given in `df`
         (a dataframe with 'chrom', 'start', 'end', 'gene_name', 'ensebl_gene_id' columns - typically the coverage_annotated dataframe).
@@ -1616,6 +1616,9 @@ class ATACSeqAnalysis(Analysis):
         fasta_file = os.path.join(output_dir, "{}_regions.fa".format(prefix))
         bed_to_fasta(bed_file, fasta_file)
 
+        if not run:
+            return
+
         meme_ame(fasta_file, output_dir)
         homer_motifs(bed_file, output_dir)
 
@@ -1627,8 +1630,6 @@ class ATACSeqAnalysis(Analysis):
 
         # Enrichr
         results = enrichr(df[['chrom', 'start', 'end', "gene_name"]])
-
-        # Save
         results.to_csv(os.path.join(output_dir, "{}_regions.enrichr.csv".format(prefix)), index=False, encoding='utf-8')
 
 

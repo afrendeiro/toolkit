@@ -698,7 +698,7 @@ def plot_differential(
     g.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.samples.clustermap.z0.svg".format(var_name)), bbox_inches="tight", dpi=300)
 
 
-def lola(bed_files, universe_file, output_folder):
+def lola(bed_files, universe_file, output_folder, genome="hg19", cpus=8):
     """
     Performs location overlap analysis (LOLA) on bedfiles with regions sets.
     """
@@ -710,23 +710,23 @@ def lola(bed_files, universe_file, output_folder):
 
             userUniverse  <- LOLA::readBed(universeFile)
 
-            dbPath1 = "/data/groups/lab_bock/shared/resources/regions/LOLACore/hg19/"
-            dbPath2 = "/data/groups/lab_bock/shared/resources/regions/customRegionDB/hg19/"
+            dbPath1 = "/data/groups/lab_bock/shared/resources/regions/LOLACore/{genome}/"
+            dbPath2 = "/data/groups/lab_bock/shared/resources/regions/customRegionDB/{genome}/"
             regionDB = loadRegionDB(c(dbPath1, dbPath2))
 
             if (typeof(bedFiles) == "character") {
                 userSet <- LOLA::readBed(bedFiles)
-                lolaResults = runLOLA(list(userSet), userUniverse, regionDB, cores=12)
+                lolaResults = runLOLA(list(userSet), userUniverse, regionDB, cores={cpus})
                 writeCombinedEnrichment(lolaResults, outFolder=outputFolder)
             } else if (typeof(bedFiles) == "double") {
                 for (bedFile in bedFiles) {
                     userSet <- LOLA::readBed(bedFile)
-                    lolaResults = runLOLA(list(userSet), userUniverse, regionDB, cores=12)
+                    lolaResults = runLOLA(list(userSet), userUniverse, regionDB, cores={cpus})
                     writeCombinedEnrichment(lolaResults, outFolder=outputFolder)
                 }
             }
         }
-    """)
+    """.genome=genome, cpus=cpus)
 
     # convert the pandas dataframe to an R dataframe
     run(bed_files, universe_file, output_folder)
@@ -750,9 +750,13 @@ def bed_to_fasta(bed_file, fasta_file, genome_2bit="~/resources/genomes/hg19/hg1
     # os.system("rm %s" % bed_file + ".tmp.bed")
 
 
-def meme_ame(input_fasta, output_dir, background_fasta=None):
+def meme_ame(input_fasta, output_dir, background_fasta=None, organism="human"):
     import os
 
+    dbs = {
+        "human": "~/resources/motifs/motif_databases/HUMAN/HOCOMOCOv10.meme",
+        "mouse": "~/resources/motifs/motif_databases/MOUSE/uniprobe_mouse.meme"
+    }
     # shuffle input in no background is provided
     if background_fasta is None:
         shuffled = input_fasta + ".shuffled"
@@ -763,11 +767,12 @@ def meme_ame(input_fasta, output_dir, background_fasta=None):
 
     cmd = """
     ame --bgformat 1 --scoring avg --method ranksum --pvalue-report-threshold 0.05 \\
-    --control {0} -o {1} {2} ~/resources/motifs/motif_databases/MOUSE/uniprobe_mouse.meme
-    """.format(background_fasta if background_fasta is not None else shuffled, output_dir, input_fasta)
+    --control {0} -o {1} {2} {3}
+    """.format(
+        background_fasta if background_fasta is not None else shuffled,
+        output_dir, input_fasta, dbs[organism])
     os.system(cmd)
-
-    os.system("rm %s" % shuffled)
+    # os.system("rm %s" % shuffled)
 
 
 def parse_ame(ame_dir):
@@ -816,11 +821,24 @@ def enrichr(dataframe, gene_set_libraries=None, kind="genes"):
     if gene_set_libraries is None:
         gene_set_libraries = [
             'GO_Biological_Process_2015',
-            # "ChEA_2015",
+            "ChEA_2015",
             "KEGG_2016",
+            "ESCAPE",
+            # "Epigenomics_Roadmap_HM_ChIP-seq",
+            "ENCODE_TF_ChIP-seq_2015",
+            "ENCODE_and_ChEA_Consensus_TFs_from_ChIP-X",
+            # "ENCODE_Histone_Modifications_2015",
+            # "OMIM_Expanded",
+            # "TF-LOF_Expression_from_GEO",
+            "Single_Gene_Perturbations_from_GEO_down",
+            "Single_Gene_Perturbations_from_GEO_up",
+            # "Disease_Perturbations_from_GEO_down",
+            # "Disease_Perturbations_from_GEO_up",
+            "Drug_Perturbations_from_GEO_down",
+            "Drug_Perturbations_from_GEO_up",
             "WikiPathways_2016",
             "Reactome_2016",
-            # "BioCarta_2016",
+            "BioCarta_2016",
             "NCI-Nature_2016"
         ]
 
@@ -864,7 +882,10 @@ def enrichr(dataframe, gene_set_libraries=None, kind="genes"):
         res = pd.DataFrame([pd.Series(s) for s in res[gene_set_library]])
         if res.shape[0] == 0:
             continue
-        res.columns = ["rank", "description", "p_value", "z_score", "combined_score", "genes", "adjusted_p_value"]
+        if len(res.columns) == 7:
+            res.columns = ["rank", "description", "p_value", "z_score", "combined_score", "genes", "adjusted_p_value"]
+        elif len(res.columns) == 9:
+            res.columns = ["rank", "description", "p_value", "z_score", "combined_score", "genes", "adjusted_p_value", "old_p_value", "old_adjusted_p_value"]
 
         # Remember gene set library used
         res["gene_set_library"] = gene_set_library
@@ -881,9 +902,10 @@ def differential_enrichment(
         data_type="ATAC-seq",
         output_dir="results/differential_analysis_{data_type}",
         output_prefix="differential_analysis",
+        genome="hg19",
         max_diff=1000,
         sort_var="pvalue",
-        run_enrichments=False
+        as_jobs=True
     ):
     """
     Given a dataframe of the results of differential analysis
@@ -892,8 +914,12 @@ def differential_enrichment(
     to the `data_type`.
 
     At most will use `max_diff` regions/genes in each comparison sorted by `sort_var`.
+    
+    `run_mode`: one of "serial" or "job".
     """
     import pandas as pd
+
+    serial = not as_jobs
 
     if data_type == "ATAC-seq":
         from ngs_toolkit.atacseq import characterize_regions_function
@@ -950,9 +976,8 @@ def differential_enrichment(
                 .sort_values()
                 .to_csv(os.path.join(comparison_dir, output_prefix + ".gene_symbols.txt"), header=None, index=False))
 
-                if run_enrichments:
+                if serial:
                     if not os.path.exists(os.path.join(comparison_dir, output_prefix + ".enrichr.csv")):
-                        
                         enr = enrichr(comparison_df.reset_index())
                         enr.to_csv(os.path.join(comparison_dir, output_prefix + ".enrichr.csv"), index=False)
                     else:
@@ -963,13 +988,13 @@ def differential_enrichment(
                 print("Doing regions of comparison '{}', direction '{}'.".format(comp, direction))
 
                 # do the suite of enrichment analysis
-                # if `run_enrichments` if True
+                # if `as_jobs` if True
                 characterize_regions_function(
                     analysis, comparison_df,
-                    output_dir=comparison_dir, prefix=output_prefix, run=run_enrichments)
+                    output_dir=comparison_dir, prefix=output_prefix, run=serial, genome=genome)
 
                 # collect enrichments
-                if run_enrichments:
+                if serial:
                     # read/parse
                     motifs = parse_ame(comparison_dir)
                     lola = pd.read_csv(os.path.join(comparison_dir, "allEnrichments.txt"), sep="\t")
@@ -984,70 +1009,76 @@ def differential_enrichment(
                     lola_enr = lola_enr.append(lola, ignore_index=True)
                     pathway_enr = pathway_enr.append(enr, ignore_index=True)
 
-    if run_enrichments:
+    if serial:
         # write combined enrichments
-        pathway_enr.to_csv(
-            os.path.join(output_dir, output_prefix + ".enrichr.csv"), index=False)
         if data_type == "ATAC-seq":
             meme_enr.to_csv(
                 os.path.join(output_dir, output_prefix + ".meme_ame.csv"), index=False)
             lola.to_csv(
                 os.path.join(output_dir, output_prefix + ".lola.csv"), index=False)
+        pathway_enr.to_csv(
+            os.path.join(output_dir, output_prefix + ".enrichr.csv"), index=False)
+        return
 
-    # PROJECT_NAME=breg
-    # GENOME=mm10
-    # # Run LOLA
-    # for F in `find results -name "*_regions.bed"`
-    # do
-    # DIR=`dirname $F`
-    # if [ ! -f ${DIR}/allEnrichments.txt ]; then
-    # echo $DIR $F
-    # sbatch -J lola.$F -o $F.lola.log -p shortq -c 8 --mem 24000 \
-    # --wrap "Rscript ~/jobs/run_LOLA.R $F ~/${PROJECT_NAME}/results/${PROJECT_NAME}_peak_set.bed ${GENOME}"
-    # fi
-    # done
+    # Submit jobs
+    # LOLA
+    cmds = ["""
+    for F in `find results -name "*_regions.bed"` do;
+    DIR=`dirname $F`
+    if [ ! -f ${{DIR}}/allEnrichments.txt ]; then
+    echo $DIR $F
+    sbatch -J lola.$F -o $F.lola.log -p shortq -c 8 --mem 24000 \
+    --wrap "Rscript ~/jobs/run_LOLA.R $F results/{PROJECT_NAME}_peak_set.bed {GENOME}"
+    fi
+    done""".format(PROJECT_NAME=analysis.name, GENOME=genome)]
 
-    # # Run AME
-    # for F in `find results -name "*_regions.fa"`
-    # do
-    # DIR=`dirname $F`
-    # if [ ! -f ${DIR}/ame.html ]; then
-    # echo $DIR $F
-    # sbatch -J "meme_ame.${F}" -o "${F}.meme_ame.log" -p shortq -c 1 --mem 4000 \
-    # --wrap "fasta-dinucleotide-shuffle -c 1 -f "$F" > "$F".shuffled.fa; \
-    # ame --bgformat 1 --scoring avg --method ranksum --pvalue-report-threshold 0.05 \
-    # --control "$F".shuffled.fa -o "$DIR" "$F" ~/resources/motifs/motif_databases/HUMAN/HOCOMOCOv10.meme"
-    # fi
-    # done
+    # AME
+    dbs = {
+        "human": "~/resources/motifs/motif_databases/HUMAN/HOCOMOCOv10.meme",
+        "mouse": "~/resources/motifs/motif_databases/MOUSE/uniprobe_mouse.meme"}
+    omap = {"hg38": "human", "hg19": "human", "mm10": "mouse"}
 
-    # # Run HOMER
-    # for F in `find results -name "*_regions.bed"`
-    # do
-    # DIR=`dirname $F`
-    # # if [ ! -f ${DIR}/homerResults ]; then
-    # echo $DIR $F
-    # sbatch -J "homer.${F}" -o "${F}.homer.log" -p shortq -c 8 --mem 20000 \
-    # --wrap "findMotifsGenome.pl ${F} ${GENOME}r ${DIR} -size 1000 -h -p 2 -len 8,10,12,14 -noknown"
-    # # fi
-    # done
+    cmds += ["""for F in `find results -name "*_regions.fa"` do;
+    DIR=`dirname $F`
+    if [ ! -f ${{DIR}}/ame.html ]; then
+    echo $DIR $F
+    sbatch -J "meme_ame.${{F}}" -o "${{F}}.meme_ame.log" -p shortq -c 1 --mem 4000 \
+    --wrap "fasta-dinucleotide-shuffle -c 1 -f "${{F}}" > "${{F}}".shuffled.fa; \
+    ame --bgformat 1 --scoring avg --method ranksum --pvalue-report-threshold 0.05 \
+    --control "${{F}}".shuffled.fa -o "${{DIR}}" "${{F}}" {motifs}"
+    fi
+    done""".format(motifs=dbs[omap[genome]])]
 
-    # # Run Enrichr
-    # for F in `find results -name "*.gene_symbols.txt"`
-    # do
-    # if [ ! -f ${F}.enrichr.csv ]; then
-    # echo $F
-    # sbatch -J enrichr.$F -o $F.enrichr.log -p shortq -c 1 --mem 4000 \
-    # --wrap "python ~/jobs/run_Enrichr.py --input-file "$F" --output-file "${F/gene_symbols.txt/enrichr.csv}" "
-    # fi
-    # done
-    # for F in `find results -name "*_genes.symbols.txt"`
-    # do
-    # if [ ! -f ${F/symbols.txt/enrichr.csv} ]; then
-    # echo $F
-    # sbatch -J enrichr.$F -o $F.enrichr.log -p shortq -c 1 --mem 4000 \
-    # --wrap "python ~/jobs/run_Enrichr.py --input-file "$F" --output-file "${F/symbols.txt/enrichr.csv}" "
-    # fi
-    # done
+    # HOMER
+    cmds += ["""for F in `find results -name "*_regions.bed"` do;
+    DIR=`dirname $F`
+    if [ ! -f ${DIR}/homerResults.html ]; then
+    echo $DIR $F
+    sbatch -J "homer.${F}" -o "${F}.homer.log" -p shortq -c 8 --mem 20000 \
+    --wrap "findMotifsGenome.pl ${F} {{GENOME}}r ${DIR} -size 1000 -h -p 2 -len 8,10,12,14 -noknown"
+    fi
+    done""".format(GENOME=genome)]
+
+    # Enrichr
+    cmds += ["""for F in `find results -name "*.gene_symbols.txt"` do;
+    if [ ! -f ${F}.enrichr.csv ]; then
+    echo $F
+    sbatch -J enrichr.$F -o $F.enrichr.log -p shortq -c 1 --mem 4000 \
+    --wrap "python ~/jobs/run_Enrichr.py --input-file "$F" --output-file "${F/gene_symbols.txt/enrichr.csv}" "
+    fi
+    done"""]
+
+    cmds += ["""for F in `find results -name "*_genes.symbols.txt"` do;
+    if [ ! -f ${F/symbols.txt/enrichr.csv} ]; then
+    echo $F
+    sbatch -J enrichr.$F -o $F.enrichr.log -p shortq -c 1 --mem 4000 \
+    --wrap "python ~/jobs/run_Enrichr.py --input-file "$F" --output-file "${F/symbols.txt/enrichr.csv}" "
+    fi
+    done"""]
+
+    for cmd in cmds:
+        os.system(cmd)
+
 
 def collect_differential_enrichment(
         differential,
@@ -1152,6 +1183,7 @@ def plot_differential_enrichment(
         data_type="ATAC-seq",
         direction_dependent=True,
         output_dir="results/differential_analysis_{data_type}",
+        comp_variable="comparison_name",
         output_prefix="differential_analysis",
         top_n=5, method="groups"):
     """
@@ -1159,6 +1191,7 @@ def plot_differential_enrichment(
     plots illustrating these enrichments in the various comparisons.
 
     `enrichment_type` is one of 'lola', 'enrichr', 'motif'.
+    `comp_variable` is the column in the enrichment table that labels groups.
     """
     import numpy as np
     import seaborn as sns
@@ -1170,7 +1203,7 @@ def plot_differential_enrichment(
         output_dir = output_dir.format(data_type=data_type)
 
     if "direction" in enrichment_table.columns and direction_dependent:
-        enrichment_table["comparison_name"] = enrichment_table["comparison_name"].astype(str) + " " + enrichment_table["direction"].astype(str)
+        enrichment_table[comp_variable] = enrichment_table[comp_variable].astype(str) + " " + enrichment_table["direction"].astype(str)
 
     if enrichment_type == "lola":
         # get a unique label for each lola region set
@@ -1186,21 +1219,21 @@ def plot_differential_enrichment(
             .str.replace(", , ", "").str.replace(", $", ""))
 
         # Plot top_n terms of each comparison in barplots
-        top_data = enrichment_table.set_index("label").groupby("comparison_name")["pValueLog"].nlargest(top_n).reset_index()
+        top_data = enrichment_table.set_index("label").groupby(comp_variable)["pValueLog"].nlargest(top_n).reset_index()
 
-        n = len(enrichment_table["comparison_name"].drop_duplicates())
+        n = len(enrichment_table[comp_variable].drop_duplicates())
         n_side = int(np.ceil(np.sqrt(n)))
-        g = sns.FacetGrid(data=top_data, col="comparison_name", col_wrap=n_side, sharex=False, sharey=False)
+        g = sns.FacetGrid(data=top_data, col=comp_variable, col_wrap=n_side, sharex=False, sharey=False)
         g.map(sns.barplot, "pValueLog", "label", orient="horizontal")
         g.savefig(os.path.join(output_dir, output_prefix + ".lola.barplot.top_{}.svg".format(top_n)), bbox_inches="tight", dpi=300)
 
         # Plot heatmaps of terms for each comparison
-        if len(enrichment_table["comparison_name"].drop_duplicates()) < 2:
+        if len(enrichment_table[comp_variable].drop_duplicates()) < 2:
             return
 
         # pivot table
         lola_pivot = pd.pivot_table(enrichment_table,
-            values="pValueLog", columns="comparison_name", index="label").fillna(0)
+            values="pValueLog", columns=comp_variable, index="label").fillna(0)
         lola_pivot = lola_pivot.replace(np.inf, lola_pivot[lola_pivot != np.inf].max().max())
 
         # plot correlation
@@ -1209,7 +1242,7 @@ def plot_differential_enrichment(
         g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0)
         g.fig.savefig(os.path.join(output_dir, output_prefix + ".lola.correlation.svg"), bbox_inches="tight", dpi=300)
 
-        top = enrichment_table.set_index('label').groupby("comparison_name")['pValueLog'].nlargest(top_n)
+        top = enrichment_table.set_index('label').groupby(comp_variable)['pValueLog'].nlargest(top_n)
         top_terms = top.index.get_level_values('label').unique()
 
         # plot clustered heatmap
@@ -1227,21 +1260,21 @@ def plot_differential_enrichment(
     if enrichment_type == "motif":
         enrichment_table["log_p_value"] = (-np.log10(enrichment_table["p_value"])).replace({np.inf: 300})
         # Plot top_n terms of each comparison in barplots
-        top_data = enrichment_table.set_index("TF").groupby("comparison_name")["log_p_value"].nlargest(top_n).reset_index()
+        top_data = enrichment_table.set_index("TF").groupby(comp_variable)["log_p_value"].nlargest(top_n).reset_index()
 
-        n = len(enrichment_table["comparison_name"].drop_duplicates())
+        n = len(enrichment_table[comp_variable].drop_duplicates())
         n_side = int(np.ceil(np.sqrt(n)))
-        g = sns.FacetGrid(data=top_data, col="comparison_name", col_wrap=n_side, sharex=False, sharey=False)
+        g = sns.FacetGrid(data=top_data, col=comp_variable, col_wrap=n_side, sharex=False, sharey=False)
         g.map(sns.barplot, "log_p_value", "TF", orient="horizontal")
         g.savefig(os.path.join(output_dir, output_prefix + ".motifs.barplot.top_{}.svg".format(top_n)), bbox_inches="tight", dpi=300)
 
         # Plot heatmaps of terms for each comparison
-        if len(enrichment_table["comparison_name"].drop_duplicates()) < 2:
+        if len(enrichment_table[comp_variable].drop_duplicates()) < 2:
             return
 
         # pivot table
         motifs_pivot = pd.pivot_table(enrichment_table,
-            values="log_p_value", columns="comparison_name", index="TF").fillna(0)
+            values="log_p_value", columns=comp_variable, index="TF").fillna(0)
 
         # plot correlation
         g = sns.clustermap(motifs_pivot.corr(), cbar_kws={"label": "Correlation of enrichemnt\nof differential regions"})
@@ -1249,7 +1282,7 @@ def plot_differential_enrichment(
         g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0)
         g.fig.savefig(os.path.join(output_dir, output_prefix + ".motifs.correlation.svg"), bbox_inches="tight", dpi=300)
 
-        top = enrichment_table.set_index('TF').groupby("comparison_name")['log_p_value'].nlargest(top_n)
+        top = enrichment_table.set_index('TF').groupby(comp_variable)['log_p_value'].nlargest(top_n)
         top_terms = top.index.get_level_values('TF').unique()
 
         # plot clustered heatmap
@@ -1277,25 +1310,25 @@ def plot_differential_enrichment(
             top_data = (
                 enrichment_table[enrichment_table["gene_set_library"] == gene_set_library]
                 .set_index("description")
-                .groupby("comparison_name")
+                .groupby(comp_variable)
                 ["log_p_value"]
                 .nlargest(top_n)
                 .reset_index())
 
-            n = len(enrichment_table["comparison_name"].drop_duplicates())
+            n = len(enrichment_table[comp_variable].drop_duplicates())
             n_side = int(np.ceil(np.sqrt(n)))
-            g = sns.FacetGrid(data=top_data, col="comparison_name", col_wrap=n_side, sharey=False, sharex=False)
+            g = sns.FacetGrid(data=top_data, col=comp_variable, col_wrap=n_side, sharey=False, sharex=False)
             g.map(sns.barplot, "log_p_value", "description", orient="horizontal")
             g.savefig(os.path.join(output_dir, output_prefix + ".enrichr.{}.barplot.top_{}.svg".format(gene_set_library, top_n)), bbox_inches="tight", dpi=300)
 
             # Plot heatmaps of terms for each comparison
-            if len(enrichment_table["comparison_name"].drop_duplicates()) < 2:
+            if len(enrichment_table[comp_variable].drop_duplicates()) < 2:
                 return
 
             # pivot table
             enrichr_pivot = pd.pivot_table(
                 enrichment_table[enrichment_table["gene_set_library"] == gene_set_library],
-                values="log_p_value", columns="description", index="comparison_name").fillna(0)
+                values="log_p_value", columns="description", index=comp_variable).fillna(0)
 
             # plot correlation
             g = sns.clustermap(enrichr_pivot.T.corr(), cbar_kws={"label": "Correlation of enrichemnt\nof differential genes"})
@@ -1303,7 +1336,7 @@ def plot_differential_enrichment(
             g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0)
             g.fig.savefig(os.path.join(output_dir, output_prefix + ".enrichr.{}.correlation.svg".format(gene_set_library)), bbox_inches="tight", dpi=300)
 
-            top = enrichment_table[enrichment_table["gene_set_library"] == gene_set_library].set_index('description').groupby("comparison_name")['p_value'].nsmallest(top_n)
+            top = enrichment_table[enrichment_table["gene_set_library"] == gene_set_library].set_index('description').groupby(comp_variable)['p_value'].nsmallest(top_n)
             top_terms = top.index.get_level_values('description').unique()
             # top_terms = top_terms[top_terms.isin(lola_pivot.columns[lola_pivot.sum() > 5])]
 

@@ -1542,7 +1542,7 @@ class ATACSeqAnalysis(Analysis):
         # save
         enrichments.to_csv(os.path.join(output_dir, "%s_regions.region_enrichment.csv" % prefix), index=True)
 
-    def characterize_regions_function(self, df, output_dir, prefix, universe_file=None, run=True):
+    def characterize_regions_function(self, df, output_dir, prefix, universe_file=None, run=True, genome="hg19"):
         """
         Performs a range of functional enrichments of a set of regions given in `df`
         (a dataframe with 'chrom', 'start', 'end', 'gene_name', 'ensebl_gene_id' columns - typically the coverage_annotated dataframe).
@@ -1551,9 +1551,12 @@ class ATACSeqAnalysis(Analysis):
 
         This requires several programs and R libraries:
          - MEME suite (AME)
-         - LOLA
+         - HOMER suite (findMotifsGenome.pl)
+         - LOLA (R library)
+
+        Additionally, some genome-specific databases are needed to run these programs.
         """
-        # from ngs_toolkit.general import bed_to_fasta, meme_ame, homer_motifs, lola, enrichr, standard_scale
+        from ngs_toolkit.general import bed_to_fasta, meme_ame, homer_motifs, lola, enrichr, standard_scale
 
         # use all sites as universe
         if universe_file is None:
@@ -1619,12 +1622,13 @@ class ATACSeqAnalysis(Analysis):
         if not run:
             return
 
-        meme_ame(fasta_file, output_dir)
-        homer_motifs(bed_file, output_dir)
+        omap = {"hg38": "human", "hg19": "human", "mm10": "mouse"}
+        meme_ame(fasta_file, output_dir, organism=omap[genome])
+        homer_motifs(bed_file, output_dir, genome=genome)
 
         # Lola
         try:
-            lola(bed_file, universe_file, output_dir)
+            lola(bed_file, universe_file, output_dir, genome=genome)
         except:
             print("LOLA analysis for {} failed!".format(prefix))
 

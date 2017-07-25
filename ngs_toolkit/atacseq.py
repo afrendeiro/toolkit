@@ -1617,7 +1617,7 @@ class ATACSeqAnalysis(Analysis):
         # Motifs
         # de novo motif finding - enrichment
         fasta_file = os.path.join(output_dir, "{}_regions.fa".format(prefix))
-        bed_to_fasta(bed_file, fasta_file)
+        bed_to_fasta(bed_file, fasta_file, genome=genome)
 
         if not run:
             return

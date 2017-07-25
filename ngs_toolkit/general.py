@@ -405,7 +405,7 @@ def differential_overlap(
 def plot_differential(
         analysis,
         results,
-        comparison_table,
+        comparison_table=None,
         samples=None,
         data_type="ATAC-seq",
         alpha=0.05,
@@ -415,6 +415,7 @@ def plot_differential(
         output_prefix="differential_analysis"):
     """
     Discover differential regions across samples that are associated with a certain trait.
+    The `results` matrix should be indexed by the relevant type of feature (regions/genes).
     """
     import pandas as pd
     import numpy as np
@@ -468,10 +469,9 @@ def plot_differential(
 
     if samples is None:
         samples = analysis.samples
-    samples = [s for s in samples if 
-        (s.name in comparison_table['sample_name'].tolist()) &
-        (s.name in matrix.columns)
-    ]
+    samples = [s for s in samples if s.name in matrix.columns]
+    if comparison_table is not None:
+        samples = [s for s in samples if s.name in comparison_table['sample_name'].tolist()]
     matrix = matrix[[s.name for s in samples]]
 
     # PLOTS
@@ -510,40 +510,41 @@ def plot_differential(
     fig.savefig(os.path.join(output_dir, output_prefix + ".number_differential.svg"), bbox_inches="tight")
 
     # Pairwise scatter plots
-    fig, axes = plt.subplots(n_side, n_side, figsize=(n_side * 4, n_side * 4), sharex=True, sharey=True)
-    if n_side > 1 or n_side > 1:
-        axes = iter(axes.flatten())
-    else:
-        axes = iter([axes])
-    for comparison in comparisons:
-        c = comparison_table[comparison_table["comparison_name"] == comparison]
-        a = c.loc[c['comparison_side'] >= 1, "sample_name"]
-        b = c.loc[c['comparison_side'] <= 0, "sample_name"]
+    if comparison_table is not None:
+        fig, axes = plt.subplots(n_side, n_side, figsize=(n_side * 4, n_side * 4), sharex=True, sharey=True)
+        if n_side > 1 or n_side > 1:
+            axes = iter(axes.flatten())
+        else:
+            axes = iter([axes])
+        for comparison in comparisons:
+            c = comparison_table[comparison_table["comparison_name"] == comparison]
+            a = c.loc[c['comparison_side'] >= 1, "sample_name"]
+            b = c.loc[c['comparison_side'] <= 0, "sample_name"]
 
-        a = matrix[[s.name for s in samples if s.name in a.tolist() and s.library == data_type]].mean(axis=1)
-        b = matrix[[s.name for s in samples if s.name in b.tolist() and s.library == data_type]].mean(axis=1)
+            a = matrix[[s.name for s in samples if s.name in a.tolist() and s.library == data_type]].mean(axis=1)
+            b = matrix[[s.name for s in samples if s.name in b.tolist() and s.library == data_type]].mean(axis=1)
 
-        # Hexbin plot
-        ax = axes.next()
-        ax.hexbin(b, a, alpha=0.85, color="black", edgecolors="white", linewidths=0, bins='log', mincnt=1, rasterized=True)
+            # Hexbin plot
+            ax = axes.next()
+            ax.hexbin(b, a, alpha=0.85, color="black", edgecolors="white", linewidths=0, bins='log', mincnt=1, rasterized=True)
 
-        # Scatter for significant
-        diff_vars = results[(results["comparison_name"] == comparison) & (results["diff"] == True)].index
-        if diff_vars.shape[0] > 0:
-            ax.scatter(b.loc[diff_vars], a.loc[diff_vars], alpha=0.1, color="red", s=2)
-        ax.set_title(comparison)
-        ax.set_xlabel("Down")
-        ax.set_ylabel("Up")
-        # x = y square
-        lims = [np.min([ax.get_xlim(), ax.get_ylim()]), np.max([ax.get_xlim(), ax.get_ylim()])]
-        ax.plot(lims, lims, linestyle='--', alpha=0.5, zorder=0, color="black")
-        ax.set_aspect('equal')
-        ax.set_xlim(lims)
-        ax.set_ylim(lims)
-    for ax in axes:
-        ax.set_visible(False)
-    sns.despine(fig)
-    fig.savefig(os.path.join(output_dir, output_prefix + ".scatter_plots.svg"), bbox_inches="tight", dpi=300)
+            # Scatter for significant
+            diff_vars = results[(results["comparison_name"] == comparison) & (results["diff"] == True)].index
+            if diff_vars.shape[0] > 0:
+                ax.scatter(b.loc[diff_vars], a.loc[diff_vars], alpha=0.1, color="red", s=2)
+            ax.set_title(comparison)
+            ax.set_xlabel("Down")
+            ax.set_ylabel("Up")
+            # x = y square
+            lims = [np.min([ax.get_xlim(), ax.get_ylim()]), np.max([ax.get_xlim(), ax.get_ylim()])]
+            ax.plot(lims, lims, linestyle='--', alpha=0.5, zorder=0, color="black")
+            ax.set_aspect('equal')
+            ax.set_xlim(lims)
+            ax.set_ylim(lims)
+        for ax in axes:
+            ax.set_visible(False)
+        sns.despine(fig)
+        fig.savefig(os.path.join(output_dir, output_prefix + ".scatter_plots.svg"), bbox_inches="tight", dpi=300)
 
     # Volcano plots
     fig, axes = plt.subplots(n_side, n_side, figsize=(n_side * 4, n_side * 4), sharex=False, sharey=False)
@@ -623,35 +624,36 @@ def plot_differential(
     else:
         sample_cols = matrix.columns.tolist()
 
-    if results["comparison_name"].drop_duplicates().shape[0] > 1:
-        groups = pd.DataFrame()
-        for sample_group in results["comparison_name"].drop_duplicates():
-            c = comparison_table.loc[comparison_table["sample_group"] == sample_group, "sample_name"].drop_duplicates()
-            if c.shape[0] > 0:
-                groups.loc[:, sample_group] = matrix[[d for d in c if d in sample_cols]].mean(axis=1)
+    if comparison_table is not None:
+        if results["comparison_name"].drop_duplicates().shape[0] > 1:
+            groups = pd.DataFrame()
+            for sample_group in results["comparison_name"].drop_duplicates():
+                c = comparison_table.loc[comparison_table["sample_group"] == sample_group, "sample_name"].drop_duplicates()
+                if c.shape[0] > 0:
+                    groups.loc[:, sample_group] = matrix[[d for d in c if d in sample_cols]].mean(axis=1)
 
-        # Heatmaps
-        # Comparison level
-        g = sns.clustermap(
-            groups.corr(),
-            xticklabels=False, cbar_kws={"label": "Pearson correlation\non differential {}".format(var_name)},
-            cmap="BuGn", metric="correlation", rasterized=True)
-        g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0)
-        g.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.groups.clustermap.corr.svg".format(var_name)), bbox_inches="tight", dpi=300, metric="correlation")
+            # Heatmaps
+            # Comparison level
+            g = sns.clustermap(
+                groups.corr(),
+                xticklabels=False, cbar_kws={"label": "Pearson correlation\non differential {}".format(var_name)},
+                cmap="BuGn", metric="correlation", rasterized=True)
+            g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0)
+            g.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.groups.clustermap.corr.svg".format(var_name)), bbox_inches="tight", dpi=300, metric="correlation")
 
-        g = sns.clustermap(
-            groups.loc[all_diff, :],
-            yticklabels=False, cbar_kws={"label": "{} of\ndifferential {}".format(quantity, var_name)},
-            metric="correlation", rasterized=True)
-        g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90)
-        g.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.groups.clustermap.svg".format(var_name)), bbox_inches="tight", dpi=300)
+            g = sns.clustermap(
+                groups.loc[all_diff, :],
+                yticklabels=False, cbar_kws={"label": "{} of\ndifferential {}".format(quantity, var_name)},
+                metric="correlation", rasterized=True)
+            g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90)
+            g.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.groups.clustermap.svg".format(var_name)), bbox_inches="tight", dpi=300)
 
-        g = sns.clustermap(
-            groups.loc[all_diff, :],
-            yticklabels=False, z_score=0, cbar_kws={"label": "Z-score of {}\non differential {}".format(quantity, var_name)},
-            metric="correlation", rasterized=True)
-        g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90)
-        g.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.groups.clustermap.z0.svg".format(var_name)), bbox_inches="tight", dpi=300)
+            g = sns.clustermap(
+                groups.loc[all_diff, :],
+                yticklabels=False, z_score=0, cbar_kws={"label": "Z-score of {}\non differential {}".format(quantity, var_name)},
+                metric="correlation", rasterized=True)
+            g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90)
+            g.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.groups.clustermap.z0.svg".format(var_name)), bbox_inches="tight", dpi=300)
 
     # Fold-changes and P-values
     # pivot table of genes vs comparisons
@@ -677,7 +679,7 @@ def plot_differential(
         matrix.columns = matrix.columns.get_level_values("sample_name")
 
     g = sns.clustermap(matrix.loc[all_diff, :].corr(),
-        yticklabels=sample_names, xticklabels=False,
+        yticklabels=True, xticklabels=False,
         cbar_kws={"label": "Pearson correlation\non differential {}".format(var_name)},
         cmap="BuGn", metric="correlation", rasterized=True)
     g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0)
@@ -685,14 +687,14 @@ def plot_differential(
 
     g = sns.clustermap(matrix.loc[all_diff, :],
         yticklabels=False, cbar_kws={"label": "{} of\ndifferential {}".format(quantity, var_name)},
-        xticklabels=sample_names,
+        xticklabels=True,
         vmin=0, metric="correlation", rasterized=True)
     g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90)
     g.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.samples.clustermap.svg".format(var_name)), bbox_inches="tight", dpi=300)
 
     g = sns.clustermap(matrix.loc[all_diff, :],
         yticklabels=False, z_score=0, cbar_kws={"label": "Z-score of {}\non differential {}".format(quantity, var_name)},
-        xticklabels=sample_names,
+        xticklabels=True,
         metric="correlation", rasterized=True)
     g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90)
     g.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.samples.clustermap.z0.svg".format(var_name)), bbox_inches="tight", dpi=300)
@@ -732,9 +734,12 @@ def lola(bed_files, universe_file, output_folder, genome="hg19", cpus=8):
     run(bed_files, universe_file, output_folder)
 
 
-def bed_to_fasta(bed_file, fasta_file, genome_2bit="~/resources/genomes/hg19/hg19.2bit"):
+def bed_to_fasta(bed_file, fasta_file, genome="hg19", genome_2bit=None):
     import os
     import pandas as pd
+
+    if genome_2bit is None:
+        genome_2bit = "~/resources/genomes/{genome}/{genome}.2bit".format(genome=genome)
 
     # write name column
     bed = pd.read_csv(bed_file, sep='\t', header=None)
@@ -896,6 +901,67 @@ def enrichr(dataframe, gene_set_libraries=None, kind="genes"):
     return results
 
 
+def run_enrichment_jobs(analysis_name, genome):
+    """
+    Submit enrichment jobs for a specifc analysis.
+    """
+    # LOLA
+    cmds = ["""for F in `find results -name "*_regions.bed"`; do
+DIR=`dirname $F`
+if [ ! -f ${{DIR}}/allEnrichments.txt ]; then
+echo $DIR $F
+sbatch -J lola.$F -o $F.lola.log -p shortq -c 8 --mem 24000 \
+--wrap "Rscript ~/jobs/run_LOLA.R $F results/{PROJECT_NAME}_peak_set.bed {GENOME}"
+fi
+done""".format(PROJECT_NAME=analysis_name, GENOME=genome)]
+
+    # AME
+    dbs = {
+        "human": "~/resources/motifs/motif_databases/HUMAN/HOCOMOCOv10.meme",
+        "mouse": "~/resources/motifs/motif_databases/MOUSE/uniprobe_mouse.meme"}
+    omap = {"hg38": "human", "hg19": "human", "mm10": "mouse"}
+
+    cmds += ["""for F in `find results -name "*_regions.fa"`; do
+DIR=`dirname $F`
+if [ ! -f ${{DIR}}/ame.html ]; then
+echo $DIR $F
+sbatch -J "meme_ame.${{F}}" -o "${{F}}.meme_ame.log" -p shortq -c 1 --mem 4000 \
+--wrap "fasta-dinucleotide-shuffle -c 1 -f "${{F}}" > "${{F}}".shuffled.fa; \
+ame --bgformat 1 --scoring avg --method ranksum --pvalue-report-threshold 0.05 \
+--control "${{F}}".shuffled.fa -o "${{DIR}}" "${{F}}" {motifs}"
+fi
+done""".format(motifs=dbs[omap[genome]])]
+
+    # HOMER
+    cmds += ["""for F in `find results -name "*_regions.bed"`; do
+DIR=`dirname $F`
+if [ ! -f ${{DIR}}/homerResults.html ]; then
+echo $DIR $F
+sbatch -J "homer.${{F}}" -o "${{F}}.homer.log" -p shortq -c 8 --mem 20000 \
+--wrap "findMotifsGenome.pl ${{F}} {GENOME}r ${{DIR}} -size 1000 -h -p 2 -len 8,10,12,14 -noknown"
+fi
+done""".format(GENOME=genome)]
+
+    # Enrichr
+    cmds += ["""for F in `find results -name "*.gene_symbols.txt"`; do
+if [ ! -f ${{F}}.enrichr.csv ]; then
+echo $F
+sbatch -J enrichr.$F -o $F.enrichr.log -p shortq -c 1 --mem 4000 \
+--wrap "python ~/jobs/run_Enrichr.py --input-file "$F" --output-file "${F/gene_symbols.txt/enrichr.csv}" "
+fi
+done"""]
+    cmds += ["""for F in `find results -name "*_genes.symbols.txt"`; do
+if [ ! -f ${F/symbols.txt/enrichr.csv} ]; then
+echo $F
+sbatch -J enrichr.$F -o $F.enrichr.log -p shortq -c 1 --mem 4000 \
+--wrap "python ~/jobs/run_Enrichr.py --input-file "$F" --output-file "${F/symbols.txt/enrichr.csv}" "
+fi
+done"""]
+
+    for cmd in cmds:
+        os.system(cmd)
+
+
 def differential_enrichment(
         analysis,
         differential,
@@ -988,7 +1054,6 @@ def differential_enrichment(
                 print("Doing regions of comparison '{}', direction '{}'.".format(comp, direction))
 
                 # do the suite of enrichment analysis
-                # if `as_jobs` if True
                 characterize_regions_function(
                     analysis, comparison_df,
                     output_dir=comparison_dir, prefix=output_prefix, run=serial, genome=genome)
@@ -1018,66 +1083,8 @@ def differential_enrichment(
                 os.path.join(output_dir, output_prefix + ".lola.csv"), index=False)
         pathway_enr.to_csv(
             os.path.join(output_dir, output_prefix + ".enrichr.csv"), index=False)
-        return
-
-    # Submit jobs
-    # LOLA
-    cmds = ["""
-    for F in `find results -name "*_regions.bed"` do;
-    DIR=`dirname $F`
-    if [ ! -f ${{DIR}}/allEnrichments.txt ]; then
-    echo $DIR $F
-    sbatch -J lola.$F -o $F.lola.log -p shortq -c 8 --mem 24000 \
-    --wrap "Rscript ~/jobs/run_LOLA.R $F results/{PROJECT_NAME}_peak_set.bed {GENOME}"
-    fi
-    done""".format(PROJECT_NAME=analysis.name, GENOME=genome)]
-
-    # AME
-    dbs = {
-        "human": "~/resources/motifs/motif_databases/HUMAN/HOCOMOCOv10.meme",
-        "mouse": "~/resources/motifs/motif_databases/MOUSE/uniprobe_mouse.meme"}
-    omap = {"hg38": "human", "hg19": "human", "mm10": "mouse"}
-
-    cmds += ["""for F in `find results -name "*_regions.fa"` do;
-    DIR=`dirname $F`
-    if [ ! -f ${{DIR}}/ame.html ]; then
-    echo $DIR $F
-    sbatch -J "meme_ame.${{F}}" -o "${{F}}.meme_ame.log" -p shortq -c 1 --mem 4000 \
-    --wrap "fasta-dinucleotide-shuffle -c 1 -f "${{F}}" > "${{F}}".shuffled.fa; \
-    ame --bgformat 1 --scoring avg --method ranksum --pvalue-report-threshold 0.05 \
-    --control "${{F}}".shuffled.fa -o "${{DIR}}" "${{F}}" {motifs}"
-    fi
-    done""".format(motifs=dbs[omap[genome]])]
-
-    # HOMER
-    cmds += ["""for F in `find results -name "*_regions.bed"` do;
-    DIR=`dirname $F`
-    if [ ! -f ${DIR}/homerResults.html ]; then
-    echo $DIR $F
-    sbatch -J "homer.${F}" -o "${F}.homer.log" -p shortq -c 8 --mem 20000 \
-    --wrap "findMotifsGenome.pl ${F} {{GENOME}}r ${DIR} -size 1000 -h -p 2 -len 8,10,12,14 -noknown"
-    fi
-    done""".format(GENOME=genome)]
-
-    # Enrichr
-    cmds += ["""for F in `find results -name "*.gene_symbols.txt"` do;
-    if [ ! -f ${F}.enrichr.csv ]; then
-    echo $F
-    sbatch -J enrichr.$F -o $F.enrichr.log -p shortq -c 1 --mem 4000 \
-    --wrap "python ~/jobs/run_Enrichr.py --input-file "$F" --output-file "${F/gene_symbols.txt/enrichr.csv}" "
-    fi
-    done"""]
-
-    cmds += ["""for F in `find results -name "*_genes.symbols.txt"` do;
-    if [ ! -f ${F/symbols.txt/enrichr.csv} ]; then
-    echo $F
-    sbatch -J enrichr.$F -o $F.enrichr.log -p shortq -c 1 --mem 4000 \
-    --wrap "python ~/jobs/run_Enrichr.py --input-file "$F" --output-file "${F/symbols.txt/enrichr.csv}" "
-    fi
-    done"""]
-
-    for cmd in cmds:
-        os.system(cmd)
+    else:
+        run_enrichment_jobs(analysis_name=analysis.name, genome=genome)
 
 
 def collect_differential_enrichment(
@@ -1185,7 +1192,7 @@ def plot_differential_enrichment(
         output_dir="results/differential_analysis_{data_type}",
         comp_variable="comparison_name",
         output_prefix="differential_analysis",
-        top_n=5, method="groups"):
+        top_n=5):
     """
     Given a table of enrichment terms across several comparisons, produce
     plots illustrating these enrichments in the various comparisons.
@@ -1196,8 +1203,8 @@ def plot_differential_enrichment(
     import numpy as np
     import seaborn as sns
 
-    if enrichment_type not in ["lola", "enrichr", "motif"]:
-        raise AssertionError("`enrichment_type` must be one of 'lola', 'enrichr', 'motif'.")
+    if enrichment_type not in ["lola", "enrichr", "motif", 'great']:
+        raise AssertionError("`enrichment_type` must be one of 'lola', 'enrichr', 'motif', 'great.")
 
     if "{data_type}" in output_dir:
         output_dir = output_dir.format(data_type=data_type)
@@ -1218,14 +1225,31 @@ def plot_differential_enrichment(
             .str.replace("nan", "").str.replace("None", "")
             .str.replace(", , ", "").str.replace(", $", ""))
 
+        # Replace inf values with 
+        enrichment_table["pValueLog"] = enrichment_table["pValueLog"].replace(
+            np.inf,
+            enrichment_table.loc[enrichment_table["pValueLog"] != np.inf, "pValueLog"].max()
+        )
+
         # Plot top_n terms of each comparison in barplots
         top_data = enrichment_table.set_index("label").groupby(comp_variable)["pValueLog"].nlargest(top_n).reset_index()
 
         n = len(enrichment_table[comp_variable].drop_duplicates())
         n_side = int(np.ceil(np.sqrt(n)))
-        g = sns.FacetGrid(data=top_data, col=comp_variable, col_wrap=n_side, sharex=False, sharey=False)
-        g.map(sns.barplot, "pValueLog", "label", orient="horizontal")
-        g.savefig(os.path.join(output_dir, output_prefix + ".lola.barplot.top_{}.svg".format(top_n)), bbox_inches="tight", dpi=300)
+
+        fig, axis = plt.subplots(n_side, n_side, figsize=(4 * n_side, n_side * max(5, 0.12 * top_n)), sharex=False, sharey=False)
+        axis = iter(axis.flatten())
+        for i, comp in enumerate(top_data[comp_variable].drop_duplicates().sort_values()):
+            df2 = top_data.loc[top_data[comp_variable] == comp, :]
+            ax = next(axis)
+            sns.barplot(
+                df2["pValueLog"], df2["label"], estimator=max,
+                orient="horizontal", ax=ax, color=sns.color_palette("colorblind")[0])
+            ax.set_title(comp)
+        for ax in axis:
+            ax.set_visible(False)
+        sns.despine(fig)
+        fig.savefig(os.path.join(output_dir, output_prefix + ".lola.barplot.top_{}.svg".format(top_n)), bbox_inches="tight", dpi=300)
 
         # Plot heatmaps of terms for each comparison
         if len(enrichment_table[comp_variable].drop_duplicates()) < 2:
@@ -1237,7 +1261,8 @@ def plot_differential_enrichment(
         lola_pivot = lola_pivot.replace(np.inf, lola_pivot[lola_pivot != np.inf].max().max())
 
         # plot correlation
-        g = sns.clustermap(lola_pivot.corr(), cbar_kws={"label": "Correlation of enrichemnt\nof differential regions"})
+        g = sns.clustermap(
+            lola_pivot.corr(), cbar_kws={"label": "Correlation of enrichemnt\nof differential regions"})
         g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90)
         g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0)
         g.fig.savefig(os.path.join(output_dir, output_prefix + ".lola.correlation.svg"), bbox_inches="tight", dpi=300)
@@ -1246,15 +1271,20 @@ def plot_differential_enrichment(
         top_terms = top.index.get_level_values('label').unique()
 
         # plot clustered heatmap
-        g = sns.clustermap(lola_pivot.loc[top_terms, :], figsize=(20, 12), cbar_kws={"label": "-log10(p-value) of enrichment\nof differential regions"}, metric="correlation")
-        g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90, ha="right")
-        g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0)
+        shape = lola_pivot.loc[top_terms, :].shape
+        g = sns.clustermap(
+            lola_pivot.loc[top_terms, :], figsize=(max(6, 0.12 * shape[1]), max(6, 0.12 * shape[0])),
+            cbar_kws={"label": "-log10(p-value) of enrichment\nof differential regions"}, metric="correlation")
+        g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90, ha="right", fontsize="xx-small")
+        g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small")
         g.fig.savefig(os.path.join(output_dir, output_prefix + ".lola.cluster_specific.svg"), bbox_inches="tight", dpi=300)
 
         # plot clustered heatmap
-        g = sns.clustermap(lola_pivot.loc[top_terms, :], figsize=(20, 12), z_score=1, cbar_kws={"label": "Z-score of enrichment\nof differential regions"}, metric="correlation")
-        g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90, ha="right")
-        g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0)
+        g = sns.clustermap(
+            lola_pivot.loc[top_terms, :], figsize=(max(6, 0.12 * shape[1]), max(6, 0.12 * shape[0])),
+            z_score=0, cbar_kws={"label": "Z-score of enrichment\nof differential regions"}, metric="correlation")
+        g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90, ha="right", fontsize="xx-small")
+        g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small")
         g.fig.savefig(os.path.join(output_dir, output_prefix + ".lola.cluster_specific.z_score.svg"), bbox_inches="tight", dpi=300)
 
     if enrichment_type == "motif":
@@ -1264,9 +1294,20 @@ def plot_differential_enrichment(
 
         n = len(enrichment_table[comp_variable].drop_duplicates())
         n_side = int(np.ceil(np.sqrt(n)))
-        g = sns.FacetGrid(data=top_data, col=comp_variable, col_wrap=n_side, sharex=False, sharey=False)
-        g.map(sns.barplot, "log_p_value", "TF", orient="horizontal")
-        g.savefig(os.path.join(output_dir, output_prefix + ".motifs.barplot.top_{}.svg".format(top_n)), bbox_inches="tight", dpi=300)
+
+        fig, axis = plt.subplots(n_side, n_side, figsize=(4 * n_side, n_side * max(5, 0.12 * top_n)), sharex=False, sharey=False)
+        axis = iter(axis.flatten())
+        for i, comp in enumerate(top_data[comp_variable].drop_duplicates().sort_values()):
+            df2 = top_data.loc[top_data[comp_variable] == comp, :]
+            ax = next(axis)
+            sns.barplot(
+                df2["log_p_value"], df2["TF"], estimator=max,
+                orient="horizontal", ax=ax, color=sns.color_palette("colorblind")[0])
+            ax.set_title(comp)
+        for ax in axis:
+            ax.set_visible(False)
+        sns.despine(fig)
+        fig.savefig(os.path.join(output_dir, output_prefix + ".motifs.barplot.top_{}.svg".format(top_n)), bbox_inches="tight", dpi=300)
 
         # Plot heatmaps of terms for each comparison
         if len(enrichment_table[comp_variable].drop_duplicates()) < 2:
@@ -1286,15 +1327,19 @@ def plot_differential_enrichment(
         top_terms = top.index.get_level_values('TF').unique()
 
         # plot clustered heatmap
-        g = sns.clustermap(motifs_pivot.loc[top_terms, :], figsize=(20, 12), cbar_kws={"label": "-log10(p-value) of enrichment\nof differential regions"}, metric="correlation")
-        g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90, ha="right")
-        g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0)
+        shape = motifs_pivot.loc[top_terms, :].shape
+        g = sns.clustermap(motifs_pivot.loc[top_terms, :].T, figsize=(max(6, 0.12 * shape[0]), max(6, 0.12 * shape[1])),
+            cbar_kws={"label": "-log10(p-value) of enrichment\nof differential regions"}, metric="correlation")
+        g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90, ha="right", fontsize="xx-small")
+        g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small")
         g.fig.savefig(os.path.join(output_dir, output_prefix + ".motifs.cluster_specific.svg"), bbox_inches="tight", dpi=300)
 
         # plot clustered heatmap
-        g = sns.clustermap(motifs_pivot.loc[top_terms, :], figsize=(20, 12), z_score=1, cbar_kws={"label": "Z-score of enrichment\nof differential regions"}, metric="correlation")
-        g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90, ha="right")
-        g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0)
+        shape = motifs_pivot.loc[top_terms, :].shape
+        g = sns.clustermap(motifs_pivot.loc[top_terms, :].T, figsize=(max(6, 0.12 * shape[0]), max(6, 0.12 * shape[1])),
+            z_score=0, cbar_kws={"label": "Z-score of enrichment\nof differential regions"}, metric="correlation")
+        g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90, ha="right", fontsize="xx-small")
+        g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small")
         g.fig.savefig(os.path.join(output_dir, output_prefix + ".motifs.cluster_specific.z_score.svg"), bbox_inches="tight", dpi=300)
 
     if enrichment_type == "enrichr":
@@ -1317,9 +1362,20 @@ def plot_differential_enrichment(
 
             n = len(enrichment_table[comp_variable].drop_duplicates())
             n_side = int(np.ceil(np.sqrt(n)))
-            g = sns.FacetGrid(data=top_data, col=comp_variable, col_wrap=n_side, sharey=False, sharex=False)
-            g.map(sns.barplot, "log_p_value", "description", orient="horizontal")
-            g.savefig(os.path.join(output_dir, output_prefix + ".enrichr.{}.barplot.top_{}.svg".format(gene_set_library, top_n)), bbox_inches="tight", dpi=300)
+
+            fig, axis = plt.subplots(n_side, n_side, figsize=(4 * n_side, n_side * max(5, 0.12 * top_n)), sharex=False, sharey=False)
+            axis = iter(axis.flatten())
+            for i, comp in enumerate(top_data[comp_variable].drop_duplicates().sort_values()):
+                df2 = top_data.loc[top_data[comp_variable] == comp, :]
+                ax = next(axis)
+                sns.barplot(
+                    df2["log_p_value"], df2["description"], estimator=max,
+                    orient="horizontal", ax=ax, color=sns.color_palette("colorblind")[0])
+                ax.set_title(comp)
+            for ax in axis:
+                ax.set_visible(False)
+            sns.despine(fig)
+            fig.savefig(os.path.join(output_dir, output_prefix + ".enrichr.{}.barplot.top_{}.svg".format(gene_set_library, top_n)), bbox_inches="tight", dpi=300)
 
             # Plot heatmaps of terms for each comparison
             if len(enrichment_table[comp_variable].drop_duplicates()) < 2:
@@ -1341,16 +1397,91 @@ def plot_differential_enrichment(
             # top_terms = top_terms[top_terms.isin(lola_pivot.columns[lola_pivot.sum() > 5])]
 
             # plot clustered heatmap
-            g = sns.clustermap(enrichr_pivot[list(set(top_terms))], figsize=(20, 12), cbar_kws={"label": "-log10(p-value) of enrichment\nof differential genes"}, metric="correlation")
-            g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90, ha="right", fontsize=4)
-            g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0)
+            shape = enrichr_pivot[list(set(top_terms))].shape
+            g = sns.clustermap(enrichr_pivot[list(set(top_terms))].T, figsize=(max(6, 0.12 * shape[0]), max(6, 0.12 * shape[1])),
+                cbar_kws={"label": "-log10(p-value) of enrichment\nof differential genes"}, metric="correlation")
+            g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90, ha="right", fontsize="xx-small")
+            g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small")
             g.fig.savefig(os.path.join(output_dir, output_prefix + ".enrichr.{}.cluster_specific.svg".format(gene_set_library)), bbox_inches="tight", dpi=300)
 
             # plot clustered heatmap
-            g = sns.clustermap(enrichr_pivot[list(set(top_terms))], figsize=(20, 12), z_score=1, cbar_kws={"label": "Z-score of enrichment\nof differential genes"}, metric="correlation")
-            g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90, ha="right", fontsize=4)
-            g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0)
+            shape = enrichr_pivot[list(set(top_terms))].shape
+            g = sns.clustermap(enrichr_pivot[list(set(top_terms))].T, figsize=(max(6, 0.12 * shape[0]), max(6, 0.12 * shape[1])),
+                z_score=0, cbar_kws={"label": "Z-score of enrichment\nof differential genes"}, metric="correlation")
+            g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90, ha="right", fontsize="xx-small")
+            g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small")
             g.fig.savefig(os.path.join(output_dir, output_prefix + ".enrichr.{}.cluster_specific.z_score.svg".format(gene_set_library)), bbox_inches="tight", dpi=300)
+
+    if enrichment_type == "great":
+        # enrichment_table["description"] = enrichment_table["description"].str.decode("utf-8")
+        enrichment_table["log_q_value"] = (-np.log10(enrichment_table["HyperFdrQ"])).replace({np.inf: 300})
+
+        for gene_set_library in enrichment_table["Ontology"].unique():
+            print(gene_set_library)
+
+            # Plot top_n terms of each comparison in barplots
+            top_data = (
+                enrichment_table[enrichment_table["Ontology"] == gene_set_library]
+                .set_index("Desc")
+                .groupby(comp_variable)
+                ["log_q_value"]
+                .nlargest(top_n)
+                .reset_index())
+
+            n = len(enrichment_table[comp_variable].drop_duplicates())
+            n_side = int(np.ceil(np.sqrt(n)))
+
+            fig, axis = plt.subplots(n_side, n_side, figsize=(4 * n_side, n_side * max(5, 0.12 * top_n)), sharex=False, sharey=False)
+            axis = iter(axis.flatten())
+            for i, comp in enumerate(top_data[comp_variable].drop_duplicates().sort_values()):
+                df2 = top_data.loc[top_data[comp_variable] == comp, :]
+                ax = next(axis)
+                sns.barplot(
+                    df2["log_q_value"], df2["Desc"], estimator=max,
+                    orient="horizontal", ax=ax, color=sns.color_palette("colorblind")[0])
+                ax.set_title(comp)
+            for ax in axis:
+                ax.set_visible(False)
+            sns.despine(fig)
+            fig.savefig(os.path.join(output_dir, output_prefix + ".great.{}.barplot.top_{}.svg".format(gene_set_library, top_n)), bbox_inches="tight", dpi=300)
+
+            # Plot heatmaps of terms for each comparison
+            if len(enrichment_table[comp_variable].drop_duplicates()) < 2:
+                return
+
+            # pivot table
+            great_pivot = pd.pivot_table(
+                enrichment_table[enrichment_table["Ontology"] == gene_set_library],
+                values="log_q_value", columns="Desc", index=comp_variable).fillna(0)
+
+            # plot correlation
+            try:
+                g = sns.clustermap(great_pivot.T.corr(), cbar_kws={"label": "Correlation of enrichemnt\nof differential genes"})
+                g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90)
+                g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0)
+                g.fig.savefig(os.path.join(output_dir, output_prefix + ".great.{}.correlation.svg".format(gene_set_library)), bbox_inches="tight", dpi=300)
+            except FloatingPointError:
+                continue
+
+            top = enrichment_table[enrichment_table["Ontology"] == gene_set_library].set_index('Desc').groupby(comp_variable)['HyperP'].nsmallest(top_n)
+            top_terms = top.index.get_level_values('Desc').unique()
+            # top_terms = top_terms[top_terms.isin(lola_pivot.columns[lola_pivot.sum() > 5])]
+
+            # plot clustered heatmap
+            shape = great_pivot[list(set(top_terms))].shape
+            g = sns.clustermap(great_pivot[list(set(top_terms))].T, figsize=(max(6, 0.12 * shape[0]), max(6, 0.12 * shape[1])),
+                cbar_kws={"label": "-log10(p-value) of enrichment\nof differential genes"}, metric="correlation")
+            g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90, ha="right", fontsize="xx-small")
+            g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small")
+            g.fig.savefig(os.path.join(output_dir, output_prefix + ".great.{}.cluster_specific.svg".format(gene_set_library)), bbox_inches="tight", dpi=300)
+
+            # plot clustered heatmap
+            shape = great_pivot[list(set(top_terms))].shape
+            g = sns.clustermap(great_pivot[list(set(top_terms))].T, figsize=(max(6, 0.12 * shape[0]), max(6, 0.12 * shape[1])),
+                z_score=0, cbar_kws={"label": "Z-score of enrichment\nof differential genes"}, metric="correlation")
+            g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90, ha="right", fontsize="xx-small")
+            g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small")
+            g.fig.savefig(os.path.join(output_dir, output_prefix + ".great.{}.cluster_specific.z_score.svg".format(gene_set_library)), bbox_inches="tight", dpi=300)
 
 
 def chunks(l, n):

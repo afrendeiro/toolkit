@@ -728,7 +728,7 @@ def lola(bed_files, universe_file, output_folder, genome="hg19", cpus=8):
                 }
             }
         }
-    """.genome=genome, cpus=cpus)
+    """.format(genome=genome, cpus=cpus))
 
     # convert the pandas dataframe to an R dataframe
     run(bed_files, universe_file, output_folder)

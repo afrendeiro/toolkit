@@ -55,7 +55,7 @@ def create_project(
     metadata_dir = os.path.join(project_dir, "metadata")
     project_config = os.path.join(metadata_dir, "project_config.yaml")
     annotation_table = os.path.join(metadata_dir, "annotation.csv")
-    merge_table = os.path.join(metadata_dir, "merge.csv")
+    merge_table = os.path.join(metadata_dir, "merge_table.csv")
     comparison_table = os.path.join(metadata_dir, "comparison_table.csv")
     src_dir = os.path.join(project_dir, "src")
 

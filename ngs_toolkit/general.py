@@ -4,6 +4,7 @@ import os
 
 import numpy as np
 import pandas as pd
+import tqdm
 
 
 def pickle_me(function):
@@ -133,6 +134,7 @@ def deseq_analysis(
     Perform differential comparisons with DESeq2.
     """
     import pandas as pd
+    import tqdm
     from rpy2.robjects import numpy2ri, pandas2ri
     import rpy2.robjects as robjects
     numpy2ri.activate()
@@ -169,7 +171,7 @@ def deseq_analysis(
     # _save(dds, file=os.path.join(output_dir, output_prefix + ".deseq_dds_object.Rdata"))
 
     results = pd.DataFrame()
-    for comp in comparison_table["comparison_name"].drop_duplicates().sort_values():
+    for comp in tqdm(comparison_table["comparison_name"].drop_duplicates().sort_values()):
         out_file = os.path.join(output_dir, output_prefix + ".deseq_result.{}.csv".format(comp))
         if not overwrite and os.path.exists(out_file):
             continue
@@ -316,8 +318,8 @@ def differential_overlap(
     piv = pd.pivot_table(differential.reset_index(), index='index', columns=['comparison_name', 'direction'], values='intersect', fill_value=0)
 
     intersections = pd.DataFrame(columns=["group1", "group2", "dir1", "dir2", "size1", "size2", "intersection", "union"])
-    for ((k1, dir1), i1), ((k2, dir2), i2) in itertools.permutations(piv.T.groupby(level=['comparison_name', 'direction']).groups.items(), 2):
-        print(k1, k2)
+    for ((k1, dir1), i1), ((k2, dir2), i2) in tqdm(
+            itertools.permutations(piv.T.groupby(level=['comparison_name', 'direction']).groups.items(), 2)):
         i1 = set(piv[i1][piv[i1] == 1].dropna().index)
         i2 = set(piv[i2][piv[i2] == 1].dropna().index)
         intersections = intersections.append(
@@ -632,27 +634,29 @@ def plot_differential(
                 if c.shape[0] > 0:
                     groups.loc[:, sample_group] = matrix[[d for d in c if d in sample_cols]].mean(axis=1)
 
+            groups = groups.loc[all_diff, :]
+            figsize = (max(5, 0.12 * groups.shape[1]), 5)
             # Heatmaps
             # Comparison level
             g = sns.clustermap(
                 groups.corr(),
                 xticklabels=False, cbar_kws={"label": "Pearson correlation\non differential {}".format(var_name)},
-                cmap="BuGn", metric="correlation", rasterized=True)
-            g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0)
+                cmap="BuGn", metric="correlation", rasterized=True, figsize=(figsize[0], figsize[0]))
+            g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small")
             g.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.groups.clustermap.corr.svg".format(var_name)), bbox_inches="tight", dpi=300, metric="correlation")
 
             g = sns.clustermap(
-                groups.loc[all_diff, :],
+                groups,
                 yticklabels=False, cbar_kws={"label": "{} of\ndifferential {}".format(quantity, var_name)},
-                metric="correlation", rasterized=True)
-            g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90)
+                metric="correlation", rasterized=True, figsize=figsize)
+            g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90, fontsize="xx-small")
             g.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.groups.clustermap.svg".format(var_name)), bbox_inches="tight", dpi=300)
 
             g = sns.clustermap(
-                groups.loc[all_diff, :],
+                groups,
                 yticklabels=False, z_score=0, cbar_kws={"label": "Z-score of {}\non differential {}".format(quantity, var_name)},
-                metric="correlation", rasterized=True)
-            g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90)
+                metric="correlation", rasterized=True, figsize=figsize)
+            g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90, fontsize="xx-small")
             g.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.groups.clustermap.z0.svg".format(var_name)), bbox_inches="tight", dpi=300)
 
     # Fold-changes and P-values
@@ -662,41 +666,46 @@ def plot_differential(
 
     # fold
     if fold_changes.shape[1] > 1:
+        figsize = (max(5, 0.12 * fold_changes.shape[1]), 5)
+
         g = sns.clustermap(fold_changes.corr(),
             xticklabels=False, cbar_kws={"label": "Pearson correlation\non fold-changes"},
-            cmap="BuGn", vmin=0, vmax=1, metric="correlation", rasterized=True)
-        g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0)
+            cmap="BuGn", vmin=0, vmax=1, metric="correlation", rasterized=True, figsize=(figsize[0], figsize[0]))
+        g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small")
         g.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.groups.fold_changes.clustermap.corr.svg".format(var_name)), bbox_inches="tight", dpi=300, metric="correlation")
 
         g = sns.clustermap(fold_changes.loc[all_diff, :],
             yticklabels=False, cbar_kws={"label": "Fold-change of\ndifferential {}".format(var_name)},
-            robust=True, metric="correlation", rasterized=True)
-        g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90)
+            robust=True, metric="correlation", rasterized=True, figsize=figsize)
+        g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90, fontsize="xx-small")
         g.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.groups.fold_changes.clustermap.svg".format(var_name)), bbox_inches="tight", dpi=300)
 
     # Sample level
     if type(matrix.columns) is pd.core.indexes.multi.MultiIndex:
         matrix.columns = matrix.columns.get_level_values("sample_name")
 
-    g = sns.clustermap(matrix.loc[all_diff, :].corr(),
+    matrix = matrix.loc[all_diff, :]
+    figsize = (max(5, 0.12 * matrix.shape[1]), 5)
+
+    g = sns.clustermap(matrix.corr(),
         yticklabels=True, xticklabels=False,
         cbar_kws={"label": "Pearson correlation\non differential {}".format(var_name)},
-        cmap="BuGn", metric="correlation", rasterized=True)
-    g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0)
+        cmap="BuGn", metric="correlation", rasterized=True, figsize=(figsize[0], figsize[0]))
+    g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small")
     g.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.samples.clustermap.corr.svg".format(var_name)), bbox_inches="tight", dpi=300)
 
-    g = sns.clustermap(matrix.loc[all_diff, :],
+    g = sns.clustermap(matrix,
         yticklabels=False, cbar_kws={"label": "{} of\ndifferential {}".format(quantity, var_name)},
         xticklabels=True,
-        vmin=0, metric="correlation", rasterized=True)
-    g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90)
+        vmin=0, metric="correlation", rasterized=True, figsize=figsize)
+    g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90, fontsize="xx-small")
     g.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.samples.clustermap.svg".format(var_name)), bbox_inches="tight", dpi=300)
 
-    g = sns.clustermap(matrix.loc[all_diff, :],
+    g = sns.clustermap(matrix,
         yticklabels=False, z_score=0, cbar_kws={"label": "Z-score of {}\non differential {}".format(quantity, var_name)},
         xticklabels=True,
-        metric="correlation", rasterized=True)
-    g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90)
+        metric="correlation", rasterized=True, figsize=figsize)
+    g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90, fontsize="xx-small")
     g.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.samples.clustermap.z0.svg".format(var_name)), bbox_inches="tight", dpi=300)
 
 
@@ -818,6 +827,7 @@ def enrichr(dataframe, gene_set_libraries=None, kind="genes"):
     import json
     import requests
     import pandas as pd
+    import tqdm
 
     ENRICHR_ADD = 'http://amp.pharm.mssm.edu/Enrichr/addList'
     ENRICHR_RETRIEVE = 'http://amp.pharm.mssm.edu/Enrichr/enrich'
@@ -848,7 +858,7 @@ def enrichr(dataframe, gene_set_libraries=None, kind="genes"):
         ]
 
     results = pd.DataFrame()
-    for gene_set_library in gene_set_libraries:
+    for gene_set_library in tqdm(gene_set_libraries):
         print("Using enricher on %s gene set library." % gene_set_library)
 
         if kind == "genes":
@@ -901,19 +911,19 @@ def enrichr(dataframe, gene_set_libraries=None, kind="genes"):
     return results
 
 
-def run_enrichment_jobs(analysis_name, genome):
+def run_enrichment_jobs(analysis_name, results_dir, genome):
     """
     Submit enrichment jobs for a specifc analysis.
     """
     # LOLA
-    cmds = ["""for F in `find results -name "*_regions.bed"`; do
+    cmds = ["""for F in `find {results_dir} -name "*_regions.bed"`; do
 DIR=`dirname $F`
 if [ ! -f ${{DIR}}/allEnrichments.txt ]; then
 echo $DIR $F
 sbatch -J lola.$F -o $F.lola.log -p shortq -c 8 --mem 24000 \
 --wrap "Rscript ~/jobs/run_LOLA.R $F results/{PROJECT_NAME}_peak_set.bed {GENOME}"
 fi
-done""".format(PROJECT_NAME=analysis_name, GENOME=genome)]
+done""".format(results_dir=results_dir, PROJECT_NAME=analysis_name, GENOME=genome)]
 
     # AME
     dbs = {
@@ -921,7 +931,7 @@ done""".format(PROJECT_NAME=analysis_name, GENOME=genome)]
         "mouse": "~/resources/motifs/motif_databases/MOUSE/uniprobe_mouse.meme"}
     omap = {"hg38": "human", "hg19": "human", "mm10": "mouse"}
 
-    cmds += ["""for F in `find results -name "*_regions.fa"`; do
+    cmds += ["""for F in `find {results_dir} -name "*_regions.fa"`; do
 DIR=`dirname $F`
 if [ ! -f ${{DIR}}/ame.html ]; then
 echo $DIR $F
@@ -930,33 +940,33 @@ sbatch -J "meme_ame.${{F}}" -o "${{F}}.meme_ame.log" -p shortq -c 1 --mem 4000 \
 ame --bgformat 1 --scoring avg --method ranksum --pvalue-report-threshold 0.05 \
 --control "${{F}}".shuffled.fa -o "${{DIR}}" "${{F}}" {motifs}"
 fi
-done""".format(motifs=dbs[omap[genome]])]
+done""".format(results_dir=results_dir, motifs=dbs[omap[genome]])]
 
     # HOMER
-    cmds += ["""for F in `find results -name "*_regions.bed"`; do
+    cmds += ["""for F in `find {results_dir} -name "*_regions.bed"`; do
 DIR=`dirname $F`
 if [ ! -f ${{DIR}}/homerResults.html ]; then
 echo $DIR $F
 sbatch -J "homer.${{F}}" -o "${{F}}.homer.log" -p shortq -c 8 --mem 20000 \
 --wrap "findMotifsGenome.pl ${{F}} {GENOME}r ${{DIR}} -size 1000 -h -p 2 -len 8,10,12,14 -noknown"
 fi
-done""".format(GENOME=genome)]
+done""".format(results_dir=results_dir, GENOME=genome)]
 
     # Enrichr
-    cmds += ["""for F in `find results -name "*.gene_symbols.txt"`; do
+    cmds += ["""for F in `find {results_dir} -name "*.gene_symbols.txt"`; do
 if [ ! -f ${{F}}.enrichr.csv ]; then
 echo $F
 sbatch -J enrichr.$F -o $F.enrichr.log -p shortq -c 1 --mem 4000 \
---wrap "python ~/jobs/run_Enrichr.py --input-file "$F" --output-file "${F/gene_symbols.txt/enrichr.csv}" "
+--wrap "python ~/jobs/run_Enrichr.py --input-file "$F" --output-file "${{F/gene_symbols.txt/enrichr.csv}}" "
 fi
-done"""]
-    cmds += ["""for F in `find results -name "*_genes.symbols.txt"`; do
-if [ ! -f ${F/symbols.txt/enrichr.csv} ]; then
+done""".format(results_dir=results_dir)]
+    cmds += ["""for F in `find {results_dir} -name "*_genes.symbols.txt"`; do
+if [ ! -f ${{F/symbols.txt/enrichr.csv}} ]; then
 echo $F
 sbatch -J enrichr.$F -o $F.enrichr.log -p shortq -c 1 --mem 4000 \
---wrap "python ~/jobs/run_Enrichr.py --input-file "$F" --output-file "${F/symbols.txt/enrichr.csv}" "
+--wrap "python ~/jobs/run_Enrichr.py --input-file "$F" --output-file "${{F/symbols.txt/enrichr.csv}}" "
 fi
-done"""]
+done""".format(results_dir=results_dir)]
 
     for cmd in cmds:
         os.system(cmd)
@@ -969,6 +979,7 @@ def differential_enrichment(
         output_dir="results/differential_analysis_{data_type}",
         output_prefix="differential_analysis",
         genome="hg19",
+        directional=True,
         max_diff=1000,
         sort_var="pvalue",
         as_jobs=True
@@ -979,8 +990,9 @@ def differential_enrichment(
     will get enrichment of gene sets, regions and TF motifs according
     to the `data_type`.
 
+    If `directional`, separate features by the log2FoldChange direction (higher or less than 0).
     At most will use `max_diff` regions/genes in each comparison sorted by `sort_var`.
-    
+
     `run_mode`: one of "serial" or "job".
     """
     import pandas as pd
@@ -988,7 +1000,7 @@ def differential_enrichment(
     serial = not as_jobs
 
     if data_type == "ATAC-seq":
-        from ngs_toolkit.atacseq import characterize_regions_function
+        # from ngs_toolkit.atacseq import characterize_regions_function
         matrix = analysis.coverage_annotated
         lola_enr = pd.DataFrame()
         meme_enr = pd.DataFrame()
@@ -1004,25 +1016,44 @@ def differential_enrichment(
         output_dir = output_dir.format(data_type=data_type)
 
     # Examine each region cluster
-    max_diff = 1000
+    max_diff = max_diff
     for comp in differential['comparison_name'].drop_duplicates():
-        # Separate in up/down-regulated genes
-        for f, direction, top in [(np.less, "down", "head"), (np.greater, "up", "tail")]:
-            diff = differential.loc[
-                (differential["comparison_name"] == comp) &
-                (f(differential["log2FoldChange"], 0)), :].index
+        
+        if directional:
+            # Separate in up/down-regulated genes
+            params = [(np.less, 0, "down", "head"), (np.greater, 0, "up", "tail")]
+        else:
+            # get all genes
+            params = [(np.less, np.inf, "all", "head")]
+
+        for f, arg, direction, top in params:
+            if directional:
+                diff = differential.loc[
+                    (differential["comparison_name"] == comp) &
+                    (f(differential["log2FoldChange"], arg)), :].index
+            else:
+                diff = differential.loc[
+                    (differential["comparison_name"] == comp), :].index
 
             # Handle extremes of regions
             if diff.shape[0] < 1:
                 continue
             if diff.shape[0] > max_diff:
-                diff = (
-                    getattr(
-                        differential[
-                            (differential["comparison_name"] == comp) &
-                            (f(differential["log2FoldChange"], 0))]
-                        [sort_var].sort_values(), top)
-                    (max_diff).index)
+                if directional:
+                    diff = (
+                        getattr(
+                            differential[
+                                (differential["comparison_name"] == comp) &
+                                (f(differential["log2FoldChange"], arg))]
+                            [sort_var].sort_values(), top)
+                        (max_diff).index)
+                else:
+                    diff = (
+                        getattr(
+                            differential[
+                                (differential["comparison_name"] == comp)]
+                            [sort_var].sort_values(), top)
+                        (max_diff).index)
 
             # Add data_type specific info
             comparison_df = matrix.loc[diff, :]
@@ -1084,11 +1115,12 @@ def differential_enrichment(
         pathway_enr.to_csv(
             os.path.join(output_dir, output_prefix + ".enrichr.csv"), index=False)
     else:
-        run_enrichment_jobs(analysis_name=analysis.name, genome=genome)
+        run_enrichment_jobs(analysis_name=analysis.name, results_dir=output_dir, genome=genome)
 
 
 def collect_differential_enrichment(
         differential,
+        directional=True,
         data_type="ATAC-seq",
         output_dir="results/differential_analysis_{data_type}",
         output_prefix="differential_analysis",
@@ -1116,8 +1148,13 @@ def collect_differential_enrichment(
     pathway_enr = pd.DataFrame()
     # Examine each region cluster
     for comp in differential['comparison_name'].drop_duplicates():
-        # Separate in up/down-regulated genes
-        for f, direction, top in [(np.less, "down", "head"), (np.greater, "up", "tail")]:
+        if directional:
+            # Separate in up/down-regulated genes
+            params = ["down", "up"]
+        else:
+            params = ["all"]
+
+        for direction in params:
             comparison_dir = os.path.join(output_dir, "{}.{}".format(comp, direction))
 
             if data_type == "RNA-seq":
@@ -1201,6 +1238,7 @@ def plot_differential_enrichment(
     `comp_variable` is the column in the enrichment table that labels groups.
     """
     import numpy as np
+    import matplotlib.pyplot as plt
     import seaborn as sns
 
     if enrichment_type not in ["lola", "enrichr", "motif", 'great']:
@@ -1645,6 +1683,27 @@ def detect_peaks(x, mph=None, mpd=1, threshold=0, edge='rising',
     return ind
 
 
+def count_jobs_running(cmd="squeue", sep="\n"):
+    """
+    Count running jobs on a cluster by invoquing a command that lists the jobs.
+    """
+    import subprocess
+    return subprocess.check_output(cmd).split(sep).__len__()
+
+
+def submit_job_if_possible(cmd, total_job_lim=800, refresh_time=10, in_between_time=5):
+    from ngs_toolkit.general import count_jobs_running
+    import time
+    import os
+
+    submit = count_jobs_running() < total_job_lim
+    while not submit:
+        time.sleep(refresh_time)
+        submit = count_jobs_running() < total_job_lim
+    os.system(cmd)
+    time.sleep(in_between_time)
+
+
 def sra_id2geo_id(sra_ids):
     """Query SRA ID from GEO ID"""
     import subprocess
@@ -1913,3 +1972,4 @@ def subtract_principal_component_by_attribute(df, pc=1, attributes=["CLL"]):
         if X2.loc[sample, :].isnull().all():
             X2.loc[sample, :] = df.loc[sample, :]
     return X2
+

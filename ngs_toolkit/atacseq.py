@@ -53,11 +53,12 @@ class ATACSeqAnalysis(Analysis):
         `blacklist_bed` is a 3 column BED file with genomic positions to exclude from consensus peak set.
         """
         import re
+        import tqdm
 
         if samples is None:
             samples = self.samples
 
-        for i, sample in enumerate(samples):
+        for i, sample in tqdm(enumerate(samples)):
             print(sample.name)
             # Get peaks
             if region_type == "summits":
@@ -108,12 +109,13 @@ class ATACSeqAnalysis(Analysis):
         (i.e. ratio of samples containing a peak overlapping region in union set of peaks).
         """
         import re
+        import tqdm
 
         if samples is None:
             samples = self.samples
 
         # calculate support (number of samples overlaping each merged peak)
-        for i, sample in enumerate(samples):
+        for i, sample in tqdm(enumerate(samples)):
             print(sample.name)
             if region_type == "summits":
                 peaks = re.sub("_peaks.narrowPeak", "_summits.bed", sample.peaks)
@@ -685,6 +687,7 @@ class ATACSeqAnalysis(Analysis):
         if samples is None:
             samples = self.samples
 
+        # TODO: add parallelization with parmap
         stats = pd.DataFrame([
             map(get_sample_reads, [s.filtered for s in samples]),
             map(get_peak_number, [s.peaks for s in samples]),
@@ -1500,141 +1503,143 @@ class ATACSeqAnalysis(Analysis):
                 tick.set_rotation(0)
             g.fig.savefig(os.path.join(self.results_dir, "PCA.PC_pvalues.enrichr_enrichments.{}.z_score.svg".format(gene_set_library)), bbox_inches="tight", dpi=300)
 
-    def characterize_regions_structure(self, df, prefix, output_dir, universe_df=None):
-        # use all sites as universe
-        if universe_df is None:
-            universe_df = self.coverage_annotated
 
-        # make output dirs
-        if not os.path.exists(output_dir):
-            os.makedirs(output_dir)
-        # compare genomic regions and chromatin_states
-        enrichments = pd.DataFrame()
-        for i, var in enumerate(['genomic_region', 'chromatin_state']):
-            # prepare:
-            # separate comma-delimited fields:
-            df_count = Counter(df[var].str.split(',').apply(pd.Series).stack().tolist())
-            df_universe_count = Counter(universe_df[var].str.split(',').apply(pd.Series).stack().tolist())
+def characterize_regions_structure(analysis, df, prefix, output_dir, universe_df=None):
+    # use all sites as universe
+    if universe_df is None:
+        universe_df = analysis.coverage_annotated
 
-            # divide by total:
-            df_count = {k: v / float(len(df)) for k, v in df_count.items()}
-            df_universe_count = {k: v / float(len(universe_df)) for k, v in df_universe_count.items()}
+    # make output dirs
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+    # compare genomic regions and chromatin_states
+    enrichments = pd.DataFrame()
+    for i, var in enumerate(['genomic_region', 'chromatin_state']):
+        # prepare:
+        # separate comma-delimited fields:
+        df_count = Counter(df[var].str.split(',').apply(pd.Series).stack().tolist())
+        df_universe_count = Counter(universe_df[var].str.split(',').apply(pd.Series).stack().tolist())
 
-            # join data, sort by subset data
-            both = pd.DataFrame([df_count, df_universe_count], index=['subset', 'all']).T
-            both = both.sort_values("subset")
-            both['region'] = both.index
-            data = pd.melt(both, var_name="set", id_vars=['region']).replace(np.nan, 0)
+        # divide by total:
+        df_count = {k: v / float(len(df)) for k, v in df_count.items()}
+        df_universe_count = {k: v / float(len(universe_df)) for k, v in df_universe_count.items()}
 
-            # sort for same order
-            data.sort_values('region', inplace=True)
+        # join data, sort by subset data
+        both = pd.DataFrame([df_count, df_universe_count], index=['subset', 'all']).T
+        both = both.sort_values("subset")
+        both['region'] = both.index
+        data = pd.melt(both, var_name="set", id_vars=['region']).replace(np.nan, 0)
 
-            # g = sns.FacetGrid(col="region", data=data, col_wrap=3, sharey=True)
-            # g.map(sns.barplot, "set", "value")
-            # plt.savefig(os.path.join(output_dir, "%s_regions.%s.svg" % (prefix, var)), bbox_inches="tight")
+        # sort for same order
+        data.sort_values('region', inplace=True)
 
-            fc = pd.DataFrame(np.log2(both['subset'] / both['all']), columns=['value'])
-            fc['variable'] = var
+        # g = sns.FacetGrid(col="region", data=data, col_wrap=3, sharey=True)
+        # g.map(sns.barplot, "set", "value")
+        # plt.savefig(os.path.join(output_dir, "%s_regions.%s.svg" % (prefix, var)), bbox_inches="tight")
 
-            # append
-            enrichments = enrichments.append(fc)
+        fc = pd.DataFrame(np.log2(both['subset'] / both['all']), columns=['value'])
+        fc['variable'] = var
 
-        # save
-        enrichments.to_csv(os.path.join(output_dir, "%s_regions.region_enrichment.csv" % prefix), index=True)
+        # append
+        enrichments = enrichments.append(fc)
 
-    def characterize_regions_function(self, df, output_dir, prefix, universe_file=None, run=True, genome="hg19"):
-        """
-        Performs a range of functional enrichments of a set of regions given in `df`
-        (a dataframe with 'chrom', 'start', 'end', 'gene_name', 'ensebl_gene_id' columns - typically the coverage_annotated dataframe).
-        Will extract regions, their underlying sequence, associated genes, perform motif enrichment,
-        location overlap analysis (LOLA), and gene set enrichment (using the Enrichr API).
+    # save
+    enrichments.to_csv(os.path.join(output_dir, "%s_regions.region_enrichment.csv" % prefix), index=True)
 
-        This requires several programs and R libraries:
-         - MEME suite (AME)
-         - HOMER suite (findMotifsGenome.pl)
-         - LOLA (R library)
 
-        Additionally, some genome-specific databases are needed to run these programs.
-        """
-        from ngs_toolkit.general import bed_to_fasta, meme_ame, homer_motifs, lola, enrichr, standard_scale
+def characterize_regions_function(analysis, df, output_dir, prefix, universe_file=None, run=True, genome="hg19"):
+    """
+    Performs a range of functional enrichments of a set of regions given in `df`
+    (a dataframe with 'chrom', 'start', 'end', 'gene_name', 'ensebl_gene_id' columns - typically the coverage_annotated dataframe).
+    Will extract regions, their underlying sequence, associated genes, perform motif enrichment,
+    location overlap analysis (LOLA), and gene set enrichment (using the Enrichr API).
 
-        # use all sites as universe
-        if universe_file is None:
-            universe_file = self.sites
+    This requires several programs and R libraries:
+        - MEME suite (AME)
+        - HOMER suite (findMotifsGenome.pl)
+        - LOLA (R library)
 
-        # make output dirs
-        if not os.path.exists(output_dir):
-            os.makedirs(output_dir)
+    Additionally, some genome-specific databases are needed to run these programs.
+    """
+    from ngs_toolkit.general import bed_to_fasta, meme_ame, homer_motifs, lola, enrichr, standard_scale
 
-        # save to bed
-        bed_file = os.path.join(output_dir, "{}_regions.bed".format(prefix))
-        df[['chrom', 'start', 'end']].to_csv(bed_file, sep="\t", header=False, index=False)
-        # save as tsv
-        tsv_file = os.path.join(output_dir, "{}_regions.tsv".format(prefix))
-        df[['chrom', 'start', 'end']].reset_index().to_csv(tsv_file, sep="\t", header=False, index=False)
+    # use all sites as universe
+    if universe_file is None:
+        universe_file = analysis.sites
 
-        # export gene names
-        (df['gene_name']
+    # make output dirs
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
+    # save to bed
+    bed_file = os.path.join(output_dir, "{}_regions.bed".format(prefix))
+    df[['chrom', 'start', 'end']].to_csv(bed_file, sep="\t", header=False, index=False)
+    # save as tsv
+    tsv_file = os.path.join(output_dir, "{}_regions.tsv".format(prefix))
+    df[['chrom', 'start', 'end']].reset_index().to_csv(tsv_file, sep="\t", header=False, index=False)
+
+    # export gene names
+    (df['gene_name']
+    .str.split(",")
+    .apply(pd.Series, 1)
+    .stack()
+    .drop_duplicates()
+    .to_csv(
+        os.path.join(output_dir, "{}_genes.symbols.txt".format(prefix)),
+        index=False))
+    if "ensembl_gene_id" in df.columns:
+        # export ensembl gene names
+        (df['ensembl_gene_id']
         .str.split(",")
         .apply(pd.Series, 1)
         .stack()
         .drop_duplicates()
         .to_csv(
-            os.path.join(output_dir, "{}_genes.symbols.txt".format(prefix)),
+            os.path.join(output_dir, "{}_genes.ensembl.txt".format(prefix)),
             index=False))
-        if "ensembl_gene_id" in df.columns:
-            # export ensembl gene names
-            (df['ensembl_gene_id']
+
+    # export gene symbols with scaled absolute fold change
+    if "log2FoldChange" in df.columns:
+        df["score"] = standard_scale(abs(df["log2FoldChange"]))
+        df["abs_fc"] = abs(df["log2FoldChange"])
+
+        d = df[['gene_name', 'score']].sort_values('score', ascending=False)
+
+        # split gene names from score if a reg.element was assigned to more than one gene
+        a = (
+            d['gene_name']
             .str.split(",")
             .apply(pd.Series, 1)
             .stack()
-            .drop_duplicates()
-            .to_csv(
-                os.path.join(output_dir, "{}_genes.ensembl.txt".format(prefix)),
-                index=False))
+        )
+        a.index = a.index.droplevel(1)
+        a.name = 'gene_name'
+        d = d[['score']].join(a)
+        # reduce various ranks to mean per gene
+        d = d.groupby('gene_name').mean().reset_index()
+        d.to_csv(os.path.join(output_dir, "{}_genes.symbols.score.csv".format(prefix)), index=False)
 
-        # export gene symbols with scaled absolute fold change
-        if "log2FoldChange" in df.columns:
-            df["score"] = standard_scale(abs(df["log2FoldChange"]))
-            df["abs_fc"] = abs(df["log2FoldChange"])
+    # Motifs
+    # de novo motif finding - enrichment
+    fasta_file = os.path.join(output_dir, "{}_regions.fa".format(prefix))
+    bed_to_fasta(bed_file, fasta_file, genome=genome)
 
-            d = df[['gene_name', 'score']].sort_values('score', ascending=False)
+    if not run:
+        return
 
-            # split gene names from score if a reg.element was assigned to more than one gene
-            a = (
-                d['gene_name']
-                .str.split(",")
-                .apply(pd.Series, 1)
-                .stack()
-            )
-            a.index = a.index.droplevel(1)
-            a.name = 'gene_name'
-            d = d[['score']].join(a)
-            # reduce various ranks to mean per gene
-            d = d.groupby('gene_name').mean().reset_index()
-            d.to_csv(os.path.join(output_dir, "{}_genes.symbols.score.csv".format(prefix)), index=False)
+    omap = {"hg38": "human", "hg19": "human", "mm10": "mouse"}
+    meme_ame(fasta_file, output_dir, organism=omap[genome])
+    homer_motifs(bed_file, output_dir, genome=genome)
 
-        # Motifs
-        # de novo motif finding - enrichment
-        fasta_file = os.path.join(output_dir, "{}_regions.fa".format(prefix))
-        bed_to_fasta(bed_file, fasta_file, genome=genome)
+    # Lola
+    try:
+        lola(bed_file, universe_file, output_dir, genome=genome)
+    except:
+        print("LOLA analysis for {} failed!".format(prefix))
 
-        if not run:
-            return
-
-        omap = {"hg38": "human", "hg19": "human", "mm10": "mouse"}
-        meme_ame(fasta_file, output_dir, organism=omap[genome])
-        homer_motifs(bed_file, output_dir, genome=genome)
-
-        # Lola
-        try:
-            lola(bed_file, universe_file, output_dir, genome=genome)
-        except:
-            print("LOLA analysis for {} failed!".format(prefix))
-
-        # Enrichr
-        results = enrichr(df[['chrom', 'start', 'end', "gene_name"]])
-        results.to_csv(os.path.join(output_dir, "{}_regions.enrichr.csv".format(prefix)), index=False, encoding='utf-8')
+    # Enrichr
+    results = enrichr(df[['chrom', 'start', 'end', "gene_name"]])
+    results.to_csv(os.path.join(output_dir, "{}_regions.enrichr.csv".format(prefix)), index=False, encoding='utf-8')
 
 
 def metagene_plot(bams, labels, output_prefix, region="genebody", genome="hg19"):

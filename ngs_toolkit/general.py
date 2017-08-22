@@ -204,6 +204,119 @@ def deseq_analysis(
     return results
 
 
+def least_squares_fit(
+        quant_matrix, design_matrix, test_model,
+        null_model="~ 1", standardize_data=True,
+        multiple_correction_method="fdr_bh"):
+    """
+    Fit a least squares model with only categorical predictors.
+    Computes p-values by comparing the log likelihood ratio of the chosen model to a `null_model`.
+
+    `quant_matrix` is a (samples, variables) matrix.
+    `design_matrix` is a (samples, variables) dataframe with all the variables in `test_model`.
+    """
+    from sklearn.preprocessing import StandardScaler
+    import patsy
+    from scipy.linalg import lstsq
+    from scipy import stats
+    from statsmodels.sandbox.stats.multicomp import multipletests
+
+    # # to test
+    # quant_matrix = np.random.random(10000000).reshape(100, 100000)
+    # P = np.concatenate([[0] * 50, [1] * 50])
+    # Q = np.concatenate([[0] * 25, [1] * 25] + [[0] * 25, [1] * 25])
+    # design_matrix = pd.DataFrame([P, Q], index=["P", "Q"]).T
+    # quant_matrix = quant_matrix.T * (1 + (design_matrix.sum(axis=1) * 4).values)
+    # quant_matrix = pd.DataFrame(quant_matrix.T)
+    # test_model = "~ Q + P"
+    # null_model = "~ Q"
+
+    if standardize_data:
+        norm = StandardScaler()
+        quant_matrix = pd.DataFrame(
+            norm.fit_transform(quant_matrix),
+            index=quant_matrix.index, columns=quant_matrix.columns)
+
+    A1 = patsy.dmatrix(test_model, design_matrix)
+    betas1, residuals1, _, _ = lstsq(A1, quant_matrix)
+
+    A0 = patsy.dmatrix(null_model, design_matrix)
+    betas0, residuals0, _, _ = lstsq(A0, quant_matrix)
+
+    results = pd.DataFrame(betas1.T, columns=A1.design_info.column_names, index=quant_matrix.columns)
+
+    # Calculate the log-likelihood ratios
+    n = float(quant_matrix.shape[0])
+    results['model_residuals'] = residuals1
+    results['null_residuals'] = residuals0
+    results['model_log_likelihood'] = (-n / 2.) * np.log(2 * np.pi) - n / 2. * np.log(results['model_residuals'] / n) - n / 2.
+    results['null_log_likelihood'] = (-n / 2.) * np.log(2 * np.pi) - n / 2. * np.log(results['null_residuals'] / n) - n / 2.
+
+    results['log_likelihood_ratio'] = results['model_log_likelihood'] - results['null_log_likelihood']
+    results['D_statistic'] = 2 * results['log_likelihood_ratio']
+    results['p_value'] = stats.chi2.sf(results['log_likelihood_ratio'], df=betas1.shape[0] - betas0.shape[0])
+    results['q_value'] = multipletests(results['p_value'], method=multiple_correction_method)[1]
+
+    if not standardize_data:
+        results["mean"] = quant_matrix.mean(axis=0)
+
+    return results
+
+
+# def independent_filtering(df, alpha=0.05, n_quantiles=100):
+#     """
+#     """
+#     raise NotImplementedError
+#     import numpy as np
+
+#     req_columns = ["pvalue", "baseMean"]
+#     assert all([x in df.columns for x in req_columns])
+
+#     # compute quantiles accross mean and pvalue distributions
+#     stats = pd.DataFrame()
+#     p = (np.arange(n_quantiles) / float(n_quantiles)) * 100
+#     p = np.append(p, 100.)
+#     for start, end in zip(p, p[1:]):
+#         m = np.log2(1 + df['baseMean'])
+#         i = df.loc[
+#             (m >= np.percentile(m, start)) &
+#             (m <= np.percentile(m, end)), :].index
+#         stats.loc[start, "n"] = i.shape[0]
+#         stats.loc[start, "mean"] = df.loc[i, "baseMean"].mean()
+#         stats.loc[start, "mean_p"] = df.loc[i, "pvalue"].mean()
+#         stats.loc[start, "n_sig_p"] = (df.loc[i, "pvalue"] < alpha).sum()
+
+#     # plot
+#     fig, axis = plt.subplots(1, 2, figsize=(4 * 2, 4 * 1))
+#     axis[0].scatter(stats.index, stats.loc[:, "n_sig_p"])
+#     axis[1].scatter(stats.index, -np.log10(stats.loc[:, "mean_p"]))
+
+#     # choose inflection point
+
+#     return
+
+
+# def fit_curve():
+#     import numpy as np
+#     import matplotlib.pyplot as plt
+#     from scipy.optimize import curve_fit
+
+#     def func(x, a, b, c):
+#         return a * np.exp(-b * x) + c
+
+#     plt.plot(stats.index, -np.log10(stats['mean_p']), 'b-', label='data')
+
+#     popt, pcov = curve_fit(func, stats.index, -np.log10(stats['mean_p']))
+#     plt.plot(stats.index, func(stats.index, *popt), 'r-', label='fit')
+
+#     popt, pcov = curve_fit(func, stats.index, stats['mean_p'], bounds=(0, [3., 2., 1.]))
+#     plt.plot(stats.index, func(stats.index, *popt), 'g--', label='fit-with-bounds')
+#     plt.xlabel('x')
+#     plt.ylabel('y')
+#     plt.legend()
+#     plt.show()
+
+
 def differential_analysis(
         analysis,
         comparison_table,

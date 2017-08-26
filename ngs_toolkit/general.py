@@ -4,7 +4,7 @@ import os
 
 import numpy as np
 import pandas as pd
-import tqdm
+from tqdm import tqdm
 
 
 def pickle_me(function):
@@ -134,7 +134,7 @@ def deseq_analysis(
     Perform differential comparisons with DESeq2.
     """
     import pandas as pd
-    import tqdm
+    from tqdm import tqdm
     from rpy2.robjects import numpy2ri, pandas2ri
     import rpy2.robjects as robjects
     numpy2ri.activate()
@@ -933,6 +933,44 @@ def homer_motifs(bed_file, output_dir, genome="hg19"):
     os.system(cmd)
 
 
+def parse_homer(homer_dir):
+    import glob
+    import os
+    import re
+    import pandas as pd
+
+    motif_htmls = sorted(glob.glob(os.path.join(homer_dir, "motif*.info.html")))
+
+    output = pd.DataFrame()
+    for motif_html in motif_htmls:
+
+        motif = int(re.sub(".info.html", "", re.sub(os.path.join(homer_dir, "motif"), "", motif_html)))
+
+        with open(motif_html, 'r') as handle:
+            content = handle.read()
+
+        # Parse table with motif info
+        info_table = content[
+            re.search("""<TABLE border="1" cellpading="0" cellspacing="0">""", content).end()
+            :
+            re.search("</TABLE>", content).start()].strip()
+
+        info_table = pd.DataFrame([x.split("</TD><TD>") for x in info_table.replace("<TR><TD>", "").split("</TD></TR>")])
+        info_table[0] = info_table[0].str.strip()
+        info_table["motif"] = motif
+
+        # Add most probable known motif name
+        info_table["known_motif"] = content[
+            re.search("<H4>", content).end()
+            :
+            re.search("</H4>", content).start()]
+
+        # append
+        output = output.append(info_table, ignore_index=True)
+
+    return output.sort_values("motif")
+
+
 def enrichr(dataframe, gene_set_libraries=None, kind="genes"):
     """
     Use Enrichr on a list of genes (currently only genes supported through the API).
@@ -940,7 +978,7 @@ def enrichr(dataframe, gene_set_libraries=None, kind="genes"):
     import json
     import requests
     import pandas as pd
-    import tqdm
+    from tqdm import tqdm
 
     ENRICHR_ADD = 'http://amp.pharm.mssm.edu/Enrichr/addList'
     ENRICHR_RETRIEVE = 'http://amp.pharm.mssm.edu/Enrichr/enrich'
@@ -1113,10 +1151,11 @@ def differential_enrichment(
     serial = not as_jobs
 
     if data_type == "ATAC-seq":
-        # from ngs_toolkit.atacseq import characterize_regions_function
+        from ngs_toolkit.atacseq import characterize_regions_function
         matrix = analysis.coverage_annotated
         lola_enr = pd.DataFrame()
         meme_enr = pd.DataFrame()
+        homer_enr = pd.DataFrame()
         pathway_enr = pd.DataFrame()
     elif data_type == "RNA-seq":
         from ngs_toolkit.general import enrichr
@@ -1205,7 +1244,8 @@ def differential_enrichment(
                 # collect enrichments
                 if serial:
                     # read/parse
-                    motifs = parse_ame(comparison_dir)
+                    meme_motifs = parse_ame(comparison_dir)
+                    homer_motifs = parse_homer(os.path.join(comparison_dir, "homerResults"))
                     lola = pd.read_csv(os.path.join(comparison_dir, "allEnrichments.txt"), sep="\t")
                     enr = pd.read_csv(os.path.join(comparison_dir, output_prefix + "_regions.enrichr.csv"), index=False, encoding='utf-8')
                     # label
@@ -1214,7 +1254,8 @@ def differential_enrichment(
                         d["direction"] = direction
                         d["label"] = "{}.{}".format(comp, direction)
                     # append
-                    meme_enr = meme_enr.append(motifs, ignore_index=True)
+                    meme_enr = meme_enr.append(meme_motifs, ignore_index=True)
+                    homer_enr = homer_enr.append(homer_motifs, ignore_index=True)
                     lola_enr = lola_enr.append(lola, ignore_index=True)
                     pathway_enr = pathway_enr.append(enr, ignore_index=True)
 
@@ -1223,6 +1264,8 @@ def differential_enrichment(
         if data_type == "ATAC-seq":
             meme_enr.to_csv(
                 os.path.join(output_dir, output_prefix + ".meme_ame.csv"), index=False)
+            homer_enr.to_csv(
+                os.path.join(output_dir, output_prefix + ".homer_motifs.csv"), index=False)
             lola.to_csv(
                 os.path.join(output_dir, output_prefix + ".lola.csv"), index=False)
         pathway_enr.to_csv(
@@ -1246,7 +1289,7 @@ def collect_differential_enrichment(
     """
     import pandas as pd
     import numpy as np
-    from ngs_toolkit.general import parse_ame
+    from ngs_toolkit.general import parse_ame, parse_homer
 
     if data_type not in ["ATAC-seq", "RNA-seq"]:
         raise AssertionError("`data_type` must match one of 'ATAC-seq' or 'RNA-seq'.")
@@ -1258,6 +1301,7 @@ def collect_differential_enrichment(
 
     lola_enr = pd.DataFrame()
     meme_enr = pd.DataFrame()
+    homer_enr = pd.DataFrame()
     pathway_enr = pd.DataFrame()
     # Examine each region cluster
     for comp in differential['comparison_name'].drop_duplicates():
@@ -1286,18 +1330,34 @@ def collect_differential_enrichment(
             elif data_type == "ATAC-seq":
                 # print("Collecting enrichments of comparison '{}', direction '{}'.".format(comp, direction))
                 # read/parse
+
+                # MEME/AME
                 try:
-                    motifs = parse_ame(comparison_dir).reset_index()
-                    motifs.columns = ["TF", "p_value"]
+                    ame_motifs = parse_ame(comparison_dir).reset_index()
+                    ame_motifs.columns = ["TF", "p_value"]
                 except IOError as e:
                     if permissive:
-                        print(error_msg.format("Motif", comp, direction))
+                        print(error_msg.format("MEME/AME motif", comp, direction))
                     else:
                         raise e
                 else:
-                    motifs["comparison_name"] = comp
-                    motifs["direction"] = direction
-                    meme_enr = meme_enr.append(motifs, ignore_index=True)
+                    ame_motifs["comparison_name"] = comp
+                    ame_motifs["direction"] = direction
+                    meme_enr = meme_enr.append(ame_motifs, ignore_index=True)
+
+                # HOMER
+                try:
+                    homer_motifs = parse_homer(os.path.join(comparison_dir, "homerResults"))
+                    homer_motifs.columns = ["TF", "p_value"]
+                except IOError as e:
+                    if permissive:
+                        print(error_msg.format("HOMER motif", comp, direction))
+                    else:
+                        raise e
+                else:
+                    homer_motifs["comparison_name"] = comp
+                    homer_motifs["direction"] = direction
+                    homer_enr = homer_enr.append(homer_motifs, ignore_index=True)
 
                 # LOLA
                 try:
@@ -1324,12 +1384,15 @@ def collect_differential_enrichment(
                     enr["comparison_name"] = comp
                     enr["direction"] = direction
                     pathway_enr = pathway_enr.append(enr, ignore_index=True)
+
     # write combined enrichments
     pathway_enr.to_csv(
         os.path.join(output_dir, output_prefix + ".enrichr.csv"), index=False)
     if data_type == "ATAC-seq":
         meme_enr.to_csv(
             os.path.join(output_dir, output_prefix + ".meme_ame.csv"), index=False)
+        homer_enr.to_csv(
+            os.path.join(output_dir, output_prefix + ".homer_motifs.csv"), index=False)
         lola_enr.to_csv(
             os.path.join(output_dir, output_prefix + ".lola.csv"), index=False)
 

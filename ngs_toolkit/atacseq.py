@@ -53,7 +53,7 @@ class ATACSeqAnalysis(Analysis):
         `blacklist_bed` is a 3 column BED file with genomic positions to exclude from consensus peak set.
         """
         import re
-        import tqdm
+        from tqdm import tqdm
 
         if samples is None:
             samples = self.samples
@@ -109,7 +109,7 @@ class ATACSeqAnalysis(Analysis):
         (i.e. ratio of samples containing a peak overlapping region in union set of peaks).
         """
         import re
-        import tqdm
+        from tqdm import tqdm
 
         if samples is None:
             samples = self.samples
@@ -1062,7 +1062,8 @@ class ATACSeqAnalysis(Analysis):
         if samples is None:
             samples = [s for s in self.samples if s.name in matrix.columns.get_level_values("sample_name")]
 
-        color_dataframe = pd.DataFrame(self.get_level_colors(index=matrix.columns, levels=attributes_to_plot), index=attributes_to_plot, columns=[s.name for s in samples])
+        color_dataframe = pd.DataFrame(self.get_level_colors(index=matrix.columns, levels=attributes_to_plot), index=attributes_to_plot, columns=[s.name for s in self.samples])
+        color_dataframe = color_dataframe.loc[:, [s.name for s in samples]]
         # # exclude samples if needed
         # color_dataframe = color_dataframe[[s.name for s in samples]]
         # sample_display_names = color_dataframe.columns.str.replace("ATAC-seq_", "")
@@ -1073,7 +1074,7 @@ class ATACSeqAnalysis(Analysis):
         # Pairwise correlations
         g = sns.clustermap(
             X.astype(float).corr(), xticklabels=False, annot=True,  # yticklabels=sample_display_names,
-            cmap="Spectral_r", figsize=(15, 15), cbar_kws={"label": "Pearson correlation"}, row_colors=color_dataframe.values.tolist())
+            cmap="Spectral_r", figsize=(0.2 * X.shape[1], 0.2 * X.shape[1]), cbar_kws={"label": "Pearson correlation"}, row_colors=color_dataframe.values.tolist())
         g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize='xx-small')
         g.ax_heatmap.set_xlabel(None, visible=False)
         g.ax_heatmap.set_ylabel(None, visible=False)
@@ -1105,8 +1106,8 @@ class ATACSeqAnalysis(Analysis):
             handles, labels = axis[i].get_legend_handles_labels()
             by_label = OrderedDict(zip(labels, handles))
             if any([type(c) in [str, unicode] for c in by_label.keys()]) and len(by_label) <= 20:
-                if not any([re.match("^\d", c) for c in by_label.keys()]):
-                    axis[i].legend(by_label.values(), by_label.keys())
+                # if not any([re.match("^\d", c) for c in by_label.keys()]):
+                axis[i].legend(by_label.values(), by_label.keys())
         fig.savefig(os.path.join(self.results_dir, "{}.{}.mds.svg".format(self.name, plot_prefix)), bbox_inches="tight")
 
         # PCA

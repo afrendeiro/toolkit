@@ -26,7 +26,8 @@ setup(
     version=version,
     entry_points={
         "console_scripts": [
-            'mkprj = ngs_toolkit.project_manager:main'
+            'mkprj = ngs_toolkit.project_manager:main',
+            'trackmanager = ngs_toolkit.track_manager:main'
         ],
     },
     description="Toolkit for bioinformatics.",

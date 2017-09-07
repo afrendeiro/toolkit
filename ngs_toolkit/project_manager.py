@@ -119,6 +119,54 @@ def create_project(
     return os.system("cd {}; git init".format(project_name))
 
 
+def create_makefile(
+        project_name, overwrite=False):
+    """
+    Create a Makefile to manage the project execution.
+    """
+    # Easier change later, especially likely for library --> protocol.
+    project_dir = os.path.join(os.path.curdir, project_name)
+    makefile = os.path.join(project_dir, "Makefile")
+    src_dir = os.path.join(project_dir, "src")
+    log_dir = os.path.join(project_dir, "log")
+    metadata_dir = os.path.join(project_dir, "metadata")
+    project_config = os.path.join(metadata_dir, "project_config.yaml")
+
+    if os.path.exists(project_dir):
+        if not overwrite:
+            return
+
+    makefile_content = """    .DEFAULT_GOAL := analysis_job
+
+    requirements:
+        pip install -r requirements.txt
+
+    # process project's data
+    # with looper/pypiper/pipelines:
+    # see https://github.com/epigen/looper
+    # see https://github.com/epigen/pypiper
+    # see https://github.com/epigen/open_pipelines
+    process:
+        looper run {project_config}
+
+    analysis:
+        python -u src/analysis.py
+
+    analysis_job:
+        sbatch -p shortq -c 12 --mem 80000 -J {project_name}.analysis -o {log_dir}/{project_name}.analysis.log --wrap "python -u src/analysis.py"
+
+    all: requirements process analysis
+
+    .PHONY: requirements process analysis all""".format(
+        project_config=project_config,
+        project_name=project_name,
+        log_dir=log_dir)
+
+    # write Makefile
+    with open(makefile, "w") as handle:
+        handle.write(textwrap.dedent(makefile_content))
+
+
 def main():
     """
     Program's main entry point.
@@ -127,7 +175,12 @@ def main():
     args = parse_arguments()
 
     # Create project.
-    create_project(args.project_name)
+    git_ok = create_project(args.project_name)
+
+    # Create Makefile.
+    create_makefile(args.project_name)
+
+    return git_ok
 
 
 if __name__ == '__main__':

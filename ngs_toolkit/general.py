@@ -941,6 +941,9 @@ def parse_homer(homer_dir):
 
     motif_htmls = sorted(glob.glob(os.path.join(homer_dir, "motif*.info.html")))
 
+    if len(motif_htmls) < 1:
+        raise IOError("Homer directory does not contain any discovered motifs.")
+
     output = pd.DataFrame()
     for motif_html in motif_htmls:
 
@@ -956,7 +959,8 @@ def parse_homer(homer_dir):
             re.search("</TABLE>", content).start()].strip()
 
         info_table = pd.DataFrame([x.split("</TD><TD>") for x in info_table.replace("<TR><TD>", "").split("</TD></TR>")])
-        info_table[0] = info_table[0].str.strip()
+        info_table.columns = ["description", "value"]
+        info_table["description"] = info_table["description"].str.strip()
         info_table["motif"] = motif
 
         # Add most probable known motif name
@@ -1108,14 +1112,14 @@ done""".format(results_dir=results_dir, GENOME=genome)]
 if [ ! -f ${{F}}.enrichr.csv ]; then
 echo $F
 sbatch -J enrichr.$F -o $F.enrichr.log -p shortq -c 1 --mem 4000 \
---wrap "python ~/jobs/run_Enrichr.py --input-file "$F" --output-file "${{F/gene_symbols.txt/enrichr.csv}}" "
+--wrap "python -u ~/jobs/run_Enrichr.py --input-file "$F" --output-file "${{F/gene_symbols.txt/enrichr.csv}}" "
 fi
 done""".format(results_dir=results_dir)]
     cmds += ["""for F in `find {results_dir} -name "*_genes.symbols.txt"`; do
 if [ ! -f ${{F/symbols.txt/enrichr.csv}} ]; then
 echo $F
 sbatch -J enrichr.$F -o $F.enrichr.log -p shortq -c 1 --mem 4000 \
---wrap "python ~/jobs/run_Enrichr.py --input-file "$F" --output-file "${{F/symbols.txt/enrichr.csv}}" "
+--wrap "python -u ~/jobs/run_Enrichr.py --input-file "$F" --output-file "${{F/symbols.txt/enrichr.csv}}" "
 fi
 done""".format(results_dir=results_dir)]
 
@@ -1348,7 +1352,6 @@ def collect_differential_enrichment(
                 # HOMER
                 try:
                     homer_motifs = parse_homer(os.path.join(comparison_dir, "homerResults"))
-                    homer_motifs.columns = ["TF", "p_value"]
                 except IOError as e:
                     if permissive:
                         print(error_msg.format("HOMER motif", comp, direction))

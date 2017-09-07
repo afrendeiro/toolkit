@@ -2082,6 +2082,33 @@ def series_matrix2csv(matrix_url, prefix=None):
     return prj, samples
 
 
+def query_biomart(
+        attributes=["ensembl_gene_id", "external_gene_name", "hgnc_id", "hgnc_symbol"],
+        species="hsapiens", ensembl_version="grch37"):
+    """
+    Query Biomart for gene attributes.
+    Returns pandas dataframe with query results.
+    """
+    import requests
+    import numpy as np
+    import pandas as pd
+
+    # Build request XML
+    url_query = "".join([
+        """http://{ensembl_version}.ensembl.org/biomart/martservice?query=""".format(ensembl_version),
+        """<?xml version="1.0" encoding="UTF-8"?>""",
+        """<!DOCTYPE Query>""",
+        """<Query  virtualSchemaName="default" formatter="CSV" header="0" uniqueRows="0" count="" datasetConfigVersion="0.6" >""",
+        """<Dataset name="{species}_gene_ensembl" interface="default" >""".format(species)] +
+        ["""<Attribute name="{attr}" />""".format(attr) for attr in attributes] +
+        ["""</Dataset>""",
+        """</Query>"""])
+    req = requests.get(url_query, stream=True)
+    return pd.DataFrame(
+        (x.strip().split(",") for x in list(req.iter_lines())),
+        columns=attributes).replace("", np.nan)
+
+
 def subtract_principal_component(
         X, pc=1, norm=False, plot=True, plot_name="PCA_based_batch_correction.svg", pcs_to_plot=6):
     """

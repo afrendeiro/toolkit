@@ -26,7 +26,7 @@ setup(
     version=version,
     entry_points={
         "console_scripts": [
-            'mkprj = ngs_toolkit.project_manager:main',
+            'projectmanager = ngs_toolkit.project_manager:main',
             'trackmanager = ngs_toolkit.track_manager:main'
         ],
     },

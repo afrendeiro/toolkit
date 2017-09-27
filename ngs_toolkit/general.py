@@ -204,6 +204,45 @@ def deseq_analysis(
     return results
 
 
+def deseq_results_to_bed_file(
+        deseq_result_file, bed_file, sort=True, ascending=False, normalize=False,
+        significant_only=False, alpha=0.05, abs_fold_change=1.):
+    """
+    Write BED file with fold changes from DESeq2 as score value.
+    """
+
+    df = pd.read_csv(deseq_result_file, index_col=0)
+
+    assert "log2FoldChange" in df.columns.tolist()
+
+    if sort is True:
+        df = df.sort_values("log2FoldChange", ascending=ascending)
+
+    if significant_only is True:
+        df = df.loc[(df['padj'] < alpha) & (df['log2FoldChange'].abs() > abs_fold_change), :]
+
+    # decompose index string (chrom:start-end) into columns
+    df['chrom'] = map(lambda x: x[0], df.index.str.split(":"))
+    r = pd.Series(map(lambda x: x[1], df.index.str.split(":")))
+    df['start'] = map(lambda x: x[0], r.str.split("-"))
+    df['end'] = map(lambda x: x[1], r.str.split("-"))
+    df['name'] = df.index
+    if normalize:
+        from sklearn.preprocessing import MinMaxScaler
+        MinMaxScaler(feature_range=(0, 1000)).fit_transform(df["log2FoldChange"])
+    df['score'] = df["log2FoldChange"]
+
+    df[["chrom", "start", "end", "name", "score"]].to_csv(bed_file, sep="\t", header=False, index=False)
+
+
+for knockout in ["ARID1A", "SMARCA4", "SMARCD1", "BRD9", "BCL7B"]:
+    deseq_result_file = "results/deseq_knockout/deseq_knockout.knockout.{}-WT.csv".format(knockout)
+
+    deseq_results_to_bed_file(
+        deseq_result_file, deseq_result_file.replace(".csv", ".logfoldchange_score.bed"),
+        significant_only=True)
+
+
 def least_squares_fit(
         quant_matrix, design_matrix, test_model,
         null_model="~ 1", standardize_data=True,

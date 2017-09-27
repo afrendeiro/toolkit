@@ -606,6 +606,21 @@ class ATACSeqAnalysis(Analysis):
             self.accessibility = accessibility
         return accessibility
 
+    def get_gene_level_accessibility(analysis):
+        """
+        Get gene-level measurements of chromatin accessibility.
+        """
+        assert hasattr(analysis, "gene_annotation")
+        acc = analysis.accessibility.copy()
+
+        g = analysis.gene_annotation['gene_name'].str.split(",").apply(pd.Series).stack()
+        g.index = g.index.droplevel(1)
+        g.name = "gene_name"
+        acc2 = analysis.accessibility.join(g).drop("gene_name", axis=1)
+        acc2.index = analysis.accessibility.join(g).reset_index().set_index(['index', 'gene_name']).index
+        acc2.columns = analysis.accessibility.columns
+        return acc2.groupby(level=['gene_name']).mean()
+
     def get_level_colors(self, index=None, levels=None, pallete="Paired", cmap="RdBu_r", nan_color=(0.662745, 0.662745, 0.662745, 0.5)):
         """
         Get tuples of floats representing a colour for a sample in a given variable in a dataframe's index

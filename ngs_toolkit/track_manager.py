@@ -225,7 +225,7 @@ trackDb {g}/trackDb.txt
         "Add the following URL to your UCSC trackHubs:",
         "{url}/hub.txt".format(url=prj['trackhubs']['url']),
         "or alternatively follow this URL: "
-        + "http://genome.ucsc.edu/cgi-bin/hgTracks?db=hg19&hubClear={url}/hub.txt".format(url=prj['trackhubs']['url'])
+        + "http://genome.ucsc.edu/cgi-bin/hgTracks?db=hg19&hubUrl={url}/hub.txt".format(url=prj['trackhubs']['url'])
     ])
 
     if 'trackhubs' in prj:

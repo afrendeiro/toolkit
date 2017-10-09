@@ -5,10 +5,6 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 
-# Set settings
-pd.set_option("date_dayfirst", True)
-
-
 def barmap(x, figsize=None, square=False, row_colors=None, z_score=None):
     """
     Plot a heatmap-style grid with barplots.

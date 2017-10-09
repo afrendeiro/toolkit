@@ -41,6 +41,12 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
         """
         Call peaks for ChIP-seq samples using an annotation of which samples belong in each comparison and which
         samples represent signal or background.
+
+        :param pd.DataFrame comparison_table: Comparison table with the following required columns:
+            "comparison_name", "sample_name", "comparison_side", "sample_group".
+        :param str output_dir: Parent directory where peaks will be created. Will be created if does not exist.
+        :param bool permissive: If incomplete/incoherent comparisons should be skipped or an error should be thrown.
+        :raises ValueError: Will be raised if not `permissive` and incomplete/incoherent comparisons are detected.
         """
         req_columns = ["comparison_name", "sample_name", "comparison_side", "sample_group"]
         assert all([col in comparison_table.columns for col in req_columns]), "Comparison table is missing some of the following columns: '{}'.".format(",".join(req_columns))
@@ -62,7 +68,7 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
                     print(error)
                     continue
                 else:
-                    raise TypeError(error)
+                    raise ValueError(error)
 
             # Get the sample names of samples in each side
             pos_names = comparison_table[
@@ -83,11 +89,17 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
             ))
             # Call peaks
             call_chipseq_peak_job(
-                signal_samples, control_samples, name=comparison, output_dir=output_dir)
+                signal_samples, control_samples, output_dir=output_dir, name=comparison)
 
 
-def call_chipseq_peak_job(samples, controls, name, output_dir):
+def call_chipseq_peak_job(signal_samples, control_samples, output_dir, name):
     """
+    Call ChIP-seq peaks with MACS2 in a slurm job.
+
+    :param list signal_samples: Signal Sample objects.
+    :param list control_samples: Background Sample objects.
+    :param list output_dir: Parent directory where MACS2 outputs will be stored.
+    :param str name: Name of the MACS2 comparison being performed.
     """
     from pypiper.ngstk import NGSTk
     import textwrap
@@ -111,7 +123,7 @@ def call_chipseq_peak_job(samples, controls, name, output_dir):
     # load macs2
     cmd += """
 \t\t/home/arendeiro/.local/bin/macs2 callpeak -t {0} -c {1} -n {2} --outdir {3}
-""".format(" ".join([s.mapped for s in samples]), " ".join([s.mapped for s in controls]), name, output_path)
+""".format(" ".join([s.mapped for s in signal_samples]), " ".join([s.mapped for s in control_samples]), name, output_path)
 
     # Slurm footer
     cmd += "\t\t" + tk.slurm_footer() + "\n"

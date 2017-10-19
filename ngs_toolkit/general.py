@@ -566,7 +566,8 @@ def plot_differential(
         corrected_p_value=True,
         fold_change=None,
         output_dir="results/differential_analysis_{data_type}",
-        output_prefix="differential_analysis"):
+        output_prefix="differential_analysis",
+        rasterized=True, robust=False):
     """
     Discover differential regions across samples that are associated with a certain trait.
     The `results` matrix should be indexed by the relevant type of feature (regions/genes).
@@ -661,6 +662,7 @@ def plot_differential(
     axis[0][1].set_xlabel("N. diff (% of total)")
     axis[1][0].set_xlabel("N. diff")
     axis[1][1].set_xlabel("N. diff (% of total)")
+    sns.despine(fig)
     fig.savefig(os.path.join(output_dir, output_prefix + ".number_differential.svg"), bbox_inches="tight")
 
     # Pairwise scatter plots
@@ -786,7 +788,16 @@ def plot_differential(
                 if c.shape[0] > 0:
                     groups.loc[:, sample_group] = matrix[[d for d in c if d in sample_cols]].mean(axis=1)
 
+            if groups.empty:
+                # It seems comparisons were not done in a all-versus-all fashion
+                for group in comparison_table["sample_group"].drop_duplicates():
+                    c = comparison_table.loc[comparison_table["sample_group"] == group, "sample_name"].drop_duplicates()
+                    if c.shape[0] > 0:
+                        groups.loc[:, group] = matrix[c].mean(axis=1)
+
+            # Select only differential regions from groups
             groups = groups.loc[all_diff, :]
+
             figsize = (max(5, 0.12 * groups.shape[1]), 5)
             # Heatmaps
             # Comparison level
@@ -842,21 +853,21 @@ def plot_differential(
     g = sns.clustermap(matrix.corr(),
         yticklabels=True, xticklabels=False,
         cbar_kws={"label": "Pearson correlation\non differential {}".format(var_name)},
-        cmap="BuGn", metric="correlation", rasterized=True, figsize=(figsize[0], figsize[0]))
+        cmap="BuGn", metric="correlation", figsize=(figsize[0], figsize[0]), rasterized=rasterized, robust=robust)
     g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small")
     g.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.samples.clustermap.corr.svg".format(var_name)), bbox_inches="tight", dpi=300)
 
     g = sns.clustermap(matrix,
         yticklabels=False, cbar_kws={"label": "{} of\ndifferential {}".format(quantity, var_name)},
         xticklabels=True,
-        vmin=0, metric="correlation", rasterized=True, figsize=figsize)
+        vmin=0, metric="correlation", figsize=figsize, rasterized=rasterized, robust=robust)
     g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90, fontsize="xx-small")
     g.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.samples.clustermap.svg".format(var_name)), bbox_inches="tight", dpi=300)
 
     g = sns.clustermap(matrix,
         yticklabels=False, z_score=0, cbar_kws={"label": "Z-score of {}\non differential {}".format(quantity, var_name)},
         xticklabels=True,
-        metric="correlation", rasterized=True, figsize=figsize)
+        metric="correlation", figsize=figsize, rasterized=rasterized, robust=robust)
     g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90, fontsize="xx-small")
     g.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.samples.clustermap.z0.svg".format(var_name)), bbox_inches="tight", dpi=300)
 

@@ -134,7 +134,8 @@ class ATACSeqAnalysis(Analysis):
             support = pd.read_csv("_tmp.peaks.bed", sep="\t", header=None)
 
         support.columns = ["chrom", "start", "end"] + [sample.name for sample in samples]
-        support.to_csv(os.path.join(self.results_dir, self.name + "_peaks.binary_overlap_support.csv"), index=False)
+        support.index = support['chrom'] + ":" + support['start'].astype(str) + "-" + support['end'].astype(str)
+        support.to_csv(os.path.join(self.results_dir, self.name + "_peaks.binary_overlap_support.csv"), index=True)
 
         # get % of total consensus regions found per sample
         # m = (
@@ -145,7 +146,7 @@ class ATACSeqAnalysis(Analysis):
         # divide sum (of unique overlaps) by total to get support value between 0 and 1
         support["support"] = support[[sample.name for sample in samples]].apply(lambda x: sum([i if i <= 1 else 1 for i in x]) / float(len(self.samples)), axis=1)
         # save
-        support.to_csv(os.path.join(self.results_dir, self.name + "_peaks.support.csv"), index=False)
+        support.to_csv(os.path.join(self.results_dir, self.name + "_peaks.support.csv"), index=True)
 
         self.support = support
 

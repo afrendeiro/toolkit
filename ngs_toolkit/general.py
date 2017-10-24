@@ -235,12 +235,12 @@ def deseq_results_to_bed_file(
     df[["chrom", "start", "end", "name", "score"]].to_csv(bed_file, sep="\t", header=False, index=False)
 
 
-for knockout in ["ARID1A", "SMARCA4", "SMARCD1", "BRD9", "BCL7B"]:
-    deseq_result_file = "results/deseq_knockout/deseq_knockout.knockout.{}-WT.csv".format(knockout)
+# for knockout in ["ARID1A", "SMARCA4", "SMARCD1", "BRD9", "BCL7B"]:
+#     deseq_result_file = "results/deseq_knockout/deseq_knockout.knockout.{}-WT.csv".format(knockout)
 
-    deseq_results_to_bed_file(
-        deseq_result_file, deseq_result_file.replace(".csv", ".logfoldchange_score.bed"),
-        significant_only=True)
+#     deseq_results_to_bed_file(
+#         deseq_result_file, deseq_result_file.replace(".csv", ".logfoldchange_score.bed"),
+#         significant_only=True)
 
 
 def least_squares_fit(
@@ -2130,6 +2130,60 @@ def series_matrix2csv(matrix_url, prefix=None):
         samples.to_csv(os.path.join(prefix + ".sample_annotation.csv"), index=False)
 
     return prj, samples
+
+
+def project_to_geo(project, output_dir=None, samples=None, as_jobs=False):
+    """
+    Prepare raw sequencing files for submission to GEO.
+
+    It will get raw BAM files, calculate md5 sums.
+    """
+    if output_dir is None:
+        output_dir = os.path.join("geo_submission")
+    if samples is None:
+        samples = project.samples
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
+    cmds = list()
+    for sample in samples:
+        various = len(s.data_path.split(" ")) > 1
+        for i, file in enumerate(sample.data_path.split(" ")):
+            suffix = ".file{}".format(i) if various else ""
+            # Copy raw file
+            cmd = "cp {} {}; ".format(file, os.path.join(output_dir, sample.name + "{}.bam".format(suffix)))
+
+            # Copy or generate md5sum
+            if os.path.exists(file + ".md5"):
+                cmd += "cp {} {}".format(file + ".md5", os.path.join(output_dir, sample.name + "{}.bam.md5".format(suffix)))
+            else:
+                b = os.path.basename(file)
+                cmd += "md5sum {} > {}".format(os.path.join(output_dir, b), os.path.join(output_dir, sample.name + "{}.bam.md5".format(suffix)))
+            cmds.append(cmd)
+
+        # Copy bigWig files
+        if sample.library in ["ATAC-seq", "ChIP-seq"]:
+            cmd = "cp {} {}; ".format(sample.bigWig, os.path.join(output_dir, sample.name + ".bigWig"))
+            cmds.append(cmd)
+
+        # Copy peaks
+        if sample.library == "ATAC-seq":
+            cmd = "cp {} {}; ".format(sample.peaks, os.path.join(output_dir, sample.name + ".peaks.narrowPeak"))
+            cmds.append(cmd)
+
+    if as_jobs:
+        import pypiper.NGSTk as Tk
+        tk = Tk()
+
+    else:
+        for i, cmd in enumerate(cmds):
+            print(i, cmd)
+            os.system(cmd)
+
+    # # Collect md5 sum
+    # cmd = "md5sum {} > ".format("")
+    # suffix = ".file{}".format(i) if various else ""
+    # return md5_table
 
 
 def query_biomart(

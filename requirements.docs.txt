@@ -1,0 +1,9 @@
+numpy
+pandas>=0.20.2
+pysam
+pybedtools
+parmap
+matplotlib
+seaborn
+pyyaml
+tqdm

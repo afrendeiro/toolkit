@@ -14,7 +14,7 @@ def parse_arguments():
     """
     Argument Parsing.
     """
-    description = "%(prog)s - A project creator."
+    description = "%(prog)s - A project manager."
     epilog = "https://github.com/afrendeiro/toolkit"
 
     parser = argparse.ArgumentParser(
@@ -193,7 +193,9 @@ def create_makefile(
         python -u src/analysis.py
 
     analysis_job:
-        sbatch -p shortq -c 12 --mem 80000 -J {project_name}.analysis -o {log_dir}/{project_name}.analysis.log --wrap "python -u src/analysis.py"
+        mkdir -p log
+        TIMESTAMP=`date +"%Y%m%d-%H%M%S"`
+        sbatch -p shortq -c 12 --mem 80000 -J {project_name}.analysis -o {log_dir}/${{TIMESTAMP}}.{project_name}.analysis.log --wrap "python -u src/analysis.py"
 
     all: requirements process analysis
 
@@ -230,8 +232,6 @@ def main():
     create_makefile(
         project_name=args.project_name,
         overwrite=args.overwrite)
-
-    
 
 
 if __name__ == '__main__':

@@ -42,6 +42,61 @@ class ATACSeqAnalysis(Analysis):
             from_pickle=from_pickle,
             **kwargs)
 
+    def load_data(self, output_mapping=None, only_these_keys=None, permissive=True):
+        """
+        Load the output files of the major functions of the Analysis.
+
+        :param output_mapping dict: Dictionary with "attribute name": "path prefix" to load the files.
+        :param only_these_keys list | None: Iterable of analysis attributes to load up.
+        :param permissive bool: Whether an error should be thrown if reading a file causes IOError.
+        """
+
+        if output_mapping is None:
+            # TODO: get default mapping by having functions declare what they output
+            # perhaps also with a dict of kwargs to pass to pandas.read_csv
+            output_mapping = {
+                "support": "_peaks.support.csv",
+                "coverage": "_peaks.raw_coverage.csv",
+                "coverage_qnorm": "_peaks.coverage_qnorm.csv",
+                "nuc": "_peaks.gccontent_length.csv",
+                "coverage_gc_corrected": "_peaks.coverage_gc_corrected.csv",
+                "gene_annotation": "_peaks.gene_annotation.csv",
+                "region_annotation": "_peaks.region_annotation.csv",
+                "region_annotation_b": "_peaks.region_annotation_background.csv",
+                "chrom_state_annotation": "_peaks.chromatin_state.csv",
+                "chrom_state_annotation_b": "_peaks.chromatin_state_background.csv",
+                "coverage_annotated": "_peaks.coverage_qnorm.annotated.csv",
+            }
+
+        if only_these_keys is not None:
+            output_mapping = {k:v for k,v in output_mapping.items() if k in only_these_keys}
+
+        for name, suffix in output_mapping.items():
+            try:
+                setattr(self, name, pd.read_csv(os.path.join(self.results_dir, self.name + suffix), index_col=0))
+            except IOError("File of attribute '{}' could not be read: {}".format(name, os.path.join(self.results_dir, self.name + suffix))) as e:
+                if not permissive:
+                    raise e
+                else:
+                    print(e)
+        
+        # Special cases
+        try:
+            setattr(self, "sites", pybedtools.BedTool(os.path.join(self.results_dir, self.name + "_peak_set.bed")))
+        except IOError("File of attribute '{}' could not be read: {}".format("sites", os.path.join(self.results_dir, self.name + "_peak_set.bed"))) as e:
+            if not permissive:
+                raise e
+            else:
+                print(e)
+
+        try:
+            setattr(self, "accessibility", pd.read_csv(os.path.join(self.results_dir, self.name + ".accessibility.annotated_metadata.csv"), index_col=0, header=range(5)))
+        except IOError("File of attribute '{}' could not be read: {}".format("accessibility", os.path.join(self.results_dir, self.name + ".accessibility.annotated_metadata.csv"))) as e:
+            if not permissive:
+                raise e
+            else:
+                print(e)
+
     def get_consensus_sites(
             self, samples=None, region_type="summits", extension=250,
             blacklist_bed="wgEncodeDacMapabilityConsensusExcludable.bed"):
@@ -258,7 +313,7 @@ class ATACSeqAnalysis(Analysis):
 
         return coverage_rpm
 
-    def normalize_coverage_quantiles(self, matrix=None, samples=None, implementation="R", save=True, assign=True):
+    def normalize_coverage_quantiles(self, matrix=None, samples=None, implementation="R", log_transform=True, log_constant=0.001, save=True, assign=True):
         """
         Quantile normalization of matrix of (n_features, n_samples).
         """
@@ -281,7 +336,8 @@ class ATACSeqAnalysis(Analysis):
             raise ValueError("Implementation of quantile normalization must be one of 'R' of 'Python'")
 
         # Log2 transform
-        coverage_qnorm = np.log2(0.001 + coverage_qnorm)
+        if log_transform:
+            coverage_qnorm = np.log2(log_constant + coverage_qnorm)
 
         # Add back postition columns
         coverage_qnorm = coverage_qnorm.join(self.coverage[['chrom', 'start', 'end']])
@@ -416,9 +472,10 @@ class ATACSeqAnalysis(Analysis):
 
         # aggregate annotation per peak, concatenate various genes (comma-separated)
         self.gene_annotation = gene_annotation.groupby(['chrom', 'start', 'end']).aggregate(lambda x: ",".join(set([str(i) for i in x]))).reset_index()
+        self.gene_annotation.index = self.gene_annotation['chrom'] + ":" + self.gene_annotation['start'].astype(str) + "-" + self.gene_annotation['end'].astype(str)
 
         # save to disk
-        self.gene_annotation.to_csv(os.path.join(self.results_dir, self.name + "_peaks.gene_annotation.csv"), index=False)
+        self.gene_annotation.to_csv(os.path.join(self.results_dir, self.name + "_peaks.gene_annotation.csv"), index=True)
 
         # save distances to all TSSs (for plotting)
         self.closest_tss_distances = gene_annotation['distance'].tolist()
@@ -607,20 +664,27 @@ class ATACSeqAnalysis(Analysis):
             self.accessibility = accessibility
         return accessibility
 
-    def get_gene_level_accessibility(analysis):
+    def get_gene_level_accessibility(self, matrix="accessibility"):
         """
-        Get gene-level measurements of chromatin accessibility.
+        Get gene-level measurements of coverage.
+        Requires a 'gene_annotation' attribute to be set containing a mapping between the index of `matrix` and genes
+        (produced from `get_peak_gene_annotation`).
+
+        :param str matrix: Quantification matrix to be used (e.g. 'coverage' or 'accessibility')
+        # :param ngs_toolkit.general.Analysis analysis: Analysis 
         """
-        assert hasattr(analysis, "gene_annotation")
-        acc = analysis.accessibility.copy()
+        assert hasattr(analysis, "gene_annotation"), """Analysis object lacks "gene_annotation" dataframe."""
+
+        matrix = getattr(analysis, matrix).copy()
 
         g = analysis.gene_annotation['gene_name'].str.split(",").apply(pd.Series).stack()
         g.index = g.index.droplevel(1)
         g.name = "gene_name"
-        acc2 = analysis.accessibility.join(g).drop("gene_name", axis=1)
-        acc2.index = analysis.accessibility.join(g).reset_index().set_index(['index', 'gene_name']).index
-        acc2.columns = analysis.accessibility.columns
-        return acc2.groupby(level=['gene_name']).mean()
+
+        matrix2 = matrix.join(g).drop("gene_name", axis=1)
+        matrix2.index = matrix.join(g).reset_index().set_index(['index', 'gene_name']).index
+        matrix2.columns = matrix.columns
+        return matrix2.groupby(level=['gene_name']).mean()
 
     def get_level_colors(self, index=None, levels=None, pallete="Paired", cmap="RdBu_r", nan_color=(0.662745, 0.662745, 0.662745, 0.5)):
         """
@@ -1078,10 +1142,10 @@ class ATACSeqAnalysis(Analysis):
         if samples is None:
             samples = [s for s in self.samples if s.name in matrix.columns.get_level_values("sample_name")]
 
-        color_dataframe = pd.DataFrame(self.get_level_colors(index=matrix.columns, levels=attributes_to_plot), index=attributes_to_plot, columns=[s.name for s in self.samples])
-        color_dataframe = color_dataframe.loc[:, [s.name for s in samples]]
-        # # exclude samples if needed
-        # color_dataframe = color_dataframe[[s.name for s in samples]]
+        # This will always be a matrix for all samples
+        color_dataframe = pd.DataFrame(self.get_level_colors(index=matrix.columns, levels=attributes_to_plot), index=attributes_to_plot, columns=matrix.columns.get_level_values("sample_name"))
+        # will be filtered now by the requested samples if needed
+        color_dataframe = color_dataframe[[s.name for s in samples]]
         # sample_display_names = color_dataframe.columns.str.replace("ATAC-seq_", "")
 
         # All regions, matching samples (provided samples in matrix)
@@ -1111,7 +1175,7 @@ class ATACSeqAnalysis(Analysis):
                     label = getattr(samples[j], attributes_to_plot[i])
                 except AttributeError:
                     label = np.nan
-                axis[i].scatter(xx.ix[j][0], xx.ix[j][1], s=50, color=color_dataframe.ix[attr][j], label=label)
+                axis[i].scatter(xx.loc[j, 0], xx.loc[j, 1], s=50, color=color_dataframe.ix[attr][j], label=label)
             axis[i].set_title(attributes_to_plot[i])
             axis[i].set_xlabel("MDS 1")
             axis[i].set_ylabel("MDS 2")
@@ -1153,7 +1217,7 @@ class ATACSeqAnalysis(Analysis):
                         label = getattr(samples[j], attributes_to_plot[i])
                     except AttributeError:
                         label = np.nan
-                    axis[pc, i].scatter(xx.ix[j][pc], xx.ix[j][pc + 1], s=50, color=color_dataframe.ix[attr][j], label=label)
+                    axis[pc, i].scatter(xx.loc[j, pc], xx.loc[j, pc + 1], s=50, color=color_dataframe.ix[attr][j], label=label)
                 axis[pc, i].set_title(attributes_to_plot[i])
                 axis[pc, i].set_xlabel("PC {}".format(pc + 1))
                 axis[pc, i].set_ylabel("PC {}".format(pc + 2))
@@ -1277,7 +1341,7 @@ class ATACSeqAnalysis(Analysis):
         #                     label = getattr(sel_samples[j], to_plot[i])
         #                 except AttributeError:
         #                     label = np.nan
-        #                 axis[pc, i].scatter(xx.ix[j][pc], xx.ix[j][pc + 1], s=50, color=color_dataframe.ix[attr][j], label=label)
+        #                 axis[pc, i].scatter(xx.loc[j, pc], xx.loc[j, pc + 1], s=50, color=color_dataframe.ix[attr][j], label=label)
         #             axis[pc, i].set_title(to_plot[i])
         #             axis[pc, i].set_xlabel("PC {}".format(pc + 1))
         #             axis[pc, i].set_ylabel("PC {}".format(pc + 2))

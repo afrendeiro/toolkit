@@ -24,6 +24,9 @@ def parse_arguments():
     parser.add_argument(
         '-r', '--overlay-replicates', dest="overlay_replicates", action="store_true",
         help="Whether replicate samples should be overlaied in same track. Default=False.")
+    parser.add_argument(
+        '-l', '--link', dest="link", action="store_true",
+        help="Whether bigWig files should be soft-linked to the track database directory. Default=False.")
     # args = parser.parse_args("-a patient_id,timepoint,cell_type -c cell_type metadata/project_config.yaml".split(" "))
     args = parser.parse_args()
     args.attributes = args.attributes.split(',')
@@ -94,8 +97,7 @@ maxHeighPixels 32:32:8{0}{1}{2}
     showSubtrackColorOnUi on
     type bigWig
     visibility full
-    maxHeighPixels 32:32:8
-    color {color}{subgroups}
+    maxHeighPixels 32:32:8{subgroups}
 """
 
     track_final = """
@@ -173,13 +175,13 @@ trackDb {g}/trackDb.txt
 
                 # Make symbolic link to bigWig
                 dest = os.path.join(os.path.join(bigwig_dir, genome, os.path.basename(sample_attrs['bigwig'])))
-                if not os.path.exists(dest):
+                if not os.path.exists(dest) and args.link:
                     try:
                         os.symlink(sample_attrs['bigwig'], dest)
+                        os.chmod(dest, 0755)
                     except OSError:
                         print("Sample {} track file does not exist!".format(sample_attrs["sample_name"]))
                         continue
-                os.chmod(dest, 0755)
 
             else:
                 name = "_".join(labels)
@@ -202,14 +204,14 @@ trackDb {g}/trackDb.txt
 
                 # Make symbolic link to bigWig
                 dest = os.path.join(os.path.join(bigwig_dir, genome, os.path.basename(sample_attrs['bigwig'])))
-                if not os.path.exists(dest):
+                if not os.path.exists(dest) and args.link:
                     try:
                         os.symlink(sample_attrs['bigwig'], dest)
+                        os.chmod(dest, 0755)
                     except OSError:
                         print("Sample {} track file does not exist!".format(sample_attrs["sample_name"]))
                         continue
                 # Make directories readable and executable
-                os.chmod(dest, 0755)
                 os.chmod(os.path.join(dest, genome), 0755)
 
         track = re.sub("_none", "", track)
@@ -261,7 +263,7 @@ def make_igv_tracklink(prj, track_file):
     os.chmod(track_file, 0655)
     # os.chmod(os.path.basename(track_file), 0755)
 
-    msg = "\n".join(["\nFinished producing IGV track file!"])
+    msg = "\n".join(["\nFinished producing IGV track file!", "'{}'".format(track_file)])
     print(msg)
 
 

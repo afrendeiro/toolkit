@@ -510,7 +510,8 @@ def knockout_plot(
     knockout_genes = sorted(knockout_genes)
 
     missing = [k for k in knockout_genes if k not in expression_matrix.index]
-    print(Warning("The following `knockout_genes` were not found in the expression matrix: '{}'".format(", ".join(missing))))
+    if len(missing) > 0:
+        print(Warning("The following `knockout_genes` were not found in the expression matrix: '{}'".format(", ".join(missing))))
     knockout_genes = [k for k in knockout_genes if k in expression_matrix.index]
 
     ko = expression_matrix.loc[knockout_genes, :]
@@ -534,5 +535,3 @@ def knockout_plot(
     g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90)
     g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0)
     g.savefig(os.path.join(output_dir, output_prefix + ".z_score.sorted.svg"), bbox_inches="tight")
-
-

@@ -1122,7 +1122,9 @@ class ATACSeqAnalysis(Analysis):
         plt.savefig(os.path.join(self.results_dir, self.name + ".norm_counts_per_sample.support_vs_qv2.filtered.svg"), bbox_inches="tight")
 
     def unsupervised(
-            self, quant_matrix="accessibility", samples=None, attributes_to_plot=["sample_name"], plot_prefix="all_sites"):
+            self, quant_matrix="accessibility", samples=None,
+            attributes_to_plot=["sample_name"], plot_prefix="all_sites",
+            plot_max_attr=20, plot_max_pcs=8, plot_group_centroids=True, axis_ticklabels=False, axis_lines=True, always_legend=False):
         """
         Apply unsupervised clustering (clustering of correlations) and dimentionality reduction methods (MDS, PCA) on matrix.
         Colours and labels samples by attributes in `attributes_to_plot`.
@@ -1176,25 +1178,36 @@ class ATACSeqAnalysis(Analysis):
                 except AttributeError:
                     label = np.nan
                 axis[i].scatter(xx.loc[j, 0], xx.loc[j, 1], s=50, color=color_dataframe.ix[attr][j], label=label)
+
+            # Graphics
             axis[i].set_title(attributes_to_plot[i])
             axis[i].set_xlabel("MDS 1")
             axis[i].set_ylabel("MDS 2")
-            axis[i].set_xticklabels(axis[i].get_xticklabels(), visible=False)
-            axis[i].set_yticklabels(axis[i].get_yticklabels(), visible=False)
+            if not axis_ticklabels:
+                axis[pc, i].set_xticklabels(axis[pc, i].get_xticklabels(), visible=False)
+                axis[pc, i].set_yticklabels(axis[pc, i].get_yticklabels(), visible=False)
+            if axis_lines:
+                axis[pc, i].axhline(0, linestyle="--", color="black", alpha=0.3)
+                axis[pc, i].axvline(0, linestyle="--", color="black", alpha=0.3)
 
             # Unique legend labels
             handles, labels = axis[i].get_legend_handles_labels()
             by_label = OrderedDict(zip(labels, handles))
             if any([type(c) in [str, unicode] for c in by_label.keys()]) and len(by_label) <= 20:
                 # if not any([re.match("^\d", c) for c in by_label.keys()]):
-                axis[i].legend(by_label.values(), by_label.keys())
+                if always_legend:
+                    axis[pc, i].legend(by_label.values(), by_label.keys())
+                else:
+                    if pc == pcs - 1:
+                        axis[pc, i].legend(
+                            by_label.values(), by_label.keys())
         fig.savefig(os.path.join(self.results_dir, "{}.{}.mds.svg".format(self.name, plot_prefix)), bbox_inches="tight")
 
         # PCA
         pca = PCA()
         x_new = pca.fit_transform(X.T)
         # transform again
-        xx = pd.DataFrame(x_new)
+        xx = pd.DataFrame(x_new, index=X.columns)
 
         # plot % explained variance per PC
         fig, axis = plt.subplots(1)
@@ -1207,37 +1220,70 @@ class ATACSeqAnalysis(Analysis):
         sns.despine(fig)
         fig.savefig(os.path.join(self.results_dir, "{}.{}.pca.explained_variance.svg".format(self.name, plot_prefix)), bbox_inches='tight')
 
-        # plot
-        pcs = min(xx.shape[0] - 1, 8)
-        fig, axis = plt.subplots(pcs, len(attributes_to_plot), figsize=(4 * len(attributes_to_plot), 4 * pcs))
+        # plot pca
+        pcs = min(xx.shape[0] - 1, plot_max_pcs)
+        fig, axis = plt.subplots(pcs, len(attributes_to_plot), figsize=(
+            4 * len(attributes_to_plot), 4 * pcs))
         for pc in range(pcs):
             for i, attr in enumerate(attributes_to_plot):
-                for j in range(len(xx)):
+                for j, sample in enumerate(xx.index):
+                    sample = pd.Series(sample, index=X.columns.names)
                     try:
-                        label = getattr(samples[j], attributes_to_plot[i])
+                        label = getattr(samples[j], attr)
                     except AttributeError:
                         label = np.nan
-                    axis[pc, i].scatter(xx.loc[j, pc], xx.loc[j, pc + 1], s=50, color=color_dataframe.ix[attr][j], label=label)
-                axis[pc, i].set_title(attributes_to_plot[i])
+                    axis[pc, i].scatter(
+                        xx.loc[sample['sample_name'], pc],
+                        xx.loc[sample['sample_name'], pc + 1],
+                        s=30, color=color_dataframe.loc[attr, sample['sample_name']], alpha=0.75, label=label)
+
+                # Plot groups
+                if plot_group_centroids:
+                    xx2 = xx.groupby(attr).mean()
+                    # get the color of each attribute group
+                    cd = color_dataframe.loc[attr]
+                    cd.name = None
+                    cd.index = X.columns.get_level_values(attr)
+                    cd = cd.reset_index().drop_duplicates().set_index(attr).squeeze()
+                    for j, group in enumerate(xx2.index):
+                        axis[pc, i].scatter(
+                            xx2.loc[group, pc],
+                            xx2.loc[group, pc + 1],
+                            marker="s", s=50, color=cd.loc[group], alpha=0.95, label=group)
+                        axis[pc, i].text(
+                            xx2.loc[group, pc],
+                            xx2.loc[group, pc + 1], group,
+                            color=cd.loc[group], alpha=0.95)
+
+                # Graphics
+                axis[pc, i].set_title(attr)
                 axis[pc, i].set_xlabel("PC {}".format(pc + 1))
                 axis[pc, i].set_ylabel("PC {}".format(pc + 2))
-                axis[pc, i].set_xticklabels(axis[pc, i].get_xticklabels(), visible=False)
-                axis[pc, i].set_yticklabels(axis[pc, i].get_yticklabels(), visible=False)
+                if not axis_ticklabels:
+                    axis[pc, i].set_xticklabels(axis[pc, i].get_xticklabels(), visible=False)
+                    axis[pc, i].set_yticklabels(axis[pc, i].get_yticklabels(), visible=False)
+                if axis_lines:
+                    axis[pc, i].axhline(0, linestyle="--", color="black", alpha=0.3)
+                    axis[pc, i].axvline(0, linestyle="--", color="black", alpha=0.3)
 
                 # Unique legend labels
                 handles, labels = axis[pc, i].get_legend_handles_labels()
                 by_label = OrderedDict(zip(labels, handles))
-                if any([type(c) in [str, unicode] for c in by_label.keys()]) and len(by_label) <= 20:
+                if any([type(c) in [str, unicode] for c in by_label.keys()]) and len(by_label) <= max_attr:
                     # if not any([re.match("^\d", c) for c in by_label.keys()]):
-                    axis[pc, i].legend(by_label.values(), by_label.keys())
-        fig.savefig(os.path.join(self.results_dir, "{}.{}.pca.svg".format(self.name, plot_prefix)), bbox_inches="tight")
+                    if always_legend:
+                        axis[pc, i].legend(by_label.values(), by_label.keys())
+                    else:
+                        if pc == pcs - 1:
+                            axis[pc, i].legend(
+                                by_label.values(), by_label.keys())
+        fig.savefig(os.path.join(self.results_dir, "{}.{}.pca.svg".format(
+            self.name, plot_prefix)), bbox_inches="tight")
 
         # Get PC1 loadings
         # import math
         # loadings = pd.Series(pca.components_[0, :], index=X.index).sort_values()
         # loadings = pca.components_.T * math.sqrt(pca.explained_variance_)
-
-        #
 
         # # Test association of PCs with attributes
         associations = list()

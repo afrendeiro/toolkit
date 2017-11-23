@@ -101,7 +101,7 @@ class RNASeqAnalysis(Analysis):
 
         return colors
 
-    def collect_bitseq_output(self, samples=None):
+    def collect_bitseq_output(self, samples=None, permissive=True):
         """
         Collect gene expression (read counts, transcript-level) output from Bitseq into expression matrix for `samples`.
         """
@@ -120,9 +120,11 @@ class RNASeqAnalysis(Analysis):
                             sample.name + ".tr"),
                         sep=" ", header=None, skiprows=1,
                         names=["ensembl_gene_id", "ensembl_transcript_id", "v1", "v2"])
-                except IOError:
-                    print("Sample {} is missing.".format(sample.name))
-                    continue
+                except IOError("Sample {} is missing.".format(sample.name)) as e:
+                    if permissive:
+                        print(e)
+                    else:
+                        raise e
                 # add id index
                 tr.set_index("ensembl_gene_id", append=False, inplace=True)
                 tr.set_index("ensembl_transcript_id", append=True, inplace=True)
@@ -145,6 +147,39 @@ class RNASeqAnalysis(Analysis):
             expr[sample.name] = counts
 
         return expr
+
+    def collect_esat_output(self, samples=None, permissive=True):
+        """
+        Collect gene expression (read counts, gene-level) output from ESAT into expression matrix for `samples`.
+        """
+        if samples is None:
+            samples = self.samples
+
+        first = True
+        for i, sample in enumerate(samples):
+            try:
+                # read the "tr" file of one sample to get indexes
+                c = pd.read_csv(
+                    os.path.join(
+                        sample.paths.sample_root, "ESAT_{}".format(sample.genome), sample.name + ".gene.txt"), sep="\t")
+            except IOError("Sample {} is missing.".format(sample.name)) as e:
+                if permissive:
+                    print(e)
+                    continue
+                else:
+                    raise e
+            # extract only gene ID and counts
+            c = c[["Symbol", "Exp1"]]
+            c = c.rename(columns={"Symbol": "gene_symbol", "Exp1": sample.name}).set_index("gene_symbol")
+
+            # Append
+            if first:
+                expr = c
+            else:
+                expr = expr.join(c)
+            first = False
+
+        return expr.sort_index()
 
     def get_gene_expression(self, samples=None, attributes=["sample_name"]):
         """
@@ -318,7 +353,10 @@ class RNASeqAnalysis(Analysis):
         if samples is None:
             samples = [s for s in self.samples if s.name in matrix.columns.get_level_values("sample_name")]
 
-        color_dataframe = pd.DataFrame(self.get_level_colors(index=matrix.columns, levels=attributes_to_plot), index=attributes_to_plot, columns=[s.name for s in samples])
+        # This will always be a matrix for all samples
+        color_dataframe = pd.DataFrame(self.get_level_colors(index=matrix.columns, levels=attributes_to_plot), index=attributes_to_plot, columns=matrix.columns.get_level_values("sample_name"))
+        # will be filtered now by the requested samples if needed
+        color_dataframe = color_dataframe[[s.name for s in samples]]
         # # exclude samples if needed
         # color_dataframe = color_dataframe[[s.name for s in samples]]
         # sample_display_names = color_dataframe.columns.str.replace("ATAC-seq_", "")

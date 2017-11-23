@@ -77,12 +77,20 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
             ]["sample_name"].tolist()
             neg_names = comparison_table[
                 (comparison_table["comparison_name"] == comparison) &
-                (comparison_table["comparison_side"] == 0)
+                (comparison_table["comparison_side"] < 1)
             ]["sample_name"].tolist()
 
             # Now get the actual samles
             signal_samples = [s for s in self.samples if s.name in pos_names]
             control_samples = [s for s in self.samples if s.name in neg_names]
+
+            if len(signal_samples) == 0 or len(control_samples) == 0:
+                error = "Comparison side for '{}' comparison does not contain samples.".format(comparison)
+                if permissive:
+                    print(error)
+                    continue
+                else:
+                    raise ValueError(error)
 
             print("Doing comparison '{}' with positive samples '{}' and background samples '{}'".format(
                 comparison, [s.name for s in signal_samples], [s.name for s in control_samples]
@@ -122,20 +130,48 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
             output_dir = os.path.abspath(output_dir.format(results_dir=self.results_dir))
 
         # For each comparison, count called peaks
-        peak_counts = pd.Series(name="peak_number")
+        peak_counts = pd.DataFrame()
         for comparison in comparison_table['comparison_name'].drop_duplicates().sort_values():
-            file = os.path.join(output_dir, comparison, comparison + "_homer_peaks")
-            homer_peaks_to_bed(file + ".narrowPeak", file + ".bed")
-            try:
-                df = pd.read_csv(file + ".bed", sep="\t")
-            except IOError("Peak files for comparison '{}' don't exist.".format(comparison)) as e:
-                if permissive:
-                    print(e)
-                    continue
-                else:
-                    raise e
-            peak_counts[comparison] = df.shape[0]
-        peak_counts.index.name = 'comparison_name'
+            print(comparison)
+            for peak_type, file in [
+                ("macs", os.path.join(output_dir, comparison, comparison + "_peaks.narrowPeak")),
+                ("homer_factor", os.path.join(output_dir, comparison, comparison + "_homer_peaks.factor.narrowPeak")),
+                ("homer_histone", os.path.join(output_dir, comparison, comparison + "_homer_peaks.histone.narrowPeak"))]:
+                error = "Peak files for comparison '{}' with '{}' parameters don't exist.".format(comparison, peak_type)
+
+                if "homer" in peak_type:
+                    try:
+                        homer_peaks_to_bed(file, file.replace("narrowPeak", "bed"))
+                    except IOError:
+                        if permissive:
+                            print(error)
+                            peak_counts = peak_counts.append(
+                                pd.Series([comparison, peak_type, np.nan]), ignore_index=True)
+                            continue
+                        else:
+                            raise
+                    except pd.errors.EmptyDataError:
+                        peak_counts = peak_counts.append(
+                                pd.Series([comparison, peak_type, 0]), ignore_index=True)
+
+                    file = file.replace("narrowPeak", "bed")
+                try:
+                    df = pd.read_csv(file, sep="\t")
+                except IOError:
+                    if permissive:
+                        print(error)
+                        peak_counts = peak_counts.append(
+                            pd.Series([comparison, peak_type, np.nan]), ignore_index=True)
+                        continue
+                    else:
+                        raise
+                except pd.errors.EmptyDataError:
+                    peak_counts = peak_counts.append(
+                                pd.Series([comparison, peak_type, 0]), ignore_index=True)
+
+                peak_counts = peak_counts.append(pd.Series([comparison, peak_type, df.shape[0]]), ignore_index=True)
+        peak_counts.columns = ['comparison_name', 'peak_type', 'peak_counts']
+
         return peak_counts
 
     def get_consensus_sites(
@@ -327,11 +363,18 @@ def homer_call_chipseq_peak_job(signal_samples, control_samples, output_dir, nam
     """.format(background_tag_directory, " ".join([s.filtered for s in control_samples]))
 
     # call peaks
-    output_file = os.path.join(output_dir, name, name + "_homer_peaks.narrowPeak")
+    output_file = os.path.join(output_dir, name, name + "_homer_peaks.factor.narrowPeak")
     if not os.path.exists(os.path.join(output_dir, name)):
         os.makedirs(os.path.join(output_dir, name))
     cmd += """
 \t\tfindPeaks {signal} -style factor -o {output_file} -i {background}
+""".format(output_file=output_file, background=background_tag_directory, signal=signal_tag_directory)
+
+    output_file = os.path.join(output_dir, name, name + "_homer_peaks.histone.narrowPeak")
+    if not os.path.exists(os.path.join(output_dir, name)):
+        os.makedirs(os.path.join(output_dir, name))
+    cmd += """
+\t\tfindPeaks {signal} -style histone -o {output_file} -i {background}
 """.format(output_file=output_file, background=background_tag_directory, signal=signal_tag_directory)
 
     # Slurm footer
@@ -355,7 +398,9 @@ def homer_peaks_to_bed(homer_peaks, output_bed):
     :param str output_bed: Output BED file.
     """
     df = pd.read_csv(homer_peaks, sep="\t", comment="#", header=None)
-    df['-log_pvalue'] = (-np.log10(df[13])).replace(pd.np.inf, 1000)
+    df['-log_pvalue'] = (-np.log10(df.iloc[:, -2])).replace(pd.np.inf, 1000)
     df['name'] = df[1] + ":" + df[2].astype(str) + "-" + df[3].astype(str)
 
-    df[[1, 2, 3, 'name', '-log_pvalue']].sort_values("-log_pvalue", ascending=False).to_csv(output_bed, header=False, index=False, sep="\t")
+    (df[[1, 2, 3, 'name', '-log_pvalue']]
+    .sort_values("-log_pvalue", ascending=False)
+    .to_csv(output_bed, header=False, index=False, sep="\t"))

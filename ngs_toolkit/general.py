@@ -1515,7 +1515,7 @@ def differential_enrichment(
                 comparison_df.index.name = "gene_name"
                 # write gene names to file
                 (comparison_df
-                .reset_index()[['gene_name']]
+                .reset_index()['gene_name']
                 .drop_duplicates()
                 .sort_values()
                 .to_csv(os.path.join(comparison_dir, output_prefix + ".gene_symbols.txt"), header=None, index=False))

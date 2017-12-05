@@ -144,6 +144,8 @@ def unsupervised_analysis(
     import itertools
     from scipy.stats import kruskal
     from scipy.stats import pearsonr
+    import matplotlib.pyplot as plt
+    import seaborn as sns
 
     if data_type == "ATAC-seq":
         if plot_prefix is None:
@@ -1357,7 +1359,9 @@ def enrichr(dataframe, gene_set_libraries=None, kind="genes"):
     return results
 
 
-def run_enrichment_jobs(analysis_name, results_dir, genome):
+def run_enrichment_jobs(
+        analysis_name, results_dir, genome,
+        background_bed="results/{PROJECT_NAME}_peak_set.bed"):
     """
     Submit enrichment jobs for a specifc analysis.
     """
@@ -1367,9 +1371,9 @@ DIR=`dirname $F`
 if [ ! -f ${{DIR}}/allEnrichments.txt ]; then
 echo $DIR $F
 sbatch -J lola.$F -o $F.lola.log -p shortq -c 8 --mem 24000 \
---wrap "Rscript ~/jobs/run_LOLA.R $F results/{PROJECT_NAME}_peak_set.bed {GENOME}"
+--wrap "Rscript ~/jobs/run_LOLA.R $F {background_bed} {GENOME}"
 fi
-done""".format(results_dir=results_dir, PROJECT_NAME=analysis_name, GENOME=genome)]
+done""".format(results_dir=results_dir, background_bed=background_bed, GENOME=genome)]
 
     # AME
     dbs = {
@@ -1400,7 +1404,7 @@ done""".format(results_dir=results_dir, GENOME=genome)]
 
     # Enrichr
     cmds += ["""for F in `find {results_dir} -name "*.gene_symbols.txt"`; do
-if [ ! -f ${{F}}.enrichr.csv ]; then
+if [ ! -f ${{F/gene_symbols.txt/enrichr.csv}} ]; then
 echo $F
 sbatch -J enrichr.$F -o $F.enrichr.log -p shortq -c 1 --mem 4000 \
 --wrap "python -u ~/jobs/run_Enrichr.py --input-file "$F" --output-file "${{F/gene_symbols.txt/enrichr.csv}}" "
@@ -1566,7 +1570,13 @@ def differential_enrichment(
         pathway_enr.to_csv(
             os.path.join(output_dir, output_prefix + ".enrichr.csv"), index=False)
     else:
-        run_enrichment_jobs(analysis_name=analysis.name, results_dir=output_dir, genome=genome)
+        try:
+            background = getattr(analysis, "sites").fn
+        except:
+            background = ""
+        run_enrichment_jobs(
+            analysis_name=analysis.name, results_dir=output_dir,
+            genome=genome, background_bed=background)
 
 
 def collect_differential_enrichment(
@@ -1612,7 +1622,7 @@ def collect_differential_enrichment(
             if data_type == "RNA-seq":
                 # print("Collecting enrichments of comparison '{}', direction '{}'.".format(comp, direction))
                 try:
-                    enr = pd.read_csv(os.path.join(comparison_dir, output_prefix + ".gene_symbols.txt.enrichr.csv"))
+                    enr = pd.read_csv(os.path.join(comparison_dir, output_prefix + ".enrichr.csv"))
                 except IOError as e:
                     if permissive:
                         print(error_msg.format("Enrichr", comp, direction))

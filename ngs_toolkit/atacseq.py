@@ -483,8 +483,8 @@ class ATACSeqAnalysis(Analysis):
 
     def get_peak_genomic_location(
             self, region_files=[
-            "ensembl_genes.bed", "ensembl_tss2kb.bed",
-            "ensembl_utr5.bed", "ensembl_exons.bed", "ensembl_introns.bed", "ensembl_utr3.bed"],
+                "ensembl_genes.bed", "ensembl_tss2kb.bed",
+                "ensembl_utr5.bed", "ensembl_exons.bed", "ensembl_introns.bed", "ensembl_utr3.bed"],
             genome="hg19"):
         """
         Annotates peaks with its type of genomic location.
@@ -570,28 +570,35 @@ class ATACSeqAnalysis(Analysis):
         else:
             quant_matrix = getattr(self, quant_matrix)
 
+        next_matrix = quant_matrix
         # add closest gene
         if hasattr(self, "gene_annotation"):
             self.coverage_annotated = pd.merge(
-                quant_matrix,
+                next_matrix,
                 self.gene_annotation, on=['chrom', 'start', 'end'], how="left")
+            next_matrix = self.coverage_annotated
         # add genomic location
         if hasattr(self, "region_annotation"):
             self.coverage_annotated = pd.merge(
-                self.coverage_annotated,
+                next_matrix,
                 self.region_annotation[['chrom', 'start', 'end', 'genomic_region']], on=['chrom', 'start', 'end'], how="left")
+            next_matrix = self.coverage_annotated
         # add chromatin state
         if hasattr(self, "chrom_state_annotation"):
             self.coverage_annotated = pd.merge(
-                self.coverage_annotated,
+                next_matrix,
                 self.chrom_state_annotation[['chrom', 'start', 'end', 'chromatin_state']], on=['chrom', 'start', 'end'], how="left")
+            next_matrix = self.coverage_annotated
 
         # add support
         if hasattr(self, "support"):
             self.coverage_annotated = pd.merge(
-                self.coverage_annotated,
+                next_matrix,
                 self.support[['chrom', 'start', 'end', 'support']], on=['chrom', 'start', 'end'], how="left")
-
+            next_matrix = self.coverage_annotated
+        
+        if not hasattr(self, "coverage_annotated"):
+            self.coverage_annotated = next_matrix
         # calculate mean coverage
         self.coverage_annotated['mean'] = self.coverage_annotated[[s.name for s in samples]].mean(axis=1)
         # calculate coverage variance

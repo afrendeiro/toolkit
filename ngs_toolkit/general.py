@@ -690,6 +690,8 @@ def differential_overlap(
     ):
     """
     Visualize intersection of sets of differential regions/genes.
+
+    :param pandas.DataFrame differential: DataFrame containing result of comparisons filtered for features considered as differential.
     """
     import numpy as np
     import itertools
@@ -726,25 +728,28 @@ def differential_overlap(
         )
     # convert to %
     intersections['intersection'] = intersections['intersection'].astype(float)
-    intersections['intersection_perc'] = ((intersections['intersection'] / intersections['size2']) * 100.).astype(float)
+    intersections['perc_1'] = intersections['intersection'] / intersections['size1'] * 100.
+    intersections['perc_2'] = intersections['intersection'] / intersections['size2'] * 100.
+    intersections['intersection_max_perc'] = intersections[['perc_1', 'perc_2']].max(axis=1)
 
     # save
     intersections.to_csv(os.path.join(output_dir, output_prefix + ".differential_overlap.csv"), index=False)
+    intersections = pd.read_csv(os.path.join(output_dir, output_prefix + ".differential_overlap.csv"))
 
     # make pivot tables
     piv_up = pd.pivot_table(
         intersections[(intersections['dir1'] == "up") & (intersections['dir2'] == "up")],
-        index="group1", columns="group2", values="intersection_perc").fillna(0)
+        index="group1", columns="group2", values="intersection_max_perc").fillna(0)
     piv_down = pd.pivot_table(
         intersections[(intersections['dir1'] == "down") & (intersections['dir2'] == "down")],
-        index="group1", columns="group2", values="intersection_perc").fillna(0)
+        index="group1", columns="group2", values="intersection_max_perc").fillna(0)
     np.fill_diagonal(piv_up.values, np.nan)
     np.fill_diagonal(piv_down.values, np.nan)
 
     # heatmaps
     fig, axis = plt.subplots(1, 2, figsize=(8 * 2, 8))
-    sns.heatmap(piv_down, square=True, cmap="summer", cbar_kws={"label": "Concordant {}s (% of group 2)".format(unit)}, ax=axis[0])
-    sns.heatmap(piv_up, square=True, cmap="summer", cbar_kws={"label": "Concordant {}s (% of group 2)".format(unit)}, ax=axis[1])
+    sns.heatmap(piv_down, square=True, cmap="RdBu", cbar_kws={"label": "Concordant {}s (max of intersection %)".format(unit)}, ax=axis[0], vmin=0, vmax=100)
+    sns.heatmap(piv_up, square=True, cmap="RdBu_r", cbar_kws={"label": "Concordant {}s (max of intersection %)".format(unit)}, ax=axis[1], vmin=0, vmax=100)
     axis[0].set_title("Downregulated {}s".format(unit))
     axis[1].set_title("Upregulated {}s".format(unit))
     axis[0].set_xticklabels(axis[0].get_xticklabels(), rotation=90, ha="right")
@@ -756,12 +761,12 @@ def differential_overlap(
     # combined heatmap
     # with upregulated {}s in upper square matrix and downredulated in down square
     piv_combined = pd.DataFrame(np.triu(piv_up), index=piv_up.index, columns=piv_up.columns).replace(0, np.nan)
-    piv_combined.update(pd.DataFrame(np.tril(piv_down), index=piv_down.index, columns=piv_down.columns).replace(0, np.nan))
+    piv_combined.update(pd.DataFrame(np.tril(-piv_down), index=piv_down.index, columns=piv_down.columns).replace(0, np.nan))
     piv_combined = piv_combined.fillna(0)
     np.fill_diagonal(piv_combined.values, np.nan)
 
     fig, axis = plt.subplots(1, figsize=(8, 8))
-    sns.heatmap(piv_combined, square=True, cmap="summer", cbar_kws={"label": "Concordant {}s (% of group 2)".format(unit)}, ax=axis)
+    sns.heatmap(piv_combined, square=True, cmap="RdBu_r", cbar_kws={"label": "Concordant {}s (max of intersection %)".format(unit)}, ax=axis, vmin=-150, vmax=150)
     axis.set_xticklabels(axis.get_xticklabels(), rotation=90, ha="right")
     axis.set_yticklabels(axis.get_yticklabels(), rotation=0, ha="right")
     fig.savefig(os.path.join(output_dir, output_prefix + ".differential_overlap.up_down_together.svg"), bbox_inches="tight")
@@ -776,26 +781,31 @@ def differential_overlap(
         index="group1", columns="group2", values="intersection")
 
     piv_disagree = pd.concat([piv_up, piv_down]).groupby(level=0).max()
+    np.fill_diagonal(piv_disagree.values, np.nan)
 
-    fig, axis = plt.subplots(1, 2, figsize=(16, 8))
-    sns.heatmap(piv_disagree, square=True, cmap="Greens", cbar_kws={"label": "Discordant {}s".format(unit).format(unit)}, ax=axis[0])
-    sns.heatmap(np.log2(1 + piv_disagree), square=True, cmap="Greens", cbar_kws={"label": "Discordant {}s (log2)".format(unit)}, ax=axis[1])
+    fig, axis = plt.subplots(2, 2, figsize=(16, 16))
+    sns.heatmap(piv_disagree, square=True, cmap="Greens", cbar_kws={"label": "Discordant {}s".format(unit).format(unit)}, ax=axis[0][0])
+    sns.heatmap(np.log2(1 + piv_disagree), square=True, cmap="Greens", cbar_kws={"label": "Discordant {}s (log2)".format(unit)}, ax=axis[1][0])
 
     norm = matplotlib.colors.Normalize(vmin=0, vmax=piv_disagree.max().max())
     cmap = plt.get_cmap("Greens")
-    log_norm = matplotlib.colors.Normalize(vmin=0, vmax=np.log2(1 + piv_disagree).max().max())
-    for i, g1 in enumerate(piv_disagree.columns):
-        for j, g2 in enumerate(piv_disagree.index):
-            axis[0].scatter(
+    log_norm = matplotlib.colors.Normalize(vmin=np.log2(1 + piv_disagree).min().min(), vmax=np.log2(1 + piv_disagree).max().max())
+    for j, g2 in enumerate(piv_disagree.index):
+        for i, g1 in enumerate(piv_disagree.columns):
+            # print(len(piv_disagree.index) - (j + 0.5), len(piv_disagree.index) - (i + 0.5))
+            axis[0][1].scatter(
                 len(piv_disagree.index) - (j + 0.5), len(piv_disagree.index) - (i + 0.5),
                 s=(100 ** (norm(piv_disagree.loc[g1, g2]))) - 1, color=cmap(norm(piv_disagree.loc[g1, g2])), marker="o")
-            axis[1].scatter(
+            axis[1][1].scatter(
                 len(piv_disagree.index) - (j + 0.5), len(piv_disagree.index) - (i + 0.5),
                 s=(100 ** (log_norm(np.log2(1 + piv_disagree).loc[g1, g2]))) - 1, color=cmap(log_norm(np.log2(1 + piv_disagree).loc[g1, g2])), marker="o")
 
-    for ax in axis:
+    for ax in axis[:, 0]:
         ax.set_xticklabels(ax.get_xticklabels(), rotation=90, ha="right")
         ax.set_yticklabels(ax.get_yticklabels(), rotation=0, ha="right")
+    for ax in axis[:, 1]:
+        ax.set_xlim((0, len(piv_disagree.index)))
+        ax.set_ylim((0, len(piv_disagree.columns)))
     fig.savefig(os.path.join(output_dir, output_prefix + ".differential_overlap.disagreement.svg"), bbox_inches="tight")
 
 
@@ -1918,7 +1928,7 @@ def plot_differential_enrichment(
             # plot clustered heatmap
             shape = enrichr_pivot[list(set(top_terms))].shape
             g = sns.clustermap(enrichr_pivot[list(set(top_terms))].T, figsize=(max(6, 0.12 * shape[0]), max(6, 0.12 * shape[1])),
-                cbar_kws={"label": "-log10(p-value) of enrichment\nof differential genes"}, metric="correlation")
+                cbar_kws={"label": "-log10(p-value) of enrichment\nof differential genes"}, metric="correlation", vmin=0)
             g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90, ha="right", fontsize="xx-small")
             g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small")
             g.fig.savefig(os.path.join(output_dir, output_prefix + ".enrichr.{}.cluster_specific.svg".format(gene_set_library)), bbox_inches="tight", dpi=300)

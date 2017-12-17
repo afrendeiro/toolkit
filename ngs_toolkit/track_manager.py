@@ -194,7 +194,8 @@ trackDb {g}/trackDb.txt
                     subgroups=subgroups)
 
                 for index in indices:
-                    sample_attrs = df_g.ix[indices].squeeze()
+                    sample_attrs = df_g.ix[index].squeeze()
+                    print(index, sample_attrs)
                     track += track_final.format(
                         name=sample_attrs["sample_name"],
                         color=sample_attrs['track_color'],
@@ -211,14 +212,15 @@ trackDb {g}/trackDb.txt
                     except OSError:
                         print("Sample {} track file does not exist!".format(sample_attrs["sample_name"]))
                         continue
-                # Make directories readable and executable
-                os.chmod(os.path.join(dest, genome), 0755)
+        # Make directories readable and executable
+        os.chmod(os.path.join(bigwig_dir, genome), 0755)
 
         track = re.sub("_none", "", track)
 
         # write trackDb to file
         with open(track_db, 'w') as handle:
             handle.write(textwrap.dedent(track))
+        os.chmod(track_db, 0755)
 
 
     msg = "\n".join([

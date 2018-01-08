@@ -48,9 +48,14 @@ class ATACSeqAnalysis(Analysis):
 
         :param output_mapping dict: Dictionary with "attribute name": "path prefix" to load the files.
         :param only_these_keys list | None: Iterable of analysis attributes to load up.
+                                            Possible attributes:
+                                                "sites", "support", "coverage", "coverage_qnorm",
+                                                "nuc", "coverage_gc_corrected", "gene_annotation",
+                                                "region_annotation", "region_annotation_b",
+                                                "chrom_state_annotation", "chrom_state_annotation_b",
+                                                "coverage_annotated", "accessibility".
         :param permissive bool: Whether an error should be thrown if reading a file causes IOError.
         """
-
         if output_mapping is None:
             # TODO: get default mapping by having functions declare what they output
             # perhaps also with a dict of kwargs to pass to pandas.read_csv
@@ -67,35 +72,43 @@ class ATACSeqAnalysis(Analysis):
                 "chrom_state_annotation_b": "_peaks.chromatin_state_background.csv",
                 "coverage_annotated": "_peaks.coverage_qnorm.annotated.csv",
             }
+        if only_these_keys is None:
+            only_these_keys = [
+                "sites", "support", "coverage", "coverage_qnorm",
+                "nuc", "coverage_gc_corrected", "gene_annotation",
+                "region_annotation", "region_annotation_b",
+                "chrom_state_annotation", "chrom_state_annotation_b",
+                "coverage_annotated", "accessibility"]
 
-        if only_these_keys is not None:
-            output_mapping = {k:v for k,v in output_mapping.items() if k in only_these_keys}
+        output_mapping = {k:v for k,v in output_mapping.items() if k in only_these_keys}
 
         for name, suffix in output_mapping.items():
+            if name in only_these_keys:
+                try:
+                    setattr(self, name, pd.read_csv(os.path.join(self.results_dir, self.name + suffix), index_col=0))
+                except IOError("File of attribute '{}' could not be read: {}".format(name, os.path.join(self.results_dir, self.name + suffix))) as e:
+                    if not permissive:
+                        raise e
+                    else:
+                        print(e)
+
+        # Special cases
+        if "sites" in only_these_keys:
             try:
-                setattr(self, name, pd.read_csv(os.path.join(self.results_dir, self.name + suffix), index_col=0))
-            except IOError("File of attribute '{}' could not be read: {}".format(name, os.path.join(self.results_dir, self.name + suffix))) as e:
+                setattr(self, "sites", pybedtools.BedTool(os.path.join(self.results_dir, self.name + "_peak_set.bed")))
+            except IOError("File of attribute '{}' could not be read: {}".format("sites", os.path.join(self.results_dir, self.name + "_peak_set.bed"))) as e:
                 if not permissive:
                     raise e
                 else:
                     print(e)
-        
-        # Special cases
-        try:
-            setattr(self, "sites", pybedtools.BedTool(os.path.join(self.results_dir, self.name + "_peak_set.bed")))
-        except IOError("File of attribute '{}' could not be read: {}".format("sites", os.path.join(self.results_dir, self.name + "_peak_set.bed"))) as e:
-            if not permissive:
-                raise e
-            else:
-                print(e)
-
-        try:
-            setattr(self, "accessibility", pd.read_csv(os.path.join(self.results_dir, self.name + ".accessibility.annotated_metadata.csv"), index_col=0, header=range(5)))
-        except IOError("File of attribute '{}' could not be read: {}".format("accessibility", os.path.join(self.results_dir, self.name + ".accessibility.annotated_metadata.csv"))) as e:
-            if not permissive:
-                raise e
-            else:
-                print(e)
+        if "accesibility" in only_these_keys:
+            try:
+                setattr(self, "accessibility", pd.read_csv(os.path.join(self.results_dir, self.name + ".accessibility.annotated_metadata.csv"), index_col=0, header=range(5)))
+            except IOError("File of attribute '{}' could not be read: {}".format("accessibility", os.path.join(self.results_dir, self.name + ".accessibility.annotated_metadata.csv"))) as e:
+                if not permissive:
+                    raise e
+                else:
+                    print(e)
 
     def get_consensus_sites(
             self, samples=None, region_type="summits", extension=250,
@@ -596,7 +609,7 @@ class ATACSeqAnalysis(Analysis):
                 next_matrix,
                 self.support[['chrom', 'start', 'end', 'support']], on=['chrom', 'start', 'end'], how="left")
             next_matrix = self.coverage_annotated
-        
+
         if not hasattr(self, "coverage_annotated"):
             self.coverage_annotated = next_matrix
         # calculate mean coverage

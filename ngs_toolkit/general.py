@@ -129,7 +129,9 @@ def normalize_quantiles_p(df_input):
 def unsupervised_analysis(
         analysis, data_type="ATAC-seq", quant_matrix=None, samples=None,
         attributes_to_plot=["sample_name"], plot_prefix=None,
-        plot_max_attr=20, plot_max_pcs=8, plot_group_centroids=True, axis_ticklabels=False, axis_lines=True, always_legend=False,
+        heatmap_numeric_annotation=True,
+        plot_max_attr=20, plot_max_pcs=8, plot_group_centroids=True, axis_ticklabels=False, axis_lines=True,
+        legends=False, always_legend=False,
         output_dir="{results_dir}/unsupervised"):
     """
     Apply unsupervised clustering (clustering of correlations) and dimentionality reduction methods (MDS, PCA) on matrix.
@@ -171,7 +173,9 @@ def unsupervised_analysis(
         samples = [s for s in analysis.samples if s.name in matrix.columns.get_level_values("sample_name")]
 
     # This will always be a matrix for all samples
-    color_dataframe = pd.DataFrame(analysis.get_level_colors(index=matrix.columns, levels=attributes_to_plot), index=attributes_to_plot, columns=matrix.columns.get_level_values("sample_name"))
+    color_dataframe = pd.DataFrame(
+        analysis.get_level_colors(index=matrix.columns, levels=attributes_to_plot),
+        index=attributes_to_plot, columns=matrix.columns.get_level_values("sample_name"))
     # will be filtered now by the requested samples if needed
     color_dataframe = color_dataframe[[s.name for s in samples]]
     # sample_display_names = color_dataframe.columns.str.replace("ATAC-seq_", "")
@@ -181,7 +185,8 @@ def unsupervised_analysis(
 
     # Pairwise correlations
     g = sns.clustermap(
-        X.astype(float).corr(), xticklabels=False, annot=True,  # yticklabels=sample_display_names,
+        # yticklabels=sample_display_names,
+        X.astype(float).corr(), xticklabels=False, annot=heatmap_numeric_annotation,
         cmap="Spectral_r", figsize=(0.2 * X.shape[1], 0.2 * X.shape[1]), cbar_kws={"label": "Pearson correlation"}, row_colors=color_dataframe.values.tolist())
     g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize='xx-small')
     g.ax_heatmap.set_xlabel(None, visible=False)
@@ -192,18 +197,40 @@ def unsupervised_analysis(
     mds = MDS(n_jobs=-1)
     x_new = mds.fit_transform(X.T)
     # transform again
-    x = pd.DataFrame(x_new)
-    xx = x.apply(lambda j: (j - j.mean()) / j.std(), axis=0)
+    xx = pd.DataFrame(x_new, index=X.columns, columns=list(range(x_new.shape[1])))
+    # xx = x.apply(lambda j: (j - j.mean()) / j.std(), axis=0)
 
     fig, axis = plt.subplots(1, len(attributes_to_plot), figsize=(4 * len(attributes_to_plot), 4 * 1))
     axis = axis.flatten()
     for i, attr in enumerate(attributes_to_plot):
-        for j in range(len(xx)):
+        for j, sample in enumerate(xx.index):
+            sample = pd.Series(sample, index=X.columns.names)
             try:
-                label = getattr(samples[j], attributes_to_plot[i])
+                label = getattr(sample, attributes_to_plot[i])
             except AttributeError:
                 label = np.nan
-            axis[i].scatter(xx.loc[j, 0], xx.loc[j, 1], s=50, color=color_dataframe.ix[attr][j], label=label)
+            axis[i].scatter(
+                xx.loc[sample['sample_name'], 0],
+                xx.loc[sample['sample_name'], 1],
+                s=50, color=color_dataframe.loc[attr, sample['sample_name']], alpha=0.75, label=label)
+
+        # Plot groups
+        if plot_group_centroids:
+            xx2 = xx.groupby(attr).mean()
+            # get the color of each attribute group
+            cd = color_dataframe.loc[attr]
+            cd.name = None
+            cd.index = X.columns.get_level_values(attr)
+            cd = cd.reset_index().drop_duplicates().set_index(attr)
+            for j, group in enumerate(xx2.index):
+                axis[i].scatter(
+                    xx2.loc[group, 0],
+                    xx2.loc[group, 1],
+                    marker="s", s=50, color=cd.loc[group].squeeze(), alpha=0.95, label=group)
+                axis[i].text(
+                    xx2.loc[group, 0],
+                    xx2.loc[group, 1], group,
+                    color=cd.loc[group].squeeze(), alpha=0.95)
 
         # Graphics
         axis[i].set_title(attributes_to_plot[i])
@@ -216,12 +243,13 @@ def unsupervised_analysis(
             axis[i].axhline(0, linestyle="--", color="black", alpha=0.3)
             axis[i].axvline(0, linestyle="--", color="black", alpha=0.3)
 
-        # Unique legend labels
-        handles, labels = axis[i].get_legend_handles_labels()
-        by_label = OrderedDict(zip(labels, handles))
-        if any([type(c) in [str, unicode] for c in by_label.keys()]) and len(by_label) <= 20:
-            # if not any([re.match("^\d", c) for c in by_label.keys()]):
-            axis[i].legend(by_label.values(), by_label.keys())
+        if legends:
+            # Unique legend labels
+            handles, labels = axis[i].get_legend_handles_labels()
+            by_label = OrderedDict(zip(labels, handles))
+            if any([type(c) in [str, unicode] for c in by_label.keys()]) and len(by_label) <= 20:
+                # if not any([re.match("^\d", c) for c in by_label.keys()]):
+                axis[i].legend(by_label.values(), by_label.keys())
     fig.savefig(os.path.join(output_dir, "{}.{}.mds.svg".format(analysis.name, plot_prefix)), bbox_inches="tight")
 
     # PCA
@@ -287,17 +315,18 @@ def unsupervised_analysis(
                 axis[pc, i].axhline(0, linestyle="--", color="black", alpha=0.3)
                 axis[pc, i].axvline(0, linestyle="--", color="black", alpha=0.3)
 
-            # Unique legend labels
-            handles, labels = axis[pc, i].get_legend_handles_labels()
-            by_label = OrderedDict(zip(labels, handles))
-            if any([type(c) in [str, unicode] for c in by_label.keys()]) and len(by_label) <= plot_max_attr:
-                # if not any([re.match("^\d", c) for c in by_label.keys()]):
-                if always_legend:
-                    axis[pc, i].legend(by_label.values(), by_label.keys())
-                else:
-                    if pc == pcs - 1:
-                        axis[pc, i].legend(
-                            by_label.values(), by_label.keys())
+            if legends:
+                # Unique legend labels
+                handles, labels = axis[pc, i].get_legend_handles_labels()
+                by_label = OrderedDict(zip(labels, handles))
+                if any([type(c) in [str, unicode] for c in by_label.keys()]) and len(by_label) <= plot_max_attr:
+                    # if not any([re.match("^\d", c) for c in by_label.keys()]):
+                    if always_legend:
+                        axis[pc, i].legend(by_label.values(), by_label.keys())
+                    else:
+                        if pc == pcs - 1:
+                            axis[pc, i].legend(
+                                by_label.values(), by_label.keys())
     fig.savefig(os.path.join(output_dir, "{}.{}.pca.svg".format(
         analysis.name, plot_prefix)), bbox_inches="tight")
 

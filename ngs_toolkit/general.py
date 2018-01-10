@@ -85,7 +85,10 @@ class Analysis(object):
         Will try to guess if each variable is categorical or numerical and return either colours from a colour `pallete`
         or a `cmap`, respectively with null values set to `nan_color` (a 4-value tuple with floats).
         """
+        import numpy as np
+        import matplotlib
         import matplotlib.pyplot as plt
+        from collections import Counter
 
         if index is None:
             index = getattr(self, matrix).columns

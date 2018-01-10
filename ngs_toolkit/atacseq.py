@@ -83,10 +83,12 @@ class ATACSeqAnalysis(Analysis):
         output_mapping = {k:v for k,v in output_mapping.items() if k in only_these_keys}
 
         for name, suffix in output_mapping.items():
+            file = os.path.join(self.results_dir, self.name + suffix)
             if name in only_these_keys:
+                print("Loading '{}' analysis attribute.".format(name))
                 try:
-                    setattr(self, name, pd.read_csv(os.path.join(self.results_dir, self.name + suffix), index_col=0))
-                except IOError("File of attribute '{}' could not be read: {}".format(name, os.path.join(self.results_dir, self.name + suffix))) as e:
+                    setattr(self, name, pd.read_csv(file, index_col=0))
+                except IOError as e:
                     if not permissive:
                         raise e
                     else:
@@ -94,17 +96,20 @@ class ATACSeqAnalysis(Analysis):
 
         # Special cases
         if "sites" in only_these_keys:
+            file = os.path.join(self.results_dir, self.name + "_peak_set.bed")
             try:
-                setattr(self, "sites", pybedtools.BedTool(os.path.join(self.results_dir, self.name + "_peak_set.bed")))
-            except IOError("File of attribute '{}' could not be read: {}".format("sites", os.path.join(self.results_dir, self.name + "_peak_set.bed"))) as e:
+                setattr(self, "sites", pybedtools.BedTool(file))
+            except IOError as e:
                 if not permissive:
                     raise e
                 else:
                     print(e)
+
         if "accesibility" in only_these_keys:
+            file = os.path.join(self.results_dir, self.name + ".accessibility.annotated_metadata.csv")
             try:
-                setattr(self, "accessibility", pd.read_csv(os.path.join(self.results_dir, self.name + ".accessibility.annotated_metadata.csv"), index_col=0, header=range(5)))
-            except IOError("File of attribute '{}' could not be read: {}".format("accessibility", os.path.join(self.results_dir, self.name + ".accessibility.annotated_metadata.csv"))) as e:
+                setattr(self, "accessibility", pd.read_csv(file, index_col=0, header=range(5)))
+            except IOError as e:
                 if not permissive:
                     raise e
                 else:
@@ -706,59 +711,6 @@ class ATACSeqAnalysis(Analysis):
         matrix2.columns = matrix.columns
         return matrix2.groupby(level=['gene_name']).mean()
 
-    def get_level_colors(self, index=None, levels=None, pallete="Paired", cmap="RdBu_r", nan_color=(0.662745, 0.662745, 0.662745, 0.5)):
-        """
-        Get tuples of floats representing a colour for a sample in a given variable in a dataframe's index
-        (particularly useful with MultiIndex dataframes).
-
-        By default, will act on the columns and it's levels of an `accessibiility` dataframe of self. Other `index` and `levels` can
-        be passed for costumization.
-
-        Will try to guess if each variable is categorical or numerical and return either colours from a colour `pallete`
-        or a `cmap`, respectively with null values set to `nan_color` (a 4-value tuple with floats).
-        """
-        if index is None:
-            index = self.accessibility.columns
-
-        if levels is not None:
-            index = index.droplevel([l.name for l in index.levels if l.name not in levels])
-
-        _cmap = plt.get_cmap(cmap)
-        _pallete = plt.get_cmap(pallete)
-
-        colors = list()
-        for level in index.levels:
-            # determine the type of data in each level
-            most_common = Counter([type(x) for x in level]).most_common()[0][0]
-            print(level.name, most_common)
-
-            # Add either colors based on categories or numerical scale
-            if most_common in [int, float, np.float32, np.float64, np.int32, np.int64]:
-                values = index.get_level_values(level.name)
-                # Create a range of either 0-100 if only positive values are found
-                # or symmetrically from the maximum absolute value found
-                if not any(values.dropna() < 0):
-                    norm = matplotlib.colors.Normalize(vmin=0, vmax=100)
-                else:
-                    r = max(abs(values.min()), abs(values.max()))
-                    norm = matplotlib.colors.Normalize(vmin=-r, vmax=r)
-
-                col = _cmap(norm(values))
-                # replace color for nan cases
-                col[np.where(index.get_level_values(level.name).to_series().isnull().tolist())] = nan_color
-                colors.append(col.tolist())
-            else:
-                n = len(set(index.get_level_values(level.name)))
-                # get n equidistant colors
-                p = [_pallete(1. * i / n) for i in range(n)]
-                color_dict = dict(zip(list(set(index.get_level_values(level.name))), p))
-                # color for nan cases
-                color_dict[np.nan] = nan_color
-                col = [color_dict[x] for x in index.get_level_values(level.name)]
-                colors.append(col)
-
-        return colors
-
     def plot_peak_characteristics(self, samples=None, by_attribute=None, genome_space=3e9):
         """
         Several diagnostic plots on the peak set and the Sample's signal on them.
@@ -1144,7 +1096,8 @@ class ATACSeqAnalysis(Analysis):
     def unsupervised(
             self, quant_matrix="accessibility", samples=None,
             attributes_to_plot=["sample_name"], plot_prefix="all_sites",
-            plot_max_attr=20, plot_max_pcs=8, plot_group_centroids=True, axis_ticklabels=False, axis_lines=True, always_legend=False,
+            plot_max_attr=20, plot_max_pcs=8, plot_group_centroids=True, axis_ticklabels=False, axis_lines=True,
+            legends=False, always_legend=False,
             output_dir="{results_dir}/unsupervised"):
         """
         Apply unsupervised clustering (clustering of correlations) and dimentionality reduction methods (MDS, PCA) on matrix.
@@ -1216,12 +1169,13 @@ class ATACSeqAnalysis(Analysis):
                 axis[i].axhline(0, linestyle="--", color="black", alpha=0.3)
                 axis[i].axvline(0, linestyle="--", color="black", alpha=0.3)
 
-            # Unique legend labels
-            handles, labels = axis[i].get_legend_handles_labels()
-            by_label = OrderedDict(zip(labels, handles))
-            if any([type(c) in [str, unicode] for c in by_label.keys()]) and len(by_label) <= 20:
-                # if not any([re.match("^\d", c) for c in by_label.keys()]):
-                axis[i].legend(by_label.values(), by_label.keys())
+            if legends:
+                # Unique legend labels
+                handles, labels = axis[i].get_legend_handles_labels()
+                by_label = OrderedDict(zip(labels, handles))
+                if any([type(c) in [str, unicode] for c in by_label.keys()]) and len(by_label) <= 20:
+                    # if not any([re.match("^\d", c) for c in by_label.keys()]):
+                    axis[i].legend(by_label.values(), by_label.keys())
         fig.savefig(os.path.join(output_dir, "{}.{}.mds.svg".format(self.name, plot_prefix)), bbox_inches="tight")
 
         # PCA
@@ -1287,17 +1241,18 @@ class ATACSeqAnalysis(Analysis):
                     axis[pc, i].axhline(0, linestyle="--", color="black", alpha=0.3)
                     axis[pc, i].axvline(0, linestyle="--", color="black", alpha=0.3)
 
-                # Unique legend labels
-                handles, labels = axis[pc, i].get_legend_handles_labels()
-                by_label = OrderedDict(zip(labels, handles))
-                if any([type(c) in [str, unicode] for c in by_label.keys()]) and len(by_label) <= plot_max_attr:
-                    # if not any([re.match("^\d", c) for c in by_label.keys()]):
-                    if always_legend:
-                        axis[pc, i].legend(by_label.values(), by_label.keys())
-                    else:
-                        if pc == pcs - 1:
-                            axis[pc, i].legend(
-                                by_label.values(), by_label.keys())
+                if legends:
+                    # Unique legend labels
+                    handles, labels = axis[pc, i].get_legend_handles_labels()
+                    by_label = OrderedDict(zip(labels, handles))
+                    if any([type(c) in [str, unicode] for c in by_label.keys()]) and len(by_label) <= plot_max_attr:
+                        # if not any([re.match("^\d", c) for c in by_label.keys()]):
+                        if always_legend:
+                            axis[pc, i].legend(by_label.values(), by_label.keys())
+                        else:
+                            if pc == pcs - 1:
+                                axis[pc, i].legend(
+                                    by_label.values(), by_label.keys())
         fig.savefig(os.path.join(output_dir, "{}.{}.pca.svg".format(
             self.name, plot_prefix)), bbox_inches="tight")
 

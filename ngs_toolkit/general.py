@@ -72,6 +72,61 @@ class Analysis(object):
     def update(self):
         self.__dict__.update(self.from_pickle().__dict__)
 
+    def get_level_colors(
+            self, matrix="accessibility", index=None, levels=None,
+            pallete="Paired", cmap="RdBu_r", nan_color=(0.662745, 0.662745, 0.662745, 0.5)):
+        """
+        Get tuples of floats representing a colour for a sample in a given variable in a dataframe's index
+        (particularly useful with MultiIndex dataframes).
+
+        By default, will act on the columns and it's levels of an `matrix` dataframe of self. Other `index` and `levels` can
+        be passed for costumization.
+
+        Will try to guess if each variable is categorical or numerical and return either colours from a colour `pallete`
+        or a `cmap`, respectively with null values set to `nan_color` (a 4-value tuple with floats).
+        """
+        if index is None:
+            index = getattr(self, matrix).columns
+
+        if levels is not None:
+            index = index.droplevel([l.name for l in index.levels if l.name not in levels])
+
+        _cmap = plt.get_cmap(cmap)
+        _pallete = plt.get_cmap(pallete)
+
+        colors = list()
+        for level in index.levels:
+            # determine the type of data in each level
+            most_common = Counter([type(x) for x in level]).most_common()[0][0]
+            print(level.name, most_common)
+
+            # Add either colors based on categories or numerical scale
+            if most_common in [int, float, np.float32, np.float64, np.int32, np.int64]:
+                values = index.get_level_values(level.name)
+                # Create a range of either 0-100 if only positive values are found
+                # or symmetrically from the maximum absolute value found
+                if not any(values.dropna() < 0):
+                    norm = matplotlib.colors.Normalize(vmin=0, vmax=100)
+                else:
+                    r = max(abs(values.min()), abs(values.max()))
+                    norm = matplotlib.colors.Normalize(vmin=-r, vmax=r)
+
+                col = _cmap(norm(values))
+                # replace color for nan cases
+                col[np.where(index.get_level_values(level.name).to_series().isnull().tolist())] = nan_color
+                colors.append(col.tolist())
+            else:
+                n = len(set(index.get_level_values(level.name)))
+                # get n equidistant colors
+                p = [_pallete(1. * i / n) for i in range(n)]
+                color_dict = dict(zip(list(set(index.get_level_values(level.name))), p))
+                # color for nan cases
+                color_dict[np.nan] = nan_color
+                col = [color_dict[x] for x in index.get_level_values(level.name)]
+                colors.append(col)
+
+        return colors
+
 
 def count_reads_in_intervals(bam, intervals):
     """
@@ -727,7 +782,7 @@ def differential_overlap(
     import matplotlib.pyplot as plt
     import matplotlib
     import seaborn as sns
-    import tqdm
+    from tqdm import tqdm
 
     if "{data_type}" in output_dir:
         output_dir = output_dir.format(data_type=data_type)
@@ -745,8 +800,8 @@ def differential_overlap(
     piv = pd.pivot_table(differential.reset_index(), index='index', columns=['comparison_name', 'direction'], values='intersect', fill_value=0)
 
     intersections = pd.DataFrame(columns=["group1", "group2", "dir1", "dir2", "size1", "size2", "intersection", "union"])
-    for ((k1, dir1), i1), ((k2, dir2), i2) in tqdm.tqdm(
-            itertools.permutations(piv.T.groupby(level=['comparison_name', 'direction']).groups.items(), 2)):
+    perms = list(itertools.permutations(piv.T.groupby(level=['comparison_name', 'direction']).groups.items(), 2))
+    for ((k1, dir1), i1), ((k2, dir2), i2) in tqdm(perms, total=len(perms)):
         i1 = set(piv[i1][piv[i1] == 1].dropna().index)
         i2 = set(piv[i2][piv[i2] == 1].dropna().index)
         intersections = intersections.append(

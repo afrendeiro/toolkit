@@ -5,6 +5,7 @@ pybedtools
 parmap
 matplotlib
 seaborn
+sklearn
 pyyaml
 rpy2>=2.8.6
 tqdm

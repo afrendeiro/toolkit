@@ -773,6 +773,7 @@ def differential_analysis(
 
 def differential_overlap(
         differential,
+        total,
         data_type="ATAC-seq",
         output_dir="results/differential_analysis_{data_type}",
         output_prefix="differential_analysis"
@@ -788,6 +789,8 @@ def differential_overlap(
     import matplotlib
     import seaborn as sns
     from tqdm import tqdm
+    from scipy.stats import fisher_exact
+    from statsmodels.sandbox.stats.multicomp import multipletests
 
     if "{data_type}" in output_dir:
         output_dir = output_dir.format(data_type=data_type)
@@ -822,81 +825,160 @@ def differential_overlap(
     intersections['perc_2'] = intersections['intersection'] / intersections['size2'] * 100.
     intersections['intersection_max_perc'] = intersections[['perc_1', 'perc_2']].max(axis=1)
 
+    # calculate p-value from Fisher's exact test
+    intersections['a'] = total - intersections[['size1', 'size2', 'intersection']].sum(axis=1)
+    intersections['b'] = intersections['size1'] - intersections['intersection']
+    intersections['c'] = intersections['size2'] - intersections['intersection']
+    intersections['d'] = intersections['intersection']
+
+    for i, row in intersections[['d', 'b', 'c', 'a']].astype(int).iterrows():
+        odds, p = fisher_exact(
+            row
+            .values
+            .reshape((2, 2)),
+            alternative="greater")
+        intersections.loc[i, 'odds_ratio'] = odds
+        intersections.loc[i, 'p_value'] = p
+    # intersections['q_value'] = intersections['p_value'] * intersections.shape[0]
+    intersections['q_value'] = multipletests(intersections['p_value'])[1]
+    intersections['log_p_value'] = (-np.log10(intersections['p_value'])).fillna(0).replace(np.inf, 300)
+    intersections['log_q_value'] = (-np.log10(intersections['q_value'])).fillna(0).replace(np.inf, 300)
+
     # save
     intersections.to_csv(os.path.join(output_dir, output_prefix + ".differential_overlap.csv"), index=False)
     intersections = pd.read_csv(os.path.join(output_dir, output_prefix + ".differential_overlap.csv"))
 
-    # make pivot tables
-    piv_up = pd.pivot_table(
-        intersections[(intersections['dir1'] == "up") & (intersections['dir2'] == "up")],
-        index="group1", columns="group2", values="intersection_max_perc").fillna(0)
-    piv_down = pd.pivot_table(
-        intersections[(intersections['dir1'] == "down") & (intersections['dir2'] == "down")],
-        index="group1", columns="group2", values="intersection_max_perc").fillna(0)
-    np.fill_diagonal(piv_up.values, np.nan)
-    np.fill_diagonal(piv_down.values, np.nan)
+    for metric, label, description, fill_value in [
+            ("intersection_max_perc", "percentage_overlap", "max of intersection %", 0),
+            ("log_p_value", "significance", "p-value", 0)]:
+        print(metric)
+        # make pivot tables
+        piv_up = pd.pivot_table(
+            intersections[(intersections['dir1'] == "up") & (intersections['dir2'] == "up")],
+            index="group1", columns="group2", values=metric).fillna(fill_value)
+        piv_down = pd.pivot_table(
+            intersections[(intersections['dir1'] == "down") & (intersections['dir2'] == "down")],
+            index="group1", columns="group2", values=metric).fillna(fill_value)
+        np.fill_diagonal(piv_up.values, np.nan)
+        np.fill_diagonal(piv_down.values, np.nan)
 
-    # heatmaps
-    fig, axis = plt.subplots(1, 2, figsize=(8 * 2, 8))
-    sns.heatmap(piv_down, square=True, cmap="RdBu", cbar_kws={"label": "Concordant {}s (max of intersection %)".format(unit)}, ax=axis[0], vmin=0, vmax=100)
-    sns.heatmap(piv_up, square=True, cmap="RdBu_r", cbar_kws={"label": "Concordant {}s (max of intersection %)".format(unit)}, ax=axis[1], vmin=0, vmax=100)
-    axis[0].set_title("Downregulated {}s".format(unit))
-    axis[1].set_title("Upregulated {}s".format(unit))
-    axis[0].set_xticklabels(axis[0].get_xticklabels(), rotation=90, ha="right")
-    axis[1].set_xticklabels(axis[1].get_xticklabels(), rotation=90, ha="right")
-    axis[0].set_yticklabels(axis[0].get_yticklabels(), rotation=0, ha="right")
-    axis[1].set_yticklabels(axis[1].get_yticklabels(), rotation=0, ha="right")
-    fig.savefig(os.path.join(output_dir, output_prefix + ".differential_overlap.up_down_split.svg"), bbox_inches="tight")
+        # heatmaps
+        if metric == "intersection_max_perc":
+            extra = {"vmin": 0, "vmax": 100}
+        else:
+            extra = {}
+        fig, axis = plt.subplots(1, 2, figsize=(8 * 2, 8))
+        sns.heatmap(piv_down, square=True, cmap="Blues", cbar_kws={"label": "Concordant {}s ({})".format(unit, description)}, ax=axis[0], **extra)
+        sns.heatmap(piv_up, square=True, cmap="Reds", cbar_kws={"label": "Concordant {}s ({})".format(unit, description)}, ax=axis[1], **extra)
+        axis[0].set_title("Downregulated {}s".format(unit))
+        axis[1].set_title("Upregulated {}s".format(unit))
+        axis[0].set_xticklabels(axis[0].get_xticklabels(), rotation=90, ha="center")
+        axis[1].set_xticklabels(axis[1].get_xticklabels(), rotation=90, ha="center")
+        axis[0].set_yticklabels(axis[0].get_yticklabels(), rotation=0, ha="right")
+        axis[1].set_yticklabels(axis[1].get_yticklabels(), rotation=0, ha="right")
+        fig.savefig(os.path.join(output_dir, output_prefix + ".differential_overlap.{}.up_down_split.svg".format(label)), bbox_inches="tight")
 
-    # combined heatmap
-    # with upregulated {}s in upper square matrix and downredulated in down square
-    piv_combined = pd.DataFrame(np.triu(piv_up), index=piv_up.index, columns=piv_up.columns).replace(0, np.nan)
-    piv_combined.update(pd.DataFrame(np.tril(-piv_down), index=piv_down.index, columns=piv_down.columns).replace(0, np.nan))
-    piv_combined = piv_combined.fillna(0)
-    np.fill_diagonal(piv_combined.values, np.nan)
+        # combined heatmap
+        # with upregulated {}s in upper square matrix and downredulated in down square
+        piv_combined = pd.DataFrame(np.triu(piv_up), index=piv_up.index, columns=piv_up.columns).replace(0, np.nan)
+        piv_combined.update(pd.DataFrame(np.tril(-piv_down), index=piv_down.index, columns=piv_down.columns).replace(0, np.nan))
+        piv_combined = piv_combined.fillna(fill_value)
+        np.fill_diagonal(piv_combined.values, np.nan)
 
-    fig, axis = plt.subplots(1, figsize=(8, 8))
-    sns.heatmap(piv_combined, square=True, cmap="RdBu_r", cbar_kws={"label": "Concordant {}s (max of intersection %)".format(unit)}, ax=axis, vmin=-150, vmax=150)
-    axis.set_xticklabels(axis.get_xticklabels(), rotation=90, ha="right")
-    axis.set_yticklabels(axis.get_yticklabels(), rotation=0, ha="right")
-    fig.savefig(os.path.join(output_dir, output_prefix + ".differential_overlap.up_down_together.svg"), bbox_inches="tight")
+        if metric == "intersection_max_perc":
+            extra = {"vmin": -150, "vmax": 150}
+        else:
+            extra = {}
+        fig, axis = plt.subplots(1, figsize=(8, 8))
+        sns.heatmap(piv_combined, square=True, cmap="RdBu_r", center=0, cbar_kws={"label": "Concordant {}s ({})".format(unit, description)}, ax=axis, **extra)
+        axis.set_xticklabels(axis.get_xticklabels(), rotation=90, ha="center")
+        axis.set_yticklabels(axis.get_yticklabels(), rotation=0, ha="right")
+        fig.savefig(os.path.join(output_dir, output_prefix + ".differential_overlap.{}.up_down_together.svg".format(label)), bbox_inches="tight")
 
-    # Observe disagreement between knockouts
-    # (overlap of down-regulated with up-regulated and vice-versa)
-    piv_up = pd.pivot_table(
-        intersections[(intersections['dir1'] == "up") & (intersections['dir2'] == "down")],
-        index="group1", columns="group2", values="intersection")
-    piv_down = pd.pivot_table(
-        intersections[(intersections['dir1'] == "down") & (intersections['dir2'] == "up")],
-        index="group1", columns="group2", values="intersection")
+        # Rank plots
+        if metric == "log_pvalue":
+            r = pd.melt(piv_combined.reset_index(), id_vars=['group1'], var_name="group2", value_name="agreement")
+            r = r.dropna().sort_values('agreement')
+            r = r.iloc[range(0, r.shape[0], 2)]
+            r['rank'] = r['agreement'].rank(ascending=False)
 
-    piv_disagree = pd.concat([piv_up, piv_down]).groupby(level=0).max()
-    np.fill_diagonal(piv_disagree.values, np.nan)
+            fig, axis = plt.subplots(1, 3, figsize=(3 * 4, 4))
+            axis[0].scatter(r['rank'], r['agreement'])
+            axis[0].axhline(0, linestyle="--", color="black")
+            axis[1].scatter(r['rank'].tail(10), r['agreement'].tail(10))
+            axis[2].scatter(r['rank'].head(10), r['agreement'].head(10))
+            for i, row in r.tail(10).iterrows():
+                axis[1].text(
+                    row['rank'], row['agreement'],
+                    s=row['group1'] + "\n" + row['group2'],
+                    fontsize=5)
+            for i, row in r.head(10).iterrows():
+                axis[2].text(
+                    row['rank'], row['agreement'],
+                    s=row['group1'] + "\n" + row['group2'],
+                    fontsize=5)
+            for ax in axis:
+                ax.set_ylabel("Agreement (-log(p-value))")
+                ax.set_xlabel("Rank")
+            sns.despine(fig)
+            fig.savefig(os.path.join(output_dir, output_prefix + ".differential_overlap.{}.agreement.rank.svg".format(label)), bbox_inches="tight")
 
-    fig, axis = plt.subplots(2, 2, figsize=(16, 16))
-    sns.heatmap(piv_disagree, square=True, cmap="Greens", cbar_kws={"label": "Discordant {}s".format(unit).format(unit)}, ax=axis[0][0])
-    sns.heatmap(np.log2(1 + piv_disagree), square=True, cmap="Greens", cbar_kws={"label": "Discordant {}s (log2)".format(unit)}, ax=axis[1][0])
 
-    norm = matplotlib.colors.Normalize(vmin=0, vmax=piv_disagree.max().max())
-    cmap = plt.get_cmap("Greens")
-    log_norm = matplotlib.colors.Normalize(vmin=np.log2(1 + piv_disagree).min().min(), vmax=np.log2(1 + piv_disagree).max().max())
-    for j, g2 in enumerate(piv_disagree.index):
-        for i, g1 in enumerate(piv_disagree.columns):
-            # print(len(piv_disagree.index) - (j + 0.5), len(piv_disagree.index) - (i + 0.5))
-            axis[0][1].scatter(
-                len(piv_disagree.index) - (j + 0.5), len(piv_disagree.index) - (i + 0.5),
-                s=(100 ** (norm(piv_disagree.loc[g1, g2]))) - 1, color=cmap(norm(piv_disagree.loc[g1, g2])), marker="o")
-            axis[1][1].scatter(
-                len(piv_disagree.index) - (j + 0.5), len(piv_disagree.index) - (i + 0.5),
-                s=(100 ** (log_norm(np.log2(1 + piv_disagree).loc[g1, g2]))) - 1, color=cmap(log_norm(np.log2(1 + piv_disagree).loc[g1, g2])), marker="o")
+        # Observe disagreement between knockouts
+        # (overlap of down-regulated with up-regulated and vice-versa)
+        piv_up = pd.pivot_table(
+            intersections[(intersections['dir1'] == "up") & (intersections['dir2'] == "down")],
+            index="group1", columns="group2", values=metric)
+        piv_down = pd.pivot_table(
+            intersections[(intersections['dir1'] == "down") & (intersections['dir2'] == "up")],
+            index="group1", columns="group2", values=metric)
 
-    for ax in axis[:, 0]:
-        ax.set_xticklabels(ax.get_xticklabels(), rotation=90, ha="right")
-        ax.set_yticklabels(ax.get_yticklabels(), rotation=0, ha="right")
-    for ax in axis[:, 1]:
-        ax.set_xlim((0, len(piv_disagree.index)))
-        ax.set_ylim((0, len(piv_disagree.columns)))
-    fig.savefig(os.path.join(output_dir, output_prefix + ".differential_overlap.disagreement.svg"), bbox_inches="tight")
+        piv_disagree = pd.concat([piv_up, piv_down]).groupby(level=0).max()
+        np.fill_diagonal(piv_disagree.values, np.nan)
+
+        fig, axis = plt.subplots(1, 2, figsize=(16, 8))
+        sns.heatmap(piv_disagree, square=True, cmap="Greens", cbar_kws={"label": "Discordant {}s ({})".format(unit, description)}, ax=axis[0])
+        # sns.heatmap(np.log2(1 + piv_disagree), square=True, cmap="Greens", cbar_kws={"label": "Discordant {}s (log2)".format(unit)}, ax=axis[1][0])
+
+        norm = matplotlib.colors.Normalize(vmin=0, vmax=piv_disagree.max().max())
+        cmap = plt.get_cmap("Greens")
+        log_norm = matplotlib.colors.Normalize(vmin=np.log2(1 + piv_disagree).min().min(), vmax=np.log2(1 + piv_disagree).max().max())
+        for j, g2 in enumerate(piv_disagree.index):
+            for i, g1 in enumerate(piv_disagree.columns):
+                # print(len(piv_disagree.index) - (j + 0.5), len(piv_disagree.index) - (i + 0.5))
+                axis[1].scatter(
+                    len(piv_disagree.index) - (j + 0.5), len(piv_disagree.index) - (i + 0.5),
+                    s=(100 ** (norm(piv_disagree.loc[g1, g2]))) - 1, color=cmap(norm(piv_disagree.loc[g1, g2])), marker="o")
+                # axis[1][1].scatter(
+                #     len(piv_disagree.index) - (j + 0.5), len(piv_disagree.index) - (i + 0.5),
+                #     s=(100 ** (log_norm(np.log2(1 + piv_disagree).loc[g1, g2]))) - 1, color=cmap(log_norm(np.log2(1 + piv_disagree).loc[g1, g2])), marker="o")
+
+        axis[0].set_xticklabels(axis[0].get_xticklabels(), rotation=90, ha="center")
+        axis[0].set_yticklabels(axis[0].get_yticklabels(), rotation=0, ha="right")
+        axis[1].set_xlim((0, len(piv_disagree.index)))
+        axis[1].set_ylim((0, len(piv_disagree.columns)))
+        fig.savefig(os.path.join(output_dir, output_prefix + ".differential_overlap.{}.disagreement.svg".format(label)), bbox_inches="tight")
+
+        # Rank plots
+        if metric == "log_pvalue":
+            r = pd.melt(piv_disagree.reset_index(), id_vars=['group1'], var_name="group2", value_name="disagreement")
+            r = r.dropna().sort_values('disagreement')
+            r = r.iloc[range(0, r.shape[0], 2)]
+            r['rank'] = r['disagreement'].rank(ascending=False)
+
+            fig, axis = plt.subplots(1, 2, figsize=(2 * 4, 4))
+            axis[0].scatter(r['rank'], r['disagreement'])
+            axis[1].scatter(r['rank'].tail(10), r['disagreement'].tail(10))
+            for i, row in r.tail(10).iterrows():
+                axis[1].text(
+                    row['rank'], row['disagreement'],
+                    s=row['group1'] + "\n" + row['group2'],
+                    fontsize=5)
+            for ax in axis:
+                ax.set_ylabel("Disagreement (-log(p-value))")
+                ax.set_xlabel("Rank")
+            sns.despine(fig)
+            fig.savefig(os.path.join(output_dir, output_prefix + ".differential_overlap.{}.disagreement.rank.svg".format(label)), bbox_inches="tight")
 
 
 def plot_differential(

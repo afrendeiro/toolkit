@@ -494,6 +494,10 @@ def deseq_analysis(
     experiment_matrix.to_csv(os.path.join(output_dir, output_prefix + ".experiment_matrix.tsv"), sep="\t")
     comparison_table.to_csv(os.path.join(output_dir, output_prefix + ".comparison_table.tsv"), sep="\t")
 
+    # Rename samples to avoid R errors with sample names containing symbols
+    count_matrix.columns = ["S{}".format(i) for i in range(len(count_matrix.columns))]
+    experiment_matrix.index = ["S{}".format(i) for i in range(len(experiment_matrix.index))]
+
     # Run DESeq analysis
     dds = _DESeqDataSetFromMatrix(
         countData=count_matrix.astype(int),

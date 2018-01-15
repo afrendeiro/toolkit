@@ -84,7 +84,8 @@ def create_project(
         output_dir: /scratch/lab_bock/shared/projects/{project_name}
         results_subdir: data
         submission_subdir: submission
-        pipelines_dir: /home/arendeiro/workspace/pipelines
+        # pipelines_dir: /home/arendeiro/workspace/pipelines
+        pipeline_interfaces: /home/arendeiro/workspace/open_pipelines/pipeline_interface.yaml
         sample_annotation: /scratch/lab_bock/shared/projects/{project_name}/metadata/annotation.csv
         merge_table: /scratch/lab_bock/shared/projects/{project_name}/metadata/merge_table.csv
     data_sources:
@@ -133,12 +134,18 @@ def create_project(
 
 def create_requirements_file(
         project_name,
-        libraries=[
-            "numpy", "scipy", "pandas",
-            "matplotlib", "seaborn",
-            "pysam", "pybedtools",
-            "scikit-learn", "statsmodels", "patsy",
-            "looper", "pypiper"],
+        libraries=["numpy==1.14.0",
+                   "scipy==1.0.0",
+                   "pandas==0.22.0",
+                   "matplotlib==2.1.1",
+                   "seaborn==0.8.1",
+                   "pysam==0.13",
+                   "pybedtools==0.7.10",
+                   "scikit-learn==0.19.1",
+                   "statsmodels==0.8.0",
+                   "patsy==0.4.1",
+                   "git+git://github.com/pepkit/looperv0.7.2#egg=looper",
+                   "git+git://github.com/epigen/pypipev0.6#egg=pypiper"],
         overwrite=False):
     """
     Create a requirements.txt file with pip requirements.
@@ -165,9 +172,9 @@ def create_makefile(
     """
     project_dir = os.path.join(os.path.curdir, project_name)
     makefile = os.path.join(project_dir, "Makefile")
-    src_dir = os.path.join(project_dir, "src")
-    log_dir = os.path.join(project_dir, "log")
-    metadata_dir = os.path.join(project_dir, "metadata")
+    src_dir ="src"
+    log_dir ="log"
+    metadata_dir ="metadata"
     project_config = os.path.join(metadata_dir, "project_config.yaml")
 
     if os.path.exists(makefile):
@@ -180,22 +187,19 @@ def create_makefile(
     requirements:
         pip install -r requirements.txt
 
-    # process project's data
-    # with looper/pypiper/pipelines:
-    # see https://github.com/epigen/looper
-    # see https://github.com/epigen/pypiper
-    # see https://github.com/epigen/open_pipelines
     process:
         looper run {project_config}
 
-    analysis:
+    summarize:
+        looper run {project_config}
+
+    analysis: summarize
         looper summarize {project_config}
         python -u src/analysis.py
 
-    analysis_job:
+    analysis_job: summarize
         mkdir -p log
-        TIMESTAMP=`date +"%Y%m%d-%H%M%S"`
-        sbatch -p shortq -c 12 --mem 80000 -J {project_name}.analysis -o {log_dir}/${{TIMESTAMP}}.{project_name}.analysis.log --wrap "python -u src/analysis.py"
+        sbatch -p shortq -c 12 --mem 80000 -J {project_name}.analysis -o {log_dir}/$(shell date +"%Y%m%d-%H%M%S").{project_name}.analysis.log --wrap "python -u src/analysis.py"
 
     all: requirements process analysis
 

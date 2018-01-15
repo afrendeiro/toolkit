@@ -638,6 +638,125 @@ def least_squares_fit(
     return results
 
 
+def differential_from_bivariate_fit(
+        comparison_table, matrix,
+        output_dir, output_prefix,
+        n_bins=250, multiple_correction_method="fdr_bh",
+        plot=True, palette="colorblind"):
+    """
+    Perform differential analysis using a bivariate gaussian fit
+    on the relationship between mean and fold-change for each comparison.
+
+    :param comparison_table | pd.DataFrame: Dataframe with 'comparison_name', 'comparison_side' and 'sample_name', 'sample_group' columns.
+    :param matrix | pd.DataFrame: Matrix of `n_features, n_samples` with normalized, log-transformed values to perform analysis on.
+    :param output_dir | str: Output directory
+    :param output_prefix | str: Prefix for outputs.
+    :param n_bins | int: Number of bins of mean values along which to standardize fold-changes.
+    :param multiple_correction_method | str: Multiple correction method from `statsmodels.sandbox.stats.multicomp.multipletests`.
+    :param plot | bool: Whether to generate plots.
+    :param palette | str: Color palette to use. This can be any matplotlib palette and is passed to `sns.color_palette`.
+    """
+    from scipy.stats import gaussian_kde
+    from statsmodels.sandbox.stats.multicomp import multipletests
+
+    comparisons = comparison_table['comparison_name'].drop_duplicates().sort_values()
+    if plot:
+        fig, axis = plt.subplots(
+            2, len(comparisons),
+            figsize=(4 * len(comparisons), 4 * 2), sharex=True, sharey=True)
+
+    results = pd.DataFrame()
+    for i, comparison in enumerate(comparisons):
+        print("Doing comparison '{}'".format(comparison))
+        out_file = os.path.join(output_dir, output_prefix + ".fit_result.{}.csv".format(comparison))
+
+        sa = comparison_table.loc[
+                (comparison_table['comparison_name'] == comparison) &
+                (comparison_table['comparison_side'] == 1),
+            "sample_name"]
+        ga = comparison_table.loc[
+                (comparison_table['comparison_name'] == comparison) &
+                (comparison_table['comparison_side'] == 1),
+            "sample_group"].squeeze()
+        sb = comparison_table.loc[
+                (comparison_table['comparison_name'] == comparison) &
+                (comparison_table['comparison_side'] == 0),
+            "sample_name"]
+        gb = comparison_table.loc[
+                (comparison_table['comparison_name'] == comparison) &
+                (comparison_table['comparison_side'] == 0),
+            "sample_group"].squeeze()
+        a = matrix.loc[:, sa].mean(axis=1)
+        a.name = ga
+        b = matrix.loc[:, sb].mean(axis=1)
+        b.name = gb
+
+        # assemble stats
+        res = a.to_frame()
+        res = res.join(b)
+        res['global_mean'] = matrix.mean(axis=1)
+        res['global_std'] = matrix.std(axis=1)
+        res['comparison_mean'] = res.mean(axis=1)
+        res['comparison_std'] = res.mean(axis=1)
+        res['log2FoldChange'] = np.log2(res[ga] / res[gb])
+        res['comparison_name'] = comparison
+
+        # standardize fold change
+        bounds = np.linspace(0, res['comparison_mean'].max(), n_bins)
+        for (start, end) in zip(bounds[:-2], bounds[1: -1]):
+            r = res.loc[(res['comparison_mean'] > start) &
+                    (res['comparison_mean'] < end)].index
+            v = res.loc[r, 'log2FoldChange']
+            res.loc[r, 'norm_log2FoldChange'] = (v - np.nanmean(v)) / np.nanstd(v)
+
+        # let's try a bivariate gaussian kernel
+        # separately for positive and negative to avoid biases in center of mass
+        kernel = gaussian_kde(res.loc[res['norm_log2FoldChange'] > 0, [
+                            "comparison_mean", "norm_log2FoldChange"]].T.values)
+        res.loc[res['norm_log2FoldChange'] > 0, "density"] = kernel(
+            res.loc[res['norm_log2FoldChange'] > 0, ["comparison_mean", "norm_log2FoldChange"]].T.values)
+        kernel = gaussian_kde(res.loc[res['norm_log2FoldChange'] <= 0, [
+                            "comparison_mean", "norm_log2FoldChange"]].T.values)
+        res.loc[res['norm_log2FoldChange'] <= 0, "density"] = kernel(
+            res.loc[res['norm_log2FoldChange'] <= 0, ["comparison_mean", "norm_log2FoldChange"]].T.values)
+
+        # Let's calculate something like an empirical p-value on the density
+        res['pval'] = (res['density'] - res['density'].min()) / \
+            (res['density'].max() - res['density'].min())
+        res['padj'] = multipletests(res['pval'].fillna(1), method=multiple_correction_method)[1]
+
+        res['direction'] = (res['norm_log2FoldChange'] >= 0).astype(int).replace(0, -1)
+        res.to_csv(out_file)
+
+        if plot:
+            axis[0, i].scatter(res["comparison_mean"],
+                               res["log2FoldChange"], alpha=0.2, s=5, color=sns.color_palette(palette)[0], rasterized=True)
+            axis[0, i].axhline(0, color="black", linestyle="--")
+            axis[1, i].scatter(res["comparison_mean"],
+                               res["norm_log2FoldChange"], alpha=0.2, s=5, color=sns.color_palette(palette)[0], rasterized=True)
+            diff = res.loc[(res['pval'] < 0.05) & (res['norm_log2FoldChange'].abs() >= 2), :].index
+            axis[0, i].scatter(res.loc[diff, "comparison_mean"],
+                               res.loc[diff, "log2FoldChange"], alpha=0.2, s=5, color=sns.color_palette(palette)[1], rasterized=True)
+            axis[1, i].scatter(res.loc[diff, "comparison_mean"],
+                               res.loc[diff, "norm_log2FoldChange"], alpha=0.2, s=5, color=sns.color_palette(palette)[1], rasterized=True)
+            axis[1, i].axhline(0, color="black", linestyle="--")
+            axis[0, i].set_title(comparison + "\n" + ga + " vs " + gb)
+            axis[1, i].set_xlabel("Comparison mean")
+            if i == 0:
+                axis[0, i].set_ylabel("log2 fold-change")
+                axis[1, i].set_ylabel("Norm(log2 fold-change)")
+
+        results = results.append(res)
+
+    # save figure
+    fig.savefig(os.path.join(output_dir, output_prefix + ".deseq_result.all_comparisons.scatter.svg"), dpi=300, bbox_inches="tight")
+
+    # save all
+    results.to_csv(os.path.join(output_dir, output_prefix + ".deseq_result.all_comparisons.csv"), index=False)
+
+    return results
+
+
 # def independent_filtering(df, alpha=0.05, n_quantiles=100):
 #     """
 #     """

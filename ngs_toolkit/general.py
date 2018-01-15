@@ -1084,14 +1084,14 @@ def plot_differential(
     total_diff = results.groupby(["comparison_name"])['diff'].sum().sort_values(ascending=False)
     split_diff = results.groupby(["comparison_name", "direction"])['diff'].sum().sort_values(ascending=False)
     fig, axis = plt.subplots(2, 2, figsize=(4 * 2, 4* 2))
-    sns.barplot(total_diff.values, total_diff.index, orient="h", ax=axis[0][0])
-    sns.barplot((total_diff.values / n_vars) * 100, total_diff.index, orient="h", ax=axis[0][1])
-    sns.barplot(split_diff.values, split_diff.index, orient="h", ax=axis[1][0])
-    sns.barplot((split_diff.values / n_vars) * 100, split_diff.index, orient="h", ax=axis[1][1])
-    axis[0][0].set_xlabel("N. diff")
-    axis[0][1].set_xlabel("N. diff (% of total)")
-    axis[1][0].set_xlabel("N. diff")
-    axis[1][1].set_xlabel("N. diff (% of total)")
+    sns.barplot(total_diff.values, total_diff.index, orient="h", ax=axis[0, 0])
+    sns.barplot((total_diff.values / n_vars) * 100, total_diff.index, orient="h", ax=axis[0, 1])
+    sns.barplot(split_diff.values, split_diff.index, orient="h", ax=axis[1, 0])
+    sns.barplot((split_diff.values / n_vars) * 100, split_diff.index, orient="h", ax=axis[1, 1])
+    axis[0, 0].set_xlabel("N. diff")
+    axis[0, 1].set_xlabel("N. diff (% of total)")
+    axis[1, 0].set_xlabel("N. diff")
+    axis[1, 1].set_xlabel("N. diff (% of total)")
     sns.despine(fig)
     fig.savefig(os.path.join(output_dir, output_prefix + ".number_differential.svg"), bbox_inches="tight")
 
@@ -1111,7 +1111,7 @@ def plot_differential(
             b = matrix[[s.name for s in samples if s.name in b.tolist() and s.library == data_type]].mean(axis=1)
 
             # Hexbin plot
-            ax = axes.next()
+            ax = next(axes)
             ax.hexbin(b, a, alpha=0.85, cmap="Greys", color="black", edgecolors="white", linewidths=0, bins='log', mincnt=1, rasterized=True)
 
             # Scatter for significant
@@ -1142,7 +1142,7 @@ def plot_differential(
         t = results.loc[results["comparison_name"] == comparison, :]
 
         # Hexbin plot
-        ax = axes.next()
+        ax = next(axes)
         ax.hexbin(
             t["log2FoldChange"], -np.log10(t["pvalue"]),
             alpha=0.85, cmap="Greys", color="black", edgecolors="white", linewidths=0, bins='log', mincnt=1, rasterized=True)
@@ -1159,7 +1159,7 @@ def plot_differential(
         ax.set_xlim(-l, l)
 
         # Add lines of significance
-        ax.axhline(-np.log10(t.loc[t["diff"] == True, p_var].max()), linestyle='--', alpha=0.5, zorder=0, color="black")
+        ax.axhline(-np.log10(t.loc[t["diff"] == True, "pvalue"].max()), linestyle='--', alpha=0.5, zorder=0, color="black")
         if fold_change is not None:
             ax.axvline(-fold_change, linestyle='--', alpha=0.5, zorder=0, color="black")
             ax.axvline(fold_change, linestyle='--', alpha=0.5, zorder=0, color="black")
@@ -1178,10 +1178,10 @@ def plot_differential(
         t = results.loc[results["comparison_name"] == comparison, :]
 
         # Hexbin plot
-        ax = axes.next()
+        ax = next(axes)
         ax.hexbin(
             np.log10(t["baseMean"]), t["log2FoldChange"],
-            alpha=0.85, color="black", edgecolors="white", linewidths=0, bins='log', mincnt=1, rasterized=True)
+            alpha=0.85, cmap="Greys", color="black", edgecolors="white", linewidths=0, bins='log', mincnt=1, rasterized=True)
 
         # Scatter for significant
         diff_vars = t[t["diff"] == True].index
@@ -1240,16 +1240,18 @@ def plot_differential(
 
             g = sns.clustermap(
                 groups,
-                yticklabels=yticklabels, cbar_kws={"label": "{} of\ndifferential {}".format(quantity, var_name)},
+                yticklabels=yticklabels, cbar_kws={"label": "{} of\ndifferential {}s".format(quantity, var_name)},
                 cmap="BuGn", metric="correlation", rasterized=True, figsize=figsize)
+            g.ax_heatmap.set_ylabel("Differential {}s (n = {})".format(var_name, groups.shape[0]))
             g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90, fontsize="xx-small")
             g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small")
             g.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.groups.clustermap.svg".format(var_name)), bbox_inches="tight", dpi=300)
 
             g = sns.clustermap(
                 groups,
-                yticklabels=yticklabels, z_score=0, cbar_kws={"label": "Z-score of {}\non differential {}".format(quantity, var_name)},
+                yticklabels=yticklabels, z_score=0, cbar_kws={"label": "Z-score of {}\non differential {}s".format(quantity, var_name)},
                 cmap="RdBu_r", metric="correlation", rasterized=True, figsize=figsize)
+            g.ax_heatmap.set_ylabel("Differential {}s (n = {})".format(var_name, groups.shape[0]))
             g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90, fontsize="xx-small")
             g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small")
             g.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.groups.clustermap.z0.svg".format(var_name)), bbox_inches="tight", dpi=300)
@@ -1270,8 +1272,9 @@ def plot_differential(
         g.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.groups.fold_changes.clustermap.corr.svg".format(var_name)), bbox_inches="tight", dpi=300, metric="correlation")
 
         g = sns.clustermap(fold_changes.loc[all_diff, :],
-            yticklabels=yticklabels, cbar_kws={"label": "Fold-change of\ndifferential {}".format(var_name)},
+            yticklabels=yticklabels, cbar_kws={"label": "Fold-change of\ndifferential {}s".format(var_name)},
             cmap="RdBu_r", robust=True, metric="correlation", rasterized=True, figsize=figsize)
+        g.ax_heatmap.set_ylabel("Differential {}s (n = {})".format(var_name, fold_changes.loc[all_diff, :].shape[0]))
         g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90, fontsize="xx-small")
         g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small")
         g.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.groups.fold_changes.clustermap.svg".format(var_name)), bbox_inches="tight", dpi=300)
@@ -1291,15 +1294,17 @@ def plot_differential(
     g.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.samples.clustermap.corr.svg".format(var_name)), bbox_inches="tight", dpi=300)
 
     g = sns.clustermap(matrix,
-        yticklabels=yticklabels, cbar_kws={"label": "{} of\ndifferential {}".format(quantity, var_name)},
+        yticklabels=yticklabels, cbar_kws={"label": "{} of\ndifferential {}s".format(quantity, var_name)},
         xticklabels=True, vmin=0, metric="correlation", figsize=figsize, rasterized=rasterized, robust=robust)
+    g.ax_heatmap.set_ylabel("Differential {}s (n = {})".format(var_name, matrix.shape[0]))
     g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90, fontsize="xx-small")
     g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small")
     g.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.samples.clustermap.svg".format(var_name)), bbox_inches="tight", dpi=300)
 
     g = sns.clustermap(matrix,
-        yticklabels=yticklabels, z_score=0, cbar_kws={"label": "Z-score of {}\non differential {}".format(quantity, var_name)},
+        yticklabels=yticklabels, z_score=0, cbar_kws={"label": "Z-score of {}\non differential {}s".format(quantity, var_name)},
         xticklabels=True, cmap="RdBu_r", metric="correlation", figsize=figsize, rasterized=rasterized, robust=robust)
+    g.ax_heatmap.set_ylabel("Differential {}s (n = {})".format(var_name, matrix.shape[0]))
     g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90, fontsize="xx-small")
     g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small")
     g.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.samples.clustermap.z0.svg".format(var_name)), bbox_inches="tight", dpi=300)
@@ -1896,7 +1901,7 @@ def plot_differential_enrichment(
         enrichment_type,
         data_type="ATAC-seq",
         direction_dependent=True,
-        output_dir="results/differential_analysis_{data_type}",
+        output_dir="results/differential_analysis_{data_type}/enrichments",
         comp_variable="comparison_name",
         output_prefix="differential_analysis",
         barplots=True, correlation_plots=True, top_n=5, z_score=0):
@@ -1917,6 +1922,8 @@ def plot_differential_enrichment(
 
     if "{data_type}" in output_dir:
         output_dir = output_dir.format(data_type=data_type)
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
 
     if z_score == 0:
         z_score_label = "Row"

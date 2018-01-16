@@ -6,15 +6,15 @@ Manager programs
  - ``trackmanager`` handles the creation of a UCSC trackhub or IGV link for ATAC/ChIP-seq data based on bigWig files created by ``looper`` pipelines.
 
 Here you can see the command-line usage instructions for the main looper command and for each subcommand:
-
+-e 
 ``projectmanager --help``
-----------------------------------
+-e ----------------------------------
 
 .. code-block:: none
 
 	usage: projectmanager [-h] [-d] [--overwrite] project_name
 	
-	projectmanager - A project creator.
+	projectmanager - A project manager.
 	
 	positional arguments:
 	  project_name   Project name.
@@ -26,13 +26,13 @@ Here you can see the command-line usage instructions for the main looper command
 	                 False)
 	
 	https://github.com/afrendeiro/toolkit
-
+-e 
 ``trackmanager --help``
-----------------------------------
+-e ----------------------------------
 
 .. code-block:: none
 
-	usage: trackmanager [-h] [-a [ATTRIBUTES]] [-c COLOR_ATTRIBUTE] [-r]
+	usage: trackmanager [-h] [-a [ATTRIBUTES]] [-c COLOR_ATTRIBUTE] [-r] [-l]
 	                    project_config_file
 	
 	positional arguments:
@@ -50,3 +50,5 @@ Here you can see the command-line usage instructions for the main looper command
 	  -r, --overlay-replicates
 	                        Whether replicate samples should be overlaied in same
 	                        track. Default=False.
+	  -l, --link            Whether bigWig files should be soft-linked to the
+	                        track database directory. Default=False.

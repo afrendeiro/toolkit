@@ -17,7 +17,7 @@ except ImportError:
         extra['dependencies'] = ['argparse']
 
 version = open("VERSION").read().strip()
-requirements = open("requirements.docs.txt").read().strip().split("\n")
+requirements = open("requirements.txt").read().strip().split("\n")
 
 # setup
 setup(

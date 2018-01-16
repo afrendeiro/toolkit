@@ -1,0 +1,24 @@
+
+``trackmanager --help``
+----------------------------------
+
+.. code-block:: none
+
+	usage: trackmanager [-h] [-a [ATTRIBUTES]] [-c COLOR_ATTRIBUTE] [-r]
+	                    project_config_file
+	
+	positional arguments:
+	  project_config_file
+	
+	optional arguments:
+	  -h, --help            show this help message and exit
+	  -a [ATTRIBUTES], --attrs [ATTRIBUTES]
+	                        Sample attributes (annotation sheet columns) to use to
+	                        order tracks. Add attributes comma-separated with no
+	                        whitespace.
+	  -c COLOR_ATTRIBUTE, --color-attr COLOR_ATTRIBUTE
+	                        Sample attribute to use to color tracks with. Default
+	                        is first attribute passed.
+	  -r, --overlay-replicates
+	                        Whether replicate samples should be overlaied in same
+	                        track. Default=False.

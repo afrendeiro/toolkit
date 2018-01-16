@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 
-def barmap(x, figsize=None, square=False, row_colors=None, z_score=None):
+def barmap(x, figsize=None, square=False, row_colors=None, z_score=None, ylims=None):
     """
     Plot a heatmap-style grid with barplots.
 
@@ -43,18 +43,21 @@ def barmap(x, figsize=None, square=False, row_colors=None, z_score=None):
         color = row_colors[i] if row_colors is not None else None
         axis[i].bar(left=range(x_size), height=x.iloc[i, :], width=0.95, align="center", color=[color] * x_size if row_colors is not None else None)
         # axis[i].set_yticklabels(axis[i].get_yticklabels(), visible=False)
+        axis[i].axhline(0, linestyle="--", color="black", linewidth=0.5)
         if i != y_size - 1:
             axis[i].set_xticklabels(axis[i].get_xticklabels(), visible=False)
         axis[i].margins(0.0)
+        if ylims is not None:
+            axis[i].set_ylim(ylims)
 
     axis[-1].set_xticks(range(x_size))
-    axis[-1].set_xticklabels(x.columns, rotation='vertical', ha="center", va="center")
+    axis[-1].set_xticklabels(x.columns, rotation='vertical', ha="center", va="top", fontsize=figsize[1])
 
     for i, ax in enumerate(axis):
         m = max(ax.get_yticks())
         # ax.set_yticks([m])
-        # ax.set_yticklabels([str(m)], rotation='horizontal', ha="center", va="center", visible=True)
-        ax.set_ylabel(str(x.index[i]), rotation='horizontal', ha="center", va="center", visible=True)
+        # ax.set_yticklabels([str(m)], rotation='horizontal', ha="center", va="center", visible=True, fontsize=figsize[1])
+        ax.set_ylabel(str(x.index[i]), rotation='horizontal', ha="right", va="center", visible=True, fontsize=figsize[1])
 
     return fig
 

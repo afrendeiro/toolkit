@@ -252,30 +252,33 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
         Calculate a measure of support for each region in peak set
         (i.e. ratio of samples containing a peak overlapping region in union set of peaks).
         """
-        import re
         from tqdm import tqdm
 
         if "{results_dir}" in peak_dir:
             peak_dir = os.path.abspath(peak_dir.format(results_dir=self.results_dir))
 
+        # get index
+        index = self.sites.to_dataframe()
+        index = index['chrom'] + ":" + index['start'].astype(str) + "-" + index['end'].astype(str)
+
         # calculate support (number of samples overlaping each merged peak)
         comps = comparison_table["comparison_name"].drop_duplicates()
-        for i, comparison in tqdm(enumerate(comps)):
-            peak_file = os.path.join(peak_dir, comparison, comparison + "_peaks.narrowPeak")
+        support = pd.DataFrame(index=index)
+        for i, comparison in tqdm(enumerate(comps), total=comps.shape[0]):
+            peak_files = [
+                ("MACS", os.path.join(peak_dir, comparison, comparison + "_peaks.narrowPeak")),
+                ("HOMER_factor", os.path.join(peak_dir, comparison, comparison + "_homer_peaks.factor.bed")),
+                ("HOMER_histone", os.path.join(peak_dir, comparison, comparison + "_homer_peaks.histone.bed"))]
+            for peak_type, peak_file in peak_files:
+                try:
+                    sample_support = self.sites.intersect(peak_file, wa=True, c=True).to_dataframe()
+                except:
+                    continue
+                sample_support.index = index
+                support[(comparison, peak_type)] = sample_support.iloc[:, 3]
 
-            if i == 0:
-                support = self.sites.intersect(peak_file, wa=True, c=True)
-            else:
-                support = support.intersect(peak_file, wa=True, c=True)
-
-        try:
-            support = support.to_dataframe()
-        except:
-            support.saveas("_tmp.peaks.bed")
-            support = pd.read_csv("_tmp.peaks.bed", sep="\t", header=None)
-
-        support.columns = ["chrom", "start", "end"] + comps.tolist()
-        support.index = support['chrom'] + ":" + support['start'].astype(str) + "-" + support['end'].astype(str)
+        # Make multiindex labeling comparisons and peak type
+        support.columns = pd.MultiIndex.from_tuples(support.columns, names=["comparison", "peak_type"])
         support.to_csv(os.path.join(self.results_dir, self.name + "_peaks.binary_overlap_support.csv"), index=True)
 
         # get % of total consensus regions found per sample
@@ -285,7 +288,8 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
         #     .apply(lambda x: len(x[x["value"] == 1])))
 
         # divide sum (of unique overlaps) by total to get support value between 0 and 1
-        support["support"] = support[comps].apply(lambda x: sum([i if i <= 1 else 1 for i in x]) / float(len(comps)), axis=1)
+        support["support"] = support.astype(bool).astype(int).sum(axis=1) / float(support.shape[1])
+
         # save
         support.to_csv(os.path.join(self.results_dir, self.name + "_peaks.support.csv"), index=True)
 

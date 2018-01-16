@@ -647,14 +647,14 @@ def differential_from_bivariate_fit(
     Perform differential analysis using a bivariate gaussian fit
     on the relationship between mean and fold-change for each comparison.
 
-    :param comparison_table | pd.DataFrame: Dataframe with 'comparison_name', 'comparison_side' and 'sample_name', 'sample_group' columns.
-    :param matrix | pd.DataFrame: Matrix of `n_features, n_samples` with normalized, log-transformed values to perform analysis on.
-    :param output_dir | str: Output directory
-    :param output_prefix | str: Prefix for outputs.
-    :param n_bins | int: Number of bins of mean values along which to standardize fold-changes.
-    :param multiple_correction_method | str: Multiple correction method from `statsmodels.sandbox.stats.multicomp.multipletests`.
-    :param plot | bool: Whether to generate plots.
-    :param palette | str: Color palette to use. This can be any matplotlib palette and is passed to `sns.color_palette`.
+    :param pandas.DataFrame comparison_table: Dataframe with 'comparison_name', 'comparison_side' and 'sample_name', 'sample_group' columns.
+    :param pandas.DataFrame matrix: Matrix of `n_features, n_samples` with normalized, log-transformed values to perform analysis on.
+    :param str output_dir: Output directory
+    :param str output_prefix: Prefix for outputs.
+    :param int n_bins: Number of bins of mean values along which to standardize fold-changes.
+    :param str multiple_correction_method: Multiple correction method from `statsmodels.sandbox.stats.multicomp.multipletests`.
+    :param bool plot: Whether to generate plots.
+    :param str palette: Color palette to use. This can be any matplotlib palette and is passed to `sns.color_palette`.
     """
     from scipy.stats import gaussian_kde
     from statsmodels.sandbox.stats.multicomp import multipletests
@@ -2798,23 +2798,26 @@ def query_biomart(
     Returns pandas dataframe with query results.
     """
     import requests
-    import numpy as np
     import pandas as pd
+    import numpy as np
 
     # Build request XML
     url_query = "".join([
-        """http://{ensembl_version}.ensembl.org/biomart/martservice?query=""".format(ensembl_version),
+        """http://{}.ensembl.org/biomart/martservice?query=""".format(ensembl_version),
         """<?xml version="1.0" encoding="UTF-8"?>""",
         """<!DOCTYPE Query>""",
         """<Query  virtualSchemaName="default" formatter="CSV" header="0" uniqueRows="0" count="" datasetConfigVersion="0.6" >""",
-        """<Dataset name="{species}_gene_ensembl" interface="default" >""".format(species)] +
-        ["""<Attribute name="{attr}" />""".format(attr) for attr in attributes] +
+        """<Dataset name="{}_gene_ensembl" interface="default" >""".format(species)] +
+        ["""<Attribute name="{}" />""".format(attr) for attr in attributes] +
         ["""</Dataset>""",
         """</Query>"""])
     req = requests.get(url_query, stream=True)
-    return pd.DataFrame(
-        (x.strip().split(",") for x in list(req.iter_lines())),
-        columns=attributes).replace("", np.nan)
+    content = list(req.iter_lines())
+    if type(content[0]) == bytes:
+        mapping = pd.DataFrame((x.decode("utf-8").strip().split(",") for x in content), columns=attributes)
+    else:
+        mapping = pd.DataFrame((x.strip().split(",") for x in content), columns=attributes)
+    return mapping.replace("", np.nan)
 
 
 def subtract_principal_component(

@@ -62,11 +62,11 @@ While straightforward, it still allows considerable customization due to the mod
     atac_analysis.measure_coverage()
 
     # Normalize accessibility (quantile normalization + GC correction)
-    atac_analysis.normalize(method="quantile")
+    atac_analysis.normalize(method="gc_content")
 
     # Annotate normalized accessibility with sample and region info
     # annotate matrix with peak metadata
-    atac_analysis.annotate(quant_matrix="coverage_qnorm")
+    atac_analysis.annotate()
     # annotate matrix with sample metadata
     atac_analysis.accessibility = atac_analysis.annotate_with_sample_metadata(
         quant_matrix="coverage_annotated",

@@ -87,7 +87,7 @@ class Analysis(object):
         (particularly useful with MultiIndex dataframes).
 
         By default, will act on the columns and it's levels of an `matrix` dataframe of self. Other `index` and `levels` can
-        be passed for costumization.
+        be passed for customization.
 
         Will try to guess if each variable is categorical or numerical and return either colours from a colour `pallete`
         or a `cmap`, respectively with null values set to `nan_color` (a 4-value tuple with floats).
@@ -102,6 +102,10 @@ class Analysis(object):
 
         if levels is not None:
             index = index.droplevel([l.name for l in index.levels if l.name not in levels])
+
+        # Handle special case of single level
+        if type(index) is pd.core.indexes.base.Index:
+            index = pd.MultiIndex.from_arrays([index.values], names=[index.name])
 
         _cmap = plt.get_cmap(cmap)
         _pallete = plt.get_cmap(pallete)
@@ -847,7 +851,7 @@ def differential_analysis(
         alpha=0.05,
         overwrite=True):
     """
-    Discover differential regions/genes across samples that are associated with a certain trait.
+    Perform differential regions/genes across samples that are associated with a certain trait.
 
     `comparison_table` is a dataframe with 'comparison_name', 'comparison_side' and 'sample_name', 'sample_group' columns.
     """
@@ -1141,7 +1145,17 @@ def plot_differential(
         fold_change=None,
         output_dir="results/differential_analysis_{data_type}",
         output_prefix="differential_analysis",
-        rasterized=True, robust=False, yticklabels=False):
+        log_fold_change_column="log2FoldChange",
+        p_value_column="pvalue",
+        adjusted_p_value_column="padj",
+        comparison_column="comparison_name",
+        rasterized=True,
+        dpi=300,
+        robust=False,
+        feature_labels=False,
+        group_wise_colours=False,
+        group_variables=None,
+        ):
     """
     Discover differential regions across samples that are associated with a certain trait.
     The `results` matrix should be indexed by the relevant type of feature (regions/genes).
@@ -1151,28 +1165,9 @@ def plot_differential(
     import matplotlib.pyplot as plt
     import seaborn as sns
 
-    req_attrs = ["log2FoldChange", "pvalue", "padj", "comparison_name"]
+    req_attrs = [log_fold_change_column, p_value_column, adjusted_p_value_column, comparison_column]
     if not all([x in results.columns for x in req_attrs]):
         raise AssertionError("Results dataframe must have '{}' columns.".format(", ".join(req_attrs)))
-
-    # Extract significant based on p-value and fold-change
-    if fold_change is not None:
-        fc = (abs(results["log2FoldChange"]) > fold_change)
-    else:
-        fc = [True] * results.shape[0]
-    if corrected_p_value:
-        p_var = "padj"
-    else:
-        p_var = "pvalue"
-    results.loc[(results[p_var] < alpha) & fc, "diff"] = True
-    results.loc[:, "diff"] = results.loc[:, "diff"].fillna(False)
-
-    # Annotate direction of change
-    results.loc[:, "direction"] = results.loc[:, "log2FoldChange"].apply(lambda x: "up" if x >= 0 else "down")
-
-    if results.loc[:, "diff"].sum() < 1:
-        print("No significantly different regions found in any comparison.")
-        return
 
     # Make output dir
     if "{data_type}" in output_dir:
@@ -1203,20 +1198,52 @@ def plot_differential(
         samples = [s for s in samples if s.name in comparison_table['sample_name'].tolist()]
     matrix = matrix[[s.name for s in samples]]
 
+    # Handle group colouring
+    if group_wise_colours:
+        if type(group_variables) is None:
+            raise AssertionError("If `group_wise_colours` is True, a list of `group_variables` must be passed.")
+
+        # This will always be a matrix for all samples
+        color_dataframe = pd.DataFrame(
+            analysis.get_level_colors(index=matrix.columns, levels=group_variables),
+            index=group_variables, columns=matrix.columns.get_level_values("sample_name"))
+        # will be filtered now by the requested samples if needed
+        color_dataframe = color_dataframe[[s.name for s in samples]]
+        color_dataframe = color_dataframe.loc[:, matrix.columns.get_level_values("sample_name")]
+
+    # Extract significant based on p-value and fold-change
+    if fold_change is not None:
+        fc = (abs(results[log_fold_change_column]) > fold_change)
+    else:
+        fc = [True] * results.shape[0]
+    if corrected_p_value:
+        p_var = adjusted_p_value_column
+    else:
+        p_var = p_value_column
+    results.loc[(results[p_var] < alpha) & fc, "diff"] = True
+    results.loc[:, "diff"] = results.loc[:, "diff"].fillna(False)
+
+    # Annotate direction of change
+    results.loc[:, "direction"] = results.loc[:, log_fold_change_column].apply(lambda x: "up" if x >= 0 else "down")
+
+    if results.loc[:, "diff"].sum() < 1:
+        print("No significantly different regions found in any comparison.")
+        return
+
     # PLOTS
-    comparisons = sorted(results["comparison_name"].drop_duplicates())
+    comparisons = sorted(results[comparison_column].drop_duplicates())
     n_side = int(np.ceil(np.sqrt(len(comparisons))))
 
     # P-value distributions
     fig, axis = plt.subplots(1, 1, figsize=(4, 4))
-    sns.distplot(results["pvalue"].dropna(), kde=False, ax=axis)
+    sns.distplot(results[p_value_column].dropna(), kde=False, ax=axis)
     axis.set_xlabel("P-value")
     axis.set_ylabel("Frequency")
     sns.despine(fig)
     fig.savefig(os.path.join(output_dir, output_prefix + ".pvalue_distribution.svg"), bbox_inches="tight")
     # per comparison
-    g = sns.FacetGrid(data=results, col="comparison_name", col_wrap=n_side)
-    g.map(sns.distplot, "pvalue", kde=False)
+    g = sns.FacetGrid(data=results, col=comparison_column, col_wrap=n_side)
+    g.map(sns.distplot, p_value_column, kde=False)
     for ax in g.axes:
         ax.set_xlabel("P-value")
         ax.set_ylabel("Frequency")
@@ -1225,8 +1252,8 @@ def plot_differential(
 
     # Number of differential vars
     n_vars = float(matrix.shape[0])
-    total_diff = results.groupby(["comparison_name"])['diff'].sum().sort_values(ascending=False)
-    split_diff = results.groupby(["comparison_name", "direction"])['diff'].sum().sort_values(ascending=False)
+    total_diff = results.groupby([comparison_column])['diff'].sum().sort_values(ascending=False)
+    split_diff = results.groupby([comparison_column, "direction"])['diff'].sum().sort_values(ascending=False)
     fig, axis = plt.subplots(2, 2, figsize=(4 * 2, 4* 2))
     sns.barplot(total_diff.values, total_diff.index, orient="h", ax=axis[0, 0])
     sns.barplot((total_diff.values / n_vars) * 100, total_diff.index, orient="h", ax=axis[0, 1])
@@ -1249,7 +1276,7 @@ def plot_differential(
         else:
             axes = iter([axes])
         for comparison in comparisons:
-            c = comparison_table[comparison_table["comparison_name"] == comparison]
+            c = comparison_table[comparison_table[comparison_column] == comparison]
             a = c.loc[c['comparison_side'] >= 1, "sample_name"]
             b = c.loc[c['comparison_side'] <= 0, "sample_name"]
 
@@ -1261,7 +1288,7 @@ def plot_differential(
             ax.hexbin(b, a, alpha=0.85, cmap="Greys", color="black", edgecolors="white", linewidths=0, bins='log', mincnt=1, rasterized=True)
 
             # Scatter for significant
-            diff_vars = results[(results["comparison_name"] == comparison) & (results["diff"] == True)].index
+            diff_vars = results[(results[comparison_column] == comparison) & (results["diff"] == True)].index
             if diff_vars.shape[0] > 0:
                 ax.scatter(b.loc[diff_vars], a.loc[diff_vars], alpha=0.1, color="red", s=2)
             ax.set_title(comparison)
@@ -1276,7 +1303,7 @@ def plot_differential(
         for ax in axes:
             ax.set_visible(False)
         sns.despine(fig)
-        fig.savefig(os.path.join(output_dir, output_prefix + ".scatter_plots.svg"), bbox_inches="tight", dpi=300)
+        fig.savefig(os.path.join(output_dir, output_prefix + ".scatter_plots.svg"), bbox_inches="tight", dpi=dpi)
 
     # Volcano plots
     fig, axes = plt.subplots(n_side, n_side, figsize=(n_side * 4, n_side * 4), sharex=False, sharey=False)
@@ -1285,18 +1312,18 @@ def plot_differential(
     else:
         axes = iter([axes])
     for comparison in comparisons:
-        t = results.loc[results["comparison_name"] == comparison, :]
+        t = results.loc[results[comparison_column] == comparison, :]
 
         # Hexbin plot
         ax = next(axes)
         ax.hexbin(
-            t["log2FoldChange"], -np.log10(t["pvalue"]),
+            t[log_fold_change_column], -np.log10(t[p_value_column]),
             alpha=0.85, cmap="Greys", color="black", edgecolors="white", linewidths=0, bins='log', mincnt=1, rasterized=True)
 
         # Scatter for significant
         diff_vars = t[t["diff"] == True].index
         if diff_vars.shape[0] > 0:
-            ax.scatter(t.loc[diff_vars, "log2FoldChange"], -np.log10(t.loc[diff_vars, "pvalue"]), alpha=0.1, color="red", s=2)
+            ax.scatter(t.loc[diff_vars, log_fold_change_column], -np.log10(t.loc[diff_vars, p_value_column]), alpha=0.1, color="red", s=2)
         ax.set_title(comparison)
         ax.set_xlabel("log2(Fold-change)")
         ax.set_ylabel("-log10(P-value)")
@@ -1305,14 +1332,14 @@ def plot_differential(
         ax.set_xlim(-l, l)
 
         # Add lines of significance
-        ax.axhline(-np.log10(t.loc[t["diff"] == True, "pvalue"].max()), linestyle='--', alpha=0.5, zorder=0, color="black")
+        ax.axhline(-np.log10(t.loc[t["diff"] == True, p_value_column].max()), linestyle='--', alpha=0.5, zorder=0, color="black")
         if fold_change is not None:
             ax.axvline(-fold_change, linestyle='--', alpha=0.5, zorder=0, color="black")
             ax.axvline(fold_change, linestyle='--', alpha=0.5, zorder=0, color="black")
     for ax in axes:
         ax.set_visible(False)
     sns.despine(fig)
-    fig.savefig(os.path.join(output_dir, output_prefix + ".volcano_plots.svg"), bbox_inches="tight", dpi=300)
+    fig.savefig(os.path.join(output_dir, output_prefix + ".volcano_plots.svg"), bbox_inches="tight", dpi=dpi)
 
     # MA plots
     fig, axes = plt.subplots(n_side, n_side, figsize=(n_side * 4, n_side * 4), sharex=False, sharey=False)
@@ -1321,18 +1348,18 @@ def plot_differential(
     else:
         axes = iter([axes])
     for comparison in comparisons:
-        t = results.loc[results["comparison_name"] == comparison, :]
+        t = results.loc[results[comparison_column] == comparison, :]
 
         # Hexbin plot
         ax = next(axes)
         ax.hexbin(
-            np.log10(t["baseMean"]), t["log2FoldChange"],
+            np.log10(t["baseMean"]), t[log_fold_change_column],
             alpha=0.85, cmap="Greys", color="black", edgecolors="white", linewidths=0, bins='log', mincnt=1, rasterized=True)
 
         # Scatter for significant
         diff_vars = t[t["diff"] == True].index
         if diff_vars.shape[0] > 0:
-            ax.scatter(np.log10(t.loc[diff_vars, "baseMean"]), t.loc[diff_vars, "log2FoldChange"], alpha=0.1, color="red", s=2)
+            ax.scatter(np.log10(t.loc[diff_vars, "baseMean"]), t.loc[diff_vars, log_fold_change_column], alpha=0.1, color="red", s=2)
         ax.set_title(comparison)
         ax.set_xlabel("Amplitude")
         ax.set_ylabel("log2(Fold-change)")
@@ -1347,7 +1374,7 @@ def plot_differential(
     for ax in axes:
         ax.set_visible(False)
     sns.despine(fig)
-    fig.savefig(os.path.join(output_dir, output_prefix + ".ma_plots.svg"), bbox_inches="tight", dpi=300)
+    fig.savefig(os.path.join(output_dir, output_prefix + ".ma_plots.svg"), bbox_inches="tight", dpi=dpi)
 
     # Observe values of variables across all comparisons
     all_diff = results[results["diff"] == True].index.drop_duplicates()
@@ -1357,7 +1384,7 @@ def plot_differential(
         sample_cols = matrix.columns.tolist()
 
     if comparison_table is not None:
-        if results["comparison_name"].drop_duplicates().shape[0] > 1:
+        if results[comparison_column].drop_duplicates().shape[0] > 1:
             groups = pd.DataFrame()
             for sample_group in comparison_table["sample_group"].drop_duplicates():
                 c = comparison_table.loc[comparison_table["sample_group"] == sample_group, "sample_name"].drop_duplicates()
@@ -1382,30 +1409,30 @@ def plot_differential(
                 xticklabels=False, cbar_kws={"label": "Pearson correlation\non differential {}".format(var_name)},
                 cmap="BuGn", metric="correlation", rasterized=True, figsize=(figsize[0], figsize[0]))
             g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small")
-            g.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.groups.clustermap.corr.svg".format(var_name)), bbox_inches="tight", dpi=300, metric="correlation")
+            g.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.groups.clustermap.corr.svg".format(var_name)), bbox_inches="tight", dpi=dpi, metric="correlation")
 
             g = sns.clustermap(
                 groups,
-                yticklabels=yticklabels, cbar_kws={"label": "{} of\ndifferential {}s".format(quantity, var_name)},
+                yticklabels=feature_labels, cbar_kws={"label": "{} of\ndifferential {}s".format(quantity, var_name)},
                 cmap="BuGn", metric="correlation", rasterized=True, figsize=figsize)
             g.ax_heatmap.set_ylabel("Differential {}s (n = {})".format(var_name, groups.shape[0]))
             g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90, fontsize="xx-small")
             g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small")
-            g.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.groups.clustermap.svg".format(var_name)), bbox_inches="tight", dpi=300)
+            g.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.groups.clustermap.svg".format(var_name)), bbox_inches="tight", dpi=dpi)
 
             g = sns.clustermap(
                 groups,
-                yticklabels=yticklabels, z_score=0, cbar_kws={"label": "Z-score of {}\non differential {}s".format(quantity, var_name)},
+                yticklabels=feature_labels, z_score=0, cbar_kws={"label": "Z-score of {}\non differential {}s".format(quantity, var_name)},
                 cmap="RdBu_r", metric="correlation", rasterized=True, figsize=figsize)
             g.ax_heatmap.set_ylabel("Differential {}s (n = {})".format(var_name, groups.shape[0]))
             g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90, fontsize="xx-small")
             g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small")
-            g.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.groups.clustermap.z0.svg".format(var_name)), bbox_inches="tight", dpi=300)
+            g.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.groups.clustermap.z0.svg".format(var_name)), bbox_inches="tight", dpi=dpi)
 
     # Fold-changes and P-values
     # pivot table of genes vs comparisons
-    fold_changes = pd.pivot_table(results.loc[all_diff, :].reset_index(), index=results.index.name, columns="comparison_name", values="log2FoldChange")
-    p_values = -np.log10(pd.pivot_table(results.loc[all_diff, :].reset_index(), index=results.index.name, columns="comparison_name", values="padj"))
+    fold_changes = pd.pivot_table(results.loc[all_diff, :].reset_index(), index=results.index.name, columns=comparison_column, values=log_fold_change_column)
+    p_values = -np.log10(pd.pivot_table(results.loc[all_diff, :].reset_index(), index=results.index.name, columns=comparison_column, values=adjusted_p_value_column))
 
     # fold
     if fold_changes.shape[1] > 1:
@@ -1415,15 +1442,15 @@ def plot_differential(
             xticklabels=False, cbar_kws={"label": "Pearson correlation\non fold-changes"},
             cmap="BuGn", vmin=0, vmax=1, metric="correlation", rasterized=True, figsize=(figsize[0], figsize[0]))
         g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small")
-        g.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.groups.fold_changes.clustermap.corr.svg".format(var_name)), bbox_inches="tight", dpi=300, metric="correlation")
+        g.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.groups.fold_changes.clustermap.corr.svg".format(var_name)), bbox_inches="tight", dpi=dpi, metric="correlation")
 
         g = sns.clustermap(fold_changes.loc[all_diff, :],
-            yticklabels=yticklabels, cbar_kws={"label": "Fold-change of\ndifferential {}s".format(var_name)},
+            yticklabels=feature_labels, cbar_kws={"label": "Fold-change of\ndifferential {}s".format(var_name)},
             cmap="RdBu_r", robust=True, metric="correlation", rasterized=True, figsize=figsize)
         g.ax_heatmap.set_ylabel("Differential {}s (n = {})".format(var_name, fold_changes.loc[all_diff, :].shape[0]))
         g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90, fontsize="xx-small")
         g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small")
-        g.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.groups.fold_changes.clustermap.svg".format(var_name)), bbox_inches="tight", dpi=300)
+        g.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.groups.fold_changes.clustermap.svg".format(var_name)), bbox_inches="tight", dpi=dpi)
 
     # Sample level
     if type(matrix.columns) is pd.core.indexes.multi.MultiIndex:
@@ -1435,25 +1462,28 @@ def plot_differential(
     g = sns.clustermap(matrix.corr(),
         yticklabels=True, xticklabels=False,
         cbar_kws={"label": "Pearson correlation\non differential {}".format(var_name)},
-        cmap="BuGn", metric="correlation", figsize=(figsize[0], figsize[0]), rasterized=rasterized, robust=robust)
+        cmap="BuGn", metric="correlation", figsize=(figsize[0], figsize[0]), rasterized=rasterized, robust=robust,
+        row_colors=color_dataframe.values)
     g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small")
-    g.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.samples.clustermap.corr.svg".format(var_name)), bbox_inches="tight", dpi=300)
+    g.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.samples.clustermap.corr.svg".format(var_name)), bbox_inches="tight", dpi=dpi)
 
     g = sns.clustermap(matrix,
-        yticklabels=yticklabels, cbar_kws={"label": "{} of\ndifferential {}s".format(quantity, var_name)},
-        xticklabels=True, vmin=0, metric="correlation", figsize=figsize, rasterized=rasterized, robust=robust)
+        yticklabels=feature_labels, cbar_kws={"label": "{} of\ndifferential {}s".format(quantity, var_name)},
+        xticklabels=True, vmin=0, metric="correlation", figsize=figsize, rasterized=rasterized, robust=robust,
+        col_colors=color_dataframe.values)
     g.ax_heatmap.set_ylabel("Differential {}s (n = {})".format(var_name, matrix.shape[0]))
     g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90, fontsize="xx-small")
     g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small")
-    g.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.samples.clustermap.svg".format(var_name)), bbox_inches="tight", dpi=300)
+    g.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.samples.clustermap.svg".format(var_name)), bbox_inches="tight", dpi=dpi)
 
     g = sns.clustermap(matrix,
-        yticklabels=yticklabels, z_score=0, cbar_kws={"label": "Z-score of {}\non differential {}s".format(quantity, var_name)},
-        xticklabels=True, cmap="RdBu_r", metric="correlation", figsize=figsize, rasterized=rasterized, robust=robust)
+        yticklabels=feature_labels, z_score=0, cbar_kws={"label": "Z-score of {}\non differential {}s".format(quantity, var_name)},
+        xticklabels=True, cmap="RdBu_r", metric="correlation", figsize=figsize, rasterized=rasterized, robust=robust,
+        col_colors=color_dataframe.values)
     g.ax_heatmap.set_ylabel("Differential {}s (n = {})".format(var_name, matrix.shape[0]))
     g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90, fontsize="xx-small")
     g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small")
-    g.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.samples.clustermap.z0.svg".format(var_name)), bbox_inches="tight", dpi=300)
+    g.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.samples.clustermap.z0.svg".format(var_name)), bbox_inches="tight", dpi=dpi)
 
 
 def lola(bed_files, universe_file, output_folder, genome="hg19", cpus=8):

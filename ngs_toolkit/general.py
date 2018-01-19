@@ -47,8 +47,15 @@ class Analysis(object):
         self.samples = samples
         self.prj = prj
         if pickle_file is None:
-            pickle_file = os.path.join(results_dir, "analysis.{}.pickle".format(name))
+            pickle_file = os.path.join(results_dir, "{}.pickle".format(self.name))
         self.pickle_file = pickle_file
+
+        # If no samples are provided but the prj object has samples,
+        # set them as well
+        if self.samples is None:
+            if self.prj is not None:
+                if hasattr(self.prj, "samples"):
+                    self.samples = prj.samples
 
         for directory in [self.data_dir, self.results_dir]:
             if not os.path.exists(directory):
@@ -187,11 +194,24 @@ def normalize_quantiles_p(df_input):
 
 
 def unsupervised_analysis(
-        analysis, data_type="ATAC-seq", quant_matrix=None, samples=None,
-        attributes_to_plot=["sample_name"], plot_prefix=None,
+        analysis,
+        data_type="ATAC-seq",
+        quant_matrix=None,
+        samples=None,
+        attributes_to_plot=["sample_name"],
+        plot_prefix=None,
         heatmap_numeric_annotation=True,
-        plot_max_attr=20, plot_max_pcs=8, plot_group_centroids=True, axis_ticklabels=False, axis_lines=True,
-        legends=False, always_legend=False,
+        plot_max_attr=20,
+        plot_max_pcs=8,
+        plot_group_centroids=True,
+        axis_ticklabels=False,
+        axis_lines=True,
+        legends=False,
+        always_legend=False,
+        prettier_sample_names=True,
+        display_corr_values=True,
+        rasterized=False,
+        dpi=300,
         output_dir="{results_dir}/unsupervised"):
     """
     Apply unsupervised clustering (clustering of correlations) and dimentionality reduction methods (MDS, PCA) on matrix.
@@ -238,10 +258,15 @@ def unsupervised_analysis(
         index=attributes_to_plot, columns=matrix.columns.get_level_values("sample_name"))
     # will be filtered now by the requested samples if needed
     color_dataframe = color_dataframe[[s.name for s in samples]]
-    # sample_display_names = color_dataframe.columns.str.replace("ATAC-seq_", "")
 
     # All regions, matching samples (provided samples in matrix)
     X = matrix.loc[:, matrix.columns.get_level_values("sample_name").isin([s.name for s in samples])]
+    if prettier_sample_names:
+        X.columns = (
+            color_dataframe.columns
+            .str.replace("ATAC-seq_", "")
+            .str.replace("RNA-seq_", "")
+            .str.replace("ChIP-seq_", ""))
 
     # Pairwise correlations
     g = sns.clustermap(
@@ -251,7 +276,7 @@ def unsupervised_analysis(
     g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize='xx-small')
     g.ax_heatmap.set_xlabel(None, visible=False)
     g.ax_heatmap.set_ylabel(None, visible=False)
-    g.fig.savefig(os.path.join(output_dir, "{}.{}.corr.clustermap.svg".format(analysis.name, plot_prefix)), bbox_inches='tight')
+    g.fig.savefig(os.path.join(output_dir, "{}.{}.corr.clustermap.svg".format(analysis.name, plot_prefix)), bbox_inches='tight', dpi=dpi)
 
     # MDS
     mds = MDS(n_jobs=-1)
@@ -272,7 +297,7 @@ def unsupervised_analysis(
             axis[i].scatter(
                 xx.loc[sample['sample_name'], 0],
                 xx.loc[sample['sample_name'], 1],
-                s=50, color=color_dataframe.loc[attr, sample['sample_name']], alpha=0.75, label=label)
+                s=50, color=color_dataframe.loc[attr, sample['sample_name']], alpha=0.75, label=label, rasterized=rasterized)
 
         # Plot groups
         if plot_group_centroids:
@@ -286,7 +311,7 @@ def unsupervised_analysis(
                 axis[i].scatter(
                     xx2.loc[group, 0],
                     xx2.loc[group, 1],
-                    marker="s", s=50, color=cd.loc[group].squeeze(), alpha=0.95, label=group)
+                    marker="s", s=50, color=cd.loc[group].squeeze(), alpha=0.95, label=group, rasterized=rasterized)
                 axis[i].text(
                     xx2.loc[group, 0],
                     xx2.loc[group, 1], group,
@@ -310,7 +335,7 @@ def unsupervised_analysis(
             if any([type(c) in [str, unicode] for c in by_label.keys()]) and len(by_label) <= 20:
                 # if not any([re.match("^\d", c) for c in by_label.keys()]):
                 axis[i].legend(by_label.values(), by_label.keys())
-    fig.savefig(os.path.join(output_dir, "{}.{}.mds.svg".format(analysis.name, plot_prefix)), bbox_inches="tight")
+    fig.savefig(os.path.join(output_dir, "{}.{}.mds.svg".format(analysis.name, plot_prefix)), bbox_inches='tight', dpi=dpi)
 
     # PCA
     pca = PCA()
@@ -327,7 +352,7 @@ def unsupervised_analysis(
     axis.set_xlabel("PC")
     axis.set_ylabel("% variance")
     sns.despine(fig)
-    fig.savefig(os.path.join(output_dir, "{}.{}.pca.explained_variance.svg".format(analysis.name, plot_prefix)), bbox_inches='tight')
+    fig.savefig(os.path.join(output_dir, "{}.{}.pca.explained_variance.svg".format(analysis.name, plot_prefix)), bbox_inches='tight', dpi=dpi)
 
     # plot pca
     pcs = min(xx.shape[0] - 1, plot_max_pcs)
@@ -344,7 +369,7 @@ def unsupervised_analysis(
                 axis[pc, i].scatter(
                     xx.loc[sample['sample_name'], :].loc[:, pc],
                     xx.loc[sample['sample_name'], :].loc[:, pc + 1],
-                    s=30, color=color_dataframe.loc[attr, sample['sample_name']], alpha=0.75, label=label)
+                    s=30, color=color_dataframe.loc[attr, sample['sample_name']], alpha=0.75, label=label, rasterized=rasterized)
 
             # Plot groups
             if plot_group_centroids:
@@ -358,7 +383,7 @@ def unsupervised_analysis(
                     axis[pc, i].scatter(
                         xx2.loc[group, pc],
                         xx2.loc[group, pc + 1],
-                        marker="s", s=50, color=cd.loc[group].squeeze(), alpha=0.95, label=group)
+                        marker="s", s=50, color=cd.loc[group].squeeze(), alpha=0.95, label=group, rasterized=rasterized)
                     axis[pc, i].text(
                         xx2.loc[group, pc],
                         xx2.loc[group, pc + 1], group,
@@ -448,14 +473,14 @@ def unsupervised_analysis(
     pivot = associations.groupby(["pc", "attribute"]).min()['p_value'].reset_index().pivot(index="pc", columns="attribute", values="p_value").dropna(axis=1)
 
     # heatmap of -log p-values
-    g = sns.clustermap(-np.log10(pivot), row_cluster=False, annot=True, cbar_kws={"label": "-log10(p_value) of association"}, square=True)
+    g = sns.clustermap(-np.log10(pivot), row_cluster=False, annot=True, cbar_kws={"label": "-log10(p_value) of association"}, square=True, rasterized=rasterized)
     g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=45, ha="right")
-    g.fig.savefig(os.path.join(output_dir, "{}.{}.pca.variable_principle_components_association.svg".format(analysis.name, plot_prefix)), bbox_inches="tight")
+    g.fig.savefig(os.path.join(output_dir, "{}.{}.pca.variable_principle_components_association.svg".format(analysis.name, plot_prefix)), bbox_inches="tight", dpi=dpi)
 
     # heatmap of masked significant
-    g = sns.clustermap((pivot < 0.05).astype(int), row_cluster=False, cbar_kws={"label": "significant association"}, square=True)
+    g = sns.clustermap((pivot < 0.05).astype(int), row_cluster=False, cbar_kws={"label": "significant association"}, square=True, rasterized=rasterized)
     g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=45, ha="right")
-    g.fig.savefig(os.path.join(output_dir, "{}.{}.pca.variable_principle_components_association.masked.svg".format(analysis.name, plot_prefix)), bbox_inches="tight")
+    g.fig.savefig(os.path.join(output_dir, "{}.{}.pca.variable_principle_components_association.masked.svg".format(analysis.name, plot_prefix)), bbox_inches="tight", dpi=dpi)
 
 
 def deseq_analysis(
@@ -1215,6 +1240,8 @@ def plot_differential(
     fig.savefig(os.path.join(output_dir, output_prefix + ".number_differential.svg"), bbox_inches="tight")
 
     # Pairwise scatter plots
+    # TODO: add different shadings of red for various levels of significance
+    # TODO: do this for scatter, MA, volcano plots
     if comparison_table is not None:
         fig, axes = plt.subplots(n_side, n_side, figsize=(n_side * 4, n_side * 4), sharex=True, sharey=True)
         if n_side > 1 or n_side > 1:
@@ -2356,15 +2383,31 @@ def plot_differential_enrichment(
 
 
 def chunks(l, n):
+    """
+    Partition iterable in `n` chunks.
+
+    :param iterable l: Iterable (e.g. list or numpy array).
+    :param int n: Number of chunks to generate.
+    """
     n = max(1, n)
     return (l[i:i + n] for i in range(0, len(l), n))
 
 
-def standard_scale(x):
+def standard_score(x):
+    """
+    Compute a standard score, defined as (x - min(x)) / (max(x) - min(x)).
+
+    :param numpy.array x: Numeric array.
+    """
     return (x - x.min()) / (x.max() - x.min())
 
 
 def z_score(x):
+    """
+    Compute a Z-score, defined as (x - mean(x)) / std(x).
+
+    :param numpy.array x: Numeric array.
+    """
     return (x - x.mean()) / x.std()
 
 
@@ -2372,6 +2415,9 @@ def signed_max(x, f=0.66):
     """
     Return maximum or minimum depending on the sign of the majority of values.
     If there isn't a clear majority (at least `f` fraction in one side), return mean of values.
+
+    :param numpy.array x: Numeric array.
+    :param float f: Threshold fraction of majority agreement.
     """
     l = float(len(x))
     neg = sum(x < 0)
@@ -2386,134 +2432,134 @@ def signed_max(x, f=0.66):
         return np.mean(x)
 
 
-def detect_peaks(x, mph=None, mpd=1, threshold=0, edge='rising',
-                 kpsh=False, valley=False):
-    """Detect peaks in data based on their amplitude and other features.
+# def detect_peaks(x, mph=None, mpd=1, threshold=0, edge='rising',
+#                  kpsh=False, valley=False):
+#     """Detect peaks in data based on their amplitude and other features.
 
-    Parameters
-    ----------
-    x : 1D array_like
-        data.
-    mph : {None, number}, optional (default = None)
-        detect peaks that are greater than minimum peak height.
-    mpd : positive integer, optional (default = 1)
-        detect peaks that are at least separated by minimum peak distance (in
-        number of data).
-    threshold : positive number, optional (default = 0)
-        detect peaks (valleys) that are greater (smaller) than `threshold`
-        in relation to their immediate neighbors.
-    edge : {None, 'rising', 'falling', 'both'}, optional (default = 'rising')
-        for a flat peak, keep only the rising edge ('rising'), only the
-        falling edge ('falling'), both edges ('both'), or don't detect a
-        flat peak (None).
-    kpsh : bool, optional (default = False)
-        keep peaks with same height even if they are closer than `mpd`.
-    valley : bool, optional (default = False)
-        if True (1), detect valleys (local minima) instead of peaks.
-    show : bool, optional (default = False)
-        if True (1), plot data in matplotlib figure.
-    ax : a matplotlib.axes.Axes instance, optional (default = None).
+#     Parameters
+#     ----------
+#     x : 1D array_like
+#         data.
+#     mph : {None, number}, optional (default = None)
+#         detect peaks that are greater than minimum peak height.
+#     mpd : positive integer, optional (default = 1)
+#         detect peaks that are at least separated by minimum peak distance (in
+#         number of data).
+#     threshold : positive number, optional (default = 0)
+#         detect peaks (valleys) that are greater (smaller) than `threshold`
+#         in relation to their immediate neighbors.
+#     edge : {None, 'rising', 'falling', 'both'}, optional (default = 'rising')
+#         for a flat peak, keep only the rising edge ('rising'), only the
+#         falling edge ('falling'), both edges ('both'), or don't detect a
+#         flat peak (None).
+#     kpsh : bool, optional (default = False)
+#         keep peaks with same height even if they are closer than `mpd`.
+#     valley : bool, optional (default = False)
+#         if True (1), detect valleys (local minima) instead of peaks.
+#     show : bool, optional (default = False)
+#         if True (1), plot data in matplotlib figure.
+#     ax : a matplotlib.axes.Axes instance, optional (default = None).
 
-    Returns
-    -------
-    ind : 1D array_like
-        indeces of the peaks in `x`.
+#     Returns
+#     -------
+#     ind : 1D array_like
+#         indeces of the peaks in `x`.
 
-    Notes
-    -----
-    The detection of valleys instead of peaks is performed internally by simply
-    negating the data: `ind_valleys = detect_peaks(-x)`
+#     Notes
+#     -----
+#     The detection of valleys instead of peaks is performed internally by simply
+#     negating the data: `ind_valleys = detect_peaks(-x)`
 
-    The function can handle NaN's
+#     The function can handle NaN's
 
-    See this IPython Notebook [1]_.
+#     See this IPython Notebook [1]_.
 
-    References
-    ----------
-    .. [1] http://nbviewer.ipython.org/github/demotu/BMC/blob/master/notebooks/DetectPeaks.ipynb
+#     References
+#     ----------
+#     .. [1] http://nbviewer.ipython.org/github/demotu/BMC/blob/master/notebooks/DetectPeaks.ipynb
 
-    Examples
-    --------
-    >>> from detect_peaks import detect_peaks
-    >>> x = np.random.randn(100)
-    >>> x[60:81] = np.nan
-    >>> # detect all peaks and plot data
-    >>> ind = detect_peaks(x, show=True)
-    >>> print(ind)
+#     Examples
+#     --------
+#     >>> from detect_peaks import detect_peaks
+#     >>> x = np.random.randn(100)
+#     >>> x[60:81] = np.nan
+#     >>> # detect all peaks and plot data
+#     >>> ind = detect_peaks(x, show=True)
+#     >>> print(ind)
 
-    >>> x = np.sin(2*np.pi*5*np.linspace(0, 1, 200)) + np.random.randn(200)/5
-    >>> # set minimum peak height = 0 and minimum peak distance = 20
-    >>> detect_peaks(x, mph=0, mpd=20, show=True)
+#     >>> x = np.sin(2*np.pi*5*np.linspace(0, 1, 200)) + np.random.randn(200)/5
+#     >>> # set minimum peak height = 0 and minimum peak distance = 20
+#     >>> detect_peaks(x, mph=0, mpd=20, show=True)
 
-    >>> x = [0, 1, 0, 2, 0, 3, 0, 2, 0, 1, 0]
-    >>> # set minimum peak distance = 2
-    >>> detect_peaks(x, mpd=2, show=True)
+#     >>> x = [0, 1, 0, 2, 0, 3, 0, 2, 0, 1, 0]
+#     >>> # set minimum peak distance = 2
+#     >>> detect_peaks(x, mpd=2, show=True)
 
-    >>> x = np.sin(2*np.pi*5*np.linspace(0, 1, 200)) + np.random.randn(200)/5
-    >>> # detection of valleys instead of peaks
-    >>> detect_peaks(x, mph=0, mpd=20, valley=True, show=True)
+#     >>> x = np.sin(2*np.pi*5*np.linspace(0, 1, 200)) + np.random.randn(200)/5
+#     >>> # detection of valleys instead of peaks
+#     >>> detect_peaks(x, mph=0, mpd=20, valley=True, show=True)
 
-    >>> x = [0, 1, 1, 0, 1, 1, 0]
-    >>> # detect both edges
-    >>> detect_peaks(x, edge='both', show=True)
+#     >>> x = [0, 1, 1, 0, 1, 1, 0]
+#     >>> # detect both edges
+#     >>> detect_peaks(x, edge='both', show=True)
 
-    >>> x = [-2, 1, -2, 2, 1, 1, 3, 0]
-    >>> # set threshold = 2
-    >>> detect_peaks(x, threshold = 2, show=True)
-    """
-    import numpy as np
+#     >>> x = [-2, 1, -2, 2, 1, 1, 3, 0]
+#     >>> # set threshold = 2
+#     >>> detect_peaks(x, threshold = 2, show=True)
+#     """
+#     import numpy as np
 
-    x = np.atleast_1d(x).astype('float64')
-    if x.size < 3:
-        return np.array([], dtype=int)
-    if valley:
-        x = -x
-    # find indices of all peaks
-    dx = x[1:] - x[:-1]
-    # handle NaN's
-    indnan = np.where(np.isnan(x))[0]
-    if indnan.size:
-        x[indnan] = np.inf
-        dx[np.where(np.isnan(dx))[0]] = np.inf
-    ine, ire, ife = np.array([[], [], []], dtype=int)
-    if not edge:
-        ine = np.where((np.hstack((dx, 0)) < 0) & (np.hstack((0, dx)) > 0))[0]
-    else:
-        if edge.lower() in ['rising', 'both']:
-            ire = np.where((np.hstack((dx, 0)) <= 0) & (np.hstack((0, dx)) > 0))[0]
-        if edge.lower() in ['falling', 'both']:
-            ife = np.where((np.hstack((dx, 0)) < 0) & (np.hstack((0, dx)) >= 0))[0]
-    ind = np.unique(np.hstack((ine, ire, ife)))
-    # handle NaN's
-    if ind.size and indnan.size:
-        # NaN's and values close to NaN's cannot be peaks
-        ind = ind[np.in1d(ind, np.unique(np.hstack((indnan, indnan - 1, indnan + 1))), invert=True)]
-    # first and last values of x cannot be peaks
-    if ind.size and ind[0] == 0:
-        ind = ind[1:]
-    if ind.size and ind[-1] == x.size - 1:
-        ind = ind[:-1]
-    # remove peaks < minimum peak height
-    if ind.size and mph is not None:
-        ind = ind[x[ind] >= mph]
-    # remove peaks - neighbors < threshold
-    if ind.size and threshold > 0:
-        dx = np.min(np.vstack([x[ind] - x[ind - 1], x[ind] - x[ind + 1]]), axis=0)
-        ind = np.delete(ind, np.where(dx < threshold)[0])
-    # detect small peaks closer than minimum peak distance
-    if ind.size and mpd > 1:
-        ind = ind[np.argsort(x[ind])][::-1]  # sort ind by peak height
-        idel = np.zeros(ind.size, dtype=bool)
-        for i in range(ind.size):
-            if not idel[i]:
-                # keep peaks with the same height if kpsh is True
-                idel = idel | (ind >= ind[i] - mpd) & (ind <= ind[i] + mpd) \
-                    & (x[ind[i]] > x[ind] if kpsh else True)
-                idel[i] = 0  # Keep current peak
-        # remove the small peaks and sort back the indices by their occurrence
-        ind = np.sort(ind[~idel])
+#     x = np.atleast_1d(x).astype('float64')
+#     if x.size < 3:
+#         return np.array([], dtype=int)
+#     if valley:
+#         x = -x
+#     # find indices of all peaks
+#     dx = x[1:] - x[:-1]
+#     # handle NaN's
+#     indnan = np.where(np.isnan(x))[0]
+#     if indnan.size:
+#         x[indnan] = np.inf
+#         dx[np.where(np.isnan(dx))[0]] = np.inf
+#     ine, ire, ife = np.array([[], [], []], dtype=int)
+#     if not edge:
+#         ine = np.where((np.hstack((dx, 0)) < 0) & (np.hstack((0, dx)) > 0))[0]
+#     else:
+#         if edge.lower() in ['rising', 'both']:
+#             ire = np.where((np.hstack((dx, 0)) <= 0) & (np.hstack((0, dx)) > 0))[0]
+#         if edge.lower() in ['falling', 'both']:
+#             ife = np.where((np.hstack((dx, 0)) < 0) & (np.hstack((0, dx)) >= 0))[0]
+#     ind = np.unique(np.hstack((ine, ire, ife)))
+#     # handle NaN's
+#     if ind.size and indnan.size:
+#         # NaN's and values close to NaN's cannot be peaks
+#         ind = ind[np.in1d(ind, np.unique(np.hstack((indnan, indnan - 1, indnan + 1))), invert=True)]
+#     # first and last values of x cannot be peaks
+#     if ind.size and ind[0] == 0:
+#         ind = ind[1:]
+#     if ind.size and ind[-1] == x.size - 1:
+#         ind = ind[:-1]
+#     # remove peaks < minimum peak height
+#     if ind.size and mph is not None:
+#         ind = ind[x[ind] >= mph]
+#     # remove peaks - neighbors < threshold
+#     if ind.size and threshold > 0:
+#         dx = np.min(np.vstack([x[ind] - x[ind - 1], x[ind] - x[ind + 1]]), axis=0)
+#         ind = np.delete(ind, np.where(dx < threshold)[0])
+#     # detect small peaks closer than minimum peak distance
+#     if ind.size and mpd > 1:
+#         ind = ind[np.argsort(x[ind])][::-1]  # sort ind by peak height
+#         idel = np.zeros(ind.size, dtype=bool)
+#         for i in range(ind.size):
+#             if not idel[i]:
+#                 # keep peaks with the same height if kpsh is True
+#                 idel = idel | (ind >= ind[i] - mpd) & (ind <= ind[i] + mpd) \
+#                     & (x[ind[i]] > x[ind] if kpsh else True)
+#                 idel[i] = 0  # Keep current peak
+#         # remove the small peaks and sort back the indices by their occurrence
+#         ind = np.sort(ind[~idel])
 
-    return ind
+#     return ind
 
 
 def count_jobs_running(cmd="squeue", sep="\n"):

@@ -177,7 +177,7 @@ class ATACSeqAnalysis(Analysis):
                 else:
                     print(e)
 
-        if "accesibility" in only_these_keys:
+        if "accessibility" in only_these_keys:
             file = os.path.join(self.results_dir, self.name + ".accessibility.annotated_metadata.csv")
             try:
                 setattr(self, "accessibility", pd.read_csv(file, index_col=0, header=range(5)))
@@ -1367,10 +1367,22 @@ class ATACSeqAnalysis(Analysis):
         plt.savefig(os.path.join(self.results_dir, self.name + ".norm_counts_per_sample.support_vs_qv2.filtered.svg"), bbox_inches="tight")
 
     def unsupervised(
-            self, quant_matrix="accessibility", samples=None,
-            attributes_to_plot=["sample_name"], plot_prefix="all_sites",
-            plot_max_attr=20, plot_max_pcs=8, plot_group_centroids=True, axis_ticklabels=False, axis_lines=True,
-            legends=False, always_legend=False,
+            self,
+            quant_matrix="accessibility",
+            samples=None,
+            attributes_to_plot=["sample_name"],
+            plot_prefix="all_sites",
+            plot_max_attr=20,
+            plot_max_pcs=8,
+            plot_group_centroids=True,
+            axis_ticklabels=False,
+            axis_lines=True,
+            legends=False,
+            always_legend=False,
+            prettier_sample_names=True,
+            display_corr_values=True,
+            rasterized=False,
+            dpi=300,
             output_dir="{results_dir}/unsupervised"):
         """
         Apply unsupervised clustering (clustering of correlations) and dimentionality reduction methods (MDS, PCA) on matrix.
@@ -1400,19 +1412,24 @@ class ATACSeqAnalysis(Analysis):
         color_dataframe = pd.DataFrame(self.get_level_colors(index=matrix.columns, levels=attributes_to_plot), index=attributes_to_plot, columns=matrix.columns.get_level_values("sample_name"))
         # will be filtered now by the requested samples if needed
         color_dataframe = color_dataframe[[s.name for s in samples]]
-        # sample_display_names = color_dataframe.columns.str.replace("ATAC-seq_", "")
 
         # All regions, matching samples (provided samples in matrix)
         X = matrix.loc[:, matrix.columns.get_level_values("sample_name").isin([s.name for s in samples])]
+        if prettier_sample_names:
+            X.columns = (
+                color_dataframe.columns
+                .str.replace("ATAC-seq_", "")
+                .str.replace("RNA-seq_", "")
+                .str.replace("ChIP-seq_", ""))
 
         # Pairwise correlations
         g = sns.clustermap(
-            X.astype(float).corr(), xticklabels=False, annot=True,  # yticklabels=sample_display_names,
+            X.astype(float).corr(), xticklabels=False, annot=display_corr_values, rasterized=rasterized,
             cmap="Spectral_r", figsize=(0.2 * X.shape[1], 0.2 * X.shape[1]), cbar_kws={"label": "Pearson correlation"}, row_colors=color_dataframe.values.tolist())
         g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize='xx-small')
         g.ax_heatmap.set_xlabel(None, visible=False)
         g.ax_heatmap.set_ylabel(None, visible=False)
-        g.fig.savefig(os.path.join(output_dir, "{}.{}.corr.clustermap.svg".format(self.name, plot_prefix)), bbox_inches='tight')
+        g.fig.savefig(os.path.join(output_dir, "{}.{}.corr.clustermap.svg".format(self.name, plot_prefix)), bbox_inches='tight', dpi=dpi)
 
         # MDS
         mds = MDS(n_jobs=-1)
@@ -1429,7 +1446,7 @@ class ATACSeqAnalysis(Analysis):
                     label = getattr(samples[j], attributes_to_plot[i])
                 except AttributeError:
                     label = np.nan
-                axis[i].scatter(xx.loc[j, 0], xx.loc[j, 1], s=50, color=color_dataframe.ix[attr][j], label=label)
+                axis[i].scatter(xx.loc[j, 0], xx.loc[j, 1], s=50, color=color_dataframe.ix[attr][j], label=label, rasterized=rasterized)
 
             # Graphics
             axis[i].set_title(attributes_to_plot[i])
@@ -1449,7 +1466,7 @@ class ATACSeqAnalysis(Analysis):
                 if any([type(c) in [str, unicode] for c in by_label.keys()]) and len(by_label) <= 20:
                     # if not any([re.match("^\d", c) for c in by_label.keys()]):
                     axis[i].legend(by_label.values(), by_label.keys())
-        fig.savefig(os.path.join(output_dir, "{}.{}.mds.svg".format(self.name, plot_prefix)), bbox_inches="tight")
+        fig.savefig(os.path.join(output_dir, "{}.{}.mds.svg".format(self.name, plot_prefix)), bbox_inches="tight", dpi=dpi)
 
         # PCA
         pca = PCA()
@@ -1466,7 +1483,7 @@ class ATACSeqAnalysis(Analysis):
         axis.set_xlabel("PC")
         axis.set_ylabel("% variance")
         sns.despine(fig)
-        fig.savefig(os.path.join(output_dir, "{}.{}.pca.explained_variance.svg".format(self.name, plot_prefix)), bbox_inches='tight')
+        fig.savefig(os.path.join(output_dir, "{}.{}.pca.explained_variance.svg".format(self.name, plot_prefix)), bbox_inches='tight', dpi=dpi)
 
         # plot pca
         pcs = min(xx.shape[0] - 1, plot_max_pcs)
@@ -1483,7 +1500,7 @@ class ATACSeqAnalysis(Analysis):
                     axis[pc, i].scatter(
                         xx.loc[sample['sample_name'], :].loc[:, pc],
                         xx.loc[sample['sample_name'], :].loc[:, pc + 1],
-                        s=30, color=color_dataframe.loc[attr, sample['sample_name']], alpha=0.75, label=label)
+                        s=30, color=color_dataframe.loc[attr, sample['sample_name']], alpha=0.75, label=label, rasterized=rasterized)
 
                 # Plot groups
                 if plot_group_centroids:
@@ -1497,7 +1514,7 @@ class ATACSeqAnalysis(Analysis):
                         axis[pc, i].scatter(
                             xx2.loc[group, pc],
                             xx2.loc[group, pc + 1],
-                            marker="s", s=50, color=cd.loc[group].squeeze(), alpha=0.95, label=group)
+                            marker="s", s=50, color=cd.loc[group].squeeze(), alpha=0.95, label=group, rasterized=rasterized)
                         axis[pc, i].text(
                             xx2.loc[group, pc],
                             xx2.loc[group, pc + 1], group,
@@ -1527,7 +1544,7 @@ class ATACSeqAnalysis(Analysis):
                                 axis[pc, i].legend(
                                     by_label.values(), by_label.keys())
         fig.savefig(os.path.join(output_dir, "{}.{}.pca.svg".format(
-            self.name, plot_prefix)), bbox_inches="tight")
+            self.name, plot_prefix)), bbox_inches="tight", dpi=dpi)
 
         # Get PC1 loadings
         # import math
@@ -1587,14 +1604,14 @@ class ATACSeqAnalysis(Analysis):
         pivot = associations.groupby(["pc", "attribute"]).min()['p_value'].reset_index().pivot(index="pc", columns="attribute", values="p_value").dropna(axis=1)
 
         # heatmap of -log p-values
-        g = sns.clustermap(-np.log10(pivot), row_cluster=False, annot=True, cbar_kws={"label": "-log10(p_value) of association"}, square=True)
+        g = sns.clustermap(-np.log10(pivot), row_cluster=False, annot=True, cbar_kws={"label": "-log10(p_value) of association"}, square=True, rasterized=rasterized)
         g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=45, ha="right")
-        g.fig.savefig(os.path.join(output_dir, "{}.{}.pca.variable_principle_components_association.svg".format(self.name, plot_prefix)), bbox_inches="tight")
+        g.fig.savefig(os.path.join(output_dir, "{}.{}.pca.variable_principle_components_association.svg".format(self.name, plot_prefix)), bbox_inches="tight", dpi=dpi)
 
         # heatmap of masked significant
-        g = sns.clustermap((pivot < 0.05).astype(int), row_cluster=False, cbar_kws={"label": "significant association"}, square=True)
+        g = sns.clustermap((pivot < 0.05).astype(int), row_cluster=False, cbar_kws={"label": "significant association"}, square=True, rasterized=rasterized)
         g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=45, ha="right")
-        g.fig.savefig(os.path.join(output_dir, "{}.{}.pca.variable_principle_components_association.masked.svg".format(self.name, plot_prefix)), bbox_inches="tight")
+        g.fig.savefig(os.path.join(output_dir, "{}.{}.pca.variable_principle_components_association.masked.svg".format(self.name, plot_prefix)), bbox_inches="tight", dpi=dpi)
 
     def unsupervised_enrichment(self, samples, variables=["IL10_status", "subset", "replicate", "batch"]):
         """

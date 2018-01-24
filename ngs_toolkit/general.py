@@ -81,7 +81,8 @@ class Analysis(object):
 
     def get_level_colors(
             self, matrix="accessibility", index=None, levels=None,
-            pallete="Paired", cmap="RdBu_r", nan_color=(0.662745, 0.662745, 0.662745, 0.5)):
+            pallete="Paired", cmap="RdBu_r", nan_color=(0.662745, 0.662745, 0.662745, 0.5),
+            as_dataframe=False):
         """
         Get tuples of floats representing a colour for a sample in a given variable in a dataframe's index
         (particularly useful with MultiIndex dataframes).
@@ -101,7 +102,8 @@ class Analysis(object):
             index = getattr(self, matrix).columns
 
         if levels is not None:
-            index = index.droplevel([l.name for l in index.levels if l.name not in levels])
+            drop = [l.name for l in index.levels if l.name not in levels]
+            index = index.droplevel(drop)
 
         # Handle special case of single level
         if type(index) is pd.core.indexes.base.Index:
@@ -204,7 +206,7 @@ def unsupervised_analysis(
         samples=None,
         attributes_to_plot=["sample_name"],
         plot_prefix=None,
-        heatmap_numeric_annotation=True,
+        display_corr_values=False,
         plot_max_attr=20,
         plot_max_pcs=8,
         plot_group_centroids=True,
@@ -213,7 +215,6 @@ def unsupervised_analysis(
         legends=False,
         always_legend=False,
         prettier_sample_names=True,
-        display_corr_values=True,
         rasterized=False,
         dpi=300,
         output_dir="{results_dir}/unsupervised"):
@@ -265,17 +266,19 @@ def unsupervised_analysis(
 
     # All regions, matching samples (provided samples in matrix)
     X = matrix.loc[:, matrix.columns.get_level_values("sample_name").isin([s.name for s in samples])]
-    if prettier_sample_names:
-        X.columns = (
-            color_dataframe.columns
-            .str.replace("ATAC-seq_", "")
-            .str.replace("RNA-seq_", "")
-            .str.replace("ChIP-seq_", ""))
+
+    # TODO: Re-implement to accomodate multiindex
+    # if prettier_sample_names:
+    #     X.columns = (
+    #         color_dataframe.columns
+    #         .str.replace("ATAC-seq_", "")
+    #         .str.replace("RNA-seq_", "")
+    #         .str.replace("ChIP-seq_", ""))
 
     # Pairwise correlations
     g = sns.clustermap(
         # yticklabels=sample_display_names,
-        X.astype(float).corr(), xticklabels=False, annot=heatmap_numeric_annotation,
+        X.astype(float).corr(), xticklabels=False, annot=display_corr_values,
         cmap="Spectral_r", figsize=(0.2 * X.shape[1], 0.2 * X.shape[1]), cbar_kws={"label": "Pearson correlation"}, row_colors=color_dataframe.values.tolist())
     g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize='xx-small')
     g.ax_heatmap.set_xlabel(None, visible=False)
@@ -1138,6 +1141,7 @@ def plot_differential(
         results,
         comparison_table=None,
         samples=None,
+        matrix=None,
         only_comparison_samples=False,
         data_type="ATAC-seq",
         alpha=0.05,
@@ -1145,6 +1149,7 @@ def plot_differential(
         fold_change=None,
         output_dir="results/differential_analysis_{data_type}",
         output_prefix="differential_analysis",
+        mean_column="baseMean",
         log_fold_change_column="log2FoldChange",
         p_value_column="pvalue",
         adjusted_p_value_column="padj",
@@ -1165,7 +1170,7 @@ def plot_differential(
     import matplotlib.pyplot as plt
     import seaborn as sns
 
-    req_attrs = [log_fold_change_column, p_value_column, adjusted_p_value_column, comparison_column]
+    req_attrs = [mean_column, log_fold_change_column, p_value_column, adjusted_p_value_column, comparison_column]
     if not all([x in results.columns for x in req_attrs]):
         raise AssertionError("Results dataframe must have '{}' columns.".format(", ".join(req_attrs)))
 
@@ -1176,14 +1181,17 @@ def plot_differential(
         os.makedirs(output_dir)
 
     # Get matrix and samples
+    results = results.copy()
     if data_type == "ATAC-seq":
-        matrix = analysis.accessibility
+        if matrix is None:
+            matrix = analysis.accessibility
         results.index.name = "region"
         var_name = "region"
         quantity = "Accessibility"
         unit = "RPM"
     elif data_type == "RNA-seq":
-        matrix = analysis.expression
+        if matrix is None:
+            matrix = analysis.expression
         results.index.name = "gene_name"
         var_name = "gene"
         quantity = "Expression"
@@ -1353,13 +1361,13 @@ def plot_differential(
         # Hexbin plot
         ax = next(axes)
         ax.hexbin(
-            np.log10(t["baseMean"]), t[log_fold_change_column],
+            np.log10(t[mean_column]), t[log_fold_change_column],
             alpha=0.85, cmap="Greys", color="black", edgecolors="white", linewidths=0, bins='log', mincnt=1, rasterized=True)
 
         # Scatter for significant
         diff_vars = t[t["diff"] == True].index
         if diff_vars.shape[0] > 0:
-            ax.scatter(np.log10(t.loc[diff_vars, "baseMean"]), t.loc[diff_vars, log_fold_change_column], alpha=0.1, color="red", s=2)
+            ax.scatter(np.log10(t.loc[diff_vars, mean_column]), t.loc[diff_vars, log_fold_change_column], alpha=0.1, color="red", s=2)
         ax.set_title(comparison)
         ax.set_xlabel("Amplitude")
         ax.set_ylabel("log2(Fold-change)")
@@ -1406,15 +1414,15 @@ def plot_differential(
             # Comparison level
             g = sns.clustermap(
                 groups.corr(),
-                xticklabels=False, cbar_kws={"label": "Pearson correlation\non differential {}".format(var_name)},
+                xticklabels=False, yticklabels=True, cbar_kws={"label": "Pearson correlation\non differential {}".format(var_name)},
                 cmap="BuGn", metric="correlation", rasterized=True, figsize=(figsize[0], figsize[0]))
             g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small")
             g.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.groups.clustermap.corr.svg".format(var_name)), bbox_inches="tight", dpi=dpi, metric="correlation")
 
             g = sns.clustermap(
                 groups,
-                yticklabels=feature_labels, cbar_kws={"label": "{} of\ndifferential {}s".format(quantity, var_name)},
-                cmap="BuGn", metric="correlation", rasterized=True, figsize=figsize)
+                xticklabels=True, yticklabels=feature_labels, cbar_kws={"label": "{} of\ndifferential {}s".format(quantity, var_name)},
+                cmap="BuGn", robust=robust, metric="correlation", rasterized=True, figsize=figsize)
             g.ax_heatmap.set_ylabel("Differential {}s (n = {})".format(var_name, groups.shape[0]))
             g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90, fontsize="xx-small")
             g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small")
@@ -1422,8 +1430,8 @@ def plot_differential(
 
             g = sns.clustermap(
                 groups,
-                yticklabels=feature_labels, z_score=0, cbar_kws={"label": "Z-score of {}\non differential {}s".format(quantity, var_name)},
-                cmap="RdBu_r", metric="correlation", rasterized=True, figsize=figsize)
+                xticklabels=True, yticklabels=feature_labels, z_score=0, cbar_kws={"label": "Z-score of {}\non differential {}s".format(quantity, var_name)},
+                cmap="RdBu_r", robust=robust, metric="correlation", rasterized=True, figsize=figsize)
             g.ax_heatmap.set_ylabel("Differential {}s (n = {})".format(var_name, groups.shape[0]))
             g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90, fontsize="xx-small")
             g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small")
@@ -1439,14 +1447,14 @@ def plot_differential(
         figsize = (max(5, 0.12 * fold_changes.shape[1]), 5)
 
         g = sns.clustermap(fold_changes.corr(),
-            xticklabels=False, cbar_kws={"label": "Pearson correlation\non fold-changes"},
+            xticklabels=False, yticklabels=True, cbar_kws={"label": "Pearson correlation\non fold-changes"},
             cmap="BuGn", vmin=0, vmax=1, metric="correlation", rasterized=True, figsize=(figsize[0], figsize[0]))
         g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small")
         g.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.groups.fold_changes.clustermap.corr.svg".format(var_name)), bbox_inches="tight", dpi=dpi, metric="correlation")
 
         g = sns.clustermap(fold_changes.loc[all_diff, :],
-            yticklabels=feature_labels, cbar_kws={"label": "Fold-change of\ndifferential {}s".format(var_name)},
-            cmap="RdBu_r", robust=True, metric="correlation", rasterized=True, figsize=figsize)
+            xticklabels=True, yticklabels=feature_labels, cbar_kws={"label": "Fold-change of\ndifferential {}s".format(var_name)},
+            cmap="RdBu_r", robust=robust, metric="correlation", rasterized=True, figsize=figsize)
         g.ax_heatmap.set_ylabel("Differential {}s (n = {})".format(var_name, fold_changes.loc[all_diff, :].shape[0]))
         g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90, fontsize="xx-small")
         g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small")
@@ -1458,19 +1466,21 @@ def plot_differential(
 
     matrix = matrix.loc[all_diff, :]
     figsize = (max(5, 0.12 * matrix.shape[1]), 5)
+    if group_wise_colours:
+        extra = {"col_colors": color_dataframe.values}
+    else:
+        extra = {}
 
     g = sns.clustermap(matrix.corr(),
         yticklabels=True, xticklabels=False,
         cbar_kws={"label": "Pearson correlation\non differential {}".format(var_name)},
-        cmap="BuGn", metric="correlation", figsize=(figsize[0], figsize[0]), rasterized=rasterized, robust=robust,
-        row_colors=color_dataframe.values)
+        cmap="BuGn", metric="correlation", figsize=(figsize[0], figsize[0]), rasterized=rasterized, robust=robust, **extra)
     g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small")
     g.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.samples.clustermap.corr.svg".format(var_name)), bbox_inches="tight", dpi=dpi)
 
     g = sns.clustermap(matrix,
         yticklabels=feature_labels, cbar_kws={"label": "{} of\ndifferential {}s".format(quantity, var_name)},
-        xticklabels=True, vmin=0, metric="correlation", figsize=figsize, rasterized=rasterized, robust=robust,
-        col_colors=color_dataframe.values)
+        xticklabels=True, vmin=0, metric="correlation", figsize=figsize, rasterized=rasterized, robust=robust, **extra)
     g.ax_heatmap.set_ylabel("Differential {}s (n = {})".format(var_name, matrix.shape[0]))
     g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90, fontsize="xx-small")
     g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small")
@@ -1478,8 +1488,7 @@ def plot_differential(
 
     g = sns.clustermap(matrix,
         yticklabels=feature_labels, z_score=0, cbar_kws={"label": "Z-score of {}\non differential {}s".format(quantity, var_name)},
-        xticklabels=True, cmap="RdBu_r", metric="correlation", figsize=figsize, rasterized=rasterized, robust=robust,
-        col_colors=color_dataframe.values)
+        xticklabels=True, cmap="RdBu_r", metric="correlation", figsize=figsize, rasterized=rasterized, robust=robust, **extra)
     g.ax_heatmap.set_ylabel("Differential {}s (n = {})".format(var_name, matrix.shape[0]))
     g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90, fontsize="xx-small")
     g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small")
@@ -1916,7 +1925,7 @@ def differential_enrichment(
                     # read/parse
                     meme_motifs = parse_ame(comparison_dir)
                     homer_motifs = parse_homer(os.path.join(comparison_dir, "homerResults"))
-                    lola = pd.read_csv(os.path.join(comparison_dir, "allEnrichments.txt"), sep="\t")
+                    lola = pd.read_csv(os.path.join(comparison_dir, "allEnrichments.tsv"), sep="\t")
                     enr = pd.read_csv(os.path.join(comparison_dir, output_prefix + "_regions.enrichr.csv"), index=False, encoding='utf-8')
                     # label
                     for d in [lola, enr, motifs]:
@@ -2036,7 +2045,7 @@ def collect_differential_enrichment(
 
                 # LOLA
                 try:
-                    lola = pd.read_csv(os.path.join(comparison_dir, "allEnrichments.txt"), sep="\t")
+                    lola = pd.read_csv(os.path.join(comparison_dir, "allEnrichments.tsv"), sep="\t")
                 except IOError as e:
                     if permissive:
                         print(error_msg.format("LOLA", comp, direction))

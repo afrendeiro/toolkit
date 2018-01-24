@@ -180,6 +180,8 @@ class ATACSeqAnalysis(Analysis):
         if "accessibility" in only_these_keys:
             file = os.path.join(self.results_dir, self.name + ".accessibility.annotated_metadata.csv")
             try:
+                # TODO: add configuration for custom number of header lines
+                # TODO: or think of smart way to infer
                 setattr(self, "accessibility", pd.read_csv(file, index_col=0, header=range(5)))
             except IOError as e:
                 if not permissive:
@@ -1380,7 +1382,7 @@ class ATACSeqAnalysis(Analysis):
             legends=False,
             always_legend=False,
             prettier_sample_names=True,
-            display_corr_values=True,
+            display_corr_values=False,
             rasterized=False,
             dpi=300,
             output_dir="{results_dir}/unsupervised"):
@@ -1900,7 +1902,7 @@ def characterize_regions_function(analysis, df, output_dir, prefix, universe_fil
 
     Additionally, some genome-specific databases are needed to run these programs.
     """
-    from ngs_toolkit.general import bed_to_fasta, meme_ame, homer_motifs, lola, enrichr, standard_scale
+    from ngs_toolkit.general import bed_to_fasta, meme_ame, homer_motifs, lola, enrichr, standard_score
 
     # use all sites as universe
     if universe_file is None:
@@ -1939,7 +1941,7 @@ def characterize_regions_function(analysis, df, output_dir, prefix, universe_fil
 
     # export gene symbols with scaled absolute fold change
     if "log2FoldChange" in df.columns:
-        df["score"] = standard_scale(abs(df["log2FoldChange"]))
+        df["score"] = standard_score(abs(df["log2FoldChange"]))
         df["abs_fc"] = abs(df["log2FoldChange"])
 
         d = df[['gene_name', 'score']].sort_values('score', ascending=False)

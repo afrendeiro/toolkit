@@ -1826,6 +1826,7 @@ def differential_enrichment(
     `run_mode`: one of "serial" or "job".
     """
     import pandas as pd
+    from tqdm import tqdm
 
     serial = not as_jobs
 
@@ -1848,7 +1849,8 @@ def differential_enrichment(
 
     # Examine each region cluster
     max_diff = max_diff
-    for comp in differential['comparison_name'].drop_duplicates():
+    comps = differential['comparison_name'].drop_duplicates()
+    for comp in tqdm(comps, total=len(comps)):
         
         if directional:
             # Separate in up/down-regulated genes
@@ -1975,6 +1977,7 @@ def collect_differential_enrichment(
     import pandas as pd
     import numpy as np
     from ngs_toolkit.general import parse_ame, parse_homer
+    from tqdm import tqdm
 
     if data_type not in ["ATAC-seq", "RNA-seq"]:
         raise AssertionError("`data_type` must match one of 'ATAC-seq' or 'RNA-seq'.")
@@ -1989,10 +1992,17 @@ def collect_differential_enrichment(
     homer_enr = pd.DataFrame()
     pathway_enr = pd.DataFrame()
     # Examine each region cluster
-    for comp in differential['comparison_name'].drop_duplicates():
+    comps = differential['comparison_name'].drop_duplicates()
+    for comp in tqdm(comps, total=len(comps)):
         if directional:
             # Separate in up/down-regulated genes
-            params = ["down", "up"]
+            params = list()
+            if differential[(differential['comparison_name'] == comp) & (differential['log2FoldChange'] > 0)].shape[0] > 0:
+                params.append('up')
+            if differential[(differential['comparison_name'] == comp) & (differential['log2FoldChange'] < 0)].shape[0] > 0:
+                params.append('down')
+            if len(params) == 0:
+                continue
         else:
             params = ["all"]
 

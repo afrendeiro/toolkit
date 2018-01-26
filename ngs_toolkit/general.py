@@ -206,6 +206,7 @@ def unsupervised_analysis(
         samples=None,
         attributes_to_plot=["sample_name"],
         plot_prefix=None,
+        test_pc_association=True,
         display_corr_values=False,
         plot_max_attr=20,
         plot_max_pcs=8,
@@ -254,6 +255,9 @@ def unsupervised_analysis(
 
     matrix = getattr(analysis, quant_matrix)
 
+    if type(matrix.columns) is not pd.core.indexes.multi.MultiIndex:
+        raise TypeError("Provided quantification matrix must have columns with MultiIndex.")
+
     if samples is None:
         samples = [s for s in analysis.samples if s.name in matrix.columns.get_level_values("sample_name")]
 
@@ -278,7 +282,7 @@ def unsupervised_analysis(
     # Pairwise correlations
     g = sns.clustermap(
         # yticklabels=sample_display_names,
-        X.astype(float).corr(), xticklabels=False, annot=display_corr_values,
+        X.astype(float).corr(), xticklabels=False, yticklabels=True, annot=display_corr_values,
         cmap="Spectral_r", figsize=(0.2 * X.shape[1], 0.2 * X.shape[1]), cbar_kws={"label": "Pearson correlation"}, row_colors=color_dataframe.values.tolist())
     g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize='xx-small')
     g.ax_heatmap.set_xlabel(None, visible=False)
@@ -422,12 +426,10 @@ def unsupervised_analysis(
     fig.savefig(os.path.join(output_dir, "{}.{}.pca.svg".format(
         analysis.name, plot_prefix)), bbox_inches="tight")
 
-    # Get PC1 loadings
-    # import math
-    # loadings = pd.Series(pca.components_[0, :], index=X.index).sort_values()
-    # loadings = pca.components_.T * math.sqrt(pca.explained_variance_)
+    # Test association of PCs with attributes
+    if not test_pc_association:
+        return
 
-    # # Test association of PCs with attributes
     associations = list()
     for pc in range(pcs):
         for attr in attributes_to_plot:
@@ -1221,7 +1223,7 @@ def plot_differential(
 
     # Extract significant based on p-value and fold-change
     if fold_change is not None:
-        fc = (abs(results[log_fold_change_column]) > fold_change)
+        fc = (results[log_fold_change_column].abs() > fold_change)
     else:
         fc = [True] * results.shape[0]
     if corrected_p_value:
@@ -1260,19 +1262,32 @@ def plot_differential(
 
     # Number of differential vars
     n_vars = float(matrix.shape[0])
-    total_diff = results.groupby([comparison_column])['diff'].sum().sort_values(ascending=False)
-    split_diff = results.groupby([comparison_column, "direction"])['diff'].sum().sort_values(ascending=False)
-    fig, axis = plt.subplots(2, 2, figsize=(4 * 2, 4* 2))
-    sns.barplot(total_diff.values, total_diff.index, orient="h", ax=axis[0, 0])
-    sns.barplot((total_diff.values / n_vars) * 100, total_diff.index, orient="h", ax=axis[0, 1])
-    sns.barplot(split_diff.values, split_diff.index, orient="h", ax=axis[1, 0])
-    sns.barplot((split_diff.values / n_vars) * 100, split_diff.index, orient="h", ax=axis[1, 1])
-    axis[0, 0].set_xlabel("N. diff")
-    axis[0, 1].set_xlabel("N. diff (% of total)")
-    axis[1, 0].set_xlabel("N. diff")
-    axis[1, 1].set_xlabel("N. diff (% of total)")
+    total_diff = results.groupby([comparison_column])['diff'].sum().sort_values(ascending=False).reset_index()
+    split_diff = results.groupby([comparison_column, "direction"])['diff'].sum().sort_values(ascending=False).reset_index()
+    split_diff.loc[split_diff['direction'] == 'down', "diff"] *= -1
+    split_diff['label'] = split_diff['comparison_name'] + ", " + split_diff['direction']
+    total_diff['diff_perc'] = (total_diff['diff'] / n_vars) * 100
+    split_diff['diff_perc'] = (split_diff['diff'] / n_vars) * 100
+
+    fig, axis = plt.subplots(3, 2, figsize=(4 * 2, 4 * 3))
+    sns.barplot(data=total_diff, x="diff", y="comparison_name", orient="h", ax=axis[0, 0])
+    sns.barplot(data=total_diff, x="diff_perc", y="comparison_name", orient="h", ax=axis[0, 1])
+    sns.barplot(data=split_diff, x="diff", y="label", orient="h", ax=axis[1, 0])
+    sns.barplot(data=split_diff, x="diff_perc", y="label", orient="h", ax=axis[1, 1])
+    sns.barplot(data=split_diff, x="diff", y="comparison_name", hue="direction", orient="h", ax=axis[2, 0])
+    sns.barplot(data=split_diff, x="diff_perc", y="comparison_name", hue="direction", orient="h", ax=axis[2, 1])
+    for ax in axis[:, 0]:
+        ax.set_xlabel("N. diff")
+    for ax in axis[:, 1]:
+        ax.set_xlabel("N. diff (% of total)")
+    for ax in axis[1:, :].flatten():
+        ax.axvline(0, linestyle="--", color="black", alpha=0.6)
+    m = split_diff['diff'].abs().max()
+    axis[2, 0].set_xlim((-m, m))
+    m = split_diff['diff_perc'].abs().max()
+    axis[2, 1].set_xlim((-m, m))
     sns.despine(fig)
-    fig.savefig(os.path.join(output_dir, output_prefix + ".number_differential.svg"), bbox_inches="tight")
+    fig.savefig(os.path.join(output_dir, output_prefix + "qq.number_differential.directional.svg"), bbox_inches="tight")
 
     # Pairwise scatter plots
     # TODO: add different shadings of red for various levels of significance

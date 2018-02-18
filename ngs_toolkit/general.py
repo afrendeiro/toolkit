@@ -28,7 +28,32 @@ def pickle_me(function):
 
 class Analysis(object):
     """
-    Class to hold functions and data from analysis.
+    Generic class holding functions and data from a typical NGS analysis.
+
+    Other modules implement classes inheriting from this that in general contain data type-specific
+    functions (e.g. `ngs_toolkit.atacseq.ATACSeqAnalysis` has a `get_consensus_sites` function to genrate a peak consensus map).
+
+    Objects of this type can be used to store data (e.g. dataframes), variables (e.g. paths to files or configurations) and are
+    easily serializable (saved to a file as an object) for rapid loading and cross-environment portability.
+    See the `ngs_toolkit.general.Analysis.to_pickle`, `ngs_toolkit.general.Analysis.from_pickle` and `ngs_toolkit.general.Analysis.update` functions for this.
+
+    :param name: Name of the analysis. Defaults to "analysis".
+    :type name: str, optional
+    :param samples: List of `looper.models.Sample` objects that this analysi is tied to. Defaults to None.
+    :type samples: list, optional
+    :param prj: A `looper.models.Project` object that this analysis is tied to. Defaults to None.
+    :type prj: looper.models.Project, optional
+    :param data_dir: Directory containing processed data that will be input to the analysis.
+                     This is in principle not required. Defaults to "data".
+    :type data_dir: str, optional
+    :param results_dir: Directory to contain outputs produced by the analysis. Defaults to "results".
+    :type results_dir: str, optional
+    :param pickle_file: A pickle file to serialize the object. Defaults to "`name`.pickle".
+    :type pickle_file: str, optional
+    :param from_pickle: Whether the analysis should be loaded from an existing serialized analysis object in `pickle_file`. Defaults to False.
+    :type from_pickle: bool, optional
+
+    Additional keyword arguments will simply be stored as object attributes.
     """
     def __init__(
             self,
@@ -70,28 +95,66 @@ class Analysis(object):
 
     @pickle_me
     def to_pickle(self):
+        """
+        Serialize object (i.e. save to disk).
+        """
         pass
 
-    def from_pickle(self):
-        import cPickle as pickle
-        return pickle.load(open(self.pickle_file, 'rb'))
+    def from_pickle(self, pickle_file=None):
+        """
+        Load object from pickle file.
 
-    def update(self):
-        self.__dict__.update(self.from_pickle().__dict__)
+        :param pickle_file: Pickle file to load. By default this is the object's attribute `pickle_file`.
+        :type pickle_file: str, optional
+        """
+        import cPickle as pickle
+        if pickle_file is None:
+            pickle_file = self.pickle_file
+        return pickle.load(open(pickle_file, 'rb'))
+
+    def update(self, pickle_file=None):
+        """
+        Update all of the object's attributes with the attributes from a serialized object (i.e. object stored in a file) object.
+
+        :param pickle_file: Pickle file to load. By default this is the object's attribute `pickle_file`.
+        :type pickle_file: str, optional
+        """
+        self.__dict__.update(self.from_pickle(pickle_file=pickle_file).__dict__)
 
     def get_level_colors(
-            self, matrix="accessibility", index=None, levels=None,
+            self, index=None, matrix="accessibility", levels=None,
             pallete="Paired", cmap="RdBu_r", nan_color=(0.662745, 0.662745, 0.662745, 0.5),
+            # TODO: implement dataframe return
             as_dataframe=False):
         """
         Get tuples of floats representing a colour for a sample in a given variable in a dataframe's index
         (particularly useful with MultiIndex dataframes).
 
-        By default, will act on the columns and it's levels of an `matrix` dataframe of self. Other `index` and `levels` can
+        By default, will act on the columns and its levels of an `matrix` dataframe of self. Other `index` and `levels` can
         be passed for customization.
 
         Will try to guess if each variable is categorical or numerical and return either colours from a colour `pallete`
         or a `cmap`, respectively with null values set to `nan_color` (a 4-value tuple with floats).
+
+        :param index: Pandas Index to use. If not provided (default == None), this will be the column Index of the provided `matrix`.
+        :type index: pandas.Index, optional
+        :param matrix: Name of analysis attribute containing a dataframe with pandas.MultiIndex columns to use.
+                       Defaults to "accessibility".
+        :type matrix: str, optional
+        :param levels: Levels of multiindex to restrict to. Defaults to all in index.
+        :type levels: list, optional
+        :param pallete: Name of matplotlib color palete to use with categorical levels.
+                        See matplotlib.org/examples/color/colormaps_reference.html. Defaults to "Paired".
+        :type pallete: str, optional
+        :param cmap: Name of matplotlib color palete to use with numerical levels.
+                     See matplotlib.org/examples/color/colormaps_reference.html. Defaults to "RdBu_r".
+        :type cmap: str, optional
+        :param nan_color: Color for missing (i.e. NA) values. Defaults to (0.662745, 0.662745, 0.662745, 0.5) == grey.
+        :type nan_color: tuple, optional
+        :param as_dataframe: Whether a dataframe should be return. Defaults to False. Not implemented yet.
+        :type as_dataframe: bool, optional
+        :returns: List of list tuples (matrix) of shape (level, sample) with rgb values of each of the variable.
+        :rtype: {list}
         """
         import numpy as np
         import matplotlib
@@ -115,6 +178,7 @@ class Analysis(object):
         colors = list()
         for level in index.levels:
             # determine the type of data in each level
+            # TODO: check this works in all cases
             most_common = Counter([type(x) for x in level]).most_common()[0][0]
             print(level.name, most_common)
 
@@ -148,8 +212,15 @@ class Analysis(object):
 
 def count_reads_in_intervals(bam, intervals):
     """
-    Counts total number of reads in a iterable holding strings
+    Count total number of reads in a iterable holding strings
     representing genomic intervals of the type chrom:start-end.
+
+    :param bam: BAM file.
+    :type bam: str
+    :param intervals: List of strings with genomic coordinates in format "chrom:start-end".
+    :type intervals: list
+    :returns: Dict of read counts for each interval.
+    :rtype: dict
     """
     import pysam
     counts = dict()
@@ -168,13 +239,22 @@ def count_reads_in_intervals(bam, intervals):
 
 
 def normalize_quantiles_r(array):
-    import numpy as np
+    """
+    Quantile normalization with a R implementation.
+    Requires the "rpy2" library and the R library "preprocessCore".
 
+    Install in following way:
     # install package
     # R
     # source('http://bioconductor.org/biocLite.R')
     # biocLite('preprocessCore')
 
+    :param array: Numeric array to normalize.
+    :type array: numpy.array
+    :returns: Normalized numeric array.
+    :rtype: numpy.array
+    """
+    import numpy as np
     import rpy2.robjects as robjects
     import rpy2.robjects.numpy2ri
     rpy2.robjects.numpy2ri.activate()
@@ -185,13 +265,23 @@ def normalize_quantiles_r(array):
 
 
 def normalize_quantiles_p(df_input):
+    """
+    Quantile normalization with a ure Python implementation.
+    Code from https://github.com/ShawnLYU/Quantile_Normalize.
+    Not fully reviewed, use at own risk!
+
+    :param df_input: Dataframe to normalize.
+    :type df_input: pandas.DataFrame
+    :returns: Normalized numeric array.
+    :rtype: numpy.array
+    """
     df = df_input.copy()
     # compute rank
     dic = {}
     for col in df:
-        dic.update({col : sorted(df[col])})
+        dic.update({col: sorted(df[col])})
     sorted_df = pd.DataFrame(dic)
-    rank = sorted_df.mean(axis = 1).tolist()
+    rank = sorted_df.mean(axis=1).tolist()
     # sort
     for col in df:
         t = np.searchsorted(np.sort(df[col]), df[col])
@@ -204,7 +294,7 @@ def unsupervised_analysis(
         data_type="ATAC-seq",
         quant_matrix=None,
         samples=None,
-        attributes_to_plot=["sample_name"],
+        attributes_to_plot=["cell_type"],
         plot_prefix=None,
         test_pc_association=True,
         display_corr_values=False,
@@ -220,10 +310,53 @@ def unsupervised_analysis(
         dpi=300,
         output_dir="{results_dir}/unsupervised"):
     """
-    Apply unsupervised clustering (clustering of correlations) and dimentionality reduction methods (MDS, PCA) on matrix.
-    Colours and labels samples by attributes in `attributes_to_plot`.
+    Apply unsupervised clustering and dimensionality reduction methods (MDS, PCA) on numeric matrix.
+    Colours and labels samples by their attributes as given in `attributes_to_plot`.
 
-    Plots will be prefixed with `plot_prefix`.
+    :param analysis: Analysis object to perform analysis for.
+    :type analysis: ngs_toolkit.general.Analysis
+    :param data_type: Data type. One of "ATAC-seq" or "RNA-seq". Defaults to "ATAC-seq".
+    :type data_type: str, optional
+    :param quant_matrix: Name of analysis attribute contatining the numeric dataframe to perform analysis on.
+                         Defaults to "accessibility" if data_type is ATAC-seq and "expression_annotated" if data_type is RNA-seq.
+                         This matrix should have a pandas.MultiIndex as column index.
+    :type quant_matrix: str, optional
+    :param samples: List of sample objects to restrict analysis to. Defaults to None.
+    :type samples: list, optional
+    :param attributes_to_plot: List of attributes shared between sample groups should be plotted. Defaults to ["cell_type"].
+    :type attributes_to_plot: list, optional
+    :param plot_prefix: Prefix for output files.
+                        Defaults to "all_sites" if data_type is ATAC-seq and "all_genes" if data_type is RNA-seq.
+    :type plot_prefix: str, optional
+    :param test_pc_association: Whether a test of association of principal components and variables in `attributes_to_plot` should be conducted. Defaults to True.
+    :type test_pc_association: bool, optional
+    :param display_corr_values: Whether values in heatmap of sample correlations should be displayed overlaid on top of colours. Defaults to False.
+    :type display_corr_values: bool, optional
+    :param plot_max_attr: Maximum number of sample attributes to plot for each factor in plot legend. Defaults to 20.
+    :type plot_max_attr: int, optional
+    :param plot_max_pcs: Maximum number of principal components to plot. This only affects plotting. All PCs will be calculated. Defaults to 8.
+    :type plot_max_pcs: number, optional
+    :param plot_group_centroids: Whether centroids of each sample group should be plotted alongside samples. Will be square shaped. Defaults to True.
+    :type plot_group_centroids: bool, optional
+    :param axis_ticklabels: Whether MDS and PCA axis ticks and ticklabels should be plotted. Defaults to False.
+    :type axis_ticklabels: bool, optional
+    :param axis_lines: Whether (0, 0) dashed lines should be plotted in MDS and PCA. Defaults to True.
+    :type axis_lines: bool, optional
+    :param legends: Whether legends for group colours should be plotted in MDS and PCA. Defaults to False.
+    :type legends: bool, optional
+    :param always_legend: Whether legends for group colours should be plotted in every figure panel in MDS and PCA.
+                          If False, will plot just on first/last figure panel. Defaults to False.
+    :type always_legend: bool, optional
+    :param prettier_sample_names: Whether it should attempt to prettify sample names by removing the data type from plots. Defaults to True.
+    :type prettier_sample_names: bool, optional
+    :param rasterized: Whether elements with many objects should be rasterized. Defaults to False.
+    :type rasterized: bool, optional
+    :param dpi: Definition of rasterized image in dots per inch. Defaults to 300dpi.
+    :type dpi: number, optional
+    :param output_dir: Directory for generated files and plots. Defaults to "{results_dir}/unsupervised".
+    :type output_dir: str, optional
+
+    :returns: None
     """
     from sklearn.decomposition import PCA
     from sklearn.manifold import MDS
@@ -349,6 +482,7 @@ def unsupervised_analysis(
     fig.savefig(os.path.join(output_dir, "{}.{}.mds.svg".format(analysis.name, plot_prefix)), bbox_inches='tight', dpi=dpi)
 
     # PCA
+    # TODO: Restrict PCA analysis to plot_max_pcs.
     pca = PCA()
     x_new = pca.fit_transform(X.T)
     # transform again

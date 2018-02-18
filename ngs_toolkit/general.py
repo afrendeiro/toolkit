@@ -365,6 +365,11 @@ def unsupervised_analysis(
     sns.despine(fig)
     fig.savefig(os.path.join(output_dir, "{}.{}.pca.explained_variance.svg".format(analysis.name, plot_prefix)), bbox_inches='tight', dpi=dpi)
 
+    # Write % variance expained to disk
+    pd.Series((pca.explained_variance_ / pca.explained_variance_.sum()) * 100, name="PC").to_csv(
+        os.path.join(output_dir, "{}.{}.pca.explained_variance.csv".format(
+            analysis.name, plot_prefix)))
+
     # plot pca
     pcs = min(xx.shape[0] - 1, plot_max_pcs)
     fig, axis = plt.subplots(pcs, len(attributes_to_plot), figsize=(
@@ -854,11 +859,43 @@ def differential_analysis(
         output_dir="results/differential_analysis_{data_type}",
         output_prefix="differential_analysis",
         alpha=0.05,
-        overwrite=True):
+        overwrite=True,
+        distributed=False):
     """
     Perform differential regions/genes across samples that are associated with a certain trait.
+    Currently the only implementation is with DESeq2.
+    This implies the rpy2 library and the respective R library are installed.
 
-    `comparison_table` is a dataframe with 'comparison_name', 'comparison_side' and 'sample_name', 'sample_group' columns.
+    For other implementations of differential analysis see `ngs_toolkit.general.least_squares_fit`
+    and `ngs_toolkit.general.differential_from_bivariate_fit`.
+
+    :param analysis: A ngs_toolkit Analysis object.
+    :type analysis: ngs_toolkit.general.Analysis
+    :param comparison_table: A dataframe with 'comparison_name', 'comparison_side' and 'sample_name', 'sample_group' columns.
+    :type comparison_table: pandas.DataFrame
+    :param data_type: Type of data under analysis. One of "ATAC-seq" or "RNA-seq". Defaults to "ATAC-seq".
+    :type data_type: str, optional
+    :param samples: Samples to limit analysis to. If None, defaults to all samples in analysis object.
+    :type samples: list, optional
+    :param covariates: Additional variables to take into account in the model fitting. Defaults to None.
+    :type covariates: list, optional
+    :param output_dir: Output directory for analysis. Defaults to "results/differential_analysis_{data_type}".
+                       If containing "{data_type}", will format string with variable.
+    :type output_dir: str, optional
+    :param output_prefix: Prefix for output files. Defaults to "differential_analysis".
+    :type output_prefix: str, optional
+    :param alpha: Significance level to use in diferential analysis.
+                  Results for all features will be returned nonetheless. Defaults to 0.05.
+    :type alpha: float, optional
+    :param overwrite: Whether results should be overwritten in case they already exist. Defaults to True.
+    :type overwrite: bool, optional
+    :param distributed: Whether analysis should be distributed in a computing cluster for each comparison.
+                        Currently, only a SLURM implementation is available.
+                        If `True`, will not return results. Defaults to False.
+    :type distributed: bool, optional
+
+    :returns pandas.DataFrame: DataFrame with analysis results for all comparisons.
+                               Will be `None` if `distributed` is `True`.
     """
     # Check comparisons
     # check comparison table has required columns
@@ -893,10 +930,9 @@ def differential_analysis(
 
     if samples is None:
         samples = analysis.samples
-    samples = [s for s in samples if 
-        (s.name in comparison_table['sample_name'].tolist()) &
-        (s.name in count_matrix.columns)
-    ]
+    samples = [s for s in samples if
+               (s.name in comparison_table['sample_name'].tolist()) &
+               (s.name in count_matrix.columns)]
     count_matrix = count_matrix[[s.name for s in samples]]
 
     # Get experiment matrix
@@ -908,7 +944,7 @@ def differential_analysis(
             raise AssertionError("Not all of the specified covariate variables are in the selected samples.")
         if sample_table[covariates].isnull().any().any():
             raise AssertionError("None of the selected samples can have a Null value in the specified covariate variables.")
-    
+
         # add covariates to comparison table
         comparison_table = comparison_table.set_index("sample_name").join(sample_table.set_index("sample_name")[covariates]).reset_index()
 
@@ -921,11 +957,52 @@ def differential_analysis(
     formula = "~ {}sample_group".format(" + ".join(covariates) + " + " if covariates is not None else "")
 
     # Run DESeq2 analysis
-    results = deseq_analysis(
-        count_matrix, experiment_matrix, comparison_table,
-        formula, output_dir, output_prefix, alpha=alpha, overwrite=overwrite)
+    if not distributed:
+        results = deseq_analysis(
+            count_matrix, experiment_matrix, comparison_table,
+            formula, output_dir, output_prefix, alpha=alpha, overwrite=overwrite)
+        return results
 
-    return results
+    else:
+        from pypiper.ngstk import NGSTk
+        import textwrap
+        tk = NGSTk()
+        for comparison_name in comparison_table['comparison_name'].drop_duplicates():
+            # make directory for comparison input/output
+            out = os.path.join(os.path.abspath(output_dir), comparison_name)
+            if not os.path.exists(out):
+                os.makedirs(out)
+
+            comp = comparison_table[comparison_table['comparison_name'] == comparison_name]
+            comp.to_csv(os.path.join(out, "comparison_table.csv"), index=False)
+
+            exp = experiment_matrix[experiment_matrix['sample_name'].isin(comp['sample_name'].tolist())]
+            exp.to_csv(os.path.join(out, "experiment_matrix.csv"), index=False)
+
+            count = count_matrix[comp['sample_name'].drop_duplicates()]
+            count.to_csv(os.path.join(out, "count_matrix.csv"), index=True)
+
+            job_name = "deseq_job.{}".format(comparison_name)
+            log_file = os.path.join(out, job_name + ".log")
+            job_file = os.path.join(out, job_name + ".sh")
+
+            cmd = tk.slurm_header(
+                job_name=job_name, output=log_file,
+                cpus_per_task=2, mem_per_cpu=8000)
+            # TODO: add DESeq2 script to toolkit and make path configurable
+            cmd += "python ~/deseq_parallel.py"
+            cmd += " --output_prefix {}".format(output_prefix)
+            cmd += " --formula '{}'".format(formula)
+            cmd += " --alpha {}".format(alpha)
+            if overwrite:
+                cmd += " --overwrite"
+            cmd += "  {}\n".format(out)
+            cmd += tk.slurm_footer()
+
+            with open(job_file, "w") as handle:
+                handle.write(textwrap.dedent(cmd))
+
+            tk.slurm_submit_job(job_file)
 
 
 def differential_overlap(
@@ -1006,6 +1083,7 @@ def differential_overlap(
     intersections = pd.read_csv(os.path.join(output_dir, output_prefix + ".differential_overlap.csv"))
 
     for metric, label, description, fill_value in [
+            ("intersection", "intersection", "total in intersection", 0),
             ("intersection_max_perc", "percentage_overlap", "max of intersection %", 0),
             ("log_p_value", "significance", "p-value", 0)]:
         print(metric)
@@ -1016,6 +1094,9 @@ def differential_overlap(
         piv_down = pd.pivot_table(
             intersections[(intersections['dir1'] == "down") & (intersections['dir2'] == "down")],
             index="group1", columns="group2", values=metric).fillna(fill_value)
+        if metric == "intersection":
+            piv_up = np.log10(1 + piv_up)
+            piv_down = np.log10(1 + piv_down)
         np.fill_diagonal(piv_up.values, np.nan)
         np.fill_diagonal(piv_down.values, np.nan)
 
@@ -1024,7 +1105,7 @@ def differential_overlap(
             extra = {"vmin": 0, "vmax": 100}
         else:
             extra = {}
-        fig, axis = plt.subplots(1, 2, figsize=(8 * 2, 8))
+        fig, axis = plt.subplots(1, 2, figsize=(8 * 2, 8), subplot_kw={"aspect": 'equal'})
         sns.heatmap(piv_down, square=True, cmap="Blues", cbar_kws={"label": "Concordant {}s ({})".format(unit, description)}, ax=axis[0], **extra)
         sns.heatmap(piv_up, square=True, cmap="Reds", cbar_kws={"label": "Concordant {}s ({})".format(unit, description)}, ax=axis[1], **extra)
         axis[0].set_title("Downregulated {}s".format(unit))
@@ -1040,6 +1121,8 @@ def differential_overlap(
         piv_combined = pd.DataFrame(np.triu(piv_up), index=piv_up.index, columns=piv_up.columns).replace(0, np.nan)
         piv_combined.update(pd.DataFrame(np.tril(-piv_down), index=piv_down.index, columns=piv_down.columns).replace(0, np.nan))
         piv_combined = piv_combined.fillna(fill_value)
+        if metric == "intersection":
+            piv_combined = np.log10(1 + piv_combined)
         np.fill_diagonal(piv_combined.values, np.nan)
 
         if metric == "intersection_max_perc":
@@ -1080,8 +1163,8 @@ def differential_overlap(
             sns.despine(fig)
             fig.savefig(os.path.join(output_dir, output_prefix + ".differential_overlap.{}.agreement.rank.svg".format(label)), bbox_inches="tight")
 
-
-        # Observe disagreement between knockouts
+        
+        # Observe disagreement
         # (overlap of down-regulated with up-regulated and vice-versa)
         piv_up = pd.pivot_table(
             intersections[(intersections['dir1'] == "up") & (intersections['dir2'] == "down")],
@@ -1091,9 +1174,11 @@ def differential_overlap(
             index="group1", columns="group2", values=metric)
 
         piv_disagree = pd.concat([piv_up, piv_down]).groupby(level=0).max()
+        if metric == "intersection":
+            piv_disagree = np.log10(1 + piv_disagree)
         np.fill_diagonal(piv_disagree.values, np.nan)
 
-        fig, axis = plt.subplots(1, 2, figsize=(16, 8))
+        fig, axis = plt.subplots(1, 2, figsize=(16, 8), subplot_kw={"aspect": 'equal'})
         sns.heatmap(piv_disagree, square=True, cmap="Greens", cbar_kws={"label": "Discordant {}s ({})".format(unit, description)}, ax=axis[0])
         # sns.heatmap(np.log2(1 + piv_disagree), square=True, cmap="Greens", cbar_kws={"label": "Discordant {}s (log2)".format(unit)}, ax=axis[1][0])
 
@@ -1123,7 +1208,7 @@ def differential_overlap(
             r = r.iloc[range(0, r.shape[0], 2)]
             r['rank'] = r['disagreement'].rank(ascending=False)
 
-            fig, axis = plt.subplots(1, 2, figsize=(2 * 4, 4))
+            fig, axis = plt.subplots(1, 2, figsize=(2 * 4, 4), subplot_kw={"aspect": 'equal'})
             axis[0].scatter(r['rank'], r['disagreement'])
             axis[1].scatter(r['rank'].tail(10), r['disagreement'].tail(10))
             for i, row in r.tail(10).iterrows():
@@ -1287,7 +1372,7 @@ def plot_differential(
     m = split_diff['diff_perc'].abs().max()
     axis[2, 1].set_xlim((-m, m))
     sns.despine(fig)
-    fig.savefig(os.path.join(output_dir, output_prefix + "qq.number_differential.directional.svg"), bbox_inches="tight")
+    fig.savefig(os.path.join(output_dir, output_prefix + ".number_differential.directional.svg"), bbox_inches="tight")
 
     # Pairwise scatter plots
     # TODO: add different shadings of red for various levels of significance
@@ -1479,32 +1564,32 @@ def plot_differential(
     if type(matrix.columns) is pd.core.indexes.multi.MultiIndex:
         matrix.columns = matrix.columns.get_level_values("sample_name")
 
-    matrix = matrix.loc[all_diff, :]
-    figsize = (max(5, 0.12 * matrix.shape[1]), 5)
+    matrix2 = matrix.loc[all_diff, :]
+    figsize = (max(5, 0.12 * matrix2.shape[1]), 5)
     if group_wise_colours:
         extra = {"col_colors": color_dataframe.values}
     else:
         extra = {}
 
-    g = sns.clustermap(matrix.corr(),
+    g = sns.clustermap(matrix2.corr(),
         yticklabels=True, xticklabels=False,
         cbar_kws={"label": "Pearson correlation\non differential {}".format(var_name)},
         cmap="BuGn", metric="correlation", figsize=(figsize[0], figsize[0]), rasterized=rasterized, robust=robust, **extra)
     g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small")
     g.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.samples.clustermap.corr.svg".format(var_name)), bbox_inches="tight", dpi=dpi)
 
-    g = sns.clustermap(matrix,
+    g = sns.clustermap(matrix2,
         yticklabels=feature_labels, cbar_kws={"label": "{} of\ndifferential {}s".format(quantity, var_name)},
-        xticklabels=True, vmin=0, metric="correlation", figsize=figsize, rasterized=rasterized, robust=robust, **extra)
-    g.ax_heatmap.set_ylabel("Differential {}s (n = {})".format(var_name, matrix.shape[0]))
+        xticklabels=True, vmin=0, cmap="RdBu_r", metric="correlation", figsize=figsize, rasterized=rasterized, robust=robust, **extra)
+    g.ax_heatmap.set_ylabel("Differential {}s (n = {})".format(var_name, matrix2.shape[0]))
     g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90, fontsize="xx-small")
     g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small")
     g.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.samples.clustermap.svg".format(var_name)), bbox_inches="tight", dpi=dpi)
 
-    g = sns.clustermap(matrix,
+    g = sns.clustermap(matrix2,
         yticklabels=feature_labels, z_score=0, cbar_kws={"label": "Z-score of {}\non differential {}s".format(quantity, var_name)},
         xticklabels=True, cmap="RdBu_r", metric="correlation", figsize=figsize, rasterized=rasterized, robust=robust, **extra)
-    g.ax_heatmap.set_ylabel("Differential {}s (n = {})".format(var_name, matrix.shape[0]))
+    g.ax_heatmap.set_ylabel("Differential {}s (n = {})".format(var_name, matrix2.shape[0]))
     g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90, fontsize="xx-small")
     g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small")
     g.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.samples.clustermap.z0.svg".format(var_name)), bbox_inches="tight", dpi=dpi)
@@ -2223,7 +2308,7 @@ def plot_differential_enrichment(
             g = sns.clustermap(
                 lola_pivot.loc[top_terms, :], figsize=(max(6, 0.12 * shape[1]), max(6, 0.12 * shape[0])),
                 xticklabels=True, yticklabels=True,
-                z_score=z_score, cbar_kws={"label": "{} Z-score of enrichment\nof differential regions".format(z_score_label)}, metric="correlation")
+                cmap="RdBu_r", center=0, z_score=z_score, cbar_kws={"label": "{} Z-score of enrichment\nof differential regions".format(z_score_label)}, metric="correlation")
             g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90, ha="right", fontsize="xx-small")
             g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small")
             g.fig.savefig(os.path.join(output_dir, output_prefix + ".lola.cluster_specific.{}_z_score.svg".format(z_score_label)), bbox_inches="tight", dpi=300)
@@ -2285,7 +2370,7 @@ def plot_differential_enrichment(
             g = sns.clustermap(
                 motifs_pivot.loc[:, top_terms].T, figsize=(max(6, 0.12 * shape[0]), max(6, 0.12 * shape[1])),
                 xticklabels=True, yticklabels=True,
-                z_score=z_score, cbar_kws={"label":  "{} Z-score of enrichment\nof differential regions".format(z_score_label)}, metric="correlation")
+                cmap="RdBu_r", center=0, z_score=z_score, cbar_kws={"label":  "{} Z-score of enrichment\nof differential regions".format(z_score_label)}, metric="correlation")
             g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90, ha="right", fontsize="xx-small")
             g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small")
             g.fig.savefig(os.path.join(output_dir, output_prefix + ".motifs.cluster_specific.{}_z_score.svg".format(z_score_label)), bbox_inches="tight", dpi=300)
@@ -2362,7 +2447,7 @@ def plot_differential_enrichment(
                 g = sns.clustermap(
                     enrichr_pivot[list(set(top_terms))].T, figsize=(max(6, 0.12 * shape[0]), max(6, 0.12 * shape[1])),
                     xticklabels=True, yticklabels=True,
-                    z_score=z_score, cbar_kws={"label":  "{} Z-score of enrichment\nof differential regions".format(z_score_label)}, metric="correlation")
+                    cmap="RdBu_r", center=0, z_score=z_score, cbar_kws={"label":  "{} Z-score of enrichment\nof differential regions".format(z_score_label)}, metric="correlation")
                 g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90, ha="right", fontsize="xx-small")
                 g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small")
                 g.fig.savefig(os.path.join(output_dir, output_prefix + ".enrichr.{}.cluster_specific.{}_z_score.svg".format(gene_set_library, z_score_label)), bbox_inches="tight", dpi=300)
@@ -2440,7 +2525,7 @@ def plot_differential_enrichment(
                 g = sns.clustermap(
                     great_pivot[list(set(top_terms))].T, figsize=(max(6, 0.12 * shape[0]), max(6, 0.12 * shape[1])),
                     xticklabels=True, yticklabels=True,
-                    z_score=z_score, cbar_kws={"label":  "{} Z-score of enrichment\nof differential regions".format(z_score_label)}, metric="correlation")
+                    cmap="RdBu_r", center=0, z_score=z_score, cbar_kws={"label":  "{} Z-score of enrichment\nof differential regions".format(z_score_label)}, metric="correlation")
                 g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90, ha="right", fontsize="xx-small")
                 g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small")
                 g.fig.savefig(os.path.join(output_dir, output_prefix + ".great.{}.cluster_specific.{}_z_score.svg".format(gene_set_library, z_score_label)), bbox_inches="tight", dpi=300)
@@ -2999,4 +3084,3 @@ def subtract_principal_component_by_attribute(df, pc=1, attributes=["CLL"]):
         if X2.loc[sample, :].isnull().all():
             X2.loc[sample, :] = df.loc[sample, :]
     return X2
-

@@ -3183,6 +3183,82 @@ def project_to_geo(
     return annot
 
 
+def rename_sample_files(
+        annotation_mapping,
+        old_sample_name_column="old_sample_name",
+        new_sample_name_column="new_sample_name",
+        tmp_prefix="rename_sample_files",
+        results_dir="results_pipeline",
+        dry_run=False):
+    """
+    Rename existing directories with pipeline outputs for samples based on mapping of
+    old/new sample names.
+    All files within the directory with the old sample name will be renamed recursively.
+    Old and new sample names can overlap - this procedure will handle these cases correctly
+    by assigning temporay sample names with prefix `prefix`.
+
+    :param annotation_mapping: DataFrame with mapping of
+    old (column "previous_sample_name") vs new ("new_sample_name") sample names.
+    :type annotation_mapping: pandas.DataFrame
+    :param old_sample_name_column: Name of column with old sample names.
+                        Defaults to "old_sample_name"
+    :type old_sample_name_column: str, optional
+    :param new_sample_name_column: Name of column with new sample names.
+                        Defaults to "new_sample_name"
+    :type new_sample_name_column: str, optional
+    :param tmp_prefix: Prefix for temporary files to avoid overlap between old and new names.
+                        Defaults to "rename_sample_files"
+    :type tmp_prefix: str, optional
+    :param results_dir: Pipeline output directory containing sample output directories.
+                        Defaults to "results_pipeline"
+    :type results_dir: str, optional
+    :param dry_run: Whether to print commands instead of running them. Defaults to False
+    :type dry_run: bool, optional
+
+    :returns: None
+    """
+    cmds = list()
+    # 1) move to tmp name
+    for i, series in annotation_mapping.iterrows():
+        o = series[old_sample_name_column]
+        t = "{}-{}".format(tmp_prefix, i)
+        cmds.append("# Moving old sample '{}' to '{}'.".format(
+            o, t))
+
+        # directory
+        cmds.append("mv {} {}".format(
+            os.path.join(results_dir, o), os.path.join(results_dir, t)))
+        # further directories
+        cmds.append("find {} -type d -exec rename {} {} {{}} \;".format(
+            os.path.join(results_dir, t), o, t))
+        # files
+        cmds.append("find {} -type f -exec rename {} {} {{}} \;".format(
+            os.path.join(results_dir, t), o, t))
+
+    # 2) move to new name
+    for i, series in annotation_mapping.iterrows():
+        t = "{}-{}".format(tmp_prefix, i)
+        n = series[new_sample_name_column]
+        cmds.append("# Moving old sample '{}' to '{}'.".format(
+            t, n))
+
+        # directory
+        cmds.append("mv {} {}".format(
+            os.path.join(results_dir, t), os.path.join(results_dir, n)))
+        # further directories
+        cmds.append("find {} -type d -exec rename {} {} {{}} \;".format(
+            os.path.join(results_dir, t), t, n))
+        # files
+        cmds.append("find {} -type f -exec rename {} {} {{}} \;".format(
+            os.path.join(results_dir, t), t, n))
+
+    if dry_run:
+        print("\n".join(cmds))
+    else:
+        for i, cmd in enumerate(cmds):
+            os.system(cmd)
+
+
 def query_biomart(
         attributes=["ensembl_gene_id", "external_gene_name", "hgnc_id", "hgnc_symbol"],
         species="hsapiens", ensembl_version="grch37"):

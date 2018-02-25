@@ -3065,58 +3065,122 @@ def series_matrix2csv(matrix_url, prefix=None):
     return prj, samples
 
 
-def project_to_geo(project, output_dir=None, samples=None, as_jobs=False):
+def project_to_geo(
+        project, output_dir="geo_submission",
+        samples=None, distributed=False, dry_run=False):
     """
     Prepare raw sequencing files for submission to GEO.
+    Files will be copied or generated in a new directory `output_dir`.
+    It will get the raw BAM file(s) of each sample, and in case of ATAC-seq/ChIP-seq samples,
+    the bigWig and peak files. If multiple BAM files exist for each sample, all will be copied and sequencially named with the "file\d" suffix,
+    where "\d" is the file number.
+    For each copied file a md5sum will be calculated.
+    A pandas DataFrame with info on the sample's files and md5sums will be returned.
 
-    It will get raw BAM files, calculate md5 sums.
+    :param project: A looper Project object to process.
+    :type project: looper.models.Project
+    :param output_dir: Directory to create output. Will be created/overwriten if existing.
+                       Defaults to "geo_submission".
+    :type output_dir: str, optional
+    :param samples: List of looper.models.Sample objects in project to restrict to. Defaults to all samples in project.
+    :type samples: list, optional
+    :param distributed: Whether processing should be distributed as jobs in a computing cluster for each sample.
+                        Currently available implementation supports a SLURM cluster only. Defaults to False.
+    :type distributed: bool, optional
+    :param dry_run: Whether copy/execution/submisison commands should be not be run to test.
+    :type dry_run: bool, optional
+    :returns: pandas.DataFrame with annotation of samples and their BAM, BigWig, narrowPeak files and respective md5sums.
     """
-    if output_dir is None:
-        output_dir = os.path.join("geo_submission")
+    output_dir = os.path.abspath(output_dir)
     if samples is None:
         samples = project.samples
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
     cmds = list()
+    annot = pd.DataFrame()
     for sample in samples:
-        various = len(s.data_path.split(" ")) > 1
+        various = len(sample.data_path.split(" ")) > 1
+        cmd = ""
         for i, file in enumerate(sample.data_path.split(" ")):
             suffix = ".file{}".format(i) if various else ""
             # Copy raw file
-            cmd = "cp {} {}; ".format(file, os.path.join(output_dir, sample.name + "{}.bam".format(suffix)))
+            bam_file = os.path.join(output_dir, sample.name + "{}.bam".format(suffix))
+            cmd += "cp {} {}; ".format(file, bam_file)
+            annot.loc[sample.name, "bam_file{}".format(i)] = bam_file
 
             # Copy or generate md5sum
+            md5_file = os.path.join(output_dir, sample.name + "{}.bam.md5".format(suffix))
             if os.path.exists(file + ".md5"):
-                cmd += "cp {} {}".format(file + ".md5", os.path.join(output_dir, sample.name + "{}.bam.md5".format(suffix)))
+                cmd += "cp {} {}; ".format(file + ".md5", md5_file)
             else:
                 b = os.path.basename(file)
-                cmd += "md5sum {} > {}".format(os.path.join(output_dir, b), os.path.join(output_dir, sample.name + "{}.bam.md5".format(suffix)))
-            cmds.append(cmd)
+                cmd += "md5sum {} > {}; ".format(os.path.join(output_dir, b), md5_file)
+            annot.loc[sample.name, "bam_file{}_md5sum".format(i)] = md5_file
 
         # Copy bigWig files
         if sample.library in ["ATAC-seq", "ChIP-seq"]:
-            cmd = "cp {} {}; ".format(sample.bigWig, os.path.join(output_dir, sample.name + ".bigWig"))
-            cmds.append(cmd)
+            if hasattr(sample, "bigwig"):
+                bigwig_file = os.path.join(output_dir, sample.name + ".bigWig")
+                cmd += "cp {} {}; ".format(sample.bigwig, bigwig_file)
+                annot.loc[sample.name, "bigwig_file"] = bigwig_file
+
+                # Copy or generate md5sum
+                md5_file = os.path.join(output_dir, sample.name + "{}.bigWig.md5".format(suffix))
+                if os.path.exists(sample.bigwig + ".md5"):
+                    cmd += "cp {} {}; ".format(sample.bigwig + ".md5", md5_file)
+                else:
+                    b = os.path.basename(sample.bigwig)
+                    cmd += "md5sum {} > {}; ".format(os.path.join(output_dir, b), md5_file)
+                annot.loc[sample.name, "bigwig_file_md5sum"] = md5_file
+            else:
+                print("'{}' sample '{}' does not have a 'bigwig' attribute set. Skipping bigWig file.".format(sample.library, sample.name))
 
         # Copy peaks
         if sample.library == "ATAC-seq":
-            cmd = "cp {} {}; ".format(sample.peaks, os.path.join(output_dir, sample.name + ".peaks.narrowPeak"))
+            if hasattr(sample, "peaks"):
+                peaks_file = os.path.join(output_dir, sample.name + ".peaks.narrowPeak")
+                cmd += "cp {} {}; ".format(sample.peaks, peaks_file)
+                annot.loc[sample.name, "peaks_file"] = peaks_file
+
+                # Copy or generate md5sum
+                md5_file = os.path.join(output_dir, sample.name + "{}.peaks.narrowPeak.md5".format(suffix))
+                if os.path.exists(sample.peaks + ".md5"):
+                    cmd += "cp {} {}; ".format(sample.peaks + ".md5", md5_file)
+                else:
+                    b = os.path.basename(sample.peaks)
+                    cmd += "md5sum {} > {}; ".format(os.path.join(output_dir, b), md5_file)
+                annot.loc[sample.name, "peaks_file_md5sum"] = md5_file
+            else:
+                print("'{}' sample '{}' does not have a 'peaks' attribute set. Skipping peaks file.".format(sample.library, sample.name))
+
+        if distributed and not dry_run:
+            from pypiper.ngstk import NGSTk
+            import textwrap
+            tk = NGSTk()
+
+            job_name = "project_to_geo.{}".format(sample.name)
+            log_file = os.path.join(output_dir, job_name + ".log")
+            job_file = os.path.join(output_dir, job_name + ".sh")
+
+            job = textwrap.dedent(tk.slurm_header(
+                job_name=job_name, output=log_file,
+                cpus_per_task=1, mem_per_cpu=8000))
+            job += "\n" + "\n".join(cmd.split("; ")) + "\n"
+            job += textwrap.dedent(tk.slurm_footer())
+
+            with open(job_file, "w") as handle:
+                handle.write(textwrap.dedent(job))
+            tk.slurm_submit_job(job_file)
+        else:
             cmds.append(cmd)
 
-    if as_jobs:
-        import pypiper.NGSTk as Tk
-        tk = Tk()
-
-    else:
+    if not distributed and not dry_run:
         for i, cmd in enumerate(cmds):
             print(i, cmd)
             os.system(cmd)
 
-    # # Collect md5 sum
-    # cmd = "md5sum {} > ".format("")
-    # suffix = ".file{}".format(i) if various else ""
-    # return md5_table
+    return annot
 
 
 def query_biomart(

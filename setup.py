@@ -16,7 +16,9 @@ except ImportError:
     if sys.version_info < (2, 7):
         extra['dependencies'] = ['argparse']
 
-version = open("VERSION").read().strip()
+with open(os.path.join("ngs_toolkit", "_version.py"), 'r') as handle:
+    version = handle.readline().split()[-1].strip("\"'\n")
+
 requirements = open("requirements.txt").read().strip().split("\n")
 
 # setup

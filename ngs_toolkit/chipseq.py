@@ -295,6 +295,17 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
 
         self.support = support
 
+    def get_supported_peaks(self, comparisons):
+        """
+        Get mask of sites with 0 support in the given samples.
+        Requires support matrix produced by `ngs_toolkit.atacseq.ATACSeqAnalysis.calculate_peak_support`.
+
+        :param list samples: Iterable of looper.models.Sample objects to restrict to.
+        :returns pd.Series: Boolean Pandas Series with sites with at least one of the \
+                            given samples having a peak called.
+        """
+        return self.support[[c for c in comparisons]].sum(1) != 0
+
 
 def macs2_call_chipseq_peak_job(signal_samples, control_samples, output_dir, name):
     """

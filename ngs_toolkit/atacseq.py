@@ -21,7 +21,7 @@ pd.set_option("date_dayfirst", True)
 class ATACSeqAnalysis(Analysis):
     """
     Class to model analysis of ATAC-seq data.
-    Inherits from the general `Analysis` class.
+    Inherits from the `ngs_toolkit.general.Analysis` class.
 
     :param name: Name to give analysis object. Default is `atacseq_analysis`.
     :param list samples: Iterable of looper.models.Sample objects use in analysis.
@@ -152,7 +152,7 @@ class ATACSeqAnalysis(Analysis):
                 "chrom_state_annotation", "chrom_state_annotation_b",
                 "coverage_annotated", "accessibility"]
 
-        output_mapping = {k:v for k,v in output_mapping.items() if k in only_these_keys}
+        output_mapping = {k: v for k, v in output_mapping.items() if k in only_these_keys}
 
         for name, suffix in output_mapping.items():
             file = os.path.join(self.results_dir, self.name + suffix)
@@ -1051,11 +1051,11 @@ class ATACSeqAnalysis(Analysis):
 
             fig, axis = plt.subplots(2, 1, figsize=(4 * 2, 6 * 1))
             stats = stats.sort_values("group_open_chromatin")
-            sns.barplot(x="knockout", y="open_chromatin", data=stats.reset_index(), palette="summer", ax=axis[0])
-            sns.stripplot(x="knockout", y="open_chromatin", data=stats.reset_index(), palette="summer", ax=axis[0])
+            sns.barplot(x=by_attribute, y="open_chromatin", data=stats.reset_index(), palette="summer", ax=axis[0])
+            sns.stripplot(x=by_attribute, y="open_chromatin", data=stats.reset_index(), palette="summer", ax=axis[0])
             stats = stats.sort_values("group_open_chromatin_norm")
-            sns.barplot(x="knockout", y="open_chromatin_norm", data=stats.reset_index(), palette="summer", ax=axis[1])
-            sns.stripplot(x="knockout", y="open_chromatin_norm", data=stats.reset_index(), palette="summer", ax=axis[1])
+            sns.barplot(x=by_attribute, y="open_chromatin_norm", data=stats.reset_index(), palette="summer", ax=axis[1])
+            sns.stripplot(x=by_attribute, y="open_chromatin_norm", data=stats.reset_index(), palette="summer", ax=axis[1])
             axis[0].axhline(stats.groupby(by_attribute)['open_chromatin'].median()["WT"], color="black", linestyle="--")
             axis[1].axhline(stats.groupby(by_attribute)['open_chromatin_norm'].median()["WT"], color="black", linestyle="--")
             axis[0].set_ylabel("Total open chromatin space (bp)")
@@ -1089,10 +1089,10 @@ class ATACSeqAnalysis(Analysis):
             lengths = pd.merge(lengths, lengths.groupby(by_attribute)['peak_length'].median().to_frame(name='group_mean_peak_length').reset_index())
             lengths = lengths.sort_values("group_mean_peak_length")
             fig, axis = plt.subplots(2, 1, figsize=(8 * 1, 4 * 2))
-            sns.boxplot(x="knockout", y="peak_length", data=lengths, palette="summer", ax=axis[0], showfliers=False)
+            sns.boxplot(x=by_attribute, y="peak_length", data=lengths, palette="summer", ax=axis[0], showfliers=False)
             axis[0].set_ylabel("Peak length (bp)")
             axis[0].set_xticklabels(axis[0].get_xticklabels(), visible=False)
-            sns.boxplot(x="knockout", y="peak_length", data=lengths, palette="summer", ax=axis[1], showfliers=False)
+            sns.boxplot(x=by_attribute, y="peak_length", data=lengths, palette="summer", ax=axis[1], showfliers=False)
             axis[1].set_yscale("log")
             axis[1].set_ylabel("Peak length (bp)")
             axis[1].set_xticklabels(axis[1].get_xticklabels(), rotation=45, ha="right")
@@ -1105,7 +1105,9 @@ class ATACSeqAnalysis(Analysis):
         chroms_norm = chroms_norm.ix[["chr{}".format(i) for i in range(1, 23) + ['X', 'Y', 'M']]]
 
         fig, axis = plt.subplots(1, 1, figsize=(8 * 1, 8 * 1))
-        sns.heatmap(chroms_norm, square=True, cmap="summer", ax=axis)
+        sns.heatmap(
+            chroms_norm, square=True, cmap="summer",
+            xticklabels=True, yticklabels=True, ax=axis)
         axis.set_xticklabels(axis.get_xticklabels(), rotation=90, ha="right")
         axis.set_yticklabels(axis.get_yticklabels(), rotation=0, ha="right")
         fig.savefig(os.path.join(self.results_dir, "{}.peak_location.per_sample.svg".format(self.name)), bbox_inches="tight")
@@ -1263,6 +1265,10 @@ class ATACSeqAnalysis(Analysis):
             fig.savefig(os.path.join(self.results_dir, self.name + ".raw_counts.violinplot.by_{}.svg".format(by_attribute)), bbox_inches="tight")
 
     def plot_coverage(self):
+
+        # TODO: add plots for overal genome
+        # TODO: add raw counts too
+
         data = self.accessibility.copy()
         # (rewrite to avoid putting them there in the first place)
         variables = ['gene_name', 'genomic_region', 'chromatin_state']
@@ -3248,4 +3254,3 @@ def differential_interactions(
     fig.savefig(
         os.path.join(diff_dir, "tf_differential_binding.{}.volcano.svg".format(comparison_name)),
         bbox_inches="tight", dpi=300)
-

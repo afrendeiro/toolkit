@@ -75,7 +75,6 @@ def create_project(
     if "{username}" in email:
         email = email.format(username=username)
 
-
     project_config_template = """    project_name: {project_name}
     project_description: {project_name}
     username: {username}
@@ -105,7 +104,7 @@ def create_project(
     trackhubs:
         trackhub_dir: /data/groups/lab_bock/public_html/arendeiro/{project_name}/
         url: {url}""".format(
-            project_name=project_name, username=username, email=email, url=url)
+        project_name=project_name, username=username, email=email, url=url)
 
     merge_table_template = ",".join([
         "sample_name", "flowcell", "lane", "BSF_name", "data_source"])
@@ -144,8 +143,8 @@ def create_requirements_file(
                    "scikit-learn==0.19.1",
                    "statsmodels==0.8.0",
                    "patsy==0.4.1",
-                   "git+git://github.com/pepkit/looperv0.7.2#egg=looper",
-                   "git+git://github.com/epigen/pypipev0.6#egg=pypiper"],
+                   "https://github.com/epigen/looper/tarball/v0.7.2#egg=looper",
+                   "https://github.com/epigen/pypiper/tarball/v0.6#egg=pypiper"],
         overwrite=False):
     """
     Create a requirements.txt file with pip requirements.
@@ -172,9 +171,9 @@ def create_makefile(
     """
     project_dir = os.path.join(os.path.curdir, project_name)
     makefile = os.path.join(project_dir, "Makefile")
-    src_dir ="src"
-    log_dir ="log"
-    metadata_dir ="metadata"
+    src_dir = "src"
+    log_dir = "log"
+    metadata_dir = "metadata"
     project_config = os.path.join(metadata_dir, "project_config.yaml")
 
     if os.path.exists(makefile):

@@ -1,5 +1,6 @@
 numpy==1.14.0
 scipy==1.0.0
+fastcluster
 pandas==0.22.0
 matplotlib==2.1.1
 seaborn==0.8.1
@@ -11,5 +12,5 @@ statsmodels==0.8.0
 patsy==0.4.1
 # rpy2>=2.8.6
 tqdm==4.19.5
-# git+git://github.com/pepkit/looperv0.7.2#egg=looper
-# git+git://github.com/epigen/pypipev0.6#egg=pypiper
+git+git://github.com/pepkit/looper.git@v0.7.2#egg=looper
+git+git://github.com/epigen/pypiper.git@v0.6#egg=pypiper

@@ -408,7 +408,7 @@ def unsupervised_analysis(
 
     # This will always be a matrix for all samples
     color_dataframe = pd.DataFrame(
-        get_level_colors(analysis, index=matrix.columns, levels=attributes_to_plot),
+        analysis.get_level_colors(index=matrix.columns, levels=attributes_to_plot),
         index=attributes_to_plot, columns=matrix.columns.get_level_values("sample_name"))
     # will be filtered now by the requested samples if needed
     color_dataframe = color_dataframe[[s.name for s in samples]]

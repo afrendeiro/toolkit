@@ -123,7 +123,7 @@ maxHeighPixels 32:32:8{0}{1}{2}
     if 'library' in df.columns:
         var_ = 'library'
     elif 'protocol' in df.columns:
-        var_ = 'library'
+        var_ = 'protocol'
     else:
         raise ValueError("Samples must contain either a 'library' or 'protocol' attribute.")
     df = df[df[var_].isin(["ATAC-seq", "ChIP-seq", "ChIPmentation"])]
@@ -241,7 +241,7 @@ trackDb {g}/trackDb.txt
             print(msg)
 
 
-def make_igv_tracklink(prj, track_file):
+def make_igv_tracklink(prj, track_file, track_url):
     """
     Make IGV track link for project
     """
@@ -258,7 +258,7 @@ def make_igv_tracklink(prj, track_file):
     if 'library' in df.columns:
         var_ = 'library'
     elif 'protocol' in df.columns:
-        var_ = 'library'
+        var_ = 'protocol'
     else:
         raise ValueError("Samples must contain either a 'library' or 'protocol' attribute.")
     df = df[df[var_].isin(["ATAC-seq", "ChIP-seq", "ChIPmentation"])]
@@ -286,7 +286,7 @@ def make_igv_tracklink(prj, track_file):
     msg = "\n".join([
         "Finished producing IGV track file!", "'{}'".format(track_file),
         "You can follow this URL to open tracks in a local IGV session: " +
-        "{url}\n".format(url=prj['trackhubs']['url'])
+        "{url}\n".format(url=track_url)
     ]) + "\n"
     print(msg)
 

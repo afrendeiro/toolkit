@@ -72,7 +72,6 @@ def make_ucsc_trackhub(args, prj, track_hub, bigwig_dir, genomes_hub, proj_name,
         handle.write(text)
     os.chmod(track_hub, 0755)
 
-
     # Templates for various levels
     track_parent = """track {proj}
 container multiWig
@@ -121,7 +120,13 @@ maxHeighPixels 32:32:8{0}{1}{2}
     df = pd.DataFrame([s.as_series() for s in prj.samples]).fillna("none")
 
     # Keep only samples that have appropriate types to be displayed
-    df = df[df['library'].isin(["ATAC-seq", "ChIP-seq", "ChIPmentation"])]
+    if 'library' in df.columns:
+        var_ = 'library'
+    elif 'protocol' in df.columns:
+        var_ = 'library'
+    else:
+        raise ValueError("Samples must contain either a 'library' or 'protocol' attribute.")
+    df = df[df[var_].isin(["ATAC-seq", "ChIP-seq", "ChIPmentation"])]
 
     # Create a trackHub for each genome
     for genome in df['genome'].unique():
@@ -220,15 +225,16 @@ trackDb {g}/trackDb.txt
         with open(track_db, 'w') as handle:
             handle.write(textwrap.dedent(track))
 
-
     msg = "\n".join([
         "Finished producing trackHub!",
         "----------------------------",
         "Add the following URL to your UCSC trackHubs:",
         "{url}/hub.txt".format(url=prj['trackhubs']['url']),
-        "or alternatively follow this URL: "
-        + "http://genome.ucsc.edu/cgi-bin/hgTracks?db=hg19&hubUrl={url}/hub.txt".format(url=prj['trackhubs']['url'])
-    ])
+        "or alternatively follow this URL: " +
+        "http://genome.ucsc.edu/cgi-bin/hgTracks?db={genome}&hubUrl={url}/hub.txt".format(
+            # the link can only point to one genome, so by default it will be the last one used.
+            genome=genome, url=prj['trackhubs']['url'])
+    ]) + "\n"
 
     if 'trackhubs' in prj:
         if "url" in prj['trackhubs']:
@@ -239,31 +245,49 @@ def make_igv_tracklink(prj, track_file):
     """
     Make IGV track link for project
     """
+    if not os.path.exists(os.path.dirname(track_file)):
+        os.makedirs(os.path.dirname(track_file))
+
     # Start building hub
-    header = "http://localhost:60151/load"
+    link_header = "http://localhost:60151/load"
 
     # Make dataframe
     df = pd.DataFrame([s.as_series() for s in prj.samples]).fillna("none")
 
     # Keep only samples that have appropriate types to be displayed
-    df = df[df['library'].isin(["ATAC-seq", "ChIP-seq", "ChIPmentation"])]
+    if 'library' in df.columns:
+        var_ = 'library'
+    elif 'protocol' in df.columns:
+        var_ = 'library'
+    else:
+        raise ValueError("Samples must contain either a 'library' or 'protocol' attribute.")
+    df = df[df[var_].isin(["ATAC-seq", "ChIP-seq", "ChIPmentation"])]
+
+    text = "<html><head></head><body>"
 
     # Create a trackHub for each genome
     for genome in df['genome'].unique():
         df_g = df[(df['genome'] == genome)]
 
-        text = header
+        text += "<a href="
+        text += link_header
         text += "?file=" + ",".join(prj['trackhubs']['url'] + "/{}/".format(genome) + df_g['sample_name'] + ".bigWig")
         text += "?names=" + ",".join(df_g['sample_name'])
-        text += "?genome=" + genome
+        text += "?genome={}".format(genome)
+        text += ">Open {} tracks in IGV browser.</a>\n".format(genome)
+    text += "</body></html>"
 
-        # write trackDb to file
-        with open(track_file, 'w') as handle:
-            handle.write(text + "\n")
+    # write to file
+    with open(track_file, 'w') as handle:
+        handle.write(text + "\n")
     os.chmod(track_file, 0655)
     # os.chmod(os.path.basename(track_file), 0755)
 
-    msg = "\n".join(["\nFinished producing IGV track file!", "'{}'".format(track_file)])
+    msg = "\n".join([
+        "Finished producing IGV track file!", "'{}'".format(track_file),
+        "You can follow this URL to open tracks in a local IGV session: " +
+        "{url}\n".format(url=prj['trackhubs']['url'])
+    ]) + "\n"
     print(msg)
 
 
@@ -274,8 +298,7 @@ def main():
     prj = Project(args.project_config_file)
 
     if "trackhubs" not in prj:
-        print("Project configuration does not have a trackhub section.")
-        return 1
+        raise ValueError("Project configuration does not have a trackhub section.")
 
     # Setup paths and hub files
     bigwig_dir = os.path.join(prj.trackhubs.trackhub_dir)
@@ -291,8 +314,9 @@ def main():
     # In the future there will be more actions than this
     make_ucsc_trackhub(args, prj, track_hub, bigwig_dir, genomes_hub, proj_name, proj_desc, user_email)
 
-    track_file = os.path.join(prj.trackhubs.trackhub_dir, "igv_link.txt")
-    make_igv_tracklink(prj, track_file)
+    track_file = os.path.join(bigwig_dir, "igv", "index.html")
+    track_url = os.path.join(prj['trackhubs']['url'], "igv")
+    make_igv_tracklink(prj, track_file, track_url)
 
 
 if __name__ == '__main__':

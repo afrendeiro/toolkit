@@ -22,14 +22,15 @@ with open(os.path.join("ngs_toolkit", "_version.py"), 'r') as handle:
 
 requirements = open("requirements.txt").read().strip().split("\n")
 requirements = [r for r in requirements if not r.startswith("#")]
-dependencies = list()
-for i, r in enumerate(requirements):
-    if "#egg=" in r:
-        n = r[r.index('#egg=') + 5:]
-        v = r[r.index('/v') + 1:r.index('#egg=')]
-        requirements[i] = n
-        dependencies.append(
-            'https://github.com/epigen/looper/tarball/{v}#egg={n}-{v}'.format(n=n, v=v))
+requirements = [r for r in requirements if "#egg=" not in r]
+# dependencies = list()
+# for i, r in enumerate(requirements):
+#     if "#egg=" in r:
+#         n = r[r.index('#egg=') + 5:]
+#         v = r[r.index('/v') + 1:r.index('#egg=')]
+#         requirements[i] = n
+#         dependencies.append(
+#             'https://github.com/epigen/looper/tarball/{v}#egg={n}-{v}'.format(n=n, v=v))
 
 # setup
 setup(
@@ -55,6 +56,6 @@ setup(
     author=u"Andre Rendeiro",
     license="GPL2",
     install_requires=requirements,
-    dependency_links=dependencies,
+    # dependency_links=dependencies,
     **extra
 )

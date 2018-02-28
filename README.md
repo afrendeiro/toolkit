@@ -13,12 +13,6 @@ Install with:
 ```
 git clone git@github.com:afrendeiro/toolkit.git
 cd toolkit
-pip install . --process-dependency-links
-```
-
-If problems installing dependencies, install manually with:
-
-```
-cd toolkit
 pip install -r requirements.txt
+pip install .
 ```

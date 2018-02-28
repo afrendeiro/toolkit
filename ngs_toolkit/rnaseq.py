@@ -192,7 +192,7 @@ class RNASeqAnalysis(Analysis):
     def get_gene_expression(
             self, samples=None, sample_attributes=["sample_name"],
             expression_type="counts",
-            genome_assembly="grch38", species="hsapiens"):
+            genome_assembly="grch37", species="hsapiens"):
         """
         Collect gene expression (read counts, transcript level) for all samples,
         annotates ensembl IDs with gene names, reduces gene expression to gene-level,
@@ -228,7 +228,7 @@ class RNASeqAnalysis(Analysis):
         if samples is None:
             samples = [s for s in self.samples if s.library == "RNA-seq"]
 
-        self.count_matrix = collect_bitseq_output(self, samples=samples, expression_type=expression_type)
+        self.count_matrix = self.collect_bitseq_output(samples=samples, expression_type=expression_type)
 
         # Map ensembl gene IDs to gene names
         url_query = "".join([
@@ -607,6 +607,8 @@ def knockout_plot(
     knockout_genes = [k for k in knockout_genes if k in expression_matrix.index]
 
     ko = expression_matrix.loc[knockout_genes, :]
+    v = np.absolute(scipy.stats.zscore(ko, axis=1)).flatten().max()
+    v += (v / 10.)
 
     g = sns.clustermap(ko, cbar_kws={"label": "Expression"},
         xticklabels=True, yticklabels=True, square=square)
@@ -614,7 +616,9 @@ def knockout_plot(
     g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0)
     g.savefig(os.path.join(output_dir, output_prefix + ".svg"), bbox_inches="tight")
 
-    g = sns.clustermap(ko, z_score=0, cbar_kws={"label": "Expression Z-score"},
+    g = sns.clustermap(
+        ko,
+        z_score=0, cmap="RdBu_r", vmin=-v, vmax=v, cbar_kws={"label": "Expression Z-score"},
         xticklabels=True, yticklabels=True, square=square)
     g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90)
     g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0)
@@ -626,7 +630,9 @@ def knockout_plot(
     g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0)
     g.savefig(os.path.join(output_dir, output_prefix + ".sorted.svg"), bbox_inches="tight")
 
-    g = sns.clustermap(ko, z_score=0, cbar_kws={"label": "Expression Z-score"}, row_cluster=False, col_cluster=False,
+    g = sns.clustermap(
+        ko,
+        z_score=0, cmap="RdBu_r", vmin=-v, vmax=v, cbar_kws={"label": "Expression Z-score"}, row_cluster=False, col_cluster=False,
         xticklabels=True, yticklabels=True, square=square)
     g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90)
     g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0)

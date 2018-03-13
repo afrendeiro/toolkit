@@ -98,7 +98,7 @@ class ATACSeqAnalysis(Analysis):
             from_pickle=from_pickle,
             **kwargs)
 
-    def load_data(self, output_mapping=None, only_these_keys=None, permissive=True):
+    def load_data(self, output_mapping=None, only_these_keys=None, permissive=True, n_header_vars=5):
         """
         Load the output files of the major functions of the Analysis.
 
@@ -182,7 +182,7 @@ class ATACSeqAnalysis(Analysis):
             try:
                 # TODO: add configuration for custom number of header lines
                 # TODO: or think of smart way to infer
-                setattr(self, "accessibility", pd.read_csv(file, index_col=0, header=range(5)))
+                setattr(self, "accessibility", pd.read_csv(file, index_col=0, header=range(n_header_vars)))
             except IOError as e:
                 if not permissive:
                     raise e

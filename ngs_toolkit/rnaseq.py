@@ -578,6 +578,7 @@ def knockout_plot(
     """
     Plot expression of knocked-out genes in all samples.
     """
+    import scipy
 
     if (analysis is None) and (expression_matrix is None):
         raise AssertionError("One of `analysis` or `expression_matrix` must be provided.")

@@ -27,7 +27,6 @@ def parse_arguments():
     parser.add_argument(
         '-l', '--link', dest="link", action="store_true",
         help="Whether bigWig files should be soft-linked to the track database directory. Default=False.")
-    # args = parser.parse_args("-a patient_id,timepoint,cell_type -c cell_type metadata/project_config.yaml".split(" "))
     args = parser.parse_args()
     args.attributes = args.attributes.split(',')
     if args.color_attribute is None:
@@ -166,7 +165,7 @@ trackDb {g}/trackDb.txt
 
         # Group by requested attributes, add tracks
         for labels, indices in df_g.groupby(args.attributes).groups.items():
-            subgroups = "\n        subGroups " + " ".join(["{}={}".format(k, v) for k, v in zip(args.attributes, labels)])
+            subgroups = "\n    subGroups " + " ".join(["{}={}".format(k, v) for k, v in zip(args.attributes, labels)])
 
             if len(indices) == 1:
                 sample_attrs = df_g.ix[indices].squeeze()
@@ -189,8 +188,8 @@ trackDb {g}/trackDb.txt
                         continue
 
             else:
-                name = "_".join(labels)
-                desc = " ".join(labels)
+                name = "_".join([x for x in labels if x != ""])
+                desc = " ".join([x for x in labels if x != ""])
 
                 track += track_middle.format(
                     track=name,
@@ -199,7 +198,7 @@ trackDb {g}/trackDb.txt
                     subgroups=subgroups)
 
                 for index in indices:
-                    sample_attrs = df_g.ix[indices].squeeze()
+                    sample_attrs = df_g.ix[index].squeeze()
                     track += track_final.format(
                         name=sample_attrs["sample_name"],
                         color=sample_attrs['track_color'],
@@ -217,7 +216,8 @@ trackDb {g}/trackDb.txt
                         print("Sample {} track file does not exist!".format(sample_attrs["sample_name"]))
                         continue
                 # Make directories readable and executable
-                os.chmod(os.path.join(dest, genome), 0755)
+                os.chmod(os.path.join(bigwig_dir, genome), 0755)
+                os.chmod(bigwig_dir, 0755)
 
         track = re.sub("_none", "", track)
 
@@ -281,7 +281,7 @@ def make_igv_tracklink(prj, track_file, track_url):
     with open(track_file, 'w') as handle:
         handle.write(text + "\n")
     os.chmod(track_file, 0655)
-    # os.chmod(os.path.basename(track_file), 0755)
+    os.chmod(os.path.join("..", track_file), 0755)
 
     msg = "\n".join([
         "Finished producing IGV track file!", "'{}'".format(track_file),

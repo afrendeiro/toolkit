@@ -116,7 +116,7 @@ maxHeighPixels 32:32:8{0}{1}{2}
     """
 
     # Make dataframe for groupby
-    df = pd.DataFrame([s.as_series() for s in prj.samples]).fillna("none")
+    df = pd.DataFrame([s.as_series() for s in prj.samples]).fillna("none").drop_duplicates(subset="sample_name")
 
     # Keep only samples that have appropriate types to be displayed
     if 'library' in df.columns:
@@ -281,7 +281,7 @@ def make_igv_tracklink(prj, track_file, track_url):
     with open(track_file, 'w') as handle:
         handle.write(text + "\n")
     os.chmod(track_file, 0655)
-    os.chmod(os.path.join("..", track_file), 0755)
+    os.chmod(os.path.dirname(track_file), 0755)
 
     msg = "\n".join([
         "Finished producing IGV track file!", "'{}'".format(track_file),
@@ -299,6 +299,8 @@ def main():
 
     if "trackhubs" not in prj:
         raise ValueError("Project configuration does not have a trackhub section.")
+    if "trackhub_dir" not in prj.trackhubs:
+        raise ValueError("Project trackhub configuration does not have a trackhub_dir attribute.")
 
     # Setup paths and hub files
     bigwig_dir = os.path.join(prj.trackhubs.trackhub_dir)

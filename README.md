@@ -11,8 +11,6 @@ Head to the [documentation](http://ngs-toolkit.readthedocs.io/) to see how to in
 Install with:
 
 ```
-git clone git@github.com:afrendeiro/toolkit.git
-cd toolkit
-pip install -r requirements.txt
-pip install .
+pip install https://github.com/afrendeiro/toolkit/zipball/master
 ```
+You might need to add a ``--user`` flag to the above command.

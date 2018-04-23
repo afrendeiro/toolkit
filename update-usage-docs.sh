@@ -1,12 +1,11 @@
 cp doc/source/usage_template.rst usage_template.rst
-#looper --help > USAGE.temp 2>&1
 
 for program in projectmanager trackmanager; do
     for cmd in "--help"; do
         echo $program
         echo $cmd
-        echo -e "\n\`\`$program $cmd\`\`" > ${program}_USAGE_header.temp
-        echo -e "----------------------------------" >> ${program}_USAGE_header.temp
+        echo "\n\`\`$program $cmd\`\`" > ${program}_USAGE_header.temp
+        # echo -e "----------------------------------" >> ${program}_USAGE_header.temp
         $program $cmd --help > ${program}_USAGE.temp 2>&1
         sed -i 's/^/\t/' ${program}_USAGE.temp
         sed -i '1s/^/\n.. code-block:: none\n\n/' ${program}_USAGE.temp

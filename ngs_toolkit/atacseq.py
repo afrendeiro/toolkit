@@ -345,22 +345,26 @@ class ATACSeqAnalysis(Analysis):
             samples = self.samples
         return self.support[[s.name for s in samples]].sum(1) != 0
 
-    def measure_coverage(self, samples=None, sites=None, output_file=None):
+    def measure_coverage(self, samples=None, sites=None, assign=True, save=True, output_file=None):
         """
         Measure read coverage (counts) of each sample in each region in consensus sites.
         Will try to use parallel computing using the `parmap` library.
 
-        :param list samples: Iterable of looper.models.Sample objects to restrict \
-                             to. Must have a `filtered` attribute set. \
-                             If not provided (`None` is passed) if will default to all samples \
+        :param list samples: Iterable of looper.models.Sample objects to restrict
+                             to. Must have a `filtered` attribute set.
+                             If not provided (`None` is passed) if will default to all samples
                              in the analysis (`samples` attribute).
-        :param pybedtools.BedTool sites: Sites in the genome to quantify. \
+        :param pybedtools.BedTool sites: Sites in the genome to quantify.
                                          If `None` the object's `sites` attribute will be used.
-        :param str output_file: A path to a CSV file with coverage output. \
-                                Default is `self.results_dir/self.name + "_peaks.raw_coverage.csv"`. \
-        :raises ValueError: If not `permissive` and either the peak or summit file \
+        :param pybedtools.BedTool assign: Whether to assign the matrix to an attribute of self
+                                          named `coverage`.
+        :param pybedtools.BedTool save: Whether to save to disk the coverage matrix with filename
+                                        `output_file`.
+        :param str output_file: A path to a CSV file with coverage output.
+                                Default is `self.results_dir/self.name + "_peaks.raw_coverage.csv"`.
+        :raises ValueError: If not `permissive` and either the peak or summit file
                             of a sample is not readable.
-        :var pd.DataFrame coverage: Sets a `coverage` variable with DataFrame with read counts \
+        :var pd.DataFrame coverage: Sets a `coverage` variable with DataFrame with read counts
                                     of shape (n_sites, m_samples).
         :returns pd.DataFrame: Pandas DataFrame with read counts of shape (n_sites, m_samples).
         """
@@ -373,13 +377,15 @@ class ATACSeqAnalysis(Analysis):
 
         missing = [s for s in samples if not os.path.exists(s.filtered)]
         if len(missing) > 0:
-            print("Samples have missing BAM file: {}".format(missing))
+            print("Samples have missing BAM file: {}".format("\n".join([s.name for s in missing])))
             samples = [s for s in samples if s not in missing]
 
         if sites is None:
             sites = self.sites
             if output_file is None:
                 default = True
+            else:
+                default = False
 
         # Count reads with pysam
         # make strings with intervals
@@ -418,14 +424,15 @@ class ATACSeqAnalysis(Analysis):
         coverage["start"] = [int(x[1]) for x in ints]
         coverage["end"] = [int(x[2]) for x in ints]
 
-        # save to disk
-        if default:
+        if assign:
             self.coverage = coverage
-            self.coverage.to_csv(os.path.join(self.results_dir, self.name + "_peaks.raw_coverage.csv"), index=True)
-        if output_file is not None:
-            coverage.to_csv(output_file, index=True)
-        else:
-            return coverage
+        if save:
+            if output_file is not None:
+                coverage.to_csv(output_file, index=True)
+            else:
+                self.coverage.to_csv(os.path.join(self.results_dir, self.name + "_peaks.raw_coverage.csv"), index=True)
+
+        return coverage
 
     def get_matrix(self, matrix=None, samples=None, matrix_name="coverage"):
         """
@@ -597,11 +604,9 @@ class ATACSeqAnalysis(Analysis):
             # install R package
             # source('http://bioconductor.org/biocLite.R')
             # biocLite('cqn')
-            import rpy2
-            rpy2.robjects.numpy2ri.deactivate()
-
-            import rpy2.robjects as robjects
+            from rpy2 import robjects
             import rpy2.robjects.pandas2ri
+            robjects.numpy2ri.deactivate()
             rpy2.robjects.pandas2ri.activate()
 
             robjects.r('require("cqn")')

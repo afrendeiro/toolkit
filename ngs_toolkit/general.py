@@ -819,7 +819,7 @@ def differential_from_bivariate_fit(
         comparison_table, matrix,
         output_dir, output_prefix,
         n_bins=250, multiple_correction_method="fdr_bh",
-        plot=True, palette="colorblind"):
+        plot=True, palette="colorblind", make_values_positive=False):
     """
     Perform differential analysis using a bivariate gaussian fit
     on the relationship between mean and fold-change for each comparison.
@@ -835,12 +835,16 @@ def differential_from_bivariate_fit(
     """
     from scipy.stats import gaussian_kde
     from statsmodels.sandbox.stats.multicomp import multipletests
+    import matplotlib.pyplot as plt
 
     comparisons = comparison_table['comparison_name'].drop_duplicates().sort_values()
     if plot:
         fig, axis = plt.subplots(
             2, len(comparisons),
-            figsize=(4 * len(comparisons), 4 * 2), sharex=True, sharey=True)
+            figsize=(4 * len(comparisons), 4 * 2), sharex=True, sharey='row')
+
+    if make_values_positive:
+        matrix = matrix + abs(matrix.min().min())
 
     results = pd.DataFrame()
     for i, comparison in enumerate(comparisons):
@@ -898,9 +902,9 @@ def differential_from_bivariate_fit(
             res.loc[res['norm_log2FoldChange'] <= 0, ["comparison_mean", "norm_log2FoldChange"]].T.values)
 
         # Let's calculate something like an empirical p-value on the density
-        res['pval'] = (res['density'] - res['density'].min()) / \
+        res['pvalue'] = (res['density'] - res['density'].min()) / \
             (res['density'].max() - res['density'].min())
-        res['padj'] = multipletests(res['pval'].fillna(1), method=multiple_correction_method)[1]
+        res['padj'] = multipletests(res['pvalue'].fillna(1), method=multiple_correction_method)[1]
 
         res['direction'] = (res['norm_log2FoldChange'] >= 0).astype(int).replace(0, -1)
         res.to_csv(out_file)
@@ -911,7 +915,7 @@ def differential_from_bivariate_fit(
             axis[0, i].axhline(0, color="black", linestyle="--")
             axis[1, i].scatter(res["comparison_mean"],
                                res["norm_log2FoldChange"], alpha=0.2, s=5, color=sns.color_palette(palette)[0], rasterized=True)
-            diff = res.loc[(res['pval'] < 0.05) & (res['norm_log2FoldChange'].abs() >= 2), :].index
+            diff = res.loc[(res['pvalue'] < 0.05) & (res['norm_log2FoldChange'].abs() >= 2), :].index
             axis[0, i].scatter(res.loc[diff, "comparison_mean"],
                                res.loc[diff, "log2FoldChange"], alpha=0.2, s=5, color=sns.color_palette(palette)[1], rasterized=True)
             axis[1, i].scatter(res.loc[diff, "comparison_mean"],
@@ -923,13 +927,14 @@ def differential_from_bivariate_fit(
                 axis[0, i].set_ylabel("log2 fold-change")
                 axis[1, i].set_ylabel("Norm(log2 fold-change)")
 
-        results = results.append(res)
+        results = results.append(res.reset_index(), ignore_index=True)
 
     # save figure
     fig.savefig(os.path.join(output_dir, output_prefix + ".deseq_result.all_comparisons.scatter.svg"), dpi=300, bbox_inches="tight")
 
     # save all
-    results.to_csv(os.path.join(output_dir, output_prefix + ".deseq_result.all_comparisons.csv"), index=False)
+    results = results.set_index("index")
+    results.to_csv(os.path.join(output_dir, output_prefix + ".deseq_result.all_comparisons.csv"), index=True)
 
     return results
 
@@ -1762,14 +1767,17 @@ def plot_differential(
         g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small")
         g.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.groups.fold_changes.clustermap.corr.svg".format(var_name)), bbox_inches="tight", dpi=dpi, metric="correlation")
 
-        g = sns.clustermap(
-            fold_changes.loc[all_diff, :],
-            xticklabels=True, yticklabels=feature_labels, cbar_kws={"label": "Fold-change of\ndifferential {}s".format(var_name)},
-            cmap="RdBu_r", robust=robust, metric="correlation", rasterized=True, figsize=figsize)
-        g.ax_heatmap.set_ylabel("Differential {}s (n = {})".format(var_name, fold_changes.loc[all_diff, :].shape[0]))
-        g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90, fontsize="xx-small")
-        g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small")
-        g.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.groups.fold_changes.clustermap.svg".format(var_name)), bbox_inches="tight", dpi=dpi)
+        try:
+            g = sns.clustermap(
+                fold_changes.loc[all_diff, :],
+                xticklabels=True, yticklabels=feature_labels, cbar_kws={"label": "Fold-change of\ndifferential {}s".format(var_name)},
+                cmap="RdBu_r", robust=robust, metric="correlation", rasterized=True, figsize=figsize)
+            g.ax_heatmap.set_ylabel("Differential {}s (n = {})".format(var_name, fold_changes.loc[all_diff, :].shape[0]))
+            g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90, fontsize="xx-small")
+            g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small")
+            g.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.groups.fold_changes.clustermap.svg".format(var_name)), bbox_inches="tight", dpi=dpi)
+        except FloatingPointError as e:
+            pass
 
     # Sample level
     if type(matrix.columns) is pd.core.indexes.multi.MultiIndex:
@@ -2331,6 +2339,8 @@ def collect_differential_enrichment(
                         print(error_msg.format("Enrichr", comp, direction))
                     else:
                         raise e
+                except pd.errors.EmptyDataError:
+                    continue
                 else:
                     enr["comparison_name"] = comp
                     enr["direction"] = direction

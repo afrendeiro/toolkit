@@ -1439,6 +1439,10 @@ def plot_differential(
         alpha=0.05,
         corrected_p_value=True,
         fold_change=None,
+        diff_based_on_rank=False,
+        max_rank=1000,
+        ranking_variable="padj",
+        respect_stat_thresholds=True,
         output_dir="results/differential_analysis_{data_type}",
         output_prefix="differential_analysis",
         plot_each_comparison=True,
@@ -1456,6 +1460,65 @@ def plot_differential(
     """
     Discover differential regions across samples that are associated with a certain trait.
     The `results` matrix should be indexed by the relevant type of feature (regions/genes).
+
+
+    :param analysis: Analysis object.
+    :type analysis: ngs_toolkit.general.Analysis
+    :param results: Data frame with differential analysis results. See `ngs_toolkit.general.differential_analysis` for more information.
+    :type results: pandas.DataFrame
+    :param comparison_table: Comparison table, defaults to None. If provided, group-wise plots will be produced.
+    :type comparison_table: pandas.DataFrame, optional
+    :param samples: List of sample objects to restrict analysis to. Defaults to all samples in analysis object.
+    :type samples: list, optional
+    :param matrix: Matrix of quantification to use for plotting feature values across samples/groups.
+                   Defaults to either "accessibility" for ATAC-seq analysis or "expression" for RNA-seq.
+    :type matrix: str, optional
+    :param only_comparison_samples: Whether to use only samples present in the `comparison_table`. Defaults to False.
+    :type only_comparison_samples: bool, optional
+    :param data_type: The data type being analyzed. Currently supported is "ATAC-seq" or "RNA-seq". Defaults to "ATAC-seq".
+    :type data_type: str, optional
+    :param alpha: Significance level to consider a feature differential. Defaults to 0.05.
+    :type alpha: float, optional
+    :param corrected_p_value: Whether to use a corrected p-valueto consider a feature differential. Defaults to True.
+    :type corrected_p_value: bool, optional
+    :param fold_change: Effect size (fold change) to consider a feature differential. Considers absolute values. Defaults to None.
+    :type fold_change: float, optional
+    :param diff_based_on_rank: Whether a feature should be considered differential based on its rank. Defaults to False
+    :type diff_based_on_rank: bool, optional
+    :param max_rank: Rank to use when using `diff_based_on_rank`. Defaults to 1000.
+    :type max_rank: int, optional
+    :param ranking_variable: Which variable to use for ranking when using `diff_based_on_rank`. Defaults to "padj".
+    :type ranking_variable: str, optional
+    :param respect_stat_thresholds: Whether the statistical thresholds from `alpha` and `fold_change` should still be respected when using `diff_based_on_rank`. Defaults to True
+    :type respect_stat_thresholds: bool, optional
+    :param output_dir: Directory to create output files. Defaults to "results/differential_analysis_{data_type}"
+    :type output_dir: str, optional
+    :param output_prefix: Prefix to use when creating output files. Defaults to "differential_analysis".
+    :type output_prefix: str, optional
+    :param plot_each_comparison: Whether each comparison should be plotted in scatter, MA and volcano plots. Useful to turn off with many comparisons. Defaults to True.
+    :type plot_each_comparison: bool, optional
+    :param mean_column: Column  in `results` data frame containing values for mean values across samples. Defaults to "baseMean".
+    :type mean_column: str, optional
+    :param log_fold_change_column: Column  in `results` data frame containing values for log2FoldChange values across samples. Defaults to "log2FoldChange".
+    :type log_fold_change_column: str, optional
+    :param p_value_column: Column  in `results` data frame containing values for p-values across samples. Defaults to "pvalue".
+    :type p_value_column: str, optional
+    :param adjusted_p_value_column: Column  in `results` data frame containing values for adjusted p-values across samples. Defaults to "padj".
+    :type adjusted_p_value_column: str, optional
+    :param comparison_column: Column  in `results` data frame containing the name of the comparison. Defaults to "comparison_name".
+    :type comparison_column: str, optional
+    :param rasterized: Whether plots with many objects should be rasterized. Defaults to True.
+    :type rasterized: bool, optional
+    :param dpi: Rasterization resolution (dpi). Defaults to 300.
+    :type dpi: number, optional
+    :param robust: Whether heatmap color scale ranges should be robust (using quantiles) rather than extreme values. Useful for noisy/extreme data. Defaults to False.
+    :type robust: bool, optional
+    :param feature_labels: Whether features (regions/genes) should be labeled in heatmaps. Defaults to False.
+    :type feature_labels: bool, optional
+    :param group_wise_colours: Whether groups of samples should be coloured in heatmaps. Defaults to False.
+    :type group_wise_colours: bool, optional
+    :param group_variables: Which variables to colour if `group_wise_colours` if True. Defaults to None (must be given).
+    :type group_variables: list, optional
     """
     import pandas as pd
     import numpy as np
@@ -1522,6 +1585,19 @@ def plot_differential(
         p_var = p_value_column
     results.loc[(results[p_var] < alpha) & fc, "diff"] = True
     results.loc[:, "diff"] = results.loc[:, "diff"].fillna(False)
+    # Declare significant based on top ranked features
+    if diff_based_on_rank:
+        for comparison in results[comparison_column].unique():
+            if ranking_variable == log_fold_change_column:
+                i = results.loc[results[comparison_column] == comparison, ranking_variable].abs().sort_values().tail(max_rank).index
+            else:
+                i = results.loc[results[comparison_column] == comparison, ranking_variable].sort_values().head(max_rank).index
+            results.loc[(results[comparison_column] == comparison) & results.index.isin(i), "diff_rank"] = True
+        results.loc[:, "diff_rank"] = results.loc[:, "diff_rank"].fillna(False)
+        if respect_stat_thresholds:
+            results.loc[:, 'diff'] = (results.loc[:, 'diff'] == True) & (results.loc[:, 'diff_rank'] == True)
+        else:
+            results.loc[:, 'diff'] = results.loc[:, 'diff_rank']
 
     # Annotate direction of change
     results.loc[:, "direction"] = results.loc[:, log_fold_change_column].apply(lambda x: "up" if x >= 0 else "down")

@@ -1458,13 +1458,15 @@ def plot_differential(
         group_wise_colours=False,
         group_variables=None):
     """
-    Discover differential regions across samples that are associated with a certain trait.
-    The `results` matrix should be indexed by the relevant type of feature (regions/genes).
+    Plot differential features (e.g. chromatin region, genes) discovered with supervised group comparisons
+    by ``ngs_toolkit.general.differential_analysis``.
+    This will plot number and direction of discovered features, scatter, MA and volcano plots for each comparison
+    and joint heatmaps of log fold changes, normalized values or Z-scores of individual samples or groups in the differential features.
 
 
     :param analysis: Analysis object.
     :type analysis: ngs_toolkit.general.Analysis
-    :param results: Data frame with differential analysis results. See `ngs_toolkit.general.differential_analysis` for more information.
+    :param results: Data frame with differential analysis results. See ``ngs_toolkit.general.differential_analysis`` for more information.
     :type results: pandas.DataFrame
     :param comparison_table: Comparison table, defaults to None. If provided, group-wise plots will be produced.
     :type comparison_table: pandas.DataFrame, optional

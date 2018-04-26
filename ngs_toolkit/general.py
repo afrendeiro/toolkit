@@ -2502,13 +2502,41 @@ def plot_differential_enrichment(
         output_prefix="differential_analysis",
         barplots=True, correlation_plots=True, top_n=5, z_score=0):
     """
-    Given a table of enrichment terms across several comparisons, produce
+    Given a table of enrichment terms across several comparisons, produced
     plots illustrating these enrichments in the various comparisons.
 
-    `enrichment_type` is one of 'lola', 'enrichr', 'motif', 'great'.
     # TODO: add plotting of genomic region and chromatin state enrichment.
     `comp_variable` is the column in the enrichment table that labels groups.
+
+    :param enrichment_table: Data frame with enrichment results as produced by
+                             ``ngs_toolkit.general.differential_enrichment`` and
+                             ``ngs_toolkit.general.collect_differential_enrichment``.
+    :type enrichment_table: pandas.DataFrame
+    :param enrichment_type: One of 'lola', 'enrichr', 'motif', 'great'.
+    :type enrichment_type: str
+    :param data_type: Data type. One of "ATAC-seq" and "RNA-seq". Defaults to "ATAC-seq".
+    :type data_type: str, optional
+    :param direction_dependent: Whether enrichments were made in a direction-dependent way
+                                (up-regulated and down-regulated features separately).
+                                This implies a column named "direction" exists". Defaults to True.
+    :type direction_dependent: bool, optional
+    :param output_dir: Directory to create output files. Defaults to "results/differential_analysis_{data_type}/enrichments".
+    :type output_dir: str, optional
+    :param output_prefix: Prefix to use when creating output files. Defaults to "differential_analysis".
+    :type output_prefix: str, optional
+    :param comp_variable: Column defining which comparison enrichment terms belong to. Defaults to "comparison_name".
+    :type comp_variable: str, optional
+    :param barplots: Whether barplots with top enriched terms per comparison should be produced. Defaults to True.
+    :type barplots: bool, optional
+    :param correlation_plots: Whether correlation plots of comparisons across enriched terms should be produced. Defaults to True.
+    :type correlation_plots: bool, optional
+    :param top_n: Top terms to be used to make barplots. Defaults to 5
+    :type top_n: number, optional
+    :param z_score: Which dimention/axis to perform Z-score transformation for. Numpy/Pandas conventions are used:
+                    `0` is row-wise (in this case across comparisons) and `1` is column-wise (across terms). Defaults to 0.
+    :type z_score: number, optional
     """
+        
     import numpy as np
     import matplotlib.pyplot as plt
     import seaborn as sns

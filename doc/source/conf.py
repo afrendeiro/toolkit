@@ -104,6 +104,10 @@ pygments_style = 'sphinx'
 #keep_warnings = False
 
 
+# manually added
+autodoc_member_order = 'bysource'
+
+
 # -- Options for HTML output ----------------------------------------------
 
 # The theme to use for HTML and HTML Help pages.  See the documentation for

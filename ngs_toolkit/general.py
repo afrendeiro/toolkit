@@ -2215,15 +2215,33 @@ def differential_enrichment(
         as_jobs=True
     ):
     """
-    Given a dataframe of the results of differential analysis
-    (containing "comparison_name" and "log2FoldChange" columns),
-    will get enrichment of gene sets, regions and TF motifs according
-    to the `data_type`.
+    Perform various types of enrichment analysis given a dataframe
+    of the results from differential analysis.
+    Performs enrichment of gene sets (RNA-seq and ATAC-seq), genomic regions and TF motifs (ATAC-seq only).
 
-    If `directional`, separate features by the log2FoldChange direction (higher or less than 0).
-    At most will use `max_diff` regions/genes in each comparison sorted by `sort_var`.
-
-    `run_mode`: one of "serial" or "job".
+    :param analysis: Analysis object.
+    :type analysis: ngs_toolkit.general.Analysis
+    :param differential: Data frame with differential results as produced by
+                         ``ngs_toolkit.general.differential_analysis``. Must contain a "comparison_name" column.
+    :type differential: pandas.DataFrame
+    :param data_type: Data type. One of "ATAC-seq" and "RNA-seq". Defaults to "ATAC-seq".
+    :type data_type: str, optional
+    :param output_dir: Directory to create output files. Defaults to "results/differential_analysis_{data_type}".
+    :type output_dir: str, optional
+    :param output_prefix: Prefix to use when creating output files. Defaults to "differential_analysis".
+    :type output_prefix: str, optional
+    :param genome: Genome assembly of the analysis. Defaults to "hg19".
+    :type genome: str, optional
+    :param directional: Whether enrichments should be performed in a direction-dependent way
+                        (up-regulated and down-regulated features separately).
+                        This requires a column named "log2FoldChange" to exist. Defaults to True.
+    :type directional: bool, optional
+    :param max_diff: Number of maximum features to perform enrichment for ranked by variable in `max_diff`. Defaults to 1000.
+    :type max_diff: number, optional
+    :param sort_var: Variable to sort for when setting `max_diff`. Defaults to "pvalue".
+    :type sort_var: str, optional
+    :param as_jobs: One of "serial" or "job". Defaults to True.
+    :type as_jobs: bool, optional
     """
     import pandas as pd
     from tqdm import tqdm
@@ -2369,9 +2387,22 @@ def collect_differential_enrichment(
         permissive=True):
     """
     Collect the results of enrichment analysis ran after a differential analysis.
-    `differential` is a dataframe of the various comparisons with columns "comparison_name" and "direction".
 
-    If `permissive`, will skip non-existing files, giving a warning.
+    :param differential: Data frame with differential results as produced by
+                             ``ngs_toolkit.general.differential_analysis``.
+    :type differential: pandas.DataFrame
+    :param directional: Whether enrichments were made in a direction-dependent way
+                        (up-regulated and down-regulated features separately).
+                        This implies a column named "direction" exists". Defaults to True.
+    :type directional: bool, optional
+    :param data_type: Data type. One of "ATAC-seq" and "RNA-seq". Defaults to "ATAC-seq".
+    :type data_type: str, optional
+    :param output_dir: Directory to create output files. Defaults to "results/differential_analysis_{data_type}".
+    :type output_dir: str, optional
+    :param output_prefix: Prefix to use when creating output files. Defaults to "differential_analysis".
+    :type output_prefix: str, optional
+    :param permissive: Whether to skip non-existing files, giving a warning. Defaults to True.
+    :type permissive: bool, optional
     """
     import pandas as pd
     import numpy as np
@@ -2509,7 +2540,7 @@ def plot_differential_enrichment(
     `comp_variable` is the column in the enrichment table that labels groups.
 
     :param enrichment_table: Data frame with enrichment results as produced by
-                             ``ngs_toolkit.general.differential_enrichment`` and
+                             ``ngs_toolkit.general.differential_enrichment`` or
                              ``ngs_toolkit.general.collect_differential_enrichment``.
     :type enrichment_table: pandas.DataFrame
     :param enrichment_type: One of 'lola', 'enrichr', 'motif', 'great'.

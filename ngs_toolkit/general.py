@@ -648,7 +648,34 @@ def deseq_analysis(
         output_dir, output_prefix,
         overwrite=True, alpha=0.05):
     """
-    Perform differential comparisons with DESeq2.
+    Perform differential comparison analysis with DESeq2.
+
+    .. note::
+        Do not include hyphens ("-") in any of the samples or groups names!
+        R freaks out with this.
+
+    # TODO: fix hyphens in names issue
+
+    :param count_matrix: Data frame of shape (samples, variables) with raw read counts.
+    :type count_matrix: pandas.DataFrame
+    :param experiment_matrix: Data frame with columns "sample_name" and any other variables used in the `formula`.
+    :type experiment_matrix: pandas.DataFrame
+    :param comparison_table: Data frame with columns "comparison_name", "sample_group" and sample_name".
+    :type comparison_table: pandas.DataFrame
+    :param formula: Formula to test in R/patsy notation. Usually something like "~ batch + group".
+    :type formula: str
+    :param output_dir: Output directory for produced files.
+    :type output_dir: str
+    :param output_prefix: Prefix to add to produced files.
+    :type output_prefix: str
+    :param overwrite: Whether files existing should be overwritten. Defaults to True.
+    :type overwrite: bool, optional
+    :param alpha: Significance level to reject null hypothesis.
+                  This in practice has no effect as results for all features will be returned.
+                  Defaults to 0.05.
+    :type alpha: number, optional
+    :returns: Data frame with results, statistics for each feature.
+    :rtype: pandas.DataFrame
     """
     import pandas as pd
     from tqdm import tqdm
@@ -764,8 +791,21 @@ def least_squares_fit(
     Fit a least squares model with only categorical predictors.
     Computes p-values by comparing the log likelihood ratio of the chosen model to a `null_model`.
 
-    `quant_matrix` is a (samples, variables) matrix.
-    `design_matrix` is a (samples, variables) dataframe with all the variables in `test_model`.
+    :param quant_matrix: A Data frame of shape (samples, variables).
+    :type quant_matrix: pandas.DataFrame
+    :param design_matrix: A Data frame of shape (samples, variables) with all the variables in `test_model`.
+    :type design_matrix: pandas.DataFrame
+    :param test_model: Model design to test in R/patsy notation.
+    :type test_model: str
+    :param null_model: Null model design in R/patsy notation. Defaults to "~ 1".
+    :type null_model: str, optional
+    :param standardize_data: Whether data should be standardized prior to fitting. Defaults to True.
+    :type standardize_data: bool, optional
+    :param multiple_correction_method: Method to use for multiple test correction.
+                                       See statsmodels.sandbox.stats.multicomp.multipletests. Defaults to "fdr_bh".
+    :type multiple_correction_method: str, optional
+    :returns: Statistics of model fitting and comparison between models for each feature.
+    :rtype: pandas.DataFrame
     """
     from sklearn.preprocessing import StandardScaler
     import patsy
@@ -1976,6 +2016,15 @@ def meme_ame(input_fasta, output_dir, background_fasta=None, organism="human"):
 
 
 def parse_ame(ame_dir):
+    """
+    Parse results of MEME-AME motif enrichment.
+    
+    :param ame_dir: Directory with MEME-AME results.
+    :type ame_dir: str
+    :returns: Data frame with enrichment statistics for each found TF motif.
+    :rtype: pandas.DataFrame
+    :raises: IOError
+    """
     import os
     import pandas as pd
 
@@ -2007,6 +2056,15 @@ def homer_motifs(bed_file, output_dir, genome="hg19"):
 
 
 def parse_homer(homer_dir):
+    """
+    Parse results of HOMER findMotifs.pl de novo motif enrichment.
+    
+    :param homer_dir: Directory with HOMER results.
+    :type homer_dir: str
+    :returns: Data frame with enrichment statistics for each found TF motif.
+    :rtype: pandas.DataFrame
+    :raises: IOError
+    """
     import glob
     import os
     import re

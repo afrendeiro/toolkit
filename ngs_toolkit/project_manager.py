@@ -23,19 +23,41 @@ def parse_arguments():
     # parser.add_argument("-V", "--version", action="version",
     #               version="%(prog)s {v}".format(v=__version__))
 
-    parser.add_argument(
+    subparsers = parser.add_subparsers(dest="command")
+
+    # Create command
+    create_subparser = subparsers.add_parser(
+        "create", description="Create project.",
+        help="Create project.")
+    create_subparser.add_argument(
         dest="project_name",
         help="Project name.")
-    parser.add_argument(
+    create_subparser.add_argument(
+        '-r', '--root-dir',
+        default=os.path.curdir,
+        dest="root_dir",
+        help="Root directory to create projects.")
+    create_subparser.add_argument(
         "-d",
         "--dry-run",
         action="store_true",
         help="Don't actually do anything.")
-    parser.add_argument(
+    create_subparser.add_argument(
         "--overwrite",
         action="store_true",
         default=False,
         help="Don't overwrite any existing directory or file.")
+
+    # Recipe command
+    recipe_subparser = subparsers.add_parser(
+        "recipe", description="Run recipe.",
+        help="Run ngs_toolkit recipe for a given project.")
+    recipe_subparser.add_argument(
+        dest="recipe_name",
+        help="Recipe name.")
+    recipe_subparser.add_argument(
+        dest="project_config",
+        help="Project config.")
 
     # To enable the loop to pass args directly on to the pipelines...
     args = parser.parse_args()
@@ -44,13 +66,13 @@ def parse_arguments():
 
 
 def create_project(
-        project_name, overwrite=False,
+        project_name, root_dir, overwrite=False,
         username="arendeiro", email="{username}@cemm.oeaw.ac.at",
         url="http://biomedical-sequencing.at/bocklab/{username}/{project_name}"):
     """
     Main function: Create project.
     """
-    project_dir = os.path.join(os.path.curdir, project_name)
+    project_dir = os.path.join(root_dir, project_name)
 
     if os.path.exists(project_dir):
         if not overwrite:
@@ -212,6 +234,10 @@ def create_makefile(
         handle.write(textwrap.dedent(makefile_content) + "\n")
 
 
+def run_recipe(recipe_name, project_config):
+    os.system(recipe_name + ".py" + " " + project_config)
+
+
 def main():
     """
     Program's main entry point.
@@ -219,22 +245,29 @@ def main():
     # Parse command-line arguments.
     args = parse_arguments()
 
-    # Create project.
-    git_ok = create_project(
-        project_name=args.project_name,
-        overwrite=args.overwrite)
-    if git_ok != 0:
-        return git_ok
+    if args.command == "create":
+        # Create project.
+        git_ok = create_project(
+            project_name=args.project_name,
+            root_dir=args.root_dir,
+            overwrite=args.overwrite)
+        if git_ok != 0:
+            return git_ok
 
-    # Create requirements file.
-    create_requirements_file(
-        project_name=args.project_name,
-        overwrite=args.overwrite)
+        # Create requirements file.
+        create_requirements_file(
+            project_name=args.project_name,
+            overwrite=args.overwrite)
 
-    # Create Makefile.
-    create_makefile(
-        project_name=args.project_name,
-        overwrite=args.overwrite)
+        # Create Makefile.
+        create_makefile(
+            project_name=args.project_name,
+            overwrite=args.overwrite)
+
+    elif args.command == "recipe":
+        run_recipe(
+            recipe_name=args.recipe_name,
+            project_config=args.project_config)
 
 
 if __name__ == '__main__':

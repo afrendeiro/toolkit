@@ -48,7 +48,7 @@ def add_args(parser):
         "-n", "--analysis-name",
         dest="name",
         default=None,
-        help="Name of analysis. Will be the prefix of output_files."
+        help="Name of analysis. Will be the prefix of output_files. "
             "By default it will be the name of the Project given in the YAML configuration.",
         type=str)
     parser.add_argument(

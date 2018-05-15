@@ -1,8 +1,11 @@
 Recipes
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-`ngs_toolkit` provides scripts to perform routine tasks on NGS data - recipes.
-To make it convinient to run the scripts on data from a project, recipes can be run with the command ``projectmanager recipe <recipe_name> <project_config.yaml>``.
+`ngs_toolkit` provides scripts to perform routine tasks on NGS data - they are called recipes.
+
+Recipes are distributed with ngs_toolkit and can be seen in the `github repository <https://github.com/afrendeiro/toolkit/tree/master/ngs_toolkit/recipes>`_.
+
+To make it convenient to run the scripts on data from a project, recipes can be run with the command ``projectmanager recipe <recipe_name> <project_config.yaml>``.
 
 
 ngs_analysis

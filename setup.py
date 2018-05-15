@@ -32,6 +32,11 @@ requirements = [r for r in requirements if "#egg=" not in r]
 #         dependencies.append(
 #             'https://github.com/epigen/looper/tarball/{v}#egg={n}-{v}'.format(n=n, v=v))
 
+
+# recipes
+import glob
+recipes = map(os.path.abspath, glob.glob(os.path.join(os.path.curdir, "ngs_toolkit", "recipes", "*.py")))
+
 # setup
 setup(
     name="ngs_toolkit",
@@ -56,6 +61,7 @@ setup(
     author=u"Andre Rendeiro",
     license="GPL2",
     install_requires=requirements,
+    scripts=recipes,
     # dependency_links=dependencies,
     **extra
 )

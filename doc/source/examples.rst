@@ -9,35 +9,61 @@ The following is an example of how to use ``ngs_toolkit`` in a ATAC-seq project.
 While straightforward, it still allows considerable customization due to the modularity of the toolkit and the parametrization of most functions (this example uses default values everywhere nonetheless).
 
 
-We have the following project config YAML file:
+We have the following PEP/looper project config YAML file:
+
+.. code-block:: yaml
+
+    project_name: baf_complex
+    project_description: baf_complex
+    username: user
+    email: user@cemm.oeaw.ac.at
+    metadata:
+      output_dir: /scratch/lab_bock/shared/projects/baf_complex
+      results_subdir: data
+      submission_subdir: submission
+      pipeline_interfaces: /home/user/workspace/open_pipelines/pipeline_interface.yaml
+      sample_annotation: /scratch/lab_bock/shared/projects/baf_complex/metadata/annotation.csv
+      merge_table: /scratch/lab_bock/shared/projects/baf_complex/metadata/merge_table.csv
+    data_sources:
+      bsf: /path/to/samples/{flowcell}/{flowcell}_{lane}#{sample_name}.bam
+    genomes:
+      human: hg19
+    trackhubs:
+      trackhub_dir: /data/groups/lab_bock/public_html/user/baf_complex/
+      url: http://biomedical-sequencing.at/bocklab/user/baf_complex
+
 
 The following sample annotation CSV file:
 
-.. csv-table:: Typical example of comparison_table
-   :header: "sample_name", "genotype", "replicate", "organism"
+.. csv-table:: Annotation table for example
+   :header: "sample_name", "genotype", "replicate", "organism", flowcell, lane
 
-    "ATAC-seq_KOA_r1"  "KO_A"  "1"  "human"   
-    "ATAC-seq_KOA_r2"  "KO_A"  "2"  "human"  
-    "ATAC-seq_KOB_r1"  "KO_B"  "1"  "human"  
-    "ATAC-seq_KOB_r2"  "KO_B"  "2"  "human"  
-    "ATAC-seq_WT_r1"   "WT"    "1"  "human"
-    "ATAC-seq_WT_r2"   "WT"    "2"  "human"
+    "ATAC-seq_KOA_r1",  "KO_A",   "1",   "human", "C0RQ31ACXXX",   "1"
+    "ATAC-seq_KOA_r2",  "KO_A",   "2",   "human", "C0RQ31ACXXX",   "1"
+    "ATAC-seq_KOB_r1",  "KO_B",   "1",   "human", "C0RQ31ACXXX",   "1"
+    "ATAC-seq_KOB_r2",  "KO_B",   "2",   "human", "C0RQ31ACXXX",   "1"
+    "ATAC-seq_WT_r1",   "WT",   "1",    "human",    "C0RQ31ACXXX", "1"
+    "ATAC-seq_WT_r2",   "WT",    "2",   "human", "C0RQ31ACXXX",    "1"
 
 
 And the following comparison table:
 
-.. csv-table:: Typical example of comparison_table
+.. csv-table:: Comparison table for example
    :header: "comparison_name", "comparison_side", "sample_name", "sample_group"
    :widths: 30, 30, 30, 30
 
-    "KOA_vs_WT" "1" "ATAC-seq_KOA_r1"   "KO_A"
-    "KOA_vs_WT" "1" "ATAC-seq_KOA_r2"   "KO_A"
-    "KOA_vs_WT" "0" "ATAC-seq_WT_r1"    "WT"
-    "KOA_vs_WT" "0" "ATAC-seq_WT_r2"    "WT"
-    "KOB_vs_WT" "1" "ATAC-seq_KOB_r1"   "KO_B"
-    "KOB_vs_WT" "1" "ATAC-seq_KOB_r2"   "KO_B"
-    "KOB_vs_WT" "0" "ATAC-seq_WT_r1"    "WT"
-    "KOB_vs_WT" "0" "ATAC-seq_WT_r2"    "WT"
+    "KOA_vs_WT",    "1",    "ATAC-seq_KOA_r1",  "KO_A"
+    "KOA_vs_WT",    "1",    "ATAC-seq_KOA_r2",  "KO_A"
+    "KOA_vs_WT",    "0",    "ATAC-seq_WT_r1",   "WT"
+    "KOA_vs_WT",    "0",    "ATAC-seq_WT_r2",   "WT"
+    "KOB_vs_WT",    "1",    "ATAC-seq_KOB_r1",  "KO_B"
+    "KOB_vs_WT",    "1",    "ATAC-seq_KOB_r2",  "KO_B"
+    "KOB_vs_WT",    "0",    "ATAC-seq_WT_r1",   "WT"
+    "KOB_vs_WT",    "0",    "ATAC-seq_WT_r2",   "WT"
+
+
+Example analysis:
+
 
 .. code-block:: python
 

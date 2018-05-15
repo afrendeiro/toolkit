@@ -212,19 +212,20 @@ def create_makefile(
         looper run {project_config}
 
     summarize:
-        looper run {project_config}
+        looper summarize {project_config}
+
+    mklog:
+        mkdir -p log
 
     analysis: summarize
-        looper summarize {project_config}
-        python -u src/analysis.py
+        ngs_analysis.py {project_config}
 
-    analysis_job: summarize
-        mkdir -p log
-        sbatch -p shortq -c 12 --mem 80000 -J {project_name}.analysis -o {log_dir}/$(shell date +"%Y%m%d-%H%M%S").{project_name}.analysis.log --wrap "python -u src/analysis.py"
+    analysis_job: summarize mklog
+        sbatch -p shortq -c 12 --mem 80000 -J {project_name}.analysis -o {log_dir}/$(shell date +"%Y%m%d-%H%M%S").{project_name}.analysis.log --wrap "ngs_analysis.py {project_config}"
 
     all: requirements process analysis
 
-    .PHONY: requirements process analysis all""".format(
+    .PHONY: requirements process summarize mklog analysis all""".format(
         project_config=project_config,
         project_name=project_name,
         log_dir=log_dir)

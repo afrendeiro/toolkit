@@ -55,20 +55,23 @@ def add_args(parser):
         "-o", "--results-output",
         default="results",
         dest="results_dir",
-        help="Directory for analysis output files.",
+        help="Directory for analysis output files. "
+        "Default is 'results' under the project roort directory.",
         type=str)
     parser.add_argument(
         "-t", "--data-type",
         default=None,
         choices=["ATAC-seq", "RNA-seq", "ChIP-seq"],
         dest="data_type",
-        help="Data type to restrict analysis to.",
+        help="Data type to restrict analysis to. "
+        "Default is to run separate analysis for each data type.",
         type=str)
     parser.add_argument(
         "-q", "--pass-qc",
         action="store_true",
         dest="pass_qc",
-        help="Whether only samples with a 'pass_qc' value of '1' in the annotation sheet should be used.")
+        help="Whether only samples with a 'pass_qc' value of '1' "
+        "in the annotation sheet should be used.")
     parser.add_argument(
         "-a", "--alpha",
         default=0.05,

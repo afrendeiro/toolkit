@@ -2,6 +2,8 @@
 
 import sys
 import os
+import glob
+
 
 # take care of extra required modules depending on Python version
 extra = {}
@@ -34,8 +36,9 @@ requirements = [r for r in requirements if "#egg=" not in r]
 
 
 # recipes
-import glob
-recipes = map(os.path.abspath, glob.glob(os.path.join(os.path.curdir, "ngs_toolkit", "recipes", "*.py")))
+recipes = list(map(
+    os.path.abspath,
+    glob.glob(os.path.join(os.path.curdir, "ngs_toolkit", "recipes", "*.py"))))
 
 # setup
 setup(

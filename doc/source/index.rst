@@ -12,22 +12,16 @@ Contents
 ^^^^^^^^
 
 .. toctree::
-	:caption: Introduction
 	:maxdepth: 1
 
 	intro.rst
-
-.. toctree::
-	:caption: API
-	:maxdepth: 1
-
-	api.rst
-
-.. toctree::
-	:caption: Manager programs
-	:maxdepth: 2
-
+	examples.rst
+	concepts.rst
+	comparison_table.rst
 	manager_programs.rst
+	recipes.rst
+	api.rst
+	changelog.rst
 
 
 Indices and tables
@@ -41,5 +35,4 @@ Links
 ^^^^^^^^
 
  * Documentation: http://toolkit.readthedocs.io/
- * Permalink, issues and source code: https://github.com/afrendeiro/toolkit
-
+ * Issues and source code: https://github.com/afrendeiro/toolkit

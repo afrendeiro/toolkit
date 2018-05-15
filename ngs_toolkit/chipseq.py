@@ -175,7 +175,7 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
         return peak_counts
 
     def get_consensus_sites(
-            self, comparison_table, peak_dir="{results_dir}/chipseq_peaks", region_type="summits", extension=250,
+            self, comparison_table, peak_dir="{results_dir}/chipseq_peaks", region_type="peaks", extension=250,
             blacklist_bed="wgEncodeDacMapabilityConsensusExcludable.bed"):
         """
         Get consensus (union) of enriched sites (peaks) across all comparisons.
@@ -192,33 +192,39 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
         if "{results_dir}" in peak_dir:
             peak_dir = os.path.abspath(peak_dir.format(results_dir=self.results_dir))
 
-        for i, comparison in tqdm(enumerate(comparison_table["comparison_name"].drop_duplicates())):
-            peak_file = os.path.join(peak_dir, comparison, comparison + "_peaks.narrowPeak")
-            genome = comparison_table.loc[comparison_table["comparison_name"] == comparison, "comparison_genome"].drop_duplicates().squeeze()
+        first = True
+        for comparison in tqdm(comparison_table["comparison_name"].drop_duplicates()):
+            peak_files = [
+                os.path.join(peak_dir, comparison, comparison + "_peaks.narrowPeak"),
+                os.path.join(peak_dir, comparison, comparison + "_homer_peaks.factor.bed"),
+                os.path.join(peak_dir, comparison, comparison + "_homer_peaks.histone.bed")]
+            for peak_file in peak_files:
+                genome = comparison_table.loc[comparison_table["comparison_name"] == comparison, "comparison_genome"].drop_duplicates().squeeze()
 
-            assert type(genome) is str, "Could not determine genome of comparison '{}'.".format(comparison)
+                assert type(genome) is str, "Could not determine genome of comparison '{}'.".format(comparison)
 
-            # Get peaks
-            if region_type == "summits":
-                try:
-                    f = re.sub("_peaks.narrowPeak", "_summits.bed", peak_file)
-                    peaks = pybedtools.BedTool(f).slop(b=extension, genome=genome)
-                except ValueError:
-                    print("Summits for comparison {} ({}) not found!".format(comparison, f))
-                    continue
-            else:
-                try:
-                    peaks = pybedtools.BedTool(peak_file)
-                except ValueError:
-                    print("Peaks for comparison {} ({}) not found!".format(comparison, peak_file))
-                    continue
-            # Merge overlaping peaks within a comparison
-            peaks = peaks.merge()
-            if i == 0:
-                sites = peaks
-            else:
-                # Concatenate all peaks
-                sites = sites.cat(peaks)
+                # Get peaks
+                if region_type == "summits":
+                    try:
+                        f = re.sub("_peaks.narrowPeak", "_summits.bed", peak_file)
+                        peaks = pybedtools.BedTool(f).slop(b=extension, genome=genome)
+                    except ValueError:
+                        print("Summits for comparison {} ({}) not found!".format(comparison, f))
+                        continue
+                else:
+                    try:
+                        peaks = pybedtools.BedTool(peak_file)
+                    except ValueError:
+                        print("Peaks for comparison {} ({}) not found!".format(comparison, peak_file))
+                        continue
+                # Merge overlaping peaks within a comparison
+                peaks = peaks.merge()
+                if first:
+                    sites = peaks
+                    first = False
+                else:
+                    # Concatenate all peaks
+                    sites = sites.cat(peaks)
 
         # Merge overlaping peaks across comparisons
         sites = sites.merge()
@@ -232,35 +238,47 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
         # Read up again
         self.sites = pybedtools.BedTool(os.path.join(self.results_dir, self.name + "_peak_set.bed"))
 
+    def set_consensus_sites(self, bed_file, overwrite=True):
+        """
+        Set consensus (union) sites across samples.
+        Will be stored in a `sites` attribute.
+        """
+        self.sites = pybedtools.BedTool(bed_file)
+        if overwrite:
+            self.sites.saveas(os.path.join(self.results_dir, self.name + "_peak_set.bed"))
+
     def calculate_peak_support(self, comparison_table, peak_dir="{results_dir}/chipseq_peaks"):
         """
         Calculate a measure of support for each region in peak set
         (i.e. ratio of samples containing a peak overlapping region in union set of peaks).
         """
-        import re
         from tqdm import tqdm
 
         if "{results_dir}" in peak_dir:
             peak_dir = os.path.abspath(peak_dir.format(results_dir=self.results_dir))
 
+        # get index
+        index = self.sites.to_dataframe()
+        index = index['chrom'] + ":" + index['start'].astype(str) + "-" + index['end'].astype(str)
+
         # calculate support (number of samples overlaping each merged peak)
         comps = comparison_table["comparison_name"].drop_duplicates()
-        for i, comparison in tqdm(enumerate(comps)):
-            peak_file = os.path.join(peak_dir, comparison, comparison + "_peaks.narrowPeak")
+        support = pd.DataFrame(index=index)
+        for i, comparison in tqdm(enumerate(comps), total=comps.shape[0]):
+            peak_files = [
+                ("MACS", os.path.join(peak_dir, comparison, comparison + "_peaks.narrowPeak")),
+                ("HOMER_factor", os.path.join(peak_dir, comparison, comparison + "_homer_peaks.factor.bed")),
+                ("HOMER_histone", os.path.join(peak_dir, comparison, comparison + "_homer_peaks.histone.bed"))]
+            for peak_type, peak_file in peak_files:
+                try:
+                    sample_support = self.sites.intersect(peak_file, wa=True, c=True).to_dataframe()
+                except:
+                    continue
+                sample_support.index = index
+                support[(comparison, peak_type)] = sample_support.iloc[:, 3]
 
-            if i == 0:
-                support = self.sites.intersect(peak_file, wa=True, c=True)
-            else:
-                support = support.intersect(peak_file, wa=True, c=True)
-
-        try:
-            support = support.to_dataframe()
-        except:
-            support.saveas("_tmp.peaks.bed")
-            support = pd.read_csv("_tmp.peaks.bed", sep="\t", header=None)
-
-        support.columns = ["chrom", "start", "end"] + comps.tolist()
-        support.index = support['chrom'] + ":" + support['start'].astype(str) + "-" + support['end'].astype(str)
+        # Make multiindex labeling comparisons and peak type
+        support.columns = pd.MultiIndex.from_tuples(support.columns, names=["comparison", "peak_type"])
         support.to_csv(os.path.join(self.results_dir, self.name + "_peaks.binary_overlap_support.csv"), index=True)
 
         # get % of total consensus regions found per sample
@@ -270,11 +288,23 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
         #     .apply(lambda x: len(x[x["value"] == 1])))
 
         # divide sum (of unique overlaps) by total to get support value between 0 and 1
-        support["support"] = support[comps].apply(lambda x: sum([i if i <= 1 else 1 for i in x]) / float(len(comps)), axis=1)
+        support["support"] = support.astype(bool).astype(int).sum(axis=1) / float(support.shape[1])
+
         # save
         support.to_csv(os.path.join(self.results_dir, self.name + "_peaks.support.csv"), index=True)
 
         self.support = support
+
+    def get_supported_peaks(self, comparisons):
+        """
+        Get mask of sites with 0 support in the given samples.
+        Requires support matrix produced by `ngs_toolkit.atacseq.ATACSeqAnalysis.calculate_peak_support`.
+
+        :param list samples: Iterable of looper.models.Sample objects to restrict to.
+        :returns pd.Series: Boolean Pandas Series with sites with at least one of the \
+                            given samples having a peak called.
+        """
+        return self.support[[c for c in comparisons]].sum(1) != 0
 
 
 def macs2_call_chipseq_peak_job(signal_samples, control_samples, output_dir, name):
@@ -402,5 +432,5 @@ def homer_peaks_to_bed(homer_peaks, output_bed):
     df['name'] = df[1] + ":" + df[2].astype(str) + "-" + df[3].astype(str)
 
     (df[[1, 2, 3, 'name', '-log_pvalue']]
-    .sort_values("-log_pvalue", ascending=False)
+    .sort_values([1, 2, 3], ascending=True)
     .to_csv(output_bed, header=False, index=False, sep="\t"))

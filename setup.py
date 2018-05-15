@@ -1,6 +1,9 @@
 #! /usr/bin/env python
 
 import sys
+import os
+import glob
+
 
 # take care of extra required modules depending on Python version
 extra = {}
@@ -16,8 +19,26 @@ except ImportError:
     if sys.version_info < (2, 7):
         extra['dependencies'] = ['argparse']
 
-version = open("VERSION").read().strip()
-requirements = open("requirements.docs.txt").read().strip().split("\n")
+with open(os.path.join("ngs_toolkit", "_version.py"), 'r') as handle:
+    version = handle.readline().split()[-1].strip("\"'\n")
+
+requirements = open("requirements.txt").read().strip().split("\n")
+requirements = [r for r in requirements if not r.startswith("#")]
+requirements = [r for r in requirements if "#egg=" not in r]
+# dependencies = list()
+# for i, r in enumerate(requirements):
+#     if "#egg=" in r:
+#         n = r[r.index('#egg=') + 5:]
+#         v = r[r.index('/v') + 1:r.index('#egg=')]
+#         requirements[i] = n
+#         dependencies.append(
+#             'https://github.com/epigen/looper/tarball/{v}#egg={n}-{v}'.format(n=n, v=v))
+
+
+# recipes
+recipes = list(map(
+    os.path.abspath,
+    glob.glob(os.path.join(os.path.curdir, "ngs_toolkit", "recipes", "*.py"))))
 
 # setup
 setup(
@@ -43,5 +64,7 @@ setup(
     author=u"Andre Rendeiro",
     license="GPL2",
     install_requires=requirements,
+    scripts=recipes,
+    # dependency_links=dependencies,
     **extra
 )

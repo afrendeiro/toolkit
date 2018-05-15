@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
-# pipelines documentation build configuration file, created by
-# sphinx-quickstart on Sat Jun  6 20:04:26 2015.
+# ngs_toolkit documentation build configuration file, created by
+# sphinx-quickstart on Sat Jun  6 20:04:26 2017.
 #
 # This file is execfile()d with the current directory set to its
 # containing dir.
@@ -59,7 +59,9 @@ copyright = u'2017, Andre Rendeiro'
 # built documents.
 #
 # The short X.Y version.
-version = open(os.path.join("..", "..", "VERSION")).read().strip()
+with open(os.path.join("..", "..", "ngs_toolkit", "_version.py"), 'r') as handle:
+    version = handle.readline().split()[-1].strip("\"'\n")
+
 # The full version, including alpha/beta/rc tags.
 release = version
 
@@ -100,6 +102,10 @@ pygments_style = 'sphinx'
 
 # If true, keep warnings as "system message" paragraphs in the built documents.
 #keep_warnings = False
+
+
+# manually added
+autodoc_member_order = 'bysource'
 
 
 # -- Options for HTML output ----------------------------------------------
@@ -189,7 +195,7 @@ html_static_path = []  # it's empty; suppress warning
 #html_file_suffix = None
 
 # Output file base name for HTML help builder.
-htmlhelp_basename = 'pipelinesdoc'
+htmlhelp_basename = 'ngs_toolkitdoc'
 
 
 # -- Options for LaTeX output ---------------------------------------------
@@ -209,8 +215,8 @@ latex_elements = {
 # (source start file, target name, title,
 #  author, documentclass [howto, manual, or own class]).
 latex_documents = [
-  ('index', 'pipelines.tex', u'pipelines Documentation',
-   u'Bock lab', 'manual'),
+  ('index', 'ngs_toolkit.tex', u'ngs_toolkit Documentation',
+   u'Andre Rendeiro', 'manual'),
 ]
 
 # The name of an image file (relative to this directory) to place at the top of
@@ -239,8 +245,8 @@ latex_documents = [
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
 man_pages = [
-    ('index', 'pipelines', u'pipelines Documentation',
-     [u'Bock lab'], 1)
+    ('index', 'ngs_toolkit', u'ngs_toolkit Documentation',
+     [u'Andre Rendeiro'], 1)
 ]
 
 # If true, show URL addresses after external links.
@@ -253,8 +259,8 @@ man_pages = [
 # (source start file, target name, title, author,
 #  dir menu entry, description, category)
 texinfo_documents = [
-  ('index', 'pipelines', u'pipelines Documentation',
-   u'Bock lab', 'pipelines', 'One line description of project.',
+  ('index', 'ngs_toolkit', u'ngs_toolkit Documentation',
+   u'Andre Rendeiro', 'ngs_toolkit', 'One line description of project.',
    'Miscellaneous'),
 ]
 
@@ -274,13 +280,13 @@ texinfo_documents = [
 # -- Options for Epub output ----------------------------------------------
 
 # Bibliographic Dublin Core info.
-epub_title = u'pipelines'
-epub_author = u'Bock lab'
-epub_publisher = u'Bock lab'
-epub_copyright = u'2015, Bock lab'
+epub_title = u'ngs_toolkit'
+epub_author = u'Andre Rendeiro'
+epub_publisher = u'Andre Rendeiro'
+epub_copyright = u'2017, Andre Rendeiro'
 
 # The basename for the epub file. It defaults to the project name.
-#epub_basename = u'pipelines'
+#epub_basename = u'ngs_toolkit'
 
 # The HTML theme for the epub output. Since the default themes are not optimized
 # for small screen space, using the same theme for HTML and epub output is

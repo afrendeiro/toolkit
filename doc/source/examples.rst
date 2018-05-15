@@ -13,24 +13,24 @@ We have the following PEP/looper project config YAML file:
 
 .. code-block:: yaml
 
-    project_name: baf_complex
-    project_description: baf_complex
+    project_name: example_project
+    project_description: example_project
     username: user
     email: user@cemm.oeaw.ac.at
     metadata:
-      output_dir: /scratch/lab_bock/shared/projects/baf_complex
+      output_dir: /scratch/lab_bock/shared/projects/example_project
       results_subdir: data
       submission_subdir: submission
       pipeline_interfaces: /home/user/workspace/open_pipelines/pipeline_interface.yaml
-      sample_annotation: /scratch/lab_bock/shared/projects/baf_complex/metadata/annotation.csv
-      merge_table: /scratch/lab_bock/shared/projects/baf_complex/metadata/merge_table.csv
+      sample_annotation: /scratch/lab_bock/shared/projects/example_project/metadata/annotation.csv
+      merge_table: /scratch/lab_bock/shared/projects/example_project/metadata/merge_table.csv
     data_sources:
       bsf: /path/to/samples/{flowcell}/{flowcell}_{lane}#{sample_name}.bam
     genomes:
       human: hg19
     trackhubs:
-      trackhub_dir: /data/groups/lab_bock/public_html/user/baf_complex/
-      url: http://biomedical-sequencing.at/bocklab/user/baf_complex
+      trackhub_dir: /path/to/public_html/user/example_project/
+      url: http://root-url.com/example_project
 
 
 The following sample annotation CSV file:

@@ -529,8 +529,8 @@ def unsupervised_analysis(
                 except AttributeError:
                     label = np.nan
                 axis[pc, i].scatter(
-                    xx.loc[sample['sample_name'], :].loc[:, pc],
-                    xx.loc[sample['sample_name'], :].loc[:, pc + 1],
+                    xx.loc[sample['sample_name'], pc],
+                    xx.loc[sample['sample_name'], pc + 1],
                     s=30, color=color_dataframe.loc[attr, sample['sample_name']], alpha=0.75, label=label, rasterized=rasterized)
 
             # Plot groups

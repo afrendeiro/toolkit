@@ -1863,6 +1863,27 @@ def plot_differential(
             g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small")
             g.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.groups.clustermap.z0.svg".format(var_name)), bbox_inches="tight", dpi=dpi)
 
+            # same without clustering
+            g = sns.clustermap(
+                groups,
+                col_cluster=False,
+                xticklabels=True, yticklabels=feature_labels, cbar_kws={"label": "{} of\ndifferential {}s".format(quantity, var_name)},
+                cmap="BuGn", robust=robust, metric="correlation", rasterized=True, figsize=figsize)
+            g.ax_heatmap.set_ylabel("Differential {}s (n = {})".format(var_name, groups.shape[0]))
+            g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90, fontsize="xx-small")
+            g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small")
+            g.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.groups.clustermap.svg".format(var_name)), bbox_inches="tight", dpi=dpi)
+
+            g = sns.clustermap(
+                groups,
+                col_cluster=False,
+                xticklabels=True, yticklabels=feature_labels, z_score=0, cbar_kws={"label": "Z-score of {}\non differential {}s".format(quantity, var_name)},
+                cmap="RdBu_r", robust=robust, metric="correlation", rasterized=True, figsize=figsize)
+            g.ax_heatmap.set_ylabel("Differential {}s (n = {})".format(var_name, groups.shape[0]))
+            g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90, fontsize="xx-small")
+            g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small")
+            g.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.groups.clustermap.z0.svg".format(var_name)), bbox_inches="tight", dpi=dpi)
+
     # Fold-changes and P-values
     # pivot table of genes vs comparisons
     fold_changes = pd.pivot_table(
@@ -3558,8 +3579,18 @@ def query_biomart(
         attributes=["ensembl_gene_id", "external_gene_name", "hgnc_id", "hgnc_symbol"],
         species="hsapiens", ensembl_version="grch37"):
     """
+
     Query Biomart for gene attributes.
     Returns pandas dataframe with query results.
+
+    :param attributes: List of ensembl atrributes to query. Defaults to ["ensembl_gene_id", "external_gene_name", "hgnc_id", "hgnc_symbol"].
+    :type attributes: list, optional
+    :param species: Ensembl string of species to query. Defaults to "hsapiens".
+    :type species: str, optional
+    :param ensembl_version: Ensembl version to query. Defaults to "grch37".
+    :type ensembl_version: str, optional
+    :returns: Dataframe with required attributes for each entry.
+    :rtype: pandas.DataFrame
     """
     import requests
     import pandas as pd
@@ -3567,7 +3598,7 @@ def query_biomart(
 
     # Build request XML
     url_query = "".join([
-        """http://{}.ensembl.org/biomart/martservice?query=""".format(ensembl_version),
+        """http://{}ensembl.org/biomart/martservice?query=""".format(ensembl_version + "." if ensembl_version == "grch37" else ""),
         """<?xml version="1.0" encoding="UTF-8"?>""",
         """<!DOCTYPE Query>""",
         """<Query  virtualSchemaName="default" formatter="CSV" header="0" uniqueRows="0" count="" datasetConfigVersion="0.6" >""",

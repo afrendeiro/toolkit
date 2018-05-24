@@ -699,6 +699,7 @@ class ATACSeqAnalysis(Analysis):
         :returns: None
 
         # TODO: change file to absolute path.
+        # TODO: add options to limit association based on maximum distance.
 
         """
         # create bedtool with hg19 TSS positions
@@ -978,11 +979,11 @@ class ATACSeqAnalysis(Analysis):
 
         :param str matrix: Quantification matrix to be used (e.g. 'coverage' or 'accessibility')
         """
-        assert hasattr(analysis, "gene_annotation"), """Analysis object lacks "gene_annotation" dataframe."""
+        assert hasattr(self, "gene_annotation"), """Analysis object lacks "gene_annotation" dataframe."""
 
-        matrix = getattr(analysis, matrix).copy()
+        matrix = getattr(self, matrix).copy()
 
-        g = analysis.gene_annotation['gene_name'].str.split(",").apply(pd.Series).stack()
+        g = self.gene_annotation['gene_name'].str.split(",").apply(pd.Series).stack()
         g.index = g.index.droplevel(1)
         g.name = "gene_name"
 

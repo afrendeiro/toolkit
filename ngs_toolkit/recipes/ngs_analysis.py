@@ -298,7 +298,7 @@ def main_analysis_pipeline(
         print("Complex design for differential analysis. There are sample(s) belonging to more than one group.")
         print("Performing analysis independently for each comparison.")
         analysis.differential_results = pd.DataFrame()
-        for comparison in comparison_table['comparison_name'].unique()[1:]:
+        for comparison in comparison_table['comparison_name'].unique():
             comp = comparison_table[comparison_table['comparison_name'] == comparison]
             res = differential_analysis(
                 analysis,
@@ -350,7 +350,7 @@ def main_analysis_pipeline(
             (analysis.differential_results['log2FoldChange'].abs() > abs_fold_change)],
         data_type=data_type,
         output_dir="{}/differential_analysis_{}".format(analysis.results_dir, data_type),
-        genome="hg19",
+        genome=genome,  # not all is possible for mm10
         directional=True,
         max_diff=1000,
         sort_var="pvalue",

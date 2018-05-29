@@ -1833,7 +1833,7 @@ def plot_differential(
                         groups.loc[:, group] = matrix[c].mean(axis=1)
 
             # Select only differential regions from groups
-            groups = groups.loc[all_diff, :]
+            groups = groups.loc[all_diff, :].sort_index(axis=1)
 
             figsize = (max(5, 0.12 * groups.shape[1]), 5)
             # Heatmaps
@@ -1872,17 +1872,17 @@ def plot_differential(
             g.ax_heatmap.set_ylabel("Differential {}s (n = {})".format(var_name, groups.shape[0]))
             g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90, fontsize="xx-small")
             g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small")
-            g.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.groups.clustermap.svg".format(var_name)), bbox_inches="tight", dpi=dpi)
+            g.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.groups.sorted.clustermap.svg".format(var_name)), bbox_inches="tight", dpi=dpi)
 
             g = sns.clustermap(
                 groups,
                 col_cluster=False,
                 xticklabels=True, yticklabels=feature_labels, z_score=0, cbar_kws={"label": "Z-score of {}\non differential {}s".format(quantity, var_name)},
-                cmap="RdBu_r", robust=robust, metric="correlation", rasterized=True, figsize=figsize)
+                cmap="RdBu_r", center=0, robust=robust, metric="correlation", rasterized=True, figsize=figsize)
             g.ax_heatmap.set_ylabel("Differential {}s (n = {})".format(var_name, groups.shape[0]))
             g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90, fontsize="xx-small")
             g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small")
-            g.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.groups.clustermap.z0.svg".format(var_name)), bbox_inches="tight", dpi=dpi)
+            g.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.groups.sorted.clustermap.z0.svg".format(var_name)), bbox_inches="tight", dpi=dpi)
 
     # Fold-changes and P-values
     # pivot table of genes vs comparisons
@@ -1910,7 +1910,7 @@ def plot_differential(
             g = sns.clustermap(
                 fold_changes.loc[all_diff, :],
                 xticklabels=True, yticklabels=feature_labels, cbar_kws={"label": "Fold-change of\ndifferential {}s".format(var_name)},
-                cmap="RdBu_r", robust=robust, metric="correlation", rasterized=True, figsize=figsize)
+                cmap="RdBu_r", center=0, robust=robust, metric="correlation", rasterized=True, figsize=figsize)
             g.ax_heatmap.set_ylabel("Differential {}s (n = {})".format(var_name, fold_changes.loc[all_diff, :].shape[0]))
             g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90, fontsize="xx-small")
             g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small")
@@ -1922,7 +1922,7 @@ def plot_differential(
     if type(matrix.columns) is pd.core.indexes.multi.MultiIndex:
         matrix.columns = matrix.columns.get_level_values("sample_name")
 
-    matrix2 = matrix.loc[all_diff, :]
+    matrix2 = matrix.loc[all_diff, :].sort_index(axis=1)
     figsize = (max(5, 0.12 * matrix2.shape[1]), 5)
     if group_wise_colours:
         extra = {"col_colors": color_dataframe.values}
@@ -1949,11 +1949,31 @@ def plot_differential(
     g = sns.clustermap(
         matrix2,
         yticklabels=feature_labels, z_score=0, cbar_kws={"label": "Z-score of {}\non differential {}s".format(quantity, var_name)},
-        xticklabels=True, cmap="RdBu_r", metric="correlation", figsize=figsize, rasterized=rasterized, robust=robust, **extra)
+        xticklabels=True, cmap="RdBu_r", center=0, metric="correlation", figsize=figsize, rasterized=rasterized, robust=robust, **extra)
     g.ax_heatmap.set_ylabel("Differential {}s (n = {})".format(var_name, matrix2.shape[0]))
     g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90, fontsize="xx-small")
     g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small")
     g.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.samples.clustermap.z0.svg".format(var_name)), bbox_inches="tight", dpi=dpi)
+
+    g = sns.clustermap(
+        matrix2,
+        col_cluster=False,
+        yticklabels=feature_labels, cbar_kws={"label": "{} of\ndifferential {}s".format(quantity, var_name)},
+        xticklabels=True, vmin=0, cmap="RdBu_r", metric="correlation", figsize=figsize, rasterized=rasterized, robust=robust, **extra)
+    g.ax_heatmap.set_ylabel("Differential {}s (n = {})".format(var_name, matrix2.shape[0]))
+    g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90, fontsize="xx-small")
+    g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small")
+    g.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.samples.sorted.clustermap.svg".format(var_name)), bbox_inches="tight", dpi=dpi)
+
+    g = sns.clustermap(
+        matrix2,
+        col_cluster=False,
+        yticklabels=feature_labels, z_score=0, cbar_kws={"label": "Z-score of {}\non differential {}s".format(quantity, var_name)},
+        xticklabels=True, cmap="RdBu_r", center=0, metric="correlation", figsize=figsize, rasterized=rasterized, robust=robust, **extra)
+    g.ax_heatmap.set_ylabel("Differential {}s (n = {})".format(var_name, matrix2.shape[0]))
+    g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90, fontsize="xx-small")
+    g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small")
+    g.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.samples.sorted.clustermap.z0.svg".format(var_name)), bbox_inches="tight", dpi=dpi)
 
 
 def lola(bed_files, universe_file, output_folder, genome="hg19", cpus=8):

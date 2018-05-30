@@ -82,7 +82,7 @@ showSubtrackColorOnUi on
 type bigWig
 autoScale on
 visibility full
-maxHeighPixels 32:32:8{0}{1}{2}
+maxHeightPixels 32:32:8{0}{1}{2}
 """
 
     track_middle = """
@@ -95,7 +95,8 @@ maxHeighPixels 32:32:8{0}{1}{2}
     showSubtrackColorOnUi on
     type bigWig
     visibility full
-    maxHeighPixels 32:32:8{subgroups}
+    maxHeightPixels 32:32:8
+    {subgroups}
 """
 
     track_final = """
@@ -107,11 +108,12 @@ maxHeighPixels 32:32:8{0}{1}{2}
         graphTypeDefault bar
         visibility full
         height 32
-        maxHeighPixels 32:32:8
+        maxHeightPixels 32:32:8
         windowingFunction mean
         autoScale on
         bigDataUrl {bigwig}
-        color {color}{subgroups}
+        color {color}
+        {subgroups}
 
     """
 
@@ -148,7 +150,7 @@ trackDb {g}/trackDb.txt
         open(track_db, 'w').write("")
 
         # Create subgroups, an attribute sort order and an experiment matrix
-        subgroups = "\n" + "\n".join([
+        subgroups = "\n".join([
             """subGroup{0} {1} {1} \\\n    {2}""".format(i + 1, attr, " \\\n    ".join(
                 [x + "=" + x for x in sorted(df_g[attr].unique())])) for i, attr in enumerate(args.attributes)])
         sort_order = "\n" + "sortOrder " + " ".join([x + "=+" for x in args.attributes])
@@ -165,7 +167,7 @@ trackDb {g}/trackDb.txt
 
         # Group by requested attributes, add tracks
         for labels, indices in df_g.groupby(args.attributes).groups.items():
-            subgroups = "\n    subGroups " + " ".join(["{}={}".format(k, v) for k, v in zip(args.attributes, labels)])
+            subgroups = "subGroups " + " ".join(["{}={}".format(k, v) for k, v in zip(args.attributes, labels)])
 
             if len(indices) == 1:
                 sample_attrs = df_g.ix[indices].squeeze()

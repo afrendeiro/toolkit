@@ -390,182 +390,20 @@ class RNASeqAnalysis(Analysis):
         # plt.pcolor(data2)
 
     def unsupervised(
-            self, quant_matrix="expression_annotated", samples=None, attributes_to_plot=["sample_name"], plot_prefix="all_genes"):
+            self, args, **kwargs):
         """
-        Apply unsupervised clustering (clustering of correlations) and dimentionality reduction methods (MDS, PCA) on matrix.
-        Colours and labels samples by attributes in `attributes_to_plot`.
+        RNASeqAnalysis.unsupervised is provided for backward compatibility only and will be removed in the future.
+        Please use ngs_toolkit.general.unsupervised_analysis(RNASeqAnalysis) in the future.
         """
-        from sklearn.decomposition import PCA
-        from sklearn.manifold import MDS
-        from collections import OrderedDict
-        import re
-        import itertools
-        from scipy.stats import kruskal
-        from scipy.stats import pearsonr
+        from ngs_toolkit.general import unsupervised_analysis
 
-        matrix = getattr(self, quant_matrix)
+        print(PendingDeprecationWarning(
+            "RNASeqAnalysis.unsupervised is provided for backward compatibility "
+            "only and will be removed. Please use "
+            "ngs_toolkit.general.unsupervised_analysis(RNASeqAnalysis) "
+            "in the future."))
 
-        if samples is None:
-            samples = [s for s in self.samples if s.name in matrix.columns.get_level_values("sample_name")]
-
-        # This will always be a matrix for all samples
-        color_dataframe = pd.DataFrame(self.get_level_colors(index=matrix.columns, levels=attributes_to_plot), index=attributes_to_plot, columns=matrix.columns.get_level_values("sample_name"))
-        # will be filtered now by the requested samples if needed
-        color_dataframe = color_dataframe[[s.name for s in samples]]
-        # # exclude samples if needed
-        # color_dataframe = color_dataframe[[s.name for s in samples]]
-        # sample_display_names = color_dataframe.columns.str.replace("ATAC-seq_", "")
-
-        # All regions, matching samples (provided samples in matrix)
-        X = matrix.loc[:, matrix.columns.get_level_values("sample_name").isin([s.name for s in samples])]
-
-        # Pairwise correlations
-        g = sns.clustermap(
-            X.astype(float).corr(), xticklabels=False, annot=True,  # yticklabels=sample_display_names,
-            cmap="Spectral_r", figsize=(15, 15), cbar_kws={"label": "Pearson correlation"}, row_colors=color_dataframe.values.tolist())
-        g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize='xx-small')
-        g.ax_heatmap.set_xlabel(None, visible=False)
-        g.ax_heatmap.set_ylabel(None, visible=False)
-        g.fig.savefig(os.path.join(self.results_dir, "{}.{}.corr.clustermap.svg".format(self.name, plot_prefix)), bbox_inches='tight')
-
-        # MDS
-        mds = MDS(n_jobs=-1)
-        x_new = mds.fit_transform(X.T)
-        # transform again
-        x = pd.DataFrame(x_new)
-        xx = x.apply(lambda j: (j - j.mean()) / j.std(), axis=0)
-
-        fig, axis = plt.subplots(1, len(attributes_to_plot), figsize=(4 * len(attributes_to_plot), 4 * 1))
-        axis = axis.flatten()
-        for i, attr in enumerate(attributes_to_plot):
-            for j in range(len(xx)):
-                try:
-                    label = getattr(samples[j], attributes_to_plot[i])
-                except AttributeError:
-                    label = np.nan
-                axis[i].scatter(xx.loc[j, 0], xx.loc[j, 1], s=50, color=color_dataframe.loc[attr].iloc[j], label=label)
-            axis[i].set_title(attributes_to_plot[i])
-            axis[i].set_xlabel("MDS 1")
-            axis[i].set_ylabel("MDS 2")
-            axis[i].set_xticklabels(axis[i].get_xticklabels(), visible=False)
-            axis[i].set_yticklabels(axis[i].get_yticklabels(), visible=False)
-
-            # Unique legend labels
-            handles, labels = axis[i].get_legend_handles_labels()
-            by_label = OrderedDict(zip(labels, handles))
-            if any([type(c) in [str, unicode] for c in by_label.keys()]) and len(by_label) <= 20:
-                # if not any([re.match("^\d", c) for c in by_label.keys()]):
-                axis[i].legend(by_label.values(), by_label.keys())
-        fig.savefig(os.path.join(self.results_dir, "{}.{}.mds.svg".format(self.name, plot_prefix)), bbox_inches="tight")
-
-        # PCA
-        pca = PCA()
-        x_new = pca.fit_transform(X.T)
-        # transform again
-        xx = pd.DataFrame(x_new)
-
-        # plot % explained variance per PC
-        fig, axis = plt.subplots(1)
-        axis.plot(
-            range(1, len(pca.explained_variance_) + 1),  # all PCs
-            (pca.explained_variance_ / pca.explained_variance_.sum()) * 100, 'o-')  # % of total variance
-        axis.axvline(len(attributes_to_plot), linestyle='--')
-        axis.set_xlabel("PC")
-        axis.set_ylabel("% variance")
-        sns.despine(fig)
-        fig.savefig(os.path.join(self.results_dir, "{}.{}.pca.explained_variance.svg".format(self.name, plot_prefix)), bbox_inches='tight')
-
-        # plot
-        pcs = min(xx.shape[0] - 1, 8)
-        fig, axis = plt.subplots(pcs, len(attributes_to_plot), figsize=(4 * len(attributes_to_plot), 4 * pcs))
-        for pc in range(pcs):
-            for i, attr in enumerate(attributes_to_plot):
-                for j in range(len(xx)):
-                    try:
-                        label = getattr(samples[j], attributes_to_plot[i])
-                    except AttributeError:
-                        label = np.nan
-                    axis[pc, i].scatter(xx.loc[j, pc], xx.loc[j, pc + 1], s=50, color=color_dataframe.loc[attr].iloc[j], label=label)
-                axis[pc, i].set_title(attributes_to_plot[i])
-                axis[pc, i].set_xlabel("PC {}".format(pc + 1))
-                axis[pc, i].set_ylabel("PC {}".format(pc + 2))
-                axis[pc, i].set_xticklabels(axis[pc, i].get_xticklabels(), visible=False)
-                axis[pc, i].set_yticklabels(axis[pc, i].get_yticklabels(), visible=False)
-
-                # Unique legend labels
-                handles, labels = axis[pc, i].get_legend_handles_labels()
-                by_label = OrderedDict(zip(labels, handles))
-                if any([type(c) in [str, unicode] for c in by_label.keys()]) and len(by_label) <= 20:
-                    # if not any([re.match("^\d", c) for c in by_label.keys()]):
-                    axis[pc, i].legend(by_label.values(), by_label.keys())
-        fig.savefig(os.path.join(self.results_dir, "{}.{}.pca.svg".format(self.name, plot_prefix)), bbox_inches="tight")
-
-        #
-
-        # # Test association of PCs with attributes
-        associations = list()
-        for pc in range(pcs):
-            for attr in attributes_to_plot:
-                print("PC {}; Attribute {}.".format(pc + 1, attr))
-                sel_samples = [s for s in samples if hasattr(s, attr)]
-                sel_samples = [s for s in sel_samples if not pd.isnull(getattr(s, attr))]
-
-                # Get all values of samples for this attr
-                groups = set([getattr(s, attr) for s in sel_samples])
-
-                # Determine if attr is categorical or continuous
-                if all([type(i) in [str, bool] for i in groups]) or len(groups) == 2:
-                    variable_type = "categorical"
-                elif all([type(i) in [int, float, np.int64, np.float64] for i in groups]):
-                    variable_type = "numerical"
-                else:
-                    print("attr %s cannot be tested." % attr)
-                    associations.append([pc + 1, attr, variable_type, np.nan, np.nan, np.nan])
-                    continue
-
-                if variable_type == "categorical":
-                    # It categorical, test pairwise combinations of attributes
-                    for group1, group2 in itertools.combinations(groups, 2):
-                        g1_indexes = [i for i, s in enumerate(sel_samples) if getattr(s, attr) == group1]
-                        g2_indexes = [i for i, s in enumerate(sel_samples) if getattr(s, attr) == group2]
-
-                        g1_values = xx.loc[g1_indexes, pc]
-                        g2_values = xx.loc[g2_indexes, pc]
-
-                        # Test ANOVA (or Kruskal-Wallis H-test)
-                        p = kruskal(g1_values, g2_values)[1]
-
-                        # Append
-                        associations.append([pc + 1, attr, variable_type, group1, group2, p])
-
-                elif variable_type == "numerical":
-                    # It numerical, calculate pearson correlation
-                    indexes = [i for i, s in enumerate(samples) if s in sel_samples]
-                    pc_values = xx.loc[indexes, pc]
-                    trait_values = [getattr(s, attr) for s in sel_samples]
-                    p = pearsonr(pc_values, trait_values)[1]
-
-                    associations.append([pc + 1, attr, variable_type, np.nan, np.nan, p])
-
-        associations = pd.DataFrame(associations, columns=["pc", "attribute", "variable_type", "group_1", "group_2", "p_value"])
-
-        # write
-        associations.to_csv(os.path.join(self.results_dir, "{}.{}.pca.variable_principle_components_association.csv".format(self.name, plot_prefix)), index=False)
-
-        # Plot
-        # associations[associations['p_value'] < 0.05].drop(['group_1', 'group_2'], axis=1).drop_duplicates()
-        # associations.drop(['group_1', 'group_2'], axis=1).drop_duplicates().pivot(index="pc", columns="attribute", values="p_value")
-        pivot = associations.groupby(["pc", "attribute"]).min()['p_value'].reset_index().pivot(index="pc", columns="attribute", values="p_value").dropna(axis=1)
-
-        # heatmap of -log p-values
-        g = sns.clustermap(-np.log10(pivot), row_cluster=False, annot=True, cbar_kws={"label": "-log10(p_value) of association"})
-        g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=45, ha="right")
-        g.fig.savefig(os.path.join(self.results_dir, "{}.{}.pca.variable_principle_components_association.svg".format(self.name, plot_prefix)), bbox_inches="tight")
-
-        # heatmap of masked significant
-        g = sns.clustermap((pivot < 0.05).astype(int), row_cluster=False, cbar_kws={"label": "significant association"})
-        g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=45, ha="right")
-        g.fig.savefig(os.path.join(self.results_dir, "{}.{}.pca.variable_principle_components_association.masked.svg".format(self.name, plot_prefix)), bbox_inches="tight")
+        unsupervised_analysis(args, **kwargs)
 
 
 def knockout_plot(

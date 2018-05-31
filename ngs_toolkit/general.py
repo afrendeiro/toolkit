@@ -2571,6 +2571,14 @@ def collect_differential_enrichment(
                     ame_motifs["direction"] = direction
                     meme_enr = meme_enr.append(ame_motifs, ignore_index=True)
 
+                    # fix mouse TF names
+                    if meme_enr['TF'].str.startswith("UP").all():
+                        annot = pd.read_table(
+                            "~/resources/motifs/motif_databases/MOUSE/uniprobe_mouse.id_mapping.tsv",
+                            header=None, names=["TF", "TF_name"])
+                        annot["TF"] = annot['TF'].str.replace(r"_.*", "")
+                        meme_enr = pd.merge(meme_enr, annot).drop("TF", axis=1).rename(columns={"TF_name": "TF"})
+
                 # HOMER
                 try:
                     homer_motifs = parse_homer(os.path.join(comparison_dir, "homerResults"))

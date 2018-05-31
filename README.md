@@ -11,6 +11,6 @@ Head to the [documentation](http://ngs-toolkit.readthedocs.io/) to see how to in
 Install with:
 
 ```
-pip install https://github.com/afrendeiro/toolkit/zipball/master
+pip install ngs-toolkit
 ```
 You might need to add a ``--user`` flag to the above command.

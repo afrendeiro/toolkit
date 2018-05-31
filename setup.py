@@ -51,18 +51,19 @@ setup(
             'trackmanager = ngs_toolkit.track_manager:main'
         ],
     },
-    description="Toolkit for bioinformatics.",
+    description="A toolkit for NGS analysis with Python.",
     long_description=open('README.md').read(),
     classifiers=[
         "Development Status :: 3 - Alpha",
-        "License :: OSI Approved :: GNU General Public License v2 or later (GPLv2+)",
+        "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
         "Programming Language :: Python :: 2.7",
         "Topic :: Scientific/Engineering :: Bio-Informatics"
     ],
-    keywords="bioinformatics, sequencing, ngs, ATAC-Seq, ChIP-seq, RNA-seq",
+    keywords="bioinformatics, sequencing, ngs, ngs analysis, ATAC-Seq, ChIP-seq, RNA-seq, project management",
     url="https://github.com/afrendeiro/toolkit",
     author=u"Andre Rendeiro",
-    license="GPL2",
+    author_email = 'afrendeiro@gmail.com',
+    license="GPL3",
     install_requires=requirements,
     scripts=recipes,
     # dependency_links=dependencies,

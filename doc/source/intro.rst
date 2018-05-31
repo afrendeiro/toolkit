@@ -8,7 +8,7 @@ To install ``ngs_toolkit`` simply do:
 
 .. code-block:: bash
 
-   pip install https://github.com/afrendeiro/toolkit/zipball/master [--user]
+   pip install ngs-toolkit [--user]
 
 you might need the ``--user`` flag if not root or running in a virtual environment.
 

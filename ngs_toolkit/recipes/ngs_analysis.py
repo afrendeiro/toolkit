@@ -103,7 +103,7 @@ def main():
     os.chdir(prj.metadata.output_dir)
     if args.pass_qc:
         print("Filtering samples out which didn't pass QC as specified in sample annotation in column 'pass_qc'")
-        prj._samples = [s for s in prj._samples if s.pass_qc == '1']
+        prj._samples = [s for s in prj._samples if s.pass_qc not in ['0', 0, 'False', False]]
     print("Setting location of sample files dependent on sample types.")
     for sample in prj.samples:
         if hasattr(sample, "protocol"):
@@ -141,7 +141,9 @@ def main():
         print("Starting analysis for samples of type: '{}'.".format(data_type))
         samples = [s for s in prj.samples if (s.library == data_type)]
         if len(samples) > 0:
-            print("Samples under consideration: '{}'.".format(",".join([s.name for s in samples])))
+            print(
+                "Samples under consideration: '{}'. ".format(",".join([s.name for s in samples])) +
+                "Total of {} samples.".format(len([s.name for s in samples])))
         else:
             raise ValueError("There were no valid samples for this analysis type!")
 
@@ -321,11 +323,13 @@ def main_analysis_pipeline(
     if diff.empty:
         print("Differential analysis contains no significant {} at alpha {} and absolute fold change {}.".format(feature_name, alpha, abs_fold_change))
         return 0
-    differential_overlap(
-        diff,
-        getattr(analysis, quant_matrix).shape[0],
-        output_dir="{}/differential_analysis_{}".format(analysis.results_dir, data_type),
-        data_type=data_type)
+
+    if diff.groupby('comparison_name').count().shape[0] > 1:
+        differential_overlap(
+            diff,
+            getattr(analysis, quant_matrix).shape[0],
+            output_dir="{}/differential_analysis_{}".format(analysis.results_dir, data_type),
+            data_type=data_type)
 
     plot_differential(
         analysis,

@@ -1,4 +1,6 @@
-[![Documentation Status](https://readthedocs.org/projects/ngs-toolkit/badge/?version=latest)](http://ngs-toolkit.readthedocs.io/en/latest/?badge=latest)
+[![Documentation Status](https://readthedocs.org/projects/ngs-toolkit/badge/?version=latest)](http://ngs-toolkit.readthedocs.io/en/latest/?badge=latest) [![PyPI version](https://badge.fury.io/py/ngs-toolkit.svg)](https://badge.fury.io/py/ngs-toolkit) [![Documentation Status](https://landscape.io/github/afrendeiro/toolkit/master/landscape.png)](https://landscape.io/github/afrendeiro/toolkit/master)
+
+
 
 ## toolkit
 

@@ -228,7 +228,7 @@ def create_makefile(
     .PHONY: requirements process summarize mklog analysis all""".format(
         project_config=project_config,
         project_name=project_name,
-        log_dir=log_dir)
+        log_dir=log_dir).replace("    ", "\t")
 
     # write Makefile
     with open(makefile, "w") as handle:

@@ -1,6 +1,28 @@
 Changelog
 ******************************
 
+- **v0.1.3.5.3b** (*2018-06-12*):
+
+  - Fixes:
+
+    - general.deseq_analysis: fix hyphen character conversion; better contrasts for DESeq2
+
+.. |br| raw:: html
+
+   <br />
+
+- **v0.1.3.5.3** (*2018-05-31*):
+
+  - Fixes:
+
+    - projectmanager: fix Makefile creation
+    - ngs_analysis recipe: change selection of samples on "pass_qc"; do differential_overlap only when >1 comparison
+
+
+.. |br| raw:: html
+
+   <br />
+
 - **v0.1.3.5.2** (*2018-05-30*):
 
   - Fixes:

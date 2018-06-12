@@ -681,6 +681,7 @@ def deseq_analysis(
     from tqdm import tqdm
     from rpy2.robjects import numpy2ri, pandas2ri
     import rpy2.robjects as robjects
+    from rpy2.rinterface import RRuntimeError
     numpy2ri.activate()
     pandas2ri.activate()
 
@@ -709,6 +710,9 @@ def deseq_analysis(
     # Rename samples to avoid R errors with sample names containing symbols
     count_matrix.columns = ["S{}".format(i) for i in range(len(count_matrix.columns))]
     experiment_matrix.index = ["S{}".format(i) for i in range(len(experiment_matrix.index))]
+    # Replace hyphens with underscores
+    experiment_matrix = experiment_matrix.replace("-", "_")
+    comparison_table = comparison_table.replace("-", "_")
 
     # Run DESeq analysis
     dds = _DESeqDataSetFromMatrix(
@@ -733,8 +737,19 @@ def deseq_analysis(
             (comparison_table["comparison_side"] <= 0),
             "sample_group"].drop_duplicates().squeeze()
 
-        contrast = ["sample_group" + a, "sample_group" + b]
-        res = _as_data_frame(_results(dds, contrast=contrast, alpha=alpha, independentFiltering=False, parallel=True))
+        contrast = np.array(["sample_group", a, b])
+        try:
+            res = _as_data_frame(_results(dds, contrast=contrast, alpha=alpha, independentFiltering=False, parallel=True))
+        except RRuntimeError as e:
+            print("DESeq2 group contrast '{}' didn't work!".format(contrast))
+            print(e)
+            contrast = ["sample_group" + a, "sample_group" + b]
+            try:
+                res = _as_data_frame(_results(dds, contrast=contrast, alpha=alpha, independentFiltering=False, parallel=True))
+                print("DESeq2 group contrast '{}' did work now!".format(", ".join(contrast)))
+            except RRuntimeError as e2:
+                print("DESeq2 group contrast '{}' didn't work either!".format(", ".join(contrast)))
+                raise e2
 
         # convert to pandas dataframe
         res2 = r2pandas_df(res)

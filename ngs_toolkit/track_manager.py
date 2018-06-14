@@ -82,7 +82,8 @@ showSubtrackColorOnUi on
 type bigWig
 autoScale on
 visibility full
-maxHeightPixels 32:32:8{0}{1}{2}
+maxHeightPixels 32:32:8
+{0}{1}{2}
 """
 
     track_middle = """

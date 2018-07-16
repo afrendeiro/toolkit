@@ -121,7 +121,7 @@ def create_project(
     pipeline_config:
         atacseq: null
     compute:
-        submission_template: templates/slurm_template.sub
+        submission_template: slurm_template.sub
         submission_command: sbatch
     trackhubs:
         trackhub_dir: /data/groups/lab_bock/public_html/arendeiro/{project_name}/

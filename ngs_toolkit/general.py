@@ -3042,25 +3042,56 @@ def z_score(x):
     return (x - x.mean()) / x.std()
 
 
-def signed_max(x, f=0.66):
+def signed_max(x, f=0.66, axis=0):
     """
-    Return maximum or minimum depending on the sign of the majority of values.
+    Return maximum or minimum of array `x` depending on the sign of the majority of values.
     If there isn't a clear majority (at least `f` fraction in one side), return mean of values.
+    If given a pandas DataFrame or 2D numpy array, will apply this across rows (columns-wise, axis=0)
+    or across columns (row-wise, axis=1).
+    Will return NaN for non-numeric values.
 
-    :param numpy.array x: Numeric array.
+    :param numpy.array x: Numeric array or pandas Dataframe or Series.
     :param float f: Threshold fraction of majority agreement.
+    :param int axis: Whether to apply across rows (0, columns-wise) or across columns (1, row-wise).
+    :returns: Pandas Series with values reduced to the signed maximum.
+    :rtype: pandas.Series
     """
-    l = float(len(x))
-    neg = sum(x < 0)
-    pos = sum(x > 0)
-    obs_f = max(neg / l, pos / l)
-    if obs_f >= f:
-        if neg > pos:
-            return min(x)
+    if axis not in [0, 1]:
+        raise ValueError("Axis must be one of 0 (columns) or 1 (rows).")
+
+    if len(x.shape) == 1:
+        # Return nan if not numeric
+        if x.dtype not in [np.float_, np.int_]:
+            return np.nan
+
+        types = [type(i) for i in x]
+        if not all(types):
+            return np.nan
         else:
-            return max(x)
+            if types[0] not in [np.float_, float, np.int_, int]:
+                return np.nan
+        l = float(len(x))
+        neg = sum(x < 0)
+        pos = sum(x > 0)
+        obs_f = max(neg / l, pos / l)
+        if obs_f >= f:
+            if neg > pos:
+                return min(x)
+            else:
+                return max(x)
+        else:
+            return np.mean(x)
     else:
-        return np.mean(x)
+        if type(x) != pd.DataFrame:
+            x = pd.DataFrame(x)
+
+        if axis == 1:
+            x = x.T
+        res = pd.Series(np.empty(x.shape[1]), index=x.columns)
+        for v in x.columns:
+            res[v] = signed_max(x.loc[:, v])
+
+        return res
 
 
 # def detect_peaks(x, mph=None, mpd=1, threshold=0, edge='rising',

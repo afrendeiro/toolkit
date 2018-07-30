@@ -971,13 +971,14 @@ class ATACSeqAnalysis(Analysis):
             self.accessibility = accessibility
         return accessibility
 
-    def get_gene_level_accessibility(self, matrix="accessibility"):
+    def get_gene_level_accessibility(self, matrix="accessibility", reduce_func=np.mean):
         """
         Get gene-level measurements of coverage.
         Requires a 'gene_annotation' attribute to be set containing a mapping between the index of `matrix` and genes
         (produced from `get_peak_gene_annotation`).
 
         :param str matrix: Quantification matrix to be used (e.g. 'coverage' or 'accessibility')
+        :param def reduce_func: Function to apply to reduce values. Default is mean
         """
         assert hasattr(self, "gene_annotation"), """Analysis object lacks "gene_annotation" dataframe."""
 
@@ -990,7 +991,34 @@ class ATACSeqAnalysis(Analysis):
         matrix2 = matrix.join(g).drop("gene_name", axis=1)
         matrix2.index = matrix.join(g).reset_index().set_index(['index', 'gene_name']).index
         matrix2.columns = matrix.columns
-        return matrix2.groupby(level=['gene_name']).mean()
+        matrix3 = matrix2.groupby(level=['gene_name']).apply(reduce_func)
+
+        return matrix3.loc[:, ~matrix3.isnull().all()]
+
+    def get_gene_level_changes(self, differential_results=None, reduce_func=np.mean):
+        """
+        Redcuce changes in regulatory elements to gene-level by aggregating across regulatory elements.
+        Requires a 'gene_annotation' attribute to be set containing a mapping between the index of `matrix` and genes
+        (produced from `get_peak_gene_annotation`).
+        :param pandas.DataFrame differential_results: Matrix with differential results to use.
+            Default is a 'differential_results' attribute of self.
+        :param def reduce_func: Function to apply to reduce values. Default is mean
+        """
+        assert hasattr(self, "gene_annotation"), """Analysis object lacks "gene_annotation" dataframe."""
+
+        if differential_results is None:
+            differential_results = self.differential_results
+
+        g = self.gene_annotation['gene_name'].str.split(",").apply(pd.Series).stack()
+        g.index = g.index.droplevel(1)
+        g.name = "gene_name"
+
+        dr2 = differential_results.join(g).drop("gene_name", axis=1)
+        dr2.index = differential_results.join(g).reset_index().set_index(['index', 'gene_name']).index
+        dr2.columns = differential_results.columns
+        dr3 = dr2.reset_index().groupby(['gene_name', 'comparison_name']).apply(reduce_func)
+
+        return dr3.loc[:, ~dr3.isnull().all()]
 
     def plot_peak_characteristics(self, samples=None, by_attribute=None, genome_space=3e9):
         """

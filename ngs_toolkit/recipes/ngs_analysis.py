@@ -263,7 +263,7 @@ def main_analysis_pipeline(
         # Get gene expression
         analysis.get_gene_expression(
             samples=analysis.samples,
-            sample_attributes=["sample_name", "knockout", 'treatment', "replicate", "clone", "batch"])
+            sample_attributes=sample_attributes)
 
         quant_matrix = "expression_annotated"
         feature_name = "genes"

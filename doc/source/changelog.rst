@@ -1,6 +1,19 @@
 Changelog
 ******************************
 
+- **v0.1.3.5.4** (*2018-07-30*):
+
+  - add Makefile to upload to Pypi
+  - update looper template folder of projectmanager
+  - add unbuferred output to ngs_analysis recipe
+  - add atacseq.get_gene_level_changes
+  - improve atacseq.get_gene_level_accessibility
+  - add 2D support to general.signed_mean
+
+.. |br| raw:: html
+
+   <br />
+
 - **v0.1.3.5.3b** (*2018-06-12*):
 
   - Fixes:

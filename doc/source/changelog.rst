@@ -9,6 +9,7 @@ Changelog
   - add atacseq.get_gene_level_changes
   - improve atacseq.get_gene_level_accessibility
   - add 2D support to general.signed_mean
+  - Fix issue #20: len(attributes_to_plot) in general.unsupervised_analysis can be 1 now
 
 .. |br| raw:: html
 

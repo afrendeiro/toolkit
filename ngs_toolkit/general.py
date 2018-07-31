@@ -442,7 +442,8 @@ def unsupervised_analysis(
     # xx = x.apply(lambda j: (j - j.mean()) / j.std(), axis=0)
 
     fig, axis = plt.subplots(1, len(attributes_to_plot), figsize=(4 * len(attributes_to_plot), 4 * 1))
-    axis = axis.flatten()
+    if len(attributes_to_plot) != 1:
+        axis = axis.flatten()
     for i, attr in enumerate(attributes_to_plot):
         for j, sample in enumerate(xx.index):
             sample = pd.Series(sample, index=X.columns.names)

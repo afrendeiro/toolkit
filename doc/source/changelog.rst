@@ -1,7 +1,7 @@
 Changelog
 ******************************
 
-- **v0.1.3.5.4** (*2018-07-30*):
+- **v0.1.3.5.4** (*2018-08-02*):
 
   - add Makefile to upload to Pypi
   - update looper template folder of projectmanager
@@ -10,6 +10,12 @@ Changelog
   - improve atacseq.get_gene_level_accessibility
   - add 2D support to general.signed_mean
   - Fix issue #20: len(attributes_to_plot) in general.unsupervised_analysis can be 1 now
+  - trackmanager:
+
+    - add default attributes to specified in project_config.group_attributes or otherwise to ['sample_name']
+    - Fix issue #16: trackmanager output indentation
+    - fix empty subGroups in UCSC trackDb file
+    - remove required attributes if no value is found
 
 .. |br| raw:: html
 

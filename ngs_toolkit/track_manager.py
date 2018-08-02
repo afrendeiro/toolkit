@@ -17,7 +17,10 @@ def parse_arguments():
     parser.add_argument(dest="project_config_file")
     parser.add_argument(
         '-a', '--attrs', dest="attributes", nargs="?",
-        help="Sample attributes (annotation sheet columns) to use to order tracks. Add attributes comma-separated with no whitespace.")
+        help="Sample attributes (annotation sheet columns) to use to order tracks. " +
+             "Add attributes comma-separated with no whitespace. " +
+             "Default is list of 'group_attributes' specified in `project_config_file`, " +
+             "if none are found, will default to 'sample_name'")
     parser.add_argument(
         '-c', '--color-attr', dest="color_attribute", default=None,
         help="Sample attribute to use to color tracks with. Default is first attribute passed.")
@@ -28,9 +31,6 @@ def parse_arguments():
         '-l', '--link', dest="link", action="store_true",
         help="Whether bigWig files should be soft-linked to the track database directory. Default=False.")
     args = parser.parse_args()
-    args.attributes = args.attributes.split(',')
-    if args.color_attribute is None:
-        args.color_attribute = args.attributes[0]
 
     return args
 
@@ -62,11 +62,11 @@ def make_ucsc_trackhub(args, prj, track_hub, bigwig_dir, genomes_hub, proj_name,
     """
     # Start building hub
     text = """hub {proj}
-    shortLabel {description}
-    longLabel {description}
-    genomesFile genomes.txt
-    email {email}
-    """.format(proj=proj_name, description=proj_desc, email=user_email)
+shortLabel {description}
+longLabel {description}
+genomesFile genomes.txt
+email {email}
+""".format(proj=proj_name, description=proj_desc, email=user_email)
     with open(track_hub, 'w') as handle:
         handle.write(text)
     os.chmod(track_hub, 0755)
@@ -130,6 +130,10 @@ maxHeightPixels 32:32:8
         raise ValueError("Samples must contain either a 'library' or 'protocol' attribute.")
     df = df[df[var_].isin(["ATAC-seq", "ChIP-seq", "ChIPmentation"])]
 
+    # Keep only attributes that have at least one value
+    d = df[args.attributes].loc[:, df[args.attributes].isnull().all()].columns.tolist()
+    attributes = [a for a in args.attributes if a not in d]
+
     # Create a trackHub for each genome
     for genome in df['genome'].unique():
         if not os.path.exists(os.path.join(bigwig_dir, genome)):
@@ -153,10 +157,11 @@ trackDb {g}/trackDb.txt
         # Create subgroups, an attribute sort order and an experiment matrix
         subgroups = "\n".join([
             """subGroup{0} {1} {1} \\\n    {2}""".format(i + 1, attr, " \\\n    ".join(
-                [x + "=" + x for x in sorted(df_g[attr].unique())])) for i, attr in enumerate(args.attributes)])
-        sort_order = "\n" + "sortOrder " + " ".join([x + "=+" for x in args.attributes])
+                [x + "=" + x for x in sorted(df_g[attr].unique())])) for i, attr in enumerate(attributes)])
+        subgroups = subgroups.replace("    = \\\n", "")  # remove values of subgroups with no value
+        sort_order = "\n" + "sortOrder " + " ".join([x + "=+" for x in attributes])
         dimensions = "\n" + "dimensions " + " ".join(
-            ["".join(x) for x in zip(["dim{}=".format(x) for x in ["X", "Y"] + [string.ascii_uppercase[:-3]]], args.attributes)])
+            ["".join(x) for x in zip(["dim{}=".format(x) for x in ["X", "Y"] + [string.ascii_uppercase[:-3]]], attributes)])
 
         track = track_parent.format(subgroups,
                                     sort_order,
@@ -167,8 +172,8 @@ trackDb {g}/trackDb.txt
         df_g['track_color'] = get_colors(df[args.color_attribute])
 
         # Group by requested attributes, add tracks
-        for labels, indices in df_g.groupby(args.attributes).groups.items():
-            subgroups = "subGroups " + " ".join(["{}={}".format(k, v) for k, v in zip(args.attributes, labels)])
+        for labels, indices in df_g.groupby(attributes).groups.items():
+            subgroups = "subGroups " + " ".join(["{}={}".format(k, v) for k, v in zip(attributes, labels)])
 
             if len(indices) == 1:
                 sample_attrs = df_g.ix[indices].squeeze()
@@ -234,7 +239,7 @@ trackDb {g}/trackDb.txt
         "Add the following URL to your UCSC trackHubs:",
         "{url}/hub.txt".format(url=prj['trackhubs']['url']),
         "or alternatively follow this URL: " +
-        "http://genome.ucsc.edu/cgi-bin/hgTracks?db={genome}&hubUrl={url}/hub.txt".format(
+        "http://genome-euro.ucsc.edu/cgi-bin/hgTracks?db={genome}&hubUrl={url}/hub.txt".format(
             # the link can only point to one genome, so by default it will be the last one used.
             genome=genome, url=prj['trackhubs']['url'])
     ]) + "\n"
@@ -304,6 +309,20 @@ def main():
         raise ValueError("Project configuration does not have a trackhub section.")
     if "trackhub_dir" not in prj.trackhubs:
         raise ValueError("Project trackhub configuration does not have a trackhub_dir attribute.")
+
+    if args.attributes is None:
+        # If no attributes are set try to use group attributes specified in the project config
+        if hasattr(prj, "group_attributes"):
+            print("Using group attributes from project configuration file: '{}'.".format(",".join(prj.group_attributes)))
+            args.attributes = prj.group_attributes
+        # If none are set in project config, use just "sample_name"
+        else:
+            args.attributes = ['sample_name']
+    else:
+        args.attributes = args.attributes.split(',')
+
+    if args.color_attribute is None:
+        args.color_attribute = args.attributes[0]
 
     # Setup paths and hub files
     bigwig_dir = os.path.join(prj.trackhubs.trackhub_dir)

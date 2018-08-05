@@ -822,6 +822,22 @@ def least_squares_fit(
     :type multiple_correction_method: str, optional
     :returns: Statistics of model fitting and comparison between models for each feature.
     :rtype: pandas.DataFrame
+
+    :Example:
+
+    import numpy as np; import pandas as pd
+    from ngs_toolkit.general import least_squares_fit
+    quant_matrix = np.random.random(10000000).reshape(100, 100000)
+    P = np.concatenate([[0] * 50, [1] * 50])  # dependent variable
+    Q = np.concatenate([[0] * 25, [1] * 25] + [[0] * 25, [1] * 25])  # covariate
+    design_matrix = pd.DataFrame([P, Q], index=["P", "Q"]).T
+    quant_matrix = quant_matrix.T * ((1 + design_matrix.sum(axis=1)) * 4).values
+    quant_matrix = pd.DataFrame(quant_matrix.T)
+    test_model = "~ Q + P"
+    null_model = "~ Q"
+    res = least_squares_fit(quant_matrix, design_matrix, test_model, null_model)
+    res.head()
+
     """
     from sklearn.preprocessing import StandardScaler
     import patsy
@@ -830,14 +846,6 @@ def least_squares_fit(
     from statsmodels.sandbox.stats.multicomp import multipletests
 
     # # to test
-    # quant_matrix = np.random.random(10000000).reshape(100, 100000)
-    # P = np.concatenate([[0] * 50, [1] * 50])
-    # Q = np.concatenate([[0] * 25, [1] * 25] + [[0] * 25, [1] * 25])
-    # design_matrix = pd.DataFrame([P, Q], index=["P", "Q"]).T
-    # quant_matrix = quant_matrix.T * (1 + (design_matrix.sum(axis=1) * 4).values)
-    # quant_matrix = pd.DataFrame(quant_matrix.T)
-    # test_model = "~ Q + P"
-    # null_model = "~ Q"
 
     if standardize_data:
         norm = StandardScaler()
@@ -888,6 +896,7 @@ def differential_from_bivariate_fit(
     :param str multiple_correction_method: Multiple correction method from `statsmodels.sandbox.stats.multicomp.multipletests`.
     :param bool plot: Whether to generate plots.
     :param str palette: Color palette to use. This can be any matplotlib palette and is passed to `sns.color_palette`.
+    :param bool make_values_positive: Whether to transform `matrix` to have minimum value 0. Default False.
     """
     from scipy.stats import gaussian_kde
     from statsmodels.sandbox.stats.multicomp import multipletests
@@ -1539,7 +1548,7 @@ def plot_differential(
     :type alpha: float, optional
     :param corrected_p_value: Whether to use a corrected p-valueto consider a feature differential. Defaults to True.
     :type corrected_p_value: bool, optional
-    :param fold_change: Effect size (fold change) to consider a feature differential. Considers absolute values. Defaults to None.
+    :param fold_change: Effect size (log2 fold change) to consider a feature differential. Considers absolute values. Defaults to None.
     :type fold_change: float, optional
     :param diff_based_on_rank: Whether a feature should be considered differential based on its rank. Defaults to False
     :type diff_based_on_rank: bool, optional

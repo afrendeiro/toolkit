@@ -1,21 +1,28 @@
 Changelog
 ******************************
 
-- **v0.1.3.5.4** (*2018-08-02*):
+- **v0.1.3.6** (*2018-08-05*):
 
+  - add two new recipes:
+
+    - region_set_frip: calculate FRiP in a consensus region set of interest for all samples (rsFRiP)
+    - merge_signal: create merged signal data for samples sharing specific attributes. Creates BAM files, bigWig files, and BAM files for nucleosomal and nucleosomal-free reads based on fragment size
+
+  - trackmanager:
+
+    - Fix issue #16: trackmanager output indentation
+    - add default attributes to specified in project_config.group_attributes or otherwise to ['sample_name']
+    - fix empty subGroups in UCSC trackDb file
+    - remove required attributes if no value is found
+
+  - Fix issue #20: len(attributes_to_plot) in general.unsupervised_analysis can be 1 now
   - add Makefile to upload to Pypi
   - update looper template folder of projectmanager
+  - add default time to longq in analysis_job task in projectmanager Makefile
   - add unbuferred output to ngs_analysis recipe
   - add atacseq.get_gene_level_changes
   - improve atacseq.get_gene_level_accessibility
   - add 2D support to general.signed_mean
-  - Fix issue #20: len(attributes_to_plot) in general.unsupervised_analysis can be 1 now
-  - trackmanager:
-
-    - add default attributes to specified in project_config.group_attributes or otherwise to ['sample_name']
-    - Fix issue #16: trackmanager output indentation
-    - fix empty subGroups in UCSC trackDb file
-    - remove required attributes if no value is found
 
 .. |br| raw:: html
 

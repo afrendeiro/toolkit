@@ -4,9 +4,11 @@
 This is the main script of the ngs_analysis recipe.
 """
 
+
 if __name__ == '__main__':
     import matplotlib
     matplotlib.use('Agg')
+
 
 from argparse import ArgumentParser
 import cPickle as pickle
@@ -28,6 +30,7 @@ from ngs_toolkit.general import (collect_differential_enrichment,
                                  plot_differential_enrichment,
                                  unsupervised_analysis)
 
+
 # Set settings
 pd.set_option("date_dayfirst", True)
 sns.set(context="paper", style="white", palette="pastel", color_codes=True)
@@ -47,6 +50,7 @@ class Unbuffered(object):
        self.stream.flush()
    def __getattr__(self, attr):
        return getattr(self.stream, attr)
+
 
 sys.stdout = Unbuffered(sys.stdout)
 

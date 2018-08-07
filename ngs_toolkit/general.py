@@ -123,7 +123,7 @@ class Analysis(object):
 
     def get_level_colors(
             self, index=None, matrix="accessibility", levels=None,
-            pallete="Paired", cmap="RdBu_r", nan_color=(0.662745, 0.662745, 0.662745, 0.5),
+            pallete="Paired", cmap="RdBu_r", nan_color=(0.662745, 0.662745, 0.662745, 1.0),
             # TODO: implement dataframe return
             as_dataframe=False):
         """
@@ -317,11 +317,9 @@ def unsupervised_analysis(
     """
     Apply unsupervised clustering and dimensionality reduction methods (MDS, PCA) on numeric matrix.
     Colours and labels samples by their attributes as given in `attributes_to_plot`.
-
     For PCA analysis, if `test_pc_association` is `True`, will compute association of PCs with sample
     attributes given in `attributes_to_plot`. For numeric attributes, the Pearson correlation will be computed
     and for categoriacal, a pairwise Kruskal-Wallis H-test (ANOVA).
-
     :param analysis: Analysis object to perform analysis for.
     :type analysis: ngs_toolkit.general.Analysis
     :param data_type: Data type. One of "ATAC-seq" or "RNA-seq". Defaults to "ATAC-seq".
@@ -364,7 +362,6 @@ def unsupervised_analysis(
     :type dpi: number, optional
     :param output_dir: Directory for generated files and plots. Defaults to "{results_dir}/unsupervised".
     :type output_dir: str, optional
-
     :returns: None
     """
     from sklearn.decomposition import PCA
@@ -2172,6 +2169,81 @@ def parse_homer(homer_dir):
     return output.sort_values("motif")
 
 
+def homer_combine_motifs(
+        comparison_dirs, output_dir,
+        p_value_threshold=1e-25, cpus=8, run=False, as_jobs=True, genome="hg19"):
+    """
+    Create consensus of de novo discovered motifs from HOMER
+
+    :param comparison_dirs: Iterable of comparison directories where homer was run.
+    Should contain a "homerMotifs.all.motifs" file.
+    :type comparison_dirs: list
+    :param output_dir: Output directory.
+    :type output_dir: str
+    :param p_value_threshold: Threshold for inclusion of a motif in the consensus set. Defaults to 1e-5
+    :type p_value_threshold: number, optional
+    :param cpus: Number of available CPUS/threads for multithread processing. Defaults to 8
+    :type cpus: number, optional
+    :param run: Whether to run enrichment of each comparison in the consensus motifs. Default is False
+    :type run: bool, optional
+    :param as_jobs: Whether to run enrichment as a cluster job. Default is True
+    :type as_jobs: bool, optional
+    :param genome: Genome assembly of the data. Default is 'hg19'.
+    :type genome: str
+    :returns: If `run` is `False`, returns path to consensus motif file. Otherwise `None`.
+    :rtype: str
+
+    :Test:
+
+    comparison_dirs = (os.popen(
+        "find analysis/differential_analysis_ATAC-seq.top_1000/ -type d ! -name homerResults")
+    .read().strip().split("\n")[1:])
+    output_dir = "analysis/differential_analysis_ATAC-seq.top_1000/"
+    """
+
+    # concatenate files
+    out_file = os.path.join(output_dir, "homerMotifs.combined.motifs")
+    with open(out_file, 'a') as outfile:
+        for dir_ in comparison_dirs:
+            with open(os.path.join(dir_, "homerMotifs.all.motifs"), "r") as infile:
+                for line in infile:
+                    outfile.write(line)
+
+    # Filter and get motif consensus
+    os.popen("compareMotifs.pl {} {} -info 0.6 -nofacts -pvalue {} -cpu {}"
+            .format(out_file, output_dir, p_value_threshold, cpus))
+
+    # concatenate consensus motif files
+    files = glob.glob(os.path.join(output_dir, "homerResults/*motif"))
+    combined_motifs = os.path.join(output_dir, "homerMotifs.filtered.motifs")
+    with open(combined_motifs, 'w') as outfile:
+        for f in files:
+            if ("similar" in f) or ("RV" in f):
+                continue
+            print(f)
+            with open(f, "r") as infile:
+                for line in infile:
+                    outfile.write(line)
+
+    if not run:
+        return combined_motifs
+
+    else:
+        for dir_ in comparison_dirs:
+            # prepare enrichment command with consensus set
+            cmd = (
+                "findMotifsGenome.pl {bed} {genome}r {dir} -p {cpus} -nomotif -mknown {motif_file}"
+                .format(bed=os.path.join(dir_, "differential_analysis_regions.bed"),
+                    genome=genome, cpus=cpus, dir=dir_,
+                    motif_file=combined_motifs))
+            # run
+            if as_jobs:
+                os.system("sbatch -J homer.{d} -o {dir}.homer.log -p shortq -c 8 --mem 20000 --wrap '{cmd}'"
+                    .format(d=os.path.basename(dir_), dir=dir_, cmd=cmd))
+            else:
+                os.system(cmd)
+
+
 def enrichr(dataframe, gene_set_libraries=None, kind="genes"):
     """
     Use Enrichr on a list of genes (currently only genes supported through the API).
@@ -2272,7 +2344,7 @@ def run_enrichment_jobs(
     # LOLA
     cmds = ["""for F in `find {results_dir} -name "*_regions.bed"`; do
 DIR=`dirname $F`
-if [ ! -f ${{DIR}}/allEnrichments.txt ]; then
+if [ ! -f ${{DIR}}/allEnrichments.tsv ]; then
 echo $DIR $F
 sbatch -J lola.$F -o $F.lola.log -p shortq -c 8 --mem 24000 \
 --wrap "Rscript ~/jobs/run_LOLA.R $F {background_bed} {GENOME}"
@@ -2544,6 +2616,7 @@ def collect_differential_enrichment(
     lola_enr = pd.DataFrame()
     meme_enr = pd.DataFrame()
     homer_enr = pd.DataFrame()
+    homer_consensus = pd.DataFrame()
     pathway_enr = pd.DataFrame()
     # Examine each region cluster
     comps = differential['comparison_name'].drop_duplicates()
@@ -2597,14 +2670,14 @@ def collect_differential_enrichment(
                     meme_enr = meme_enr.append(ame_motifs, ignore_index=True)
 
                     # fix mouse TF names
-                    if meme_enr['TF'].str.startswith("UP").all():
+                    if (meme_enr['TF'].str.startswith("UP").sum() / float(meme_enr.shape[0])) >= 0.5:
                         annot = pd.read_table(
                             "~/resources/motifs/motif_databases/MOUSE/uniprobe_mouse.id_mapping.tsv",
                             header=None, names=["TF", "TF_name"])
                         annot["TF"] = annot['TF'].str.replace(r"_.*", "")
                         meme_enr = pd.merge(meme_enr, annot).drop("TF", axis=1).rename(columns={"TF_name": "TF"})
 
-                # HOMER
+                # HOMER DE NOVO - de novo motif enrichment independent for each sample
                 try:
                     homer_motifs = parse_homer(os.path.join(comparison_dir, "homerResults"))
                 except IOError as e:
@@ -2616,6 +2689,23 @@ def collect_differential_enrichment(
                     homer_motifs["comparison_name"] = comp
                     homer_motifs["direction"] = direction
                     homer_enr = homer_enr.append(homer_motifs, ignore_index=True)
+
+                # HOMER CONSENSUS - motif enrichment on a consensus set of motifs
+                try:
+                    homer_cons = pd.read_table(os.path.join(comparison_dir, "knownResults.txt"))
+                except IOError as e:
+                    if permissive:
+                        print(error_msg.format("HOMER consensus enrichment", comp, direction))
+                    else:
+                        raise e
+                else:
+                    homer_cons.columns = homer_cons.columns.str.replace(r"\(of .*", "")
+                    homer_cons["# of Background Sequences with Motif"]
+                    for col in homer_cons.columns[homer_cons.columns.str.contains("%")]:
+                        homer_cons[col] = homer_cons[col].str.replace("%", "").astype(float)
+                    homer_cons["comparison_name"] = comp
+                    homer_cons["direction"] = direction
+                    homer_consensus = homer_consensus.append(homer_cons, ignore_index=True)
 
                 # LOLA
                 try:
@@ -2651,6 +2741,8 @@ def collect_differential_enrichment(
             os.path.join(output_dir, output_prefix + ".meme_ame.csv"), index=False)
         homer_enr.to_csv(
             os.path.join(output_dir, output_prefix + ".homer_motifs.csv"), index=False)
+        homer_consensus.to_csv(
+            os.path.join(output_dir, output_prefix + ".homer_consensus.csv"), index=False)
         lola_enr.to_csv(
             os.path.join(output_dir, output_prefix + ".lola.csv"), index=False)
 
@@ -2699,7 +2791,6 @@ def plot_differential_enrichment(
                     `0` is row-wise (in this case across comparisons) and `1` is column-wise (across terms). Defaults to 0.
     :type z_score: number, optional
     """
-        
     import numpy as np
     import matplotlib.pyplot as plt
     import seaborn as sns
@@ -2736,7 +2827,8 @@ def plot_differential_enrichment(
         enrichment_table["label"] = (
             enrichment_table["label"]
             .str.replace("nan", "").str.replace("None", "")
-            .str.replace(", , ", "").str.replace(", $", ""))
+            .str.replace(", , ", "").str.replace(", $", "")
+            .str.decode('unicode_escape').str.encode('ascii', 'ignore'))
 
         # Replace inf values with 
         enrichment_table["pValueLog"] = enrichment_table["pValueLog"].replace(
@@ -2866,6 +2958,69 @@ def plot_differential_enrichment(
             g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90, ha="right", fontsize="xx-small")
             g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small")
             g.fig.savefig(os.path.join(output_dir, output_prefix + ".motifs.cluster_specific.{}_z_score.svg".format(z_score_label)), bbox_inches="tight", dpi=300)
+
+    if enrichment_type == "homer_consensus":
+        enrichment_table["log_p_value"] = (-np.log10(enrichment_table["P-value"])).replace({np.inf: 300})
+        # Plot top_n terms of each comparison in barplots
+        top_n = min(top_n, enrichment_table.set_index("Motif Name").groupby(comp_variable)["log_p_value"].count().min() - 1)
+        top_data = enrichment_table.set_index("Motif Name").groupby(comp_variable)["log_p_value"].nlargest(top_n).reset_index()
+
+        if barplots:
+            n = len(enrichment_table[comp_variable].drop_duplicates())
+            n_side = int(np.ceil(np.sqrt(n)))
+
+            fig, axis = plt.subplots(n_side, n_side, figsize=(4 * n_side, n_side * max(5, 0.12 * top_n)), sharex=False, sharey=False)
+            axis = iter(axis.flatten())
+            for i, comp in enumerate(top_data[comp_variable].drop_duplicates().sort_values()):
+                df2 = top_data.loc[top_data[comp_variable] == comp, :]
+                ax = next(axis)
+                sns.barplot(
+                    df2["log_p_value"], df2["Motif Name"], estimator=max,
+                    orient="horizontal", ax=ax, color=sns.color_palette("colorblind")[0])
+                ax.set_title(comp)
+            for ax in axis:
+                ax.set_visible(False)
+            sns.despine(fig)
+            fig.savefig(os.path.join(output_dir, output_prefix + ".homer_consensus.barplot.top_{}.svg".format(top_n)), bbox_inches="tight", dpi=300)
+
+        # Plot heatmaps of terms for each comparison
+        if len(enrichment_table[comp_variable].drop_duplicates()) < 2:
+            return
+
+        # pivot table
+        motifs_pivot = pd.pivot_table(enrichment_table,
+            values="log_p_value", columns="Motif Name", index=comp_variable).fillna(0)
+
+        # plot correlation
+        if correlation_plots:
+            g = sns.clustermap(motifs_pivot.T.corr(), cbar_kws={"label": "Correlation of enrichemnt\nof differential regions"})
+            g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90)
+            g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0)
+            g.fig.savefig(os.path.join(output_dir, output_prefix + ".homer_consensus.correlation.svg"), bbox_inches="tight", dpi=300)
+
+        top = enrichment_table.set_index('Motif Name').groupby(comp_variable)['log_p_value'].nlargest(top_n)
+        top_terms = top.index.get_level_values('Motif Name').unique()
+
+        # plot clustered heatmap
+        shape = motifs_pivot.loc[:, top_terms].shape
+        g = sns.clustermap(
+            motifs_pivot.loc[:, top_terms].T, figsize=(max(6, 0.12 * shape[0]), max(6, 0.12 * shape[1])),
+            xticklabels=True, yticklabels=True,
+            cbar_kws={"label": "-log10(p-value) of enrichment\nof differential regions"}, metric="correlation")
+        g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90, ha="right", fontsize="xx-small")
+        g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small")
+        g.fig.savefig(os.path.join(output_dir, output_prefix + ".homer_consensus.cluster_specific.svg"), bbox_inches="tight", dpi=300)
+
+        # plot clustered heatmap
+        shape = motifs_pivot.loc[:, top_terms].shape
+        if z_score is not None:
+            g = sns.clustermap(
+                motifs_pivot.loc[:, top_terms].T, figsize=(max(6, 0.12 * shape[0]), max(6, 0.12 * shape[1])),
+                xticklabels=True, yticklabels=True,
+                cmap="RdBu_r", center=0, z_score=z_score, cbar_kws={"label":  "{} Z-score of enrichment\nof differential regions".format(z_score_label)}, metric="correlation")
+            g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90, ha="right", fontsize="xx-small")
+            g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small")
+            g.fig.savefig(os.path.join(output_dir, output_prefix + ".homer_consensus.cluster_specific.{}_z_score.svg".format(z_score_label)), bbox_inches="tight", dpi=300)
 
     if enrichment_type == "enrichr":
         # enrichment_table["description"] = enrichment_table["description"].str.decode("utf-8")

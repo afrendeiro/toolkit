@@ -2852,7 +2852,7 @@ def plot_differential_enrichment(
                              ``ngs_toolkit.general.differential_enrichment`` or
                              ``ngs_toolkit.general.collect_differential_enrichment``.
     :type enrichment_table: pandas.DataFrame
-    :param enrichment_type: One of 'lola', 'enrichr', 'motif', 'great'.
+    :param enrichment_type: One of 'lola', 'enrichr', 'motif', 'plot_differential_enrichment', great'.
     :type enrichment_type: str
     :param data_type: Data type. One of "ATAC-seq" and "RNA-seq". Defaults to "ATAC-seq".
     :type data_type: str, optional
@@ -2880,8 +2880,8 @@ def plot_differential_enrichment(
     import matplotlib.pyplot as plt
     import seaborn as sns
 
-    if enrichment_type not in ["lola", "enrichr", "motif", 'great']:
-        raise AssertionError("`enrichment_type` must be one of 'lola', 'enrichr', 'motif', 'great.")
+    if enrichment_type not in ["lola", "enrichr", "motif", "homer_consensus", 'great']:
+        raise AssertionError("`enrichment_type` must be one of 'lola', 'enrichr', 'motif', 'homer_consensus', 'great'.")
 
     if "{data_type}" in output_dir:
         output_dir = output_dir.format(data_type=data_type)

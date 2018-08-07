@@ -98,6 +98,8 @@ class ATACSeqAnalysis(Analysis):
             from_pickle=from_pickle,
             **kwargs)
 
+        self.data_type = "ATAC-seq"
+
     def load_data(self, output_mapping=None, only_these_keys=None, permissive=True, n_header_vars=5):
         """
         Load the output files of the major functions of the Analysis.

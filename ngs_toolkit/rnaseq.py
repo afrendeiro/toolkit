@@ -34,6 +34,8 @@ class RNASeqAnalysis(Analysis):
             from_pickle=from_pickle,
             **kwargs)
 
+        self.data_type = "RNA-seq"
+
     def annotate_with_sample_metadata(
             self,
             attributes=["sample_name"]):

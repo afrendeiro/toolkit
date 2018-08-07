@@ -93,6 +93,8 @@ class Analysis(object):
         if from_pickle:
             self.update()
 
+        self.data_type = None
+
     @pickle_me
     def to_pickle(self):
         """

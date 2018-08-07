@@ -487,7 +487,7 @@ class ATACSeqAnalysis(Analysis):
         return coverage_rpm
 
     def normalize_coverage_quantiles(
-            self, matrix=None, samples=None, implementation="R",
+            self, matrix=None, samples=None, implementation="Python",
             log_transform=True, log_constant=0.001, save=True, assign=True):
         """
         Quantile normalization of matrix of (n_features, n_samples).
@@ -516,8 +516,7 @@ class ATACSeqAnalysis(Analysis):
             coverage_qnorm = pd.DataFrame(
                 normalize_quantiles_r(to_norm.values),
                 index=to_norm.index,
-                columns=to_norm.columns
-            )
+                columns=to_norm.columns)
         elif implementation == "Python":
             from ngs_toolkit.general import normalize_quantiles_p
             coverage_qnorm = normalize_quantiles_p(to_norm)

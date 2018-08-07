@@ -212,20 +212,7 @@ class RNASeqAnalysis(Analysis):
         # TODO: Declare saved files and outputs in docstring
         """
         import requests
-
-        def quantile_normalize(df_input):
-            df = df_input.copy()
-            # compute rank
-            dic = {}
-            for col in df:
-                dic.update({col: sorted(df[col])})
-            sorted_df = pd.DataFrame(dic)
-            rank = sorted_df.mean(axis=1).tolist()
-            # sort
-            for col in df:
-                t = np.searchsorted(np.sort(df[col]), df[col])
-                df[col] = [rank[i] for i in t]
-            return df
+        from ngs_toolkit.general import normalize_quantiles_p
 
         if samples is None:
             samples = [s for s in self.samples if s.library == "RNA-seq"]
@@ -257,7 +244,7 @@ class RNASeqAnalysis(Analysis):
         self.count_matrix.to_csv(os.path.join(self.results_dir, self.name + ".expression_{}.csv".format(expression_type)), index=True)
 
         # Quantile normalize
-        self.matrix_qnorm = quantile_normalize(
+        self.matrix_qnorm = normalize_quantiles_p(
             self.count_matrix.reset_index().drop(["ensembl_transcript_id", "gene_name"], axis=1))
         self.matrix_qnorm.index = self.count_matrix.index
 
@@ -277,7 +264,7 @@ class RNASeqAnalysis(Analysis):
         self.expression_matrix_counts = self.count_matrix.groupby("gene_name").max()
 
         # Quantile normalize
-        self.expression_matrix_qnorm = quantile_normalize(self.expression_matrix_counts)
+        self.expression_matrix_qnorm = normalize_quantiles_p(self.expression_matrix_counts)
 
         # Log2 TPM
         if self.expression_matrix_qnorm.min().min() <= 0:

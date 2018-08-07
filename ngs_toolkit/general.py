@@ -193,7 +193,7 @@ class Analysis(object):
                 # Create a range of either 0-100 if only positive values are found
                 # or symmetrically from the maximum absolute value found
                 if not any(values.dropna() < 0):
-                    norm = matplotlib.colors.Normalize(vmin=0, vmax=100)
+                    norm = matplotlib.colors.Normalize(vmin=values.min(), vmax=values.max())
                 else:
                     r = max(abs(values.min()), abs(values.max()))
                     norm = matplotlib.colors.Normalize(vmin=-r, vmax=r)

@@ -762,6 +762,7 @@ def deseq_analysis(
     """
     import pandas as pd
     from tqdm import tqdm
+    import rpy2
     from rpy2.robjects import numpy2ri, pandas2ri
     import rpy2.robjects as robjects
     from rpy2.rinterface import RRuntimeError
@@ -834,14 +835,16 @@ def deseq_analysis(
                 print("DESeq2 group contrast '{}' didn't work either!".format(", ".join(contrast)))
                 raise e2
 
-        # convert to pandas dataframe
-        res2 = r2pandas_df(res)
-        res2.loc[:, "comparison_name"] = comp
+        if type(res) == rpy2.robjects.vectors.DataFrame:
+            # convert to pandas dataframe
+            res = r2pandas_df(res)
+
+        res.loc[:, "comparison_name"] = comp
 
         # save
-        res2.to_csv(out_file)
+        res.to_csv(out_file)
         # append
-        results = results.append(res2.reset_index(), ignore_index=True)
+        results = results.append(res.reset_index(), ignore_index=True)
 
     # save all
     results.to_csv(os.path.join(output_dir, output_prefix + ".deseq_result.all_comparisons.csv"), index=False)

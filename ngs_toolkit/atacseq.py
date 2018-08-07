@@ -911,66 +911,6 @@ class ATACSeqAnalysis(Analysis):
         # Save
         self.coverage_annotated.to_csv(os.path.join(self.results_dir, self.name + "_peaks.coverage_qnorm.annotated.csv"), index=True)
 
-    def annotate_with_sample_metadata(
-            self,
-            quant_matrix="coverage_annotated",
-            attributes=None,
-            numerical_attributes=None,
-            save=True,
-            assign=True):
-        """
-        Annotate matrix (n_regions, n_samples) with sample metadata (creates MultiIndex on columns).
-        Numerical attributes can be pass as a iterable to `numerical_attributes`.
-
-        :param str quant_matrix: Attribute name of matrix to annotate.
-        :param list attributes: Desired attributes to be annotated. This defaults \
-                                to all attributes in the original sample annotation \
-                                sheet of the analysis Project.
-        :param list numerical_attributes: Attributes which are numeric even though they
-                                          might be so in the samples' attributes.
-                                          Will attempt to convert all values to 
-                                          numeric format.
-        :param bool save: Whether to write normalized DataFrame to disk.
-        :param bool assign: Whether to assign the normalized DataFrame to an attribute ``.
-        :var pd.DataFrame accessibility: A pandas DataFrame with MultiIndex column index \
-                                         containing the sample's attributes specified.
-
-        """
-        if attributes is None:
-            attributes = self.prj.sheet.df.columns
-
-        matrix = getattr(self, quant_matrix)
-
-        if type(matrix.columns) is pd.core.indexes.multi.MultiIndex:
-            matrix.columns = matrix.columns.get_level_values("sample_name")
-
-        samples = [s for s in self.samples if s.name in matrix.columns.tolist()]
-
-        attrs = list()
-        for attr in attributes:
-            l = list()
-            for sample in samples:  # keep order of samples in matrix
-                try:
-                    l.append(getattr(sample, attr))
-                except AttributeError:
-                    l.append(np.nan)
-            if numerical_attributes is not None:
-                if attr in numerical_attributes:
-                    l = [float(x) for x in l]
-            attrs.append(l)
-
-        # Generate multiindex columns
-        index = pd.MultiIndex.from_arrays(attrs, names=attributes)
-        accessibility = matrix[[s.name for s in samples]]
-        accessibility.columns = index
-
-        # Save
-        if save:
-            accessibility.to_csv(os.path.join(self.results_dir, self.name + ".accessibility.annotated_metadata.csv"), index=True)
-        if assign:
-            self.accessibility = accessibility
-        return accessibility
-
     def get_gene_level_accessibility(self, matrix="accessibility", reduce_func=np.mean):
         """
         Get gene-level measurements of coverage.

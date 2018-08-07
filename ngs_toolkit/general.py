@@ -214,6 +214,89 @@ class Analysis(object):
 
         return colors
 
+    def annotate_with_sample_metadata(
+            self,
+            quant_matrix=None,
+            attributes=None,
+            numerical_attributes=None,
+            save=True,
+            assign=True):
+        """
+        Annotate matrix (n_regions, n_samples) with sample metadata (creates MultiIndex on columns).
+        Numerical attributes can be pass as a iterable to `numerical_attributes` to be converted.
+
+        :param str quant_matrix: Attribute name of matrix to annotate. By default this will
+        be infered from the analysis data_type in the following way:
+            ATAC-seq or ChIP-seq: 'coverage_annotated'; RNA-seq: 'expression_annotated'.
+        :param list attributes: Desired attributes to be annotated. This defaults
+        to all attributes in the original sample annotation sheet of the analysis Project.
+        :param list numerical_attributes: Attributes which are numeric even though they
+        might be so in the samples' attributes. Will attempt to convert values to numeric.
+        :param bool save: Whether to write normalized DataFrame to disk.
+        :param bool assign: Whether to assign the normalized DataFrame to an attribute ``.
+        :var pd.DataFrame {accessibility,binding,expression}: A pandas DataFrame with
+        MultiIndex column index containing the sample's attributes specified. 
+        :returns pd.DataFrame: Annotated dataframe with requested sample attributes.
+        """
+        if attributes is None:
+            attributes = self.prj.sheet.columns
+
+        if self.data_type == "ATAC-seq":
+            output_matrix = "accessibility"
+            if quant_matrix is None:
+                quant_matrix = "coverage_annotated"
+        elif self.data_type == "ChIP-seq":
+            output_matrix = "binding"
+            if quant_matrix is None:
+                quant_matrix = "coverage_annotated"
+        elif self.data_type == "RNA-seq":
+            output_matrix = "expression"
+            if quant_matrix is None:
+                quant_matrix = "expression_annotated"
+        else:
+            print("Data type of object not known, will not set as attribute.")
+            assign = False
+            output_matrix = ""
+            if quant_matrix is None:
+                raise ValueError("Data type of object not known, must specify `quant_matrix` to annotate!")
+
+        matrix = getattr(self, quant_matrix)
+
+        if type(matrix.columns) is pd.core.indexes.multi.MultiIndex:
+            matrix.columns = matrix.columns.get_level_values("sample_name")
+
+        samples = [s for s in self.samples if s.name in matrix.columns.tolist()]
+
+        attrs = list()
+        for attr in attributes:
+            print(attr)
+            l = list()
+            for sample in samples:  # keep order of samples in matrix
+                try:
+                    l.append(getattr(sample, attr))
+                except AttributeError:
+                    l.append(np.nan)
+            if numerical_attributes is not None:
+                if attr in numerical_attributes:
+                    l = [float(x) for x in l]
+            attrs.append(l)
+
+        # Generate multiindex columns
+        index = pd.MultiIndex.from_arrays(attrs, names=attributes)
+        df = matrix[[s.name for s in samples]]
+        df.columns = index
+
+        # Save
+        if save:
+            df.to_csv(
+                os.path.join(
+                    self.results_dir,
+                    self.name + "{}.annotated_metadata.csv"
+                        .format("." + output_matrix if output_matrix != "" else output_matrix)), index=True)
+        if assign:
+            setattr(self, output_matrix) = df
+        return df
+
 
 def count_reads_in_intervals(bam, intervals):
     """

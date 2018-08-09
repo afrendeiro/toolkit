@@ -2894,6 +2894,7 @@ def plot_differential_enrichment(
     import numpy as np
     import matplotlib.pyplot as plt
     import seaborn as sns
+    from scipy.stats import zscore
 
     if enrichment_type not in ["lola", "enrichr", "motif", "homer_consensus", 'great']:
         raise AssertionError("`enrichment_type` must be one of 'lola', 'enrichr', 'motif', 'homer_consensus', 'great'.")
@@ -3124,6 +3125,45 @@ def plot_differential_enrichment(
             fig.savefig(
                 os.path.join(output_dir, output_prefix + ".homer_consensus.barplot.top_{}.svg".format(top_n)),
                 bbox_inches="tight", dpi=300)
+
+        # Significance vs fold enrichment over background
+        enrichment_table['enrichment over background'] = (
+            enrichment_table['% of Target Sequences with Motif'] /
+            enrichment_table['% of Background Sequences with Motif'])
+
+        n = len(enrichment_table[comp_variable].drop_duplicates())
+        n_side = int(np.ceil(np.sqrt(n)))
+        fig, axis = plt.subplots(n_side, n_side, figsize=(3 * n_side, 3 * n_side), sharex=False, sharey=False)
+        axis = axis.flatten()
+        for i, comp in enumerate(enrichment_table[comp_variable].drop_duplicates().sort_values()):
+            enr = enrichment_table[enrichment_table[comp_variable] == comp]
+            enr['Motif Name'] = enr['Motif Name'].str.replace(".*BestGuess:", "").str.replace(r"-ChIP-Seq.*", "")
+
+            enr['combined'] = enr[['enrichment over background', 'log_p_value']].apply(zscore).mean(axis=1)
+            cs = axis[i].scatter(
+                enr['enrichment over background'],
+                enr['log_p_value'],
+                c=enr['combined'],
+                s=8, alpha=0.75)
+
+            # label top points
+            for j in enr['combined'].sort_values().tail(5).index:
+                s = enr.loc[j, "Motif Name"]
+                s
+                axis[i].text(
+                    enr.loc[j, 'enrichment over background'],
+                    enr.loc[j, 'log_p_value'],
+                    s=s, ha="right", fontsize=5)
+            axis[i].set_title(comp)
+
+        for ax in axis.reshape((n_side, n_side))[:, 0]:
+            ax.set_ylabel("-log10(p-value)")
+        for ax in axis.reshape((n_side, n_side))[-1, :]:
+            ax.set_xlabel("Enrichment over background")
+        sns.despine(fig)
+        fig.savefig(
+            os.path.join(output_dir, output_prefix + ".homer_consensus.scatterplot.svg".format(top_n)),
+            bbox_inches="tight", dpi=300)
 
         # Plot heatmaps of terms for each comparison
         if len(enrichment_table[comp_variable].drop_duplicates()) < 2:

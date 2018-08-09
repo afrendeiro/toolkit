@@ -296,7 +296,7 @@ class Analysis(object):
                     self.name + "{}.annotated_metadata.csv"
                         .format("." + output_matrix if output_matrix != "" else output_matrix)), index=True)
         if assign:
-            setattr(self, output_matrix) = df
+            setattr(self, output_matrix, df)
         return df
 
 

@@ -840,6 +840,7 @@ def deseq_analysis(
             res = r2pandas_df(res)
 
         res.loc[:, "comparison_name"] = comp
+        res.index.name = "index"
 
         # save
         res.to_csv(out_file)
@@ -847,6 +848,7 @@ def deseq_analysis(
         results = results.append(res.reset_index(), ignore_index=True)
 
     # save all
+    results.index.name = "index"
     results.to_csv(os.path.join(output_dir, output_prefix + ".deseq_result.all_comparisons.csv"), index=False)
 
     # return
@@ -2288,6 +2290,7 @@ def homer_combine_motifs(
     .read().strip().split("\n")[1:])
     output_dir = "analysis/differential_analysis_ATAC-seq.top_1000/"
     """
+    import glob
 
     # concatenate files
     out_file = os.path.join(output_dir, "homerMotifs.combined.motifs")
@@ -3374,6 +3377,20 @@ def chunks(l, n):
     """
     n = max(1, n)
     return (l[i:i + n] for i in range(0, len(l), n))
+
+
+def sorted_nicely(l):
+    """
+    Sort an iterable in the way that humans expect.
+
+    :param l: Iterable to be sorted
+    :type l: iterable
+    :returns: Sorted interable
+    :rtype: list
+    """
+    convert = lambda text: int(text) if text.isdigit() else text
+    alphanum_key = lambda key: [convert(c) for c in re.split('([0-9]+)', key)]
+    return sorted(l, key=alphanum_key)
 
 
 def standard_score(x):

@@ -36,9 +36,11 @@ requirements = [r for r in requirements if "#egg=" not in r]
 
 
 # recipes
+recipes = glob.glob(os.path.join(os.path.curdir, "ngs_toolkit", "recipes", "*.py"))
 recipes = list(map(
-    os.path.abspath,
-    glob.glob(os.path.join(os.path.curdir, "ngs_toolkit", "recipes", "*.py"))))
+    lambda x: x.replace(".py", "").replace("./", "").replace("/", "."),
+    recipes))
+recipes = [" = ".join([i, j + ":main"]) for i, j in zip(map(lambda x: x.split('.')[-1], recipes), recipes)]
 
 # setup
 setup(
@@ -49,7 +51,7 @@ setup(
         "console_scripts": [
             'projectmanager = ngs_toolkit.project_manager:main',
             'trackmanager = ngs_toolkit.track_manager:main'
-        ],
+        ] + recipes,
     },
     description="A toolkit for NGS analysis with Python.",
     long_description=open('README.md').read(),
@@ -62,10 +64,9 @@ setup(
     keywords="bioinformatics, sequencing, ngs, ngs analysis, ATAC-Seq, ChIP-seq, RNA-seq, project management",
     url="https://github.com/afrendeiro/toolkit",
     author=u"Andre Rendeiro",
-    author_email = 'afrendeiro@gmail.com',
+    author_email='afrendeiro@gmail.com',
     license="GPL3",
     install_requires=requirements,
-    scripts=recipes,
     # dependency_links=dependencies,
     **extra
 )

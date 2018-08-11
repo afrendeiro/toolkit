@@ -109,7 +109,7 @@ class Analysis(object):
         :param pickle_file: Pickle file to load. By default this is the object's attribute `pickle_file`.
         :type pickle_file: str, optional
         """
-        import cPickle as pickle
+        import pickle
         if pickle_file is None:
             pickle_file = self.pickle_file
         return pickle.load(open(pickle_file, 'rb'))
@@ -1004,20 +1004,20 @@ def differential_from_bivariate_fit(
         out_file = os.path.join(output_dir, output_prefix + ".fit_result.{}.csv".format(comparison))
 
         sa = comparison_table.loc[
-                (comparison_table['comparison_name'] == comparison) &
-                (comparison_table['comparison_side'] == 1),
+            (comparison_table['comparison_name'] == comparison) &
+            (comparison_table['comparison_side'] == 1),
             "sample_name"]
         ga = comparison_table.loc[
-                (comparison_table['comparison_name'] == comparison) &
-                (comparison_table['comparison_side'] == 1),
+            (comparison_table['comparison_name'] == comparison) &
+            (comparison_table['comparison_side'] == 1),
             "sample_group"].squeeze()
         sb = comparison_table.loc[
-                (comparison_table['comparison_name'] == comparison) &
-                (comparison_table['comparison_side'] == 0),
+            (comparison_table['comparison_name'] == comparison) &
+            (comparison_table['comparison_side'] == 0),
             "sample_name"]
         gb = comparison_table.loc[
-                (comparison_table['comparison_name'] == comparison) &
-                (comparison_table['comparison_side'] == 0),
+            (comparison_table['comparison_name'] == comparison) &
+            (comparison_table['comparison_side'] == 0),
             "sample_group"].squeeze()
         a = matrix.loc[:, sa].mean(axis=1)
         a.name = ga
@@ -1037,19 +1037,20 @@ def differential_from_bivariate_fit(
         # standardize fold change
         bounds = np.linspace(0, res['comparison_mean'].max(), n_bins)
         for (start, end) in zip(bounds[:-2], bounds[1: -1]):
-            r = res.loc[(res['comparison_mean'] > start) &
-                    (res['comparison_mean'] < end)].index
+            r = res.loc[
+                (res['comparison_mean'] > start) &
+                (res['comparison_mean'] < end)].index
             v = res.loc[r, 'log2FoldChange']
             res.loc[r, 'norm_log2FoldChange'] = (v - np.nanmean(v)) / np.nanstd(v)
 
         # let's try a bivariate gaussian kernel
         # separately for positive and negative to avoid biases in center of mass
         kernel = gaussian_kde(res.loc[res['norm_log2FoldChange'] > 0, [
-                            "comparison_mean", "norm_log2FoldChange"]].T.values)
+                              "comparison_mean", "norm_log2FoldChange"]].T.values)
         res.loc[res['norm_log2FoldChange'] > 0, "density"] = kernel(
             res.loc[res['norm_log2FoldChange'] > 0, ["comparison_mean", "norm_log2FoldChange"]].T.values)
         kernel = gaussian_kde(res.loc[res['norm_log2FoldChange'] <= 0, [
-                            "comparison_mean", "norm_log2FoldChange"]].T.values)
+                              "comparison_mean", "norm_log2FoldChange"]].T.values)
         res.loc[res['norm_log2FoldChange'] <= 0, "density"] = kernel(
             res.loc[res['norm_log2FoldChange'] <= 0, ["comparison_mean", "norm_log2FoldChange"]].T.values)
 
@@ -2171,7 +2172,7 @@ def meme_ame(input_fasta, output_dir, background_fasta=None, organism="human"):
 def parse_ame(ame_dir):
     """
     Parse results of MEME-AME motif enrichment.
-    
+
     :param ame_dir: Directory with MEME-AME results.
     :type ame_dir: str
     :returns: Data frame with enrichment statistics for each found TF motif.
@@ -2211,7 +2212,7 @@ def homer_motifs(bed_file, output_dir, genome="hg19"):
 def parse_homer(homer_dir):
     """
     Parse results of HOMER findMotifs.pl de novo motif enrichment.
-    
+
     :param homer_dir: Directory with HOMER results.
     :type homer_dir: str
     :returns: Data frame with enrichment statistics for each found TF motif.
@@ -2238,8 +2239,7 @@ def parse_homer(homer_dir):
 
         # Parse table with motif info
         info_table = content[
-            re.search("""<TABLE border="1" cellpading="0" cellspacing="0">""", content).end()
-            :
+            re.search("""<TABLE border="1" cellpading="0" cellspacing="0">""", content).end():
             re.search("</TABLE>", content).start()].strip()
 
         info_table = pd.DataFrame([x.split("</TD><TD>") for x in info_table.replace("<TR><TD>", "").split("</TD></TR>")])
@@ -2249,8 +2249,7 @@ def parse_homer(homer_dir):
 
         # Add most probable known motif name
         info_table["known_motif"] = content[
-            re.search("<H4>", content).end()
-            :
+            re.search("<H4>", content).end():
             re.search("</H4>", content).start()]
 
         # append
@@ -2302,7 +2301,7 @@ def homer_combine_motifs(
 
     # Filter and get motif consensus
     os.popen("compareMotifs.pl {} {} -info 0.6 -nofacts -pvalue {} -cpu {}"
-            .format(out_file, output_dir, p_value_threshold, cpus))
+             .format(out_file, output_dir, p_value_threshold, cpus))
 
     # concatenate consensus motif files
     files = glob.glob(os.path.join(output_dir, "homerResults/*motif"))
@@ -2325,12 +2324,12 @@ def homer_combine_motifs(
             cmd = (
                 "findMotifsGenome.pl {bed} {genome}r {dir} -p {cpus} -nomotif -mknown {motif_file}"
                 .format(bed=os.path.join(dir_, "differential_analysis_regions.bed"),
-                    genome=genome, cpus=cpus, dir=dir_,
-                    motif_file=combined_motifs))
+                        genome=genome, cpus=cpus, dir=dir_,
+                        motif_file=combined_motifs))
             # run
             if as_jobs:
                 os.system("sbatch -J homer.{d} -o {dir}.homer.log -p shortq -c 8 --mem 20000 --wrap '{cmd}'"
-                    .format(d=os.path.basename(dir_), dir=dir_, cmd=cmd))
+                          .format(d=os.path.basename(dir_), dir=dir_, cmd=cmd))
             else:
                 os.system(cmd)
 
@@ -2499,8 +2498,7 @@ def differential_enrichment(
         directional=True,
         max_diff=1000,
         sort_var="pvalue",
-        as_jobs=True
-    ):
+        as_jobs=True):
     """
     Perform various types of enrichment analysis given a dataframe
     of the results from differential analysis.
@@ -2605,10 +2603,10 @@ def differential_enrichment(
                 comparison_df.index.name = "gene_name"
                 # write gene names to file
                 (comparison_df
-                .reset_index()['gene_name']
-                .drop_duplicates()
-                .sort_values()
-                .to_csv(os.path.join(comparison_dir, output_prefix + ".gene_symbols.txt"), header=None, index=False))
+                    .reset_index()['gene_name']
+                    .drop_duplicates()
+                    .sort_values()
+                    .to_csv(os.path.join(comparison_dir, output_prefix + ".gene_symbols.txt"), header=None, index=False))
 
                 if serial:
                     if not os.path.exists(os.path.join(comparison_dir, output_prefix + ".enrichr.csv")):
@@ -3091,7 +3089,7 @@ def plot_differential_enrichment(
                 xticklabels=True, yticklabels=True, rasterized=rasterized,
                 metric=clustermap_metric,
                 cmap="RdBu_r", center=0, z_score=z_score,
-                cbar_kws={"label":  "{} Z-score of enrichment\nof differential regions".format(z_score_label)})
+                cbar_kws={"label": "{} Z-score of enrichment\nof differential regions".format(z_score_label)})
             g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(),
                                          rotation=90, ha="right", fontsize="xx-small")
             g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(),
@@ -3170,8 +3168,8 @@ def plot_differential_enrichment(
             return
 
         # pivot table
-        motifs_pivot = pd.pivot_table(enrichment_table,
-            values="log_p_value", columns="Motif Name", index=comp_variable).fillna(0)
+        motifs_pivot = pd.pivot_table(
+            enrichment_table, values="log_p_value", columns="Motif Name", index=comp_variable).fillna(0)
 
         # plot correlation
         if correlation_plots:
@@ -3200,7 +3198,7 @@ def plot_differential_enrichment(
                 motifs_pivot.loc[:, top_terms].T, figsize=(max(6, 0.12 * shape[0]), max(6, 0.12 * shape[1])),
                 xticklabels=True, yticklabels=True,
                 cmap="RdBu_r", center=0, z_score=z_score,
-                cbar_kws={"label":  "{} Z-score of enrichment\nof differential regions".format(z_score_label)}, metric="correlation")
+                cbar_kws={"label": "{} Z-score of enrichment\nof differential regions".format(z_score_label)}, metric="correlation")
             g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90, ha="right", fontsize="xx-small")
             g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small")
             g.fig.savefig(
@@ -3298,7 +3296,7 @@ def plot_differential_enrichment(
                         max(6, 0.12 * shape[0]), max(6, 0.12 * shape[1])),
                     xticklabels=True, yticklabels=True, rasterized=rasterized, metric='correlation',
                     cmap="RdBu_r", center=0, z_score=z_score,
-                    cbar_kws={"label":  "{} Z-score of enrichment\nof differential regions".format(z_score_label)})
+                    cbar_kws={"label": "{} Z-score of enrichment\nof differential regions".format(z_score_label)})
                 g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(
                 ), rotation=90, ha="right", fontsize="xx-small")
                 g.ax_heatmap.set_yticklabels(
@@ -3399,7 +3397,7 @@ def plot_differential_enrichment(
                     xticklabels=True, yticklabels=True, rasterized=rasterized,
                     metric=clustermap_metric,
                     cmap="RdBu_r", center=0, z_score=z_score,
-                    cbar_kws={"label":  "{} Z-score of enrichment\nof differential regions".format(z_score_label)})
+                    cbar_kws={"label": "{} Z-score of enrichment\nof differential regions".format(z_score_label)})
                 g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(
                 ), rotation=90, ha="right", fontsize="xx-small")
                 g.ax_heatmap.set_yticklabels(
@@ -4088,7 +4086,7 @@ def query_biomart(
         """<Dataset name="{}_gene_ensembl" interface="default" >""".format(species)] +
         ["""<Attribute name="{}" />""".format(attr) for attr in attributes] +
         ["""</Dataset>""",
-        """</Query>"""])
+         """</Query>"""])
     req = requests.get(url_query, stream=True)
     content = list(req.iter_lines())
     if type(content[0]) == bytes:

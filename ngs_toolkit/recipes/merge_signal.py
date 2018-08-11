@@ -15,16 +15,20 @@ from looper.models import Project
 
 
 class Unbuffered(object):
-   def __init__(self, stream):
-       self.stream = stream
-   def write(self, data):
-       self.stream.write(data)
-       self.stream.flush()
-   def writelines(self, datas):
-       self.stream.writelines(datas)
-       self.stream.flush()
-   def __getattr__(self, attr):
-       return getattr(self.stream, attr)
+    def __init__(self, stream):
+        self.stream = stream
+
+    def write(self, data):
+        self.stream.write(data)
+        self.stream.flush()
+
+    def writelines(self, datas):
+        self.stream.writelines(datas)
+        self.stream.flush()
+
+    def __getattr__(self, attr):
+        return getattr(self.stream, attr)
+
 
 sys.stdout = Unbuffered(sys.stdout)
 
@@ -55,12 +59,6 @@ def add_args(parser):
         dest="as_job",
         help="Whether jobs should be created for each sample, or "
         "it should run in serial mode.")
-    parser.add_argument(
-        "-n", "--normalize",
-        action="store_true",
-        dest="normalize",
-        help="Whether tracks should be normalized to total sequenced "
-        "depth.")
     parser.add_argument(
         "-n", "--normalize",
         action="store_true",
@@ -202,8 +200,7 @@ def merge_signal(
             "awk 'NR==FNR{{sum+= $4; next}}{{ $4 = ($4 / sum) * 1000000; print}}' {0}.cov {0}.cov > {0}.normalized.cov".format(transient_file) if normalize else "",
             "bedGraphToBigWig {0}{1}.cov {2} {3}".format(transient_file, ".normalized" if normalize else "", genome_sizes, output_bigwig),
             "if [[ -s {0}.cov ]]; then rm {0}.cov; fi".format(transient_file),
-            "if [[ -s {0}.normalized.cov ]]; then rm {0}.normalized.cov; fi".format(transient_file),
-            ])
+            "if [[ -s {0}.normalized.cov ]]; then rm {0}.normalized.cov; fi".format(transient_file)])
         cmds += [add_cmd(cmd, target=output_bigwig, overwrite=overwrite)]
 
         if nucleosome:

@@ -17,16 +17,20 @@ from ngs_toolkit.chipseq import ChIPSeqAnalysis
 
 
 class Unbuffered(object):
-   def __init__(self, stream):
-       self.stream = stream
-   def write(self, data):
-       self.stream.write(data)
-       self.stream.flush()
-   def writelines(self, datas):
-       self.stream.writelines(datas)
-       self.stream.flush()
-   def __getattr__(self, attr):
-       return getattr(self.stream, attr)
+    def __init__(self, stream):
+        self.stream = stream
+
+    def write(self, data):
+        self.stream.write(data)
+        self.stream.flush()
+
+    def writelines(self, datas):
+        self.stream.writelines(datas)
+        self.stream.flush()
+
+    def __getattr__(self, attr):
+        return getattr(self.stream, attr)
+
 
 sys.stdout = Unbuffered(sys.stdout)
 
@@ -44,7 +48,7 @@ def add_args(parser):
         dest="name",
         default=None,
         help="Name of analysis. Will be the prefix of output_files. "
-            "By default it will be the name of the Project given in the YAML configuration.",
+             "By default it will be the name of the Project given in the YAML configuration.",
         type=str)
     parser.add_argument(
         "-r", "--region-set",
@@ -169,7 +173,7 @@ def main():
 
         if region_set_frip is None:
             print("Generating a new region set for this analysis.")
-            # if none worked, make one 
+            # if none worked, make one
             analysis.get_consensus_sites()
 
             # and use it

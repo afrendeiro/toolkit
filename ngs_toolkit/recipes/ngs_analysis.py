@@ -11,7 +11,6 @@ if __name__ == '__main__':
 
 
 from argparse import ArgumentParser
-import cPickle as pickle
 import os
 import sys
 
@@ -40,16 +39,19 @@ matplotlib.rc('text', usetex=False)
 
 
 class Unbuffered(object):
-   def __init__(self, stream):
-       self.stream = stream
-   def write(self, data):
-       self.stream.write(data)
-       self.stream.flush()
-   def writelines(self, datas):
-       self.stream.writelines(datas)
-       self.stream.flush()
-   def __getattr__(self, attr):
-       return getattr(self.stream, attr)
+    def __init__(self, stream):
+        self.stream = stream
+
+    def write(self, data):
+        self.stream.write(data)
+        self.stream.flush()
+
+    def writelines(self, datas):
+        self.stream.writelines(datas)
+        self.stream.flush()
+
+    def __getattr__(self, attr):
+        return getattr(self.stream, attr)
 
 
 sys.stdout = Unbuffered(sys.stdout)
@@ -68,7 +70,7 @@ def add_args(parser):
         dest="name",
         default=None,
         help="Name of analysis. Will be the prefix of output_files. "
-            "By default it will be the name of the Project given in the YAML configuration.",
+             "By default it will be the name of the Project given in the YAML configuration.",
         type=str)
     parser.add_argument(
         "-o", "--results-output",
@@ -262,7 +264,6 @@ def main_analysis_pipeline(
         quant_matrix = "accessibility"
         feature_name = "sites"
 
-
     if data_type == "RNA-seq":
         # Get gene expression
         analysis.get_gene_expression(
@@ -332,9 +333,8 @@ def main_analysis_pipeline(
         analysis.differential_results = analysis.differential_results.set_index("index")
         analysis.differential_results.to_csv(
             os.path.join(analysis.results_dir, "differential_analysis_{}".format(data_type),
-                "differential_analysis.deseq_result.all_comparisons.csv"), index=True)
+                         "differential_analysis.deseq_result.all_comparisons.csv"), index=True)
     analysis.to_pickle()
-
 
     diff = analysis.differential_results[
             (analysis.differential_results['padj'] < alpha) &
@@ -404,7 +404,7 @@ def main_analysis_pipeline(
 
     elif data_type in ["ATAC-seq", "ChIP-seq"]:
         for enrichment_name, enrichment_type in [
-            ('motif', 'meme_ame'), ('lola', 'lola'), ('enrichr', 'enrichr')]:
+                ('motif', 'meme_ame'), ('lola', 'lola'), ('enrichr', 'enrichr')]:
             try:
                 enrichment_table = pd.read_csv(
                     os.path.join("{}/differential_analysis_{}".format(

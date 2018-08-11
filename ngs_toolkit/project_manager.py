@@ -236,7 +236,7 @@ def create_makefile(
 
 
 def run_recipe(recipe_name, project_config):
-    os.system(recipe_name + ".py" + " " + project_config)
+    return os.popen("python -m ngs_toolkit.recipes.{} {}".format(recipe_name, project_config))
 
 
 def main():

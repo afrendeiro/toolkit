@@ -3216,18 +3216,18 @@ def plot_differential_enrichment(
                 continue
 
             # Plot top_n terms of each comparison in barplots
-            top_data = (
-                enrichment_table[enrichment_table["gene_set_library"] == gene_set_library]
-                .set_index("description")
-                .groupby(comp_variable)
-                ["log_p_value"]
-                .nlargest(top_n)
-                .reset_index())
-
-            n = len(enrichment_table[comp_variable].drop_duplicates())
-            n_side = int(np.ceil(np.sqrt(n)))
-
             if barplots:
+                top_data = (
+                    enrichment_table[enrichment_table["gene_set_library"] == gene_set_library]
+                    .set_index("description")
+                    .groupby(comp_variable)
+                    ["log_p_value"]
+                    .nlargest(top_n)
+                    .reset_index())
+
+                n = len(enrichment_table[comp_variable].drop_duplicates())
+                n_side = int(np.ceil(np.sqrt(n)))
+
                 fig, axis = plt.subplots(
                     n_side, n_side,
                     figsize=(4 * n_side, n_side * max(5, 0.12 * top_n)),
@@ -3246,9 +3246,60 @@ def plot_differential_enrichment(
                 fig.savefig(os.path.join(output_dir, output_prefix + ".enrichr.{}.barplot.top_{}.svg".format(
                     gene_set_library, top_n)), bbox_inches="tight", dpi=300)
 
+                # # possible replacement
+                # grid = sns.catplot(
+                #     data=top_data, x='log_p_value', y="description",
+                #     order=top_data.groupby('description')['log_p_value'].mean().sort_values(ascending=False).index,
+                #     kind='bar', orient="horiz", col=comp_variable, col_wrap=n_side, palette="magma_r")
+                # grid.savefig(os.path.join(output_dir, output_prefix + ".enrichr.{}.barplot.top_{}.joint_comparisons.svg".format(
+                #         gene_set_library, top_n)), bbox_inches="tight", dpi=300)
+
+
+            # Scatter plots of Z-score vs p-value vs combined score
+            fig, axis = plt.subplots(
+                n_side, n_side,
+                figsize=(4 * n_side, 4 * n_side),
+                sharex=True, sharey=True)
+            axis = axis.flatten()
+            # normalize color across comparisons
+            d = enrichment_table.loc[(enrichment_table["gene_set_library"] == gene_set_library), "combined_score"].describe()
+            norm = matplotlib.colors.Normalize(vmin=d['min'],vmax=d['max'])
+            for i, comparison in enumerate(enrichment_table[comp_variable].unique()):
+                enr = enrichment_table[
+                        (enrichment_table["gene_set_library"] == gene_set_library) &
+                        (enrichment_table[comp_variable] == comparison)]
+                sns.scatterplot(
+                    data=enr,
+                    x="z_score", y="log_p_value", size="combined_score", hue="combined_score",
+                    hue_norm=norm,
+                    ax=axis[i], rasterized=rasterized, palette="magma")
+                axis[i].set_title(comparison)
+
+                done = list()
+                for metric in ['log_p_value', 'z_score', 'combined_score']:
+                    f = pd.DataFrame.head if metric == "z_score" else pd.DataFrame.tail
+                    for s in f(enr.sort_values(metric), top_n * sign).index:
+                        if enr.loc[s, 'description'] not in done:
+                            axis[i].text(enr.loc[s, 'z_score'], enr.loc[s, 'log_p_value'], s=enr.loc[s, 'description'])
+                            done.append(enr.loc[s, 'description'])
+            sns.despine(fig)
+            fig.savefig(
+                os.path.join(output_dir, output_prefix + ".enrichr.{}.zscore_vs_pvalue.scatterplot.svg".format(gene_set_library)),
+                bbox_inches="tight", dpi=300)
+
+            # Bar plots of p-value
+            grid = sns.catplot(
+                data=top_data, x='log_p_value', y="description",
+                order=top_data.groupby('description')['log_p_value'].mean().sort_values(ascending=False).index,
+                kind='bar', orient="horiz", col=comp_variable, col_wrap=5)
+            sns.despine(fig)
+            fig.savefig(os.path.join(output_dir, output_prefix + ".enrichr.{}.barplot.top_{}.joint_comparisons.svg".format(
+                    gene_set_library, top_n)), bbox_inches="tight", dpi=300)
+
+
             # Plot heatmaps of terms for each comparison
             if len(enrichment_table[comp_variable].drop_duplicates()) < 2:
-                return
+                continue
 
             # pivot table
             enrichr_pivot = pd.pivot_table(

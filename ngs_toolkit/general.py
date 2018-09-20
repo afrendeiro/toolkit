@@ -469,8 +469,13 @@ def unsupervised_analysis(
             plot_prefix = "all_genes"
         if quant_matrix is None:
             quant_matrix = "expression_annotated"
+    elif data_type == "CNV":
+        if plot_prefix is None:
+            plot_prefix = "all_bins"
+        if quant_matrix is None:
+            quant_matrix = "cnv"
     else:
-        raise ValueError("Data types can only be 'ATAC-seq' or 'RNA-seq'.")
+        raise ValueError("Data types can only be 'ATAC-seq', 'RNA-seq' or 'CNV'.")
 
     if "{results_dir}" in output_dir:
         output_dir = output_dir.format(results_dir=analysis.results_dir)
@@ -3944,15 +3949,17 @@ def project_to_geo(
             # Copy raw file
             bam_file = os.path.join(output_dir, sample.name + "{}.bam".format(suffix))
             cmd += "cp {} {}; ".format(file, bam_file)
+            cmd += "chmod 644 {}; ".format(bam_file)
             annot.loc[sample.name, "bam_file{}".format(i)] = bam_file
 
             # Copy or generate md5sum
-            md5_file = os.path.join(output_dir, sample.name + "{}.bam.md5".format(suffix))
+            md5_file = bam_file + ".md5"
             if os.path.exists(file + ".md5"):
                 cmd += "cp {} {}; ".format(file + ".md5", md5_file)
             else:
                 b = os.path.basename(file)
                 cmd += "md5sum {} > {}; ".format(os.path.join(output_dir, b), md5_file)
+            cmd += "chmod 644 {}; ".format(md5_file)
             annot.loc[sample.name, "bam_file{}_md5sum".format(i)] = md5_file
 
         # Copy bigWig files
@@ -3960,15 +3967,17 @@ def project_to_geo(
             if hasattr(sample, "bigwig"):
                 bigwig_file = os.path.join(output_dir, sample.name + ".bigWig")
                 cmd += "cp {} {}; ".format(sample.bigwig, bigwig_file)
+                cmd += "chmod 644 {}; ".format(bigwig_file)
                 annot.loc[sample.name, "bigwig_file"] = bigwig_file
 
                 # Copy or generate md5sum
-                md5_file = os.path.join(output_dir, sample.name + "{}.bigWig.md5".format(suffix))
+                md5_file = bigwig_file + ".md5"
                 if os.path.exists(sample.bigwig + ".md5"):
                     cmd += "cp {} {}; ".format(sample.bigwig + ".md5", md5_file)
                 else:
                     b = os.path.basename(sample.bigwig)
                     cmd += "md5sum {} > {}; ".format(os.path.join(output_dir, b), md5_file)
+                cmd += "chmod 644 {}; ".format(md5_file)
                 annot.loc[sample.name, "bigwig_file_md5sum"] = md5_file
             else:
                 print("'{}' sample '{}' does not have a 'bigwig' attribute set. Skipping bigWig file.".format(sample.library, sample.name))
@@ -3978,15 +3987,17 @@ def project_to_geo(
             if hasattr(sample, "peaks"):
                 peaks_file = os.path.join(output_dir, sample.name + ".peaks.narrowPeak")
                 cmd += "cp {} {}; ".format(sample.peaks, peaks_file)
+                cmd += "chmod 644 {}; ".format(peaks_file)
                 annot.loc[sample.name, "peaks_file"] = peaks_file
 
                 # Copy or generate md5sum
-                md5_file = os.path.join(output_dir, sample.name + "{}.peaks.narrowPeak.md5".format(suffix))
+                md5_file = peaks_file + ".md5"
                 if os.path.exists(sample.peaks + ".md5"):
                     cmd += "cp {} {}; ".format(sample.peaks + ".md5", md5_file)
                 else:
                     b = os.path.basename(sample.peaks)
-                    cmd += "md5sum {} > {}; ".format(os.path.join(output_dir, b), md5_file)
+                    cmd += "md5sum {} > {}; ".format(peaks_file, md5_file)
+                cmd += "chmod 644 {}; ".format(md5_file)
                 annot.loc[sample.name, "peaks_file_md5sum"] = md5_file
             else:
                 print("'{}' sample '{}' does not have a 'peaks' attribute set. Skipping peaks file.".format(sample.library, sample.name))

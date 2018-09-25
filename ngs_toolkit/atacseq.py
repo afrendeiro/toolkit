@@ -24,10 +24,10 @@ class ATACSeqAnalysis(Analysis):
     Inherits from the `ngs_toolkit.general.Analysis` class.
 
     :param name: Name to give analysis object. Default is `atacseq_analysis`.
-    :param list samples: Iterable of looper.models.Sample objects use in analysis.
+    :param list samples: Iterable of peppy.Sample objects use in analysis.
                          If not provided (`None` is passed) and `prj` is, it will \
                          default to all samples in the `prj` object (`samples` attribute).
-    :param looper.models.Project prj: Project to tie analysis to.
+    :param peppy.Project prj: Project to tie analysis to.
     :param str data_dir: Directory containing relevant data for analysis. Default is `data`.
     :param str results_dir: Directory to output relevant analysis results. Default is `results`.
     :param str pickle_file: File path to use to save serialized object in `pickle` format.
@@ -42,7 +42,7 @@ class ATACSeqAnalysis(Analysis):
     .. code-block:: python
 
         import os
-        from looper.models import Project
+        from peppy import Project
         from ngs_toolkit.atacseq import ATACSeqAnalysis
 
         prj = Project(os.path.join("metadata", "project_config.yaml"))
@@ -198,7 +198,7 @@ class ATACSeqAnalysis(Analysis):
         """
         Get consensus (union) of enriched sites (peaks) across samples.
 
-        :param list samples: Iterable of looper.models.Sample objects to restrict \
+        :param list samples: Iterable of peppy.Sample objects to restrict \
                              to. Must have a `peaks` attribute set. \
                              If not provided (`None` is passed) if will default to all samples \
                              in the analysis (`samples` attribute).
@@ -282,7 +282,7 @@ class ATACSeqAnalysis(Analysis):
         In addition calculate a measure of peak support (or ubiquitouness) by \
         observing the ratio of samples containing a peak overlapping each region.
 
-        :param list samples: Iterable of looper.models.Sample objects to restrict \
+        :param list samples: Iterable of peppy.Sample objects to restrict \
                              to. Must have a `peaks` attribute set. \
                              If not provided (`None` is passed) if will default to all samples \
                              in the analysis (`samples` attribute).
@@ -339,7 +339,7 @@ class ATACSeqAnalysis(Analysis):
         Get mask of sites with 0 support in the given samples.
         Requires support matrix produced by `ngs_toolkit.atacseq.ATACSeqAnalysis.calculate_peak_support`.
 
-        :param list samples: Iterable of looper.models.Sample objects to restrict to.
+        :param list samples: Iterable of peppy.Sample objects to restrict to.
         :returns pd.Series: Boolean Pandas Series with sites with at least one of the \
                             given samples having a peak called.
         """
@@ -352,7 +352,7 @@ class ATACSeqAnalysis(Analysis):
         Measure read coverage (counts) of each sample in each region in consensus sites.
         Will try to use parallel computing using the `parmap` library.
 
-        :param list samples: Iterable of looper.models.Sample objects to restrict
+        :param list samples: Iterable of peppy.Sample objects to restrict
                              to. Must have a `filtered` attribute set.
                              If not provided (`None` is passed) if will default to all samples
                              in the analysis (`samples` attribute).
@@ -441,7 +441,7 @@ class ATACSeqAnalysis(Analysis):
         Return a matrix that is an attribute of self for the requested samples.
 
         :param pandas.DataFrame matrix: Pandas DataFrame.
-        :param list samples: Iterable of looper.models.Sample objects to restrict \
+        :param list samples: Iterable of peppy.Sample objects to restrict \
                              matrix to. \
                              If not provided (`None` is passed) the matrix will not be subsetted.
         :param str matrix_name: Name of the matrix that is an attribute of the object.
@@ -467,7 +467,7 @@ class ATACSeqAnalysis(Analysis):
         Normalization of matrix of (n_features, n_samples) by total in each sample.
 
         :param str matrix: Attribute name of matrix to normalize.
-        :param list samples: Iterable of looper.models.Sample objects to restrict \
+        :param list samples: Iterable of peppy.Sample objects to restrict \
                              matrix to. \
                              If not provided (`None` is passed) the matrix will not be subsetted.
         :param float mult_factor: A constant to multiply values for.
@@ -493,7 +493,7 @@ class ATACSeqAnalysis(Analysis):
         Quantile normalization of matrix of (n_features, n_samples).
 
         :param str matrix: Attribute name of matrix to normalize.
-        :param list samples: Iterable of looper.models.Sample objects to restrict \
+        :param list samples: Iterable of peppy.Sample objects to restrict \
                              matrix to. \
                              If not provided (`None` is passed) the matrix will not be subsetted.
         :param str implementation: One of `"R"` or `"Python"`. Dictates which implementation \
@@ -577,7 +577,7 @@ class ATACSeqAnalysis(Analysis):
             >>> biocLite('cqn')
 
         :param str matrix: Attribute name of matrix to normalize.
-        :param list samples: Iterable of looper.models.Sample objects to restrict \
+        :param list samples: Iterable of peppy.Sample objects to restrict \
                              matrix to. \
                              If not provided (`None` is passed) the matrix will not be subsetted.
         :param bool save: Whether to write normalized DataFrame to disk.
@@ -660,7 +660,7 @@ class ATACSeqAnalysis(Analysis):
                                          correction by regression (cqn R package) \
                                          and log2 transformation.
         :param str matrix: Attribute name of matrix to normalize.
-        :param list samples: Iterable of looper.models.Sample objects to restrict \
+        :param list samples: Iterable of peppy.Sample objects to restrict \
                              matrix to. \
                              If not provided (`None` is passed) the matrix will not be subsetted.
         :param bool save: Whether to write normalized DataFrame to disk.
@@ -827,7 +827,7 @@ class ATACSeqAnalysis(Analysis):
 
         The numeric matrix to be used is specified in `quant_matrix`.
 
-        :param list samples: Iterable of looper.models.Sample objects to restrict \
+        :param list samples: Iterable of peppy.Sample objects to restrict \
                              matrix to. \
                              If not provided (`None` is passed) the matrix will not be subsetted. \
                              Calculated metrics will be restricted to these samples.

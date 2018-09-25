@@ -39,10 +39,10 @@ class Analysis(object):
 
     :param name: Name of the analysis. Defaults to "analysis".
     :type name: str, optional
-    :param samples: List of `looper.models.Sample` objects that this analysi is tied to. Defaults to None.
+    :param samples: List of `peppy.Sample` objects that this analysi is tied to. Defaults to None.
     :type samples: list, optional
-    :param prj: A `looper.models.Project` object that this analysis is tied to. Defaults to None.
-    :type prj: looper.models.Project, optional
+    :param prj: A `peppy.Project` object that this analysis is tied to. Defaults to None.
+    :type prj: peppy.Project, optional
     :param data_dir: Directory containing processed data that will be input to the analysis.
                      This is in principle not required. Defaults to "data".
     :type data_dir: str, optional
@@ -3919,12 +3919,12 @@ def project_to_geo(
     For each copied file a md5sum will be calculated.
     A pandas DataFrame with info on the sample's files and md5sums will be returned.
 
-    :param project: A looper Project object to process.
-    :type project: looper.models.Project
+    :param project: A peppy Project object to process.
+    :type project: peppy.Project
     :param output_dir: Directory to create output. Will be created/overwriten if existing.
                        Defaults to "geo_submission".
     :type output_dir: str, optional
-    :param samples: List of looper.models.Sample objects in project to restrict to. Defaults to all samples in project.
+    :param samples: List of peppy.Sample objects in project to restrict to. Defaults to all samples in project.
     :type samples: list, optional
     :param distributed: Whether processing should be distributed as jobs in a computing cluster for each sample.
                         Currently available implementation supports a SLURM cluster only. Defaults to False.

@@ -6,7 +6,7 @@ import sys
 import textwrap
 
 import pandas as pd
-from looper.models import Project
+from peppy import Project
 
 
 def parse_arguments():

@@ -224,3 +224,10 @@ def radar_plot(
                         labelspacing=0.1, fontsize='small')
 
     return fig
+
+
+def add_colorbar_to_axis(points, axis):
+    from mpl_toolkits.axes_grid1 import make_axes_locatable
+    divider = make_axes_locatable(axis)
+    cax = divider.append_axes("right", size="5%", pad=0.05)
+    plt.colorbar(mappable=cs, cax=cax)

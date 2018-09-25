@@ -11,7 +11,7 @@ import sys
 
 import pandas as pd
 
-from looper.models import Project
+from peppy import Project
 
 
 class Unbuffered(object):
@@ -87,15 +87,15 @@ def add_args(parser):
 
 def main():
     parser = ArgumentParser(
-        prog="ngs_analysis_recipe",
-        description="NGS analysis recipe."
+        prog="merge_signal",
+        description="Merge signal recipe."
     )
     parser = add_args(parser)
     args = parser.parse_args()
     # args = parser.parse_args('-t ATAC-seq metadata/project_config.yaml'.split(" "))
 
     # Start project
-    print("Starting looper project with project configuration file: '{}'".format(args.config_file))
+    print("Starting peppy project with project configuration file: '{}'".format(args.config_file))
     prj = Project(args.config_file)
     print("Changing directory to project root directory: '{}'.".format(prj.metadata.output_dir))
     os.chdir(prj.metadata.output_dir)

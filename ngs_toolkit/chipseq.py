@@ -302,7 +302,7 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
         Get mask of sites with 0 support in the given samples.
         Requires support matrix produced by `ngs_toolkit.atacseq.ATACSeqAnalysis.calculate_peak_support`.
 
-        :param list samples: Iterable of looper.models.Sample objects to restrict to.
+        :param list samples: Iterable of peppy.Sample objects to restrict to.
         :returns pd.Series: Boolean Pandas Series with sites with at least one of the \
                             given samples having a peak called.
         """

@@ -165,8 +165,8 @@ def create_requirements_file(
                    "scikit-learn==0.19.1",
                    "statsmodels==0.8.0",
                    "patsy==0.4.1",
-                   "https://github.com/epigen/looper/tarball/v0.7.2#egg=looper",
-                   "https://github.com/epigen/pypiper/tarball/v0.6#egg=pypiper"],
+                   "https://github.com/pepkit/looper/tarball/v0.9.1#egg=looper",
+                   "https://github.com/databio/pypiper/tarball/v0.6#egg=pypiper"],
         overwrite=False):
     """
     Create a requirements.txt file with pip requirements.

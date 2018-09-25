@@ -1,6 +1,35 @@
 Changelog
 ******************************
 
+- **v0.1.4** (*2018-09-25*):
+
+  - Update to peppy version v0.9.1
+
+
+  - fixes/improvements:
+
+    - add fold enrichment vs p-value plots in homer_consensus plot_differential_enrichments()
+    - add index name to DESeq2 CSV output; fix import on homer_combine_motifs
+    - add recipes to command-line entry in setup.py; remove cPickle import; better style
+    - add scatterplots to enrichr type of data in plot_differential_enrichment
+    - add self.data_type to Analysis objects
+    - added "homer_consensus" as one type of possible enrichment in plot_differential_enrichment, related to `issue 21 <https://github.com/afrendeiro/toolkit/issues/21>`_
+    - crunch landscape bad score for __init__;
+    - default color range of numeric values in get_level_colors to min-max
+    - fix `issue 19 <https://github.com/afrendeiro/toolkit/issues/19>`_
+    - fix `issue 24 <https://github.com/afrendeiro/toolkit/issues/24>`_; general.project_to_geo file referencing
+    - implement homer consensus motifs as in `issue 21 <https://github.com/afrendeiro/toolkit/issues/21>`_; add collectiong and plotting of homer enrichmnts
+    - moved annotate_with_sample_metadata to base Analysis class
+    - tested qnorm implementations; switched to Python implementation, close `issue 12 <https://github.com/afrendeiro/toolkit/issues/12>`_
+
+  - documentation:
+
+    - docs for the region_set_frip, merge_signal and call_peaks recipes
+
+.. |br| raw:: html
+
+   <br />
+
 - **v0.1.3.6** (*2018-08-05*):
 
   - add two new recipes:

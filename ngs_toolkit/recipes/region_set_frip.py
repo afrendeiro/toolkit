@@ -11,7 +11,7 @@ import sys
 
 import pandas as pd
 
-from looper.models import Project
+from peppy import Project
 from ngs_toolkit.atacseq import ATACSeqAnalysis
 from ngs_toolkit.chipseq import ChIPSeqAnalysis
 
@@ -81,15 +81,15 @@ def add_args(parser):
 
 def main():
     parser = ArgumentParser(
-        prog="ngs_analysis_recipe",
-        description="NGS analysis recipe."
+        prog="region_set_frip",
+        description="Region set FRiP recipe."
     )
     parser = add_args(parser)
     args = parser.parse_args()
     # args = parser.parse_args('-t ATAC-seq metadata/project_config.yaml'.split(" "))
 
     # Start project
-    print("Starting looper project with project configuration file: '{}'".format(args.config_file))
+    print("Starting peppy project with project configuration file: '{}'".format(args.config_file))
     prj = Project(args.config_file)
     print("Changing directory to project root directory: '{}'.".format(prj.metadata.output_dir))
     os.chdir(prj.metadata.output_dir)
@@ -140,7 +140,7 @@ def main():
             analysis = ATACSeqAnalysis(
                 name=args.name + "_atacseq", prj=prj,
                 samples=samples, results_dir=args.results_dir)
-        elif data_type in ["ChIP-seq"]:
+        elif data_type in ["ChIP-seq", "ChIPmentation"]:
             print("Initializing ChIP-seq analysis")
             analysis = ChIPSeqAnalysis(
                 name=args.name + "_chipseq", prj=prj,

@@ -8,26 +8,68 @@ Manager programs
 
 Here you can see the command-line usage instructions for the main looper command and for each subcommand:
 
-``projectmanager --help``
+
+projectmanager
+=============================
 
 .. code-block:: none
 
-	usage: projectmanager [-h] [-d] [--overwrite] project_name
-	
+	usage: projectmanager [-h] {create,recipe} ...
+
 	projectmanager - A project manager.
-	
+
 	positional arguments:
-	  project_name   Project name.
-	
+	  {create,recipe}
+	    create         Create project.
+	    recipe         Run ngs_toolkit recipe for a given project.
+
 	optional arguments:
-	  -h, --help     show this help message and exit
-	  -d, --dry-run  Don't actually do anything. (default: False)
-	  --overwrite    Don't overwrite any existing directory or file. (default:
-	                 False)
-	
+	  -h, --help       show this help message and exit
+
 	https://github.com/afrendeiro/toolkit
 
-``trackmanager --help``
+
+
+projectmanager::create
+-----------------------------
+
+.. code-block:: none
+
+	usage: projectmanager create [-h] [-r ROOT_DIR] [-d] [--overwrite]
+	                             project_name
+
+	Create project.
+
+	positional arguments:
+	  project_name          Project name.
+
+	optional arguments:
+	  -h, --help            show this help message and exit
+	  -r ROOT_DIR, --root-dir ROOT_DIR
+	                        Root directory to create projects.
+	  -d, --dry-run         Don't actually do anything.
+	  --overwrite           Don't overwrite any existing directory or file.
+
+
+projectmanager::recipe
+-----------------------------
+
+.. code-block:: none
+
+	usage: projectmanager recipe [-h] recipe_name project_config
+
+	Run recipe.
+
+	positional arguments:
+	  recipe_name     Recipe name.
+	  project_config  Project config.
+
+	optional arguments:
+	  -h, --help      show this help message and exit
+
+
+trackmanager
+=============================
 
 .. code-block:: none
 

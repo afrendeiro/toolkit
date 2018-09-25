@@ -18,7 +18,7 @@ import matplotlib
 import pandas as pd
 import seaborn as sns
 
-from looper.models import Project
+from peppy import Project
 from ngs_toolkit.atacseq import ATACSeqAnalysis
 from ngs_toolkit.rnaseq import RNASeqAnalysis
 from ngs_toolkit.chipseq import ChIPSeqAnalysis
@@ -118,7 +118,7 @@ def main():
     # args = parser.parse_args('-t ATAC-seq metadata/project_config.yaml'.split(" "))
 
     # Start project
-    print("Starting looper project with project configuration file: '{}'".format(args.config_file))
+    print("Starting peppy project with project configuration file: '{}'".format(args.config_file))
     prj = Project(args.config_file)
     print("Changing directory to project root directory: '{}'.".format(prj.metadata.output_dir))
     os.chdir(prj.metadata.output_dir)

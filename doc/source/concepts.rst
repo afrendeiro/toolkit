@@ -7,7 +7,7 @@ A few notes on the way some of the objects were designed to be used.
 Analysis objects
 ==============================
 
-Analysis objects are generally instantiated with ``looper`` ``Project`` objects, which instead build on ``PEP``.
+Analysis objects are generally instantiated with ``peppy`` ``Project`` objects, which instead build on ``PEP``.
 This allows the usage of looper processed samples and project variables through the project configuration file.
 
 These objects will hold attributes and functions relevant to the data type under analysis. Depending on the type of function these functions may assign their outputs to the object or return them.

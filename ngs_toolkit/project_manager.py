@@ -108,7 +108,7 @@ def create_project(
         # pipelines_dir: /home/arendeiro/workspace/pipelines
         pipeline_interfaces: /home/arendeiro/workspace/open_pipelines/pipeline_interface.yaml
         sample_annotation: /scratch/lab_bock/shared/projects/{project_name}/metadata/annotation.csv
-        merge_table: /scratch/lab_bock/shared/projects/{project_name}/metadata/merge_table.csv
+        sample_subannotation: /scratch/lab_bock/shared/projects/{project_name}/metadata/merge_table.csv
     data_sources:
         local: "/scratch/users/arendeiro/data/external/atac-seq/{{sample_name}}.bam"
         bsf: /scratch/lab_bsf/samples/{{flowcell}}/{{flowcell}}_{{lane}}_samples/{{flowcell}}_{{lane}}#{{BSF_name}}.bam

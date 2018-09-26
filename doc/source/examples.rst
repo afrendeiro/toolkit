@@ -2,14 +2,14 @@ Examples
 ******************************
 
 
-ATAC-seq analysis example
----------------------------
+Analysis example
+==============================
 
 The following is an example of how to use ``ngs_toolkit`` in a ATAC-seq project.
 While straightforward, it still allows considerable customization due to the modularity of the toolkit and the parametrization of most functions (this example uses default values everywhere nonetheless).
 
 
-We have the following PEP/looper project config YAML file:
+We have the following `PEP project <https://peppy.readthedocs.io>`_ config YAML file:
 
 .. code-block:: yaml
 
@@ -23,7 +23,7 @@ We have the following PEP/looper project config YAML file:
       submission_subdir: submission
       pipeline_interfaces: /home/user/workspace/open_pipelines/pipeline_interface.yaml
       sample_annotation: /scratch/lab_bock/shared/projects/example_project/metadata/annotation.csv
-      merge_table: /scratch/lab_bock/shared/projects/example_project/metadata/merge_table.csv
+      sample_subannotation: /scratch/lab_bock/shared/projects/example_project/metadata/merge_table.csv
     data_sources:
       bsf: /path/to/samples/{flowcell}/{flowcell}_{lane}#{sample_name}.bam
     genomes:
@@ -62,8 +62,9 @@ And the following comparison table:
     "KOB_vs_WT",    "0",    "ATAC-seq_WT_r2",   "WT"
 
 
-Example analysis:
 
+ATAC-seq example
+-------------------------------
 
 .. code-block:: python
 
@@ -73,7 +74,6 @@ Example analysis:
     from ngs_toolkit.general import (differential_analysis,
                                  plot_differential,
                                  differential_enrichment,
-                                 collect_differential_enrichment,
                                  plot_differential_enrichment)
 
 
@@ -85,6 +85,7 @@ Example analysis:
         name="example.atac_analysis",
         prj=prj,
         samples=prj.samples)
+    data_type = "ATAC-seq"
 
     # Generate consensus peak set and annotate it
     ## get consensus peak set from all samples
@@ -122,6 +123,10 @@ Example analysis:
 
 
     # UNSUPERVISED ANALYSIS
+
+    # plot pairwise sample correlations, 
+    # perform dimensionality reduction (MDS, PCA)
+    # and plot samples in this spaces, annotated with their attributes
     atac_analysis.unsupervised(
         quant_matrix="accessibility", samples=None,
         attributes_to_plot=attributes_to_plot, plot_prefix="accessibility")
@@ -136,36 +141,16 @@ Example analysis:
         (comparison_table['comparison_type'] == 'differential')]
 
     # differential analysis with DESeq2
-    # (all at once)
-    try:
-        analysis.differential_results = differential_analysis(
-            analysis,
-            comparison_table,
-            data_type=data_type,
-            samples=[s for s in analysis.samples if s.name in comparison_table['sample_name'].tolist()],
-            output_dir="{}/differential_analysis_{}".format(analysis.results_dir, data_type),
-            covariates=None,
-            alpha=alpha,  # not really used 
-            overwrite=True)
-    # (one comparison at a time)
-    except:
-        analysis.differential_results = pd.DataFrame()
-        for comparison in comparison_table['comparison_name'].unique():
-            comp = comparison_table[comparison_table['comparison_name'] == comparison_name]
-            res = differential_analysis(
-                analysis,
-                comp,
-                data_type=data_type,
-                samples=[s for s in analysis.samples if s.name in comp['sample_name'].tolist()],
-                output_dir="{}/differential_analysis_{}".format(analysis.results_dir, data_type),
-                covariates=None,
-                alpha=alpha,  # not really used 
-                overwrite=True)
-            analysis.differential_results = analysis.differential_results.append(res, ignore_index=True)
+    analysis.differential_results = differential_analysis(
+        analysis,
+        comparison_table,
+        data_type=data_type,
+        output_dir="{}/differential_analysis_{}".format(analysis.results_dir, data_type),
+        covariates=None,
+        overwrite=True)
 
-    analysis.differential_results = analysis.differential_results.set_index("index")
+    # Save analysis object
     analysis.to_pickle()
-
 
     # plot scatter, volcano, MA, heatmaps on the differential regions
     # by groups and with individual samples, with normalized values
@@ -185,3 +170,33 @@ Example analysis:
         robust=True,
         group_wise_colours=True,
         group_variables=group_variables)
+
+    # perform enrichment analysis on differnetial region sets
+    # using LOLA, MEME-AME, HOMER and Enrichr
+    differential_enrichment(
+        analysis,
+        diff,
+        data_type=data_type,
+        output_dir=output_dir,
+        directional=True,
+        max_diff=n_top,
+        sort_var="pvalue",
+        as_jobs=False)
+
+    # for each type of enrichment results,
+    # plot bar and scatter plots of odds ratio vs p-value,
+    # heatmaps of enrichment across terms for each comparison
+    # and comparison correlation in enrichment terms
+    for enrichment_name, enrichment_type in [
+            ('motif', 'meme_ame'), ('homer_consensus', 'homer_consensus'),
+            ('lola', 'lola'), ('enrichr', 'enrichr')]:
+        enrichment_table = pd.read_csv(
+                os.path.join(output_dir, "differential_analysis" + ".{}.csv".format(enrichment_type)))
+
+        plot_differential_enrichment(
+            enrichment_table,
+            enrichment_name,
+            data_type=data_type,
+            output_dir=output_dir,
+            direction_dependent=True, barplots=False,
+            top_n=10 if enrichment_name not in ["motif", "homer_consensus"] else 50)

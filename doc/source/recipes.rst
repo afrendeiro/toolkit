@@ -19,7 +19,7 @@ This recipe uses variables provided in the project configuration file ``project_
 
 Here are the command-line arguments to use it in a stand-alone script:
 
-.. code-block:: bash
+.. code-block:: none
 
 	usage: python ngs_analysis_recipe [-h] [-n NAME] [-o RESULTS_DIR]
 	                           [-t {ATAC-seq,RNA-seq,ChIP-seq}] [-q] [-a ALPHA]
@@ -59,7 +59,7 @@ It is capable of parallelizing work in jobs if a SLURM cluster is available.
 
 Here are the command-line arguments to use it in a stand-alone script:
 
-.. code-block:: bash
+.. code-block:: none
 
 	usage: call_peaks [-h] [-c COMPARISON_TABLE] [-t] [-j]
 	                           [-o RESULTS_DIR]
@@ -96,7 +96,7 @@ If the external region set is not given, a region set derived from all samples a
 
 Here are the command-line arguments to use it in a stand-alone script:
 
-.. code-block:: bash
+.. code-block:: none
 
 	usage: region_set_frip [-h] [-n NAME] [-r REGION_SET] [-q] [-j]
 	                           [-o RESULTS_DIR]
@@ -137,7 +137,7 @@ It produces merged BAM and bigWig files for all signal in the samples but is als
 
 Here are the command-line arguments to use it in a stand-alone script:
 
-.. code-block:: bash
+.. code-block:: none
 
 	usage: merge_signal [-h] [-a ATTRIBUTES] [-q] [-j] [-n] [--nucleosome]
 	                    [--overwrite] [-o OUTPUT_DIR]

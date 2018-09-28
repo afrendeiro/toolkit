@@ -2145,7 +2145,7 @@ def bed_to_fasta(bed_file, fasta_file, genome="hg19", genome_2bit=None):
     # do enrichment
     cmd = "twoBitToFa {0} -bed={1} {2}".format(genome_2bit, bed_file + ".tmp.bed", fasta_file)
 
-    os.system(cmd)
+    os.popen(cmd)
     # os.system("rm %s" % bed_file + ".tmp.bed")
 
 
@@ -2597,6 +2597,10 @@ def differential_enrichment(
 
             # Add data_type specific info
             comparison_df = matrix.loc[diff, :]
+            if comparison_df.shape != comparison_df.dropna().shape:
+                print("There are differential regions which are not in the set of annotated regions for comparison '{}'!".format(comp))
+                print("Continuing enrichment without those.")
+                comparison_df = comparison_df.dropna()
 
             # Characterize
             comparison_dir = os.path.join(output_dir, "{}.{}".format(comp, direction))
@@ -2764,7 +2768,7 @@ def collect_differential_enrichment(
                     meme_enr = meme_enr.append(ame_motifs, ignore_index=True)
 
                     # fix mouse TF names
-                    if (meme_enr['TF'].str.startswith("UP").sum() / float(meme_enr.shape[0])) >= 0.5:
+                    if (meme_enr['TF'].str.startswith("UP").sum() / float(meme_enr.shape[0])) >= 0.1:
                         annot = pd.read_table(
                             "~/resources/motifs/motif_databases/MOUSE/uniprobe_mouse.id_mapping.tsv",
                             header=None, names=["TF", "TF_name"])
@@ -3130,7 +3134,7 @@ def plot_differential_enrichment(
                 bbox_inches="tight", dpi=300)
 
         # Significance vs fold enrichment over background
-        enrichment_table['enrichment over background'] = (
+        enrichment_table['enrichment_over_background'] = (
             enrichment_table['% of Target Sequences with Motif'] /
             enrichment_table['% of Background Sequences with Motif'])
 
@@ -3142,9 +3146,9 @@ def plot_differential_enrichment(
             enr = enrichment_table[enrichment_table[comp_variable] == comp]
             enr['Motif Name'] = enr['Motif Name'].str.replace(".*BestGuess:", "").str.replace(r"-ChIP-Seq.*", "")
 
-            enr['combined'] = enr[['enrichment over background', 'log_p_value']].apply(zscore).mean(axis=1)
+            enr['combined'] = enr[['enrichment_over_background', 'log_p_value']].apply(zscore).mean(axis=1)
             cs = axis[i].scatter(
-                enr['enrichment over background'],
+                enr['enrichment_over_background'],
                 enr['log_p_value'],
                 c=enr['combined'],
                 s=8, alpha=0.75)
@@ -3154,7 +3158,7 @@ def plot_differential_enrichment(
                 s = enr.loc[j, "Motif Name"]
                 s
                 axis[i].text(
-                    enr.loc[j, 'enrichment over background'],
+                    enr.loc[j, 'enrichment_over_background'],
                     enr.loc[j, 'log_p_value'],
                     s=s, ha="right", fontsize=5)
             axis[i].set_title(comp)
@@ -3172,43 +3176,46 @@ def plot_differential_enrichment(
         if len(enrichment_table[comp_variable].drop_duplicates()) < 2:
             return
 
-        # pivot table
-        motifs_pivot = pd.pivot_table(
-            enrichment_table, values="log_p_value", columns="Motif Name", index=comp_variable).fillna(0)
+        for label, metric in [
+                ('-log10(p-value) of enrichment\nin', 'log_p_value'),
+                ('Enrichment over background of\n', 'enrichment_over_background')]:
+            # pivot table
+            motifs_pivot = pd.pivot_table(
+                enrichment_table, values=metric, columns="Motif Name", index=comp_variable).fillna(0)
 
-        # plot correlation
-        if correlation_plots:
-            g = sns.clustermap(motifs_pivot.T.corr(), cbar_kws={"label": "Correlation of enrichemnt\nof differential regions"})
-            g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90)
-            g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0)
-            g.fig.savefig(os.path.join(output_dir, output_prefix + ".homer_consensus.correlation.svg"), bbox_inches="tight", dpi=300)
+            # plot correlation
+            if correlation_plots:
+                g = sns.clustermap(motifs_pivot.T.corr(), cbar_kws={"label": "Correlation of enrichemnt\nof differential regions"})
+                g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90)
+                g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0)
+                g.fig.savefig(os.path.join(output_dir, output_prefix + ".homer_consensus.correlation.svg"), bbox_inches="tight", dpi=300)
 
-        top = enrichment_table.set_index('Motif Name').groupby(comp_variable)['log_p_value'].nlargest(top_n)
-        top_terms = top.index.get_level_values('Motif Name').unique()
+            top = enrichment_table.set_index('Motif Name').groupby(comp_variable)[metric].nlargest(top_n)
+            top_terms = top.index.get_level_values('Motif Name').unique()
 
-        # plot clustered heatmap
-        shape = motifs_pivot.loc[:, top_terms].shape
-        g = sns.clustermap(
-            motifs_pivot.loc[:, top_terms].T, figsize=(max(6, 0.12 * shape[0]), max(6, 0.12 * shape[1])),
-            xticklabels=True, yticklabels=True,
-            cbar_kws={"label": "-log10(p-value) of enrichment\nof differential regions"}, metric="correlation")
-        g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90, ha="right", fontsize="xx-small")
-        g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small")
-        g.fig.savefig(os.path.join(output_dir, output_prefix + ".homer_consensus.cluster_specific.svg"), bbox_inches="tight", dpi=300)
-
-        # plot clustered heatmap
-        shape = motifs_pivot.loc[:, top_terms].shape
-        if z_score is not None:
+            # plot clustered heatmap
+            shape = motifs_pivot.loc[:, top_terms].shape
             g = sns.clustermap(
                 motifs_pivot.loc[:, top_terms].T, figsize=(max(6, 0.12 * shape[0]), max(6, 0.12 * shape[1])),
                 xticklabels=True, yticklabels=True,
-                cmap="RdBu_r", center=0, z_score=z_score,
-                cbar_kws={"label": "{} Z-score of enrichment\nof differential regions".format(z_score_label)}, metric="correlation")
+                cbar_kws={"label": label + " differential regions"}, metric="correlation")
             g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90, ha="right", fontsize="xx-small")
             g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small")
-            g.fig.savefig(
-                os.path.join(output_dir, output_prefix + ".homer_consensus.cluster_specific.{}_z_score.svg".format(z_score_label)),
-                bbox_inches="tight", dpi=300)
+            g.fig.savefig(os.path.join(output_dir, output_prefix + ".homer_consensus.cluster_specific.{}.svg".format(metric)), bbox_inches="tight", dpi=300)
+
+            # plot clustered heatmap
+            shape = motifs_pivot.loc[:, top_terms].shape
+            if z_score is not None:
+                g = sns.clustermap(
+                    motifs_pivot.loc[:, top_terms].T, figsize=(max(6, 0.12 * shape[0]), max(6, 0.12 * shape[1])),
+                    xticklabels=True, yticklabels=True,
+                    cmap="RdBu_r", center=0, z_score=z_score,
+                    cbar_kws={"label": "{} Z-score of {} differential regions".format(z_score_label, label)}, metric="correlation")
+                g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90, ha="right", fontsize="xx-small")
+                g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small")
+                g.fig.savefig(
+                    os.path.join(output_dir, output_prefix + ".homer_consensus.cluster_specific.{}.{}_z_score.svg".format(metric, z_score_label)),
+                    bbox_inches="tight", dpi=300)
 
     if enrichment_type == "enrichr":
         # enrichment_table["description"] = enrichment_table["description"].str.decode("utf-8")

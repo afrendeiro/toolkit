@@ -25,22 +25,23 @@ with open(os.path.join("ngs_toolkit", "_version.py"), 'r') as handle:
 requirements = open("requirements.txt").read().strip().split("\n")
 requirements = [r for r in requirements if not r.startswith("#")]
 requirements = [r for r in requirements if "#egg=" not in r]
-# dependencies = list()
-# for i, r in enumerate(requirements):
-#     if "#egg=" in r:
-#         n = r[r.index('#egg=') + 5:]
-#         v = r[r.index('/v') + 1:r.index('#egg=')]
-#         requirements[i] = n
-#         dependencies.append(
-#             'https://github.com/epigen/looper/tarball/{v}#egg={n}-{v}'.format(n=n, v=v))
 
 
-# recipes
+# Recipes
 recipes = glob.glob(os.path.join(os.path.curdir, "ngs_toolkit", "recipes", "*.py"))
 recipes = list(map(
     lambda x: x.replace(".py", "").replace("./", "").replace("/", "."),
     recipes))
 recipes = [" = ".join([i, j + ":main"]) for i, j in zip(map(lambda x: x.split('.')[-1], recipes), recipes)]
+
+
+# Handle the pypi README formatting
+try:
+    import pypandoc
+    long_description = pypandoc.convert_file('README.md', 'rst')
+except(IOError, ImportError):
+    long_description = open('README.md').read()
+
 
 # setup
 setup(
@@ -54,7 +55,7 @@ setup(
         ] + recipes,
     },
     description="A toolkit for NGS analysis with Python.",
-    long_description=open('README.md').read(),
+    long_description=long_description,
     classifiers=[
         "Development Status :: 3 - Alpha",
         "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
@@ -67,6 +68,5 @@ setup(
     author_email='afrendeiro@gmail.com',
     license="GPL3",
     install_requires=requirements,
-    # dependency_links=dependencies,
     **extra
 )

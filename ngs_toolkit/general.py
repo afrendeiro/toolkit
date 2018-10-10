@@ -125,7 +125,7 @@ class Analysis(object):
 
     def get_level_colors(
             self, index=None, matrix="accessibility", levels=None,
-            pallete="Paired", cmap="RdBu_r", nan_color=(0.662745, 0.662745, 0.662745, 1.0),
+            pallete="tab20", cmap="RdBu_r", nan_color=(0.662745, 0.662745, 0.662745, 1.0),
             # TODO: implement dataframe return
             as_dataframe=False):
         """
@@ -396,6 +396,8 @@ def unsupervised_analysis(
         legends=False,
         always_legend=False,
         prettier_sample_names=True,
+        pallete="tab20",
+        cmap="RdBu_r",
         rasterized=False,
         dpi=300,
         output_dir="{results_dir}/unsupervised"):
@@ -441,6 +443,10 @@ def unsupervised_analysis(
     :type always_legend: bool, optional
     :param prettier_sample_names: Whether it should attempt to prettify sample names by removing the data type from plots. Defaults to True.
     :type prettier_sample_names: bool, optional
+    :param pallete: Color pallete to use in levels of `attributes_to_plot`. Will be passed to `analysis.get_level_colors`.
+    :type pallete: str
+    :param cmap: Color map to use in numerical levels of `attributes_to_plot`. Will be passed to `analysis.get_level_colors`.
+    :type cmap: str
     :param rasterized: Whether elements with many objects should be rasterized. Defaults to False.
     :type rasterized: bool, optional
     :param dpi: Definition of rasterized image in dots per inch. Defaults to 300dpi.
@@ -495,8 +501,8 @@ def unsupervised_analysis(
 
     # This will always be a matrix for all samples
     color_dataframe = pd.DataFrame(
-        analysis.get_level_colors(index=matrix.columns, levels=attributes_to_plot),
-        index=attributes_to_plot, columns=matrix.columns.get_level_values("sample_name"))
+        analysis.get_level_colors(index=matrix.columns, levels=attributes_to_plot, pallete=pallete, cmap=cmap),
+        index=attributes_to_plot, columns=matrix.columns)
     # will be filtered now by the requested samples if needed
     color_dataframe = color_dataframe[[s.name for s in samples]]
 
@@ -515,7 +521,8 @@ def unsupervised_analysis(
     g = sns.clustermap(
         # yticklabels=sample_display_names,
         X.astype(float).corr(), xticklabels=False, yticklabels=True, annot=display_corr_values,
-        cmap="Spectral_r", figsize=(0.2 * X.shape[1], 0.2 * X.shape[1]), cbar_kws={"label": "Pearson correlation"}, row_colors=color_dataframe.values.tolist())
+        cmap="Spectral_r", figsize=(0.2 * X.shape[1], 0.2 * X.shape[1]), cbar_kws={"label": "Pearson correlation"},
+        row_colors=color_dataframe.T, col_colors=color_dataframe.T)
     g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize='xx-small')
     g.ax_heatmap.set_xlabel(None, visible=False)
     g.ax_heatmap.set_ylabel(None, visible=False)
@@ -1614,7 +1621,9 @@ def plot_differential(
         robust=False,
         feature_labels=False,
         group_wise_colours=False,
-        group_variables=None):
+        group_variables=None,
+        pallete="tab20",
+        cmap="RdBu_r"):
     """
     Plot differential features (e.g. chromatin region, genes) discovered with supervised group comparisons
     by ``ngs_toolkit.general.differential_analysis``.
@@ -1679,6 +1688,10 @@ def plot_differential(
     :type group_wise_colours: bool, optional
     :param group_variables: Which variables to colour if `group_wise_colours` if True. Defaults to None (must be given).
     :type group_variables: list, optional
+    :param pallete: Color pallete to use in levels of `group_variables`. Will be passed to `analysis.get_level_colors`.
+    :type pallete: str
+    :param cmap: Color map to use in numerical levels of `group_variables`. Will be passed to `analysis.get_level_colors`.
+    :type cmap: str
     """
     import pandas as pd
     import numpy as np
@@ -1728,11 +1741,11 @@ def plot_differential(
 
         # This will always be a matrix for all samples
         color_dataframe = pd.DataFrame(
-            analysis.get_level_colors(index=matrix.columns, levels=group_variables),
-            index=group_variables, columns=matrix.columns.get_level_values("sample_name"))
+            analysis.get_level_colors(index=matrix.columns, levels=group_variables, pallete=pallete, cmap=cmap),
+            index=group_variables, columns=matrix.columns)
         # will be filtered now by the requested samples if needed
         color_dataframe = color_dataframe[[s.name for s in samples]]
-        color_dataframe = color_dataframe.loc[:, matrix.columns.get_level_values("sample_name")]
+        color_dataframe = color_dataframe.loc[:, matrix.columns]
 
     # Extract significant based on p-value and fold-change
     if fold_change is not None:
@@ -2043,7 +2056,7 @@ def plot_differential(
     matrix2 = matrix.loc[all_diff, :].sort_index(axis=1)
     figsize = (max(5, 0.12 * matrix2.shape[1]), 5)
     if group_wise_colours:
-        extra = {"col_colors": color_dataframe.values}
+        extra = {"col_colors": color_dataframe.T}
     else:
         extra = {}
 
@@ -2265,7 +2278,8 @@ def parse_homer(homer_dir):
 
 def homer_combine_motifs(
         comparison_dirs, output_dir,
-        p_value_threshold=1e-25, cpus=8, run=False, as_jobs=True, genome="hg19"):
+        p_value_threshold=1e-25, cpus=8, run=False, as_jobs=True, genome="hg19",
+        known_vertebrates_TFs_only=False):
     """
     Create consensus of de novo discovered motifs from HOMER
 
@@ -2305,8 +2319,11 @@ def homer_combine_motifs(
                     outfile.write(line)
 
     # Filter and get motif consensus
-    os.popen("compareMotifs.pl {} {} -info 0.6 -nofacts -pvalue {} -cpu {}"
-             .format(out_file, output_dir, p_value_threshold, cpus))
+    extra = ""
+    if mammalian_TFs_only:
+        extra = " -known /home/arendeiro/workspace/homer_4.8/data/knownTFs/vertebrates/known.motifs"
+    os.popen("compareMotifs.pl {} {} -info 0.6 -nofacts -pvalue {} -cpu {}{}"
+             .format(out_file, output_dir, p_value_threshold, cpus, extra))
 
     # concatenate consensus motif files
     files = glob.glob(os.path.join(output_dir, "homerResults/*motif"))

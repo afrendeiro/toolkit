@@ -199,10 +199,26 @@ def main():
             print("Group-wise labeling of samples will not be possible!")
             group_attributes = ['sample_name']
 
+
+        if "comparison_table" in prj.metadata.keys():
+            comparison_table_file = prj.metadata['comparison_table']
+            print("Using comparison table specified in project configuration file: '{}'.".format(comparison_table_file))
+        else:
+            comparison_table_file = os.path.join("metadata", "comparison_table.csv")
+            print("Will try using comparison table in metadata directory: '{}'.".format(comparison_table_file))
+
+        try:
+            comparison_table = pd.read_csv(comparison_table_file)
+        except IOError:
+            print("Comparison table not present for project.")
+            print("Will not perform comparisons.")
+            comparison_table = pd.DataFrame()
+
         return main_analysis_pipeline(
             analysis, data_type=data_type,
             sample_attributes=sample_attributes,
             plotting_attributes=group_attributes,
+            comparison_table=comparison_table,
             alpha=args.alpha, abs_fold_change=args.abs_fold_change
         )
 
@@ -210,6 +226,7 @@ def main():
 def main_analysis_pipeline(
         analysis, data_type,
         sample_attributes, plotting_attributes,
+        comparison_table,
         alpha=0.05, abs_fold_change=0):
     """
     Main analysis pipeline for ATAC-seq and RNA-seq - untested for ChIP-seq/ChIPmentation.
@@ -229,7 +246,17 @@ def main_analysis_pipeline(
 
         # GET CONSENSUS PEAK SET, ANNOTATE IT, PLOT
         # Get consensus peak set from all samples
-        analysis.get_consensus_sites(region_type="summits")
+        if data_type == "ChIP-seq":
+            comps = comparison_table[
+                (comparison_table['data_type'] == data_type) &
+                (comparison_table['comparison_type'] == 'peaks')]
+            if comps.empty:
+                print("Comparison table has no comparisons with 'data_type'=='ChIP-seq' and 'comparison_type'=='peaks'.")
+                print("Aborting.")
+                return 1
+            analysis.get_consensus_sites(comps, region_type="summits")
+        else:
+            analysis.get_consensus_sites(region_type="summits")
         analysis.calculate_peak_support(region_type="summits")
 
         # GET CHROMATIN OPENNESS MEASUREMENTS, PLOT
@@ -290,27 +317,21 @@ def main_analysis_pipeline(
         output_dir="{results_dir}/unsupervised_analysis")
 
     # Supervised analysis
-    try:
-        comparison_table = pd.read_csv(os.path.join("metadata", "comparison_table.csv"))
-    except IOError:
-        print("Comparison table not present for project.")
-        return 0
-    if comparison_table.empty:
-        print("Comparison table is empty.")
-        return 1
-
-    comparison_table = comparison_table[
-        # (comparison_table['toggle'] == 1) &
+    comps = comparison_table[
         (comparison_table['data_type'] == data_type) &
         (comparison_table['comparison_type'] == 'differential')]
+    if comps.empty:
+        print("Comparison table has no comparisons with 'data_type'=='{}' and 'comparison_type'=='differential'.".format(data_type))
+        print("Not performing differential analysis for this data type.")
+        return 0
 
-    if not (comparison_table['sample_name'].value_counts() > 1).any():
+    if not (comps['sample_name'].value_counts() > 1).any():
         print("Detected simple design for differential analysis. Each sample belongs only to one group.")
         analysis.differential_results = differential_analysis(
             analysis,
-            comparison_table,
+            comps,
             data_type=data_type,
-            samples=[s for s in analysis.samples if s.name in comparison_table['sample_name'].tolist()],
+            samples=[s for s in analysis.samples if s.name in comps['sample_name'].tolist()],
             output_dir="{}/differential_analysis_{}".format(analysis.results_dir, data_type),
             covariates=None,
             alpha=0.05,
@@ -320,8 +341,8 @@ def main_analysis_pipeline(
         print("Complex design for differential analysis. There are sample(s) belonging to more than one group.")
         print("Performing analysis independently for each comparison.")
         analysis.differential_results = pd.DataFrame()
-        for comparison in comparison_table['comparison_name'].unique():
-            comp = comparison_table[comparison_table['comparison_name'] == comparison]
+        for comparison in comps['comparison_name'].unique():
+            comp = comps[comps['comparison_name'] == comparison]
             res = differential_analysis(
                 analysis,
                 comp,
@@ -354,7 +375,7 @@ def main_analysis_pipeline(
         analysis,
         analysis.differential_results,
         matrix=getattr(analysis, quant_matrix),
-        comparison_table=comparison_table,
+        comparison_table=comps,
         output_dir="{}/differential_analysis_{}".format(analysis.results_dir, data_type),
         output_prefix="differential_analysis",
         data_type=data_type,

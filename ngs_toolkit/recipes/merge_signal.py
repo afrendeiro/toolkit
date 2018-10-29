@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-This is the main script of the ngs_analysis recipe.
+This is the main script of the merge_signal recipe.
 """
 
 
@@ -44,8 +44,9 @@ def add_args(parser):
     parser.add_argument(
         "-a", "--attributes",
         dest="attributes",
-        help="Attributes to merge samples by. By default will use values in the project config "
-             "`sample_attributes`.",
+        default=None,
+        help="Attributes to merge samples by. A comma-delimited string with no spaces. "
+             "By default will use values in the project config `group_attributes`.",
         type=str)
     parser.add_argument(
         "-q", "--pass-qc",
@@ -59,6 +60,11 @@ def add_args(parser):
         dest="as_job",
         help="Whether jobs should be created for each sample, or "
         "it should run in serial mode.")
+    parser.add_argument(
+        "--cpus",
+        dest="cpus",
+        default=8,
+        help="CPUs/Threads to use per job if `--as-jobs` is on.")
     parser.add_argument(
         "-n", "--normalize",
         action="store_true",
@@ -80,7 +86,7 @@ def add_args(parser):
         default="merged",
         dest="output_dir",
         help="Directory for output files. "
-        "Default is 'merged' under the project roort directory.",
+        "Default is 'merged' under the project root directory.",
         type=str)
     return parser
 
@@ -126,11 +132,27 @@ def main():
         raise ValueError("There were no valid samples after filtering for quality!")
 
     # Get only samples with signal
-    sheet = prj.sheet[prj.sheet['protocol'].isin(["ATAC-seq", "ChIP-seq", "ChIPmentation"])]
+    key = "protocol" if 'protocol' in prj.sheet.columns else 'library'
+    sheet = prj.sheet[prj.sheet[key].isin(["ATAC-seq", "ChIP-seq", "ChIPmentation"])]
     print(
         "Selecting samples with appropriate data type." +
         "Samples under consideration: '{}'. ".format(",".join(sheet['sample_name'].tolist())) +
-        "Total of {} samples.".format(sheet.shape))
+        "Total of {} samples.".format(sheet.shape[0]))
+
+    # Get default attributes if not set
+    if args.attributes is None:
+        if "group_attributes" in prj:
+            args.attributes = prj.group_attributes
+        else:
+            print("Sample attributes to group by were not set and none could be found in project configuration file!")
+            print("Aborting!")
+            return
+    else:
+        args.attributes = args.attributes.split(",")
+
+    print("Using the following attributes to merge samples: '{}', resulting in a total of {} groups.".format(
+        ", ".join(args.attributes), len(sheet.groupby(args.attributes).groups.items())))
+
     print("Starting to merge sample signals.")
     merge_signal(
         sheet, prj.samples, args.attributes, output_dir=args.output_dir,
@@ -160,7 +182,7 @@ def merge_signal(
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
-    for attrs, index in [sheet.groupby(attributes).groups.items()[0]]:
+    for attrs, index in sheet.groupby(attributes).groups.items():
         name = "_".join([a for a in attrs if not pd.isnull(a)])
         name = re.sub(r"_{2}", "_", name)
         name = re.sub(r"_$", "", name)
@@ -217,7 +239,7 @@ def merge_signal(
             handle.write(job)
 
         if as_job:
-            os.system("sbatch -p longq --time 4-00:00:00 -J merge_signal.{} -o {} -c {} --mem 80000 {}".format(sample.name, log_file, cpus, job_file))
+            os.system("sbatch -p longq --time 4-00:00:00 -J merge_signal.{} -o {} -c {} --mem 80000 {}".format(name, log_file, cpus, job_file))
         else:
             os.system("sh {}".format(job_file))
 

@@ -221,7 +221,7 @@ class ATACSeqAnalysis(Analysis):
         if samples is None:
             samples = self.samples
 
-        for i, sample in tqdm(enumerate(samples), total=(len(samples))):
+        for i, sample in tqdm(enumerate(samples), total=len(samples), desc="Sample"):
             # print(sample.name)
             if region_type == "summits":
                 try:
@@ -299,7 +299,7 @@ class ATACSeqAnalysis(Analysis):
             samples = self.samples
 
         # calculate support (number of samples overlaping each merged peak)
-        for i, sample in tqdm(enumerate(samples), total=len(samples)):
+        for i, sample in tqdm(enumerate(samples), total=len(samples), desc="Sample"):
             # print(sample.name)
             if region_type == "summits":
                 peaks = re.sub("_peaks.narrowPeak", "_summits.bed", sample.peaks)
@@ -683,6 +683,8 @@ class ATACSeqAnalysis(Analysis):
             return self.normalize_coverage_rpm(matrix=matrix, samples=samples, save=save, assign=assign)
         elif method == "gc_content":
             return self.normalize_gc_content(matrix=matrix, samples=samples, save=save, assign=assign)
+        else:
+            raise ValueError("Requested normalization method is not available!")
 
     def get_peak_gene_annotation(self, tss_file="refseq.refflat.tss.bed"):
         """

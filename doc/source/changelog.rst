@@ -1,10 +1,46 @@
 Changelog
 ******************************
 
+
+- **v0.1.4.2** (*2018-10-29*):
+
+  - fix important lack of ngs_toolkit.recipes module in setup.py: recipes should now be correctly added to $PATH
+  - fix and add full support to comparison_table in recipes.ngs_analysis
+  - add region_set_frip recipe
+  - add merge_signal recipe
+  - add PEP badge
+
+  - ngs_toolkit.general
+
+    - fix when general.collect_differential_enrichment reads an empty motif enrichment file
+    - delete existing files if existing in general.homer_combine_motifs
+    - report unmatched differnetial and total features in general.plot_differential
+    - general.collect_differential_analysis now sets index of differential_results dataframe correctly
+    - add more manifold methods to general.unsupervised_analysis: Isomap, LocallyLinearEmbedding, SpectralEmbedding, TSNE in addition to MDS (and PCA)
+    - add ChIP-seq as a valid data type to general.unsupervised_analysis
+    - add standardization to parameters of general.unsupervised_analysis
+    - add level labels to group labeling of general.unsupervised_analysis and general.plot_differential
+    - new default color palletes
+    - add option of matching motifs only to known vertebrate in general.homer_consensus
+    - add heatmap plotting of enrichment over background for homer consensus in plot_differential_enrichment
+    - change default output_dir of general.unsupervised_analysis
+    - add more descriptive labels to tqdm loops;
+    - add CPU/mem parametrization of general.differential_analysis when running in job mode
+    - quick fix for pypiper.ngstk >= 0.6 compatibility (tabs vs spaces) in general.differential_analysis - needs revision
+    - resolve pandas warnings of setting without .loc
+
+  - ngs_toolkit.chipseq
+    - add function to filter_peaks
+    - add more descriptive labels to tqdm loops;
+    - fix overaping peaks calling job files in chipseq.summarize_peaks_from_comparisons
+
+  - ngs_toolkit.atacseq
+    - add more descriptive labels to tqdm loops;
+
+
 - **v0.1.4** (*2018-09-25*):
 
   - Update to peppy version v0.9.1
-
 
   - fixes/improvements:
 

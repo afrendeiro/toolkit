@@ -67,7 +67,7 @@ def add_args(parser):
         default="results",
         dest="results_dir",
         help="Directory for analysis output files. "
-        "Default is 'results' under the project roort directory.",
+        "Default is 'results' under the project root directory.",
         type=str)
     return parser
 

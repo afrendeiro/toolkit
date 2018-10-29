@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-This is the main script of the ngs_analysis recipe.
+This is the main script of the region_set_frip recipe.
 """
 
 
@@ -44,6 +44,12 @@ def add_args(parser):
         help="YAML project configuration file.",
         type=str)
     parser.add_argument(
+        "-d", "--data-type",
+        dest="data_type",
+        default=None,
+        help="Data types to perform analysis on. Will be done separately for each.",
+        type=str)
+    parser.add_argument(
         "-n", "--analysis-name",
         dest="name",
         default=None,
@@ -53,6 +59,7 @@ def add_args(parser):
     parser.add_argument(
         "-r", "--region-set",
         dest="region_set",
+        default=None,
         help="BED file with region set derived from several samples or Oracle region set. "
         "If unset, will try to get the `sites` attribute of an existing analysis object "
         "if existing, otherwise will create a region set from the peaks of all samples.",
@@ -72,10 +79,15 @@ def add_args(parser):
     parser.add_argument(
         "-o", "--results-output",
         default="results",
-        dest="results_dir",
+        dest="output_dir",
         help="Directory for analysis output files. "
         "Default is 'results' under the project roort directory.",
         type=str)
+    parser.add_argument(
+        "-s", "--strict",
+        action="store_true",
+        dest="strict",
+        help="Whether to throw an error in case files cannot be created or not.")
     return parser
 
 
@@ -139,20 +151,20 @@ def main():
             print("Initializing ATAC-seq analysis")
             analysis = ATACSeqAnalysis(
                 name=args.name + "_atacseq", prj=prj,
-                samples=samples, results_dir=args.results_dir)
+                samples=samples, results_dir=args.output_dir)
         elif data_type in ["ChIP-seq", "ChIPmentation"]:
             print("Initializing ChIP-seq analysis")
             analysis = ChIPSeqAnalysis(
                 name=args.name + "_chipseq", prj=prj,
-                samples=samples, results_dir=args.results_dir)
+                samples=samples, results_dir=args.output_dir)
 
         region_set_frip = None
         if args.region_set is not None:
             print("Using given region set in BED format: '{}'".format(args.region_set))
             # Use given region set if passed
-            region_set_frip = region_set_frip(
+            region_set_frip = calculate_region_set_frip(
                 analysis, region_set=args.region_set, samples=samples,
-                output_dir=args.output_dir, output_prefix=args.output_prefix, as_job=args.as_job)
+                as_job=args.as_job, permissive=not args.strict)
         else:
             # try to load an analysis object that contains a `sites` attribute
             print("Trying to load an existing analysis object from pickle file: '{}'".format(analysis.pickle))
@@ -165,11 +177,11 @@ def main():
             # if it has, use it
             if hasattr(analysis, "sites"):
                 print("Using existing regions set from analysis. Contains {} regions.".format(len(analysis.sites)))
-                region_set_frip = region_set_frip(
+                region_set_frip = calculate_region_set_frip(
                     analysis, region_set=analysis.sites, samples=samples,
-                    output_dir=args.output_dir, output_prefix=args.output_prefix, as_job=args.as_job)
+                    as_job=args.as_job, permissive=not args.strict)
             else:
-                print("Existing analysis doesn't have a existing region set.")
+                print("Existing analysis does not have an existing region set.")
 
         if region_set_frip is None:
             print("Generating a new region set for this analysis.")
@@ -178,15 +190,15 @@ def main():
 
             # and use it
             print("Using generated new region set for this analysis.")
-            region_set_frip = region_set_frip(
+            region_set_frip = calculate_region_set_frip(
                 analysis, region_set=analysis.sites, samples=samples,
-                output_dir=args.output_dir, output_prefix=args.output_prefix, as_job=args.as_job)
+                as_job=args.as_job, permissive=not args.strict)
 
 
-def region_set_frip(
+def calculate_region_set_frip(
         analysis,
         region_set=None, samples=None,
-        cpus=8, as_job=False):
+        as_job=False, cpus=8, permissive=True):
     """
     """
     if region_set is None:
@@ -194,9 +206,6 @@ def region_set_frip(
 
     if samples is None:
         samples = analysis.samples
-
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
 
     for sample in samples:
         inside_reads = os.path.join(sample.paths.sample_root, "region_set_frip.inside_reads.txt")
@@ -218,13 +227,22 @@ def region_set_frip(
             'echo -e "region_set_frip\\t$FRIP\\t." >> {}'.format(sample_stats),
             "date"])
 
-        with open(job_file, "w") as handle:
-            handle.write(job)
+        try:
+            with open(job_file, "w") as handle:
+                handle.write(job)
+        except IOError as e:
+            if permissive:
+                print("Couldn't write job for sample '{}'.".format(sample.name))
+                continue
+            else:
+                raise e
 
         if as_job:
             os.system("sbatch -p shortq -J region_set_frip.{} -o {} -c {} --mem 8000 {}".format(sample.name, log_file, cpus, job_file))
         else:
             os.system("sh {}".format(job_file))
+
+    return 0
 
 
 if __name__ == '__main__':

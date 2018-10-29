@@ -33,6 +33,7 @@ recipes = list(map(
     lambda x: x.replace(".py", "").replace("./", "").replace("/", "."),
     recipes))
 recipes = [" = ".join([i, j + ":main"]) for i, j in zip(map(lambda x: x.split('.')[-1], recipes), recipes)]
+recipes = [r for r in recipes if not r.startswith("__init__")]
 
 
 # Handle the pypi README formatting
@@ -46,7 +47,7 @@ except(IOError, ImportError):
 # setup
 setup(
     name="ngs_toolkit",
-    packages=["ngs_toolkit"],
+    packages=["ngs_toolkit", "ngs_toolkit.recipes"],
     version=version,
     entry_points={
         "console_scripts": [

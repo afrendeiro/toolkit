@@ -386,6 +386,8 @@ def unsupervised_analysis(
         samples=None,
         attributes_to_plot=["cell_type"],
         plot_prefix=None,
+        standardize_matrix=False,
+        manifold_algorithms=['MDS', "Isomap", "LocallyLinearEmbedding", "SpectralEmbedding", "TSNE"],
         test_pc_association=True,
         display_corr_values=False,
         plot_max_attr=20,
@@ -400,7 +402,7 @@ def unsupervised_analysis(
         cmap="RdBu_r",
         rasterized=False,
         dpi=300,
-        output_dir="{results_dir}/unsupervised"):
+        output_dir="{results_dir}/unsupervised_analysis_{data_type}"):
     """
     Apply unsupervised clustering and dimensionality reduction methods (MDS, PCA) on numeric matrix.
     Colours and labels samples by their attributes as given in `attributes_to_plot`.
@@ -422,6 +424,10 @@ def unsupervised_analysis(
     :param plot_prefix: Prefix for output files.
                         Defaults to "all_sites" if data_type is ATAC-seq and "all_genes" if data_type is RNA-seq.
     :type plot_prefix: str, optional
+    :param standardize_matrix: Whether to standardize variables in `quant_matrix` by removing the mean and scaling to unit variance.
+    :type standardize_matrix: bool, optional
+    :param manifold_algorithms: List of manifold algorithms to use. See available algorithms here: http://scikit-learn.org/stable/modules/classes.html#module-sklearn.manifold
+    :type manifold_algorithms: list, optional
     :param test_pc_association: Whether a test of association of principal components and variables in `attributes_to_plot` should be conducted. Defaults to True.
     :type test_pc_association: bool, optional
     :param display_corr_values: Whether values in heatmap of sample correlations should be displayed overlaid on top of colours. Defaults to False.
@@ -455,8 +461,9 @@ def unsupervised_analysis(
     :type output_dir: str, optional
     :returns: None
     """
+    from sklearn.preprocessing import StandardScaler
     from sklearn.decomposition import PCA
-    from sklearn.manifold import MDS
+    from sklearn import manifold
     from collections import OrderedDict
     import re
     import itertools
@@ -470,6 +477,11 @@ def unsupervised_analysis(
             plot_prefix = "all_sites"
         if quant_matrix is None:
             quant_matrix = "accessibility"
+    elif data_type == "ChIP-seq":
+        if plot_prefix is None:
+            plot_prefix = "all_sites"
+        if quant_matrix is None:
+            quant_matrix = "binding"
     elif data_type == "RNA-seq":
         if plot_prefix is None:
             plot_prefix = "all_genes"
@@ -483,8 +495,8 @@ def unsupervised_analysis(
     else:
         raise ValueError("Data types can only be 'ATAC-seq', 'RNA-seq' or 'CNV'.")
 
-    if "{results_dir}" in output_dir:
-        output_dir = output_dir.format(results_dir=analysis.results_dir)
+    if ("{results_dir}" in output_dir) and ("{data_type}" in output_dir):
+        output_dir = output_dir.format(results_dir=analysis.results_dir, data_type=data_type)
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
@@ -509,6 +521,10 @@ def unsupervised_analysis(
     # All regions, matching samples (provided samples in matrix)
     X = matrix.loc[:, matrix.columns.get_level_values("sample_name").isin([s.name for s in samples])]
 
+    if standardize_matrix:
+        std = StandardScaler()
+        X = pd.DataFrame(std.fit_transform(X.T).T, index=X.index, columns=X.columns)
+
     # TODO: Re-implement to accomodate multiindex
     # if prettier_sample_names:
     #     X.columns = (
@@ -516,6 +532,7 @@ def unsupervised_analysis(
     #         .str.replace("ATAC-seq_", "")
     #         .str.replace("RNA-seq_", "")
     #         .str.replace("ChIP-seq_", ""))
+
 
     # Pairwise correlations
     g = sns.clustermap(
@@ -528,65 +545,73 @@ def unsupervised_analysis(
     g.ax_heatmap.set_ylabel(None, visible=False)
     g.fig.savefig(os.path.join(output_dir, "{}.{}.corr.clustermap.svg".format(analysis.name, plot_prefix)), bbox_inches='tight', dpi=dpi)
 
-    # MDS
-    mds = MDS(n_jobs=-1)
-    x_new = mds.fit_transform(X.T)
-    # transform again
-    xx = pd.DataFrame(x_new, index=X.columns, columns=list(range(x_new.shape[1])))
-    # xx = x.apply(lambda j: (j - j.mean()) / j.std(), axis=0)
 
-    fig, axis = plt.subplots(1, len(attributes_to_plot), figsize=(4 * len(attributes_to_plot), 4 * 1))
-    if len(attributes_to_plot) != 1:
-        axis = axis.flatten()
-    for i, attr in enumerate(attributes_to_plot):
-        for j, sample in enumerate(xx.index):
-            sample = pd.Series(sample, index=X.columns.names)
-            try:
-                label = getattr(sample, attributes_to_plot[i])
-            except AttributeError:
-                label = np.nan
-            axis[i].scatter(
-                xx.loc[sample['sample_name'], 0],
-                xx.loc[sample['sample_name'], 1],
-                s=50, color=color_dataframe.loc[attr, sample['sample_name']], alpha=0.75, label=label, rasterized=rasterized)
+    # Manifolds
+    params = {
+        "MDS": {'n_jobs': -1},
+        "Isomap": {'n_jobs': -1},
+        "LocallyLinearEmbedding": {},
+        "SpectralEmbedding": {'n_jobs': -1},
+        "TSNE": {'init': 'pca'},
+    }
+    for algo in manifold_algorithms:
+        mds = getattr(manifold, algo)(**params[algo])
+        x_new = mds.fit_transform(X.T)
+        xx = pd.DataFrame(x_new, index=X.columns, columns=list(range(x_new.shape[1])))
 
-        # Plot groups
-        if plot_group_centroids:
-            xx2 = xx.groupby(attr).mean()
-            # get the color of each attribute group
-            cd = color_dataframe.loc[attr]
-            cd.name = None
-            cd.index = X.columns.get_level_values(attr)
-            cd = cd.reset_index().drop_duplicates().set_index(attr)
-            for j, group in enumerate(xx2.index):
+        fig, axis = plt.subplots(1, len(attributes_to_plot), figsize=(4 * len(attributes_to_plot), 4 * 1))
+        if len(attributes_to_plot) != 1:
+            axis = axis.flatten()
+        for i, attr in enumerate(attributes_to_plot):
+            for j, sample in enumerate(xx.index):
+                sample = pd.Series(sample, index=X.columns.names)
+                try:
+                    label = getattr(sample, attributes_to_plot[i])
+                except AttributeError:
+                    label = np.nan
                 axis[i].scatter(
-                    xx2.loc[group, 0],
-                    xx2.loc[group, 1],
-                    marker="s", s=50, color=cd.loc[group].squeeze(), alpha=0.95, label=group, rasterized=rasterized)
-                axis[i].text(
-                    xx2.loc[group, 0],
-                    xx2.loc[group, 1], group,
-                    color=cd.loc[group].squeeze(), alpha=0.95)
+                    xx.loc[sample['sample_name'], 0],
+                    xx.loc[sample['sample_name'], 1],
+                    s=50, color=color_dataframe.loc[attr, sample['sample_name']], alpha=0.75, label=label, rasterized=rasterized)
 
-        # Graphics
-        axis[i].set_title(attributes_to_plot[i])
-        axis[i].set_xlabel("MDS 1")
-        axis[i].set_ylabel("MDS 2")
-        if not axis_ticklabels:
-            axis[i].set_xticklabels(axis[i].get_xticklabels(), visible=False)
-            axis[i].set_yticklabels(axis[i].get_yticklabels(), visible=False)
-        if axis_lines:
-            axis[i].axhline(0, linestyle="--", color="black", alpha=0.3)
-            axis[i].axvline(0, linestyle="--", color="black", alpha=0.3)
+            # Plot groups
+            if plot_group_centroids:
+                xx2 = xx.groupby(attr).mean()
+                # get the color of each attribute group
+                cd = color_dataframe.loc[attr]
+                cd.name = None
+                cd.index = X.columns.get_level_values(attr)
+                cd = cd.reset_index().drop_duplicates().set_index(attr)
+                for j, group in enumerate(xx2.index):
+                    axis[i].scatter(
+                        xx2.loc[group, 0],
+                        xx2.loc[group, 1],
+                        marker="s", s=50, color=cd.loc[group].squeeze(), alpha=0.95, label=group, rasterized=rasterized)
+                    axis[i].text(
+                        xx2.loc[group, 0],
+                        xx2.loc[group, 1], group,
+                        color=cd.loc[group].squeeze(), alpha=0.95)
 
-        if legends:
-            # Unique legend labels
-            handles, labels = axis[i].get_legend_handles_labels()
-            by_label = OrderedDict(zip(labels, handles))
-            if any([type(c) in [str, unicode] for c in by_label.keys()]) and len(by_label) <= 20:
-                # if not any([re.match("^\d", c) for c in by_label.keys()]):
-                axis[i].legend(by_label.values(), by_label.keys())
-    fig.savefig(os.path.join(output_dir, "{}.{}.mds.svg".format(analysis.name, plot_prefix)), bbox_inches='tight', dpi=dpi)
+            # Graphics
+            axis[i].set_title(attributes_to_plot[i])
+            axis[i].set_xlabel("{} 1".format(algo))
+            axis[i].set_ylabel("{} 2".format(algo))
+            if not axis_ticklabels:
+                axis[i].set_xticklabels(axis[i].get_xticklabels(), visible=False)
+                axis[i].set_yticklabels(axis[i].get_yticklabels(), visible=False)
+            if axis_lines:
+                axis[i].axhline(0, linestyle="--", color="black", alpha=0.3)
+                axis[i].axvline(0, linestyle="--", color="black", alpha=0.3)
+
+            if legends:
+                # Unique legend labels
+                handles, labels = axis[i].get_legend_handles_labels()
+                by_label = OrderedDict(zip(labels, handles))
+                if any([type(c) in [str, unicode] for c in by_label.keys()]) and len(by_label) <= 20:
+                    # if not any([re.match("^\d", c) for c in by_label.keys()]):
+                    axis[i].legend(by_label.values(), by_label.keys())
+        fig.savefig(os.path.join(output_dir, "{}.{}.{}.svg".format(analysis.name, plot_prefix, algo.lower())), bbox_inches='tight', dpi=dpi)
+
 
     # PCA
     # TODO: Restrict PCA analysis to plot_max_pcs.
@@ -819,7 +844,8 @@ def deseq_analysis(
     # _save(dds, file=os.path.join(output_dir, output_prefix + ".deseq_dds_object.Rdata"))
 
     results = pd.DataFrame()
-    for comp in tqdm(comparison_table["comparison_name"].drop_duplicates().sort_values()):
+    comps = comparison_table["comparison_name"].drop_duplicates().sort_values()
+    for comp in tqdm(comps, total=len(comps), desc="Comparison"):
         out_file = os.path.join(output_dir, output_prefix + ".deseq_result.{}.csv".format(comp))
         if not overwrite and os.path.exists(out_file):
             continue
@@ -1168,7 +1194,9 @@ def differential_analysis(
         output_prefix="differential_analysis",
         alpha=0.05,
         overwrite=True,
-        distributed=False):
+        distributed=False,
+        cpus=2,
+        memory=16000):
     """
     Perform differential regions/genes across samples that are associated with a certain trait.
     Currently the only implementation is with DESeq2.
@@ -1201,7 +1229,10 @@ def differential_analysis(
                         Currently, only a SLURM implementation is available.
                         If `True`, will not return results. Defaults to False.
     :type distributed: bool, optional
-
+    :param cpus: Number of CPUS to use when using distributed jobs. Default: 2.
+    :type cpus: int, optional
+    :param memory: Memory to use when using distributed jobs. Default: 16000 (16Gb).
+    :type memory: int, optional
     :returns pandas.DataFrame: DataFrame with analysis results for all comparisons.
                                Will be `None` if `distributed` is `True`.
     """
@@ -1298,17 +1329,17 @@ def differential_analysis(
                 job_name=job_name, output=log_file,
                 cpus_per_task=2, mem_per_cpu=16000)
             # TODO: add DESeq2 script to toolkit and make path configurable
-            cmd += "python ~/deseq_parallel.py"
+            cmd += "python -u ~/deseq_parallel.py"
             cmd += " --output_prefix {}".format(output_prefix)
             cmd += " --formula '{}'".format(formula)
             cmd += " --alpha {}".format(alpha)
             if overwrite:
                 cmd += " --overwrite"
-            cmd += "  {}\n".format(out)
+            cmd += " {}\n".format(out)
             cmd += tk.slurm_footer()
 
             with open(job_file, "w") as handle:
-                handle.write(textwrap.dedent(cmd))
+                handle.write(textwrap.dedent(cmd).replace("\n ", "\n").replace("  ", ""))
 
             tk.slurm_submit_job(job_file)
 
@@ -1357,7 +1388,7 @@ def collect_differential_analysis(
 
     comps = comparison_table["comparison_name"].drop_duplicates().sort_values()
     results = pd.DataFrame()
-    for comp in tqdm(comps, desc="comparisons", total=len(comps)):
+    for comp in tqdm(comps, total=len(comps), desc="Comparison"):
         out_file = os.path.join(output_dir, comp, output_prefix + ".deseq_result.{}.csv".format(comp))
         # print("Collecting comparison '{}'".format(comp))
         # read
@@ -1374,6 +1405,10 @@ def collect_differential_analysis(
 
     # save all
     results.to_csv(results_file, index=False)
+
+    # set index
+    if "index" in results.columns:
+        results = results.set_index("index")
     return results
 
 
@@ -1414,7 +1449,7 @@ def differential_overlap(
 
     intersections = pd.DataFrame(columns=["group1", "group2", "dir1", "dir2", "size1", "size2", "intersection", "union"])
     perms = list(itertools.permutations(piv.T.groupby(level=['comparison_name', 'direction']).groups.items(), 2))
-    for ((k1, dir1), i1), ((k2, dir2), i2) in tqdm(perms, total=len(perms)):
+    for ((k1, dir1), i1), ((k2, dir2), i2) in tqdm(perms, total=len(perms), desc="Permutations"):
         i1 = set(piv[i1][piv[i1] == 1].dropna().index)
         i2 = set(piv[i2][piv[i2] == 1].dropna().index)
         intersections = intersections.append(
@@ -1966,6 +2001,12 @@ def plot_differential(
             # Select only differential regions from groups
             groups = groups.loc[all_diff, :].sort_index(axis=1)
 
+            n = groups.isnull().sum().sum()
+            if n > 0:
+                print("WARNING! {} {} (across all comparisons) were not found in quantification matrix!".format(n, var_name))
+                print("Proceeding without those.")
+                groups = groups.dropna()
+
             figsize = (max(5, 0.12 * groups.shape[1]), 5)
             # Heatmaps
             # Comparison level
@@ -2054,6 +2095,12 @@ def plot_differential(
         matrix.columns = matrix.columns.get_level_values("sample_name")
 
     matrix2 = matrix.loc[all_diff, :].sort_index(axis=1)
+
+    n = matrix2.isnull().sum().sum()
+    if n > 0:
+        print("WARNING! {} {} (across all comparisons) were not found in quantification matrix!".format(n, var_name))
+        print("Proceeding without those.")
+        matrix2 = matrix2.dropna()
     figsize = (max(5, 0.12 * matrix2.shape[1]), 5)
     if group_wise_colours:
         extra = {"col_colors": color_dataframe.T}
@@ -2278,7 +2325,8 @@ def parse_homer(homer_dir):
 
 def homer_combine_motifs(
         comparison_dirs, output_dir,
-        p_value_threshold=1e-25, cpus=8, run=False, as_jobs=True, genome="hg19",
+        reduce_threshold=0.6, match_threshold=10, info_value=0.6, p_value_threshold=1e-25, fold_enrichment=None,
+        cpus=8, run=False, as_jobs=True, genome="hg19",
         known_vertebrates_TFs_only=False):
     """
     Create consensus of de novo discovered motifs from HOMER
@@ -2320,10 +2368,14 @@ def homer_combine_motifs(
 
     # Filter and get motif consensus
     extra = ""
-    if mammalian_TFs_only:
+    if known_vertebrates_TFs_only:
         extra = " -known /home/arendeiro/workspace/homer_4.8/data/knownTFs/vertebrates/known.motifs"
-    os.popen("compareMotifs.pl {} {} -info 0.6 -nofacts -pvalue {} -cpu {}{}"
-             .format(out_file, output_dir, p_value_threshold, cpus, extra))
+    if fold_enrichment is None:
+        fold_enrichment = ""
+    else:
+        fold_enrichment = " -F " + str(fold_enrichment)
+    os.popen("compareMotifs.pl {} {} -reduceThresh {} -matchThresh {}{} -pvalue {} -info {}{} -nofacts -cpu {}"
+             .format(out_file, output_dir, reduce_threshold, match_threshold, extra, p_value_threshold, info_value, fold_enrichment, cpus))
 
     # concatenate consensus motif files
     files = glob.glob(os.path.join(output_dir, "homerResults/*motif"))
@@ -2337,11 +2389,13 @@ def homer_combine_motifs(
                 for line in infile:
                     outfile.write(line)
 
-    if not run:
-        return combined_motifs
-
-    else:
+    if run:
         for dir_ in comparison_dirs:
+            # delete previous results if existing
+            results = os.path.join(dir_, "knownResults.txt")
+            if os.path.exists(results):
+                print("WARNING: deleting previously existing results file: '{}'".format(results))
+                os.remove(results)
             # prepare enrichment command with consensus set
             cmd = (
                 "findMotifsGenome.pl {bed} {genome}r {dir} -p {cpus} -nomotif -mknown {motif_file}"
@@ -2394,7 +2448,7 @@ def enrichr(dataframe, gene_set_libraries=None, kind="genes"):
         ]
 
     results = pd.DataFrame()
-    for gene_set_library in tqdm(gene_set_libraries):
+    for gene_set_library in tqdm(gene_set_libraries, total=len(gene_set_libraries), desc="Gene set library"):
         print("Using enricher on %s gene set library." % gene_set_library)
 
         if kind == "genes":
@@ -2575,7 +2629,7 @@ def differential_enrichment(
     # Examine each region cluster
     max_diff = max_diff
     comps = differential['comparison_name'].drop_duplicates()
-    for comp in tqdm(comps, total=len(comps)):
+    for comp in tqdm(comps, total=len(comps), desc="Comparison"):
         if directional:
             # Separate in up/down-regulated genes
             params = [(np.less, 0, "down", "head"), (np.greater, 0, "up", "tail")]
@@ -2735,7 +2789,7 @@ def collect_differential_enrichment(
     pathway_enr = pd.DataFrame()
     # Examine each region cluster
     comps = differential['comparison_name'].drop_duplicates()
-    for comp in tqdm(comps, total=len(comps)):
+    for comp in tqdm(comps, total=len(comps), desc="Comparison"):
         if directional:
             # Separate in up/down-regulated genes
             params = list()
@@ -2763,8 +2817,8 @@ def collect_differential_enrichment(
                 except pd.errors.EmptyDataError:
                     continue
                 else:
-                    enr["comparison_name"] = comp
-                    enr["direction"] = direction
+                    enr.loc[:, "comparison_name"] = comp
+                    enr.loc[:, "direction"] = direction
                     pathway_enr = pathway_enr.append(enr, ignore_index=True)
             elif data_type == "ATAC-seq":
                 # print("Collecting enrichments of comparison '{}', direction '{}'.".format(comp, direction))
@@ -2780,17 +2834,20 @@ def collect_differential_enrichment(
                     else:
                         raise e
                 else:
-                    ame_motifs["comparison_name"] = comp
-                    ame_motifs["direction"] = direction
-                    meme_enr = meme_enr.append(ame_motifs, ignore_index=True)
+                    if not ame_motifs.empty:  # work around no motifs enriched
+                        ame_motifs.loc[:, "comparison_name"] = comp
+                        ame_motifs.loc[:, "direction"] = direction
+                        meme_enr = meme_enr.append(ame_motifs, ignore_index=True)
 
-                    # fix mouse TF names
-                    if (meme_enr['TF'].str.startswith("UP").sum() / float(meme_enr.shape[0])) >= 0.1:
-                        annot = pd.read_table(
-                            "~/resources/motifs/motif_databases/MOUSE/uniprobe_mouse.id_mapping.tsv",
-                            header=None, names=["TF", "TF_name"])
-                        annot["TF"] = annot['TF'].str.replace(r"_.*", "")
-                        meme_enr = pd.merge(meme_enr, annot).drop("TF", axis=1).rename(columns={"TF_name": "TF"})
+                        # fix mouse TF names
+                        if (meme_enr['TF'].str.startswith("UP").sum() / float(meme_enr.shape[0])) >= 0.1:
+                            annot = pd.read_table(
+                                "~/resources/motifs/motif_databases/MOUSE/uniprobe_mouse.id_mapping.tsv",
+                                header=None, names=["TF", "TF_name"])
+                            annot.loc[:, "TF"] = annot['TF'].str.replace(r"_.*", "")
+                            meme_enr = pd.merge(meme_enr, annot).drop("TF", axis=1).rename(columns={"TF_name": "TF"})
+                    else:
+                        print("Comparison '{}' has no MEME enriched motifs.".format(comp))
 
                 # HOMER DE NOVO - de novo motif enrichment independent for each sample
                 try:
@@ -2801,8 +2858,8 @@ def collect_differential_enrichment(
                     else:
                         raise e
                 else:
-                    homer_motifs["comparison_name"] = comp
-                    homer_motifs["direction"] = direction
+                    homer_motifs.loc[:, "comparison_name"] = comp
+                    homer_motifs.loc[:, "direction"] = direction
                     homer_enr = homer_enr.append(homer_motifs, ignore_index=True)
 
                 # HOMER CONSENSUS - motif enrichment on a consensus set of motifs
@@ -2818,8 +2875,8 @@ def collect_differential_enrichment(
                     homer_cons["# of Background Sequences with Motif"]
                     for col in homer_cons.columns[homer_cons.columns.str.contains("%")]:
                         homer_cons[col] = homer_cons[col].str.replace("%", "").astype(float)
-                    homer_cons["comparison_name"] = comp
-                    homer_cons["direction"] = direction
+                    homer_cons.loc[:, "comparison_name"] = comp
+                    homer_cons.loc[:, "direction"] = direction
                     homer_consensus = homer_consensus.append(homer_cons, ignore_index=True)
 
                 # LOLA
@@ -2831,8 +2888,8 @@ def collect_differential_enrichment(
                     else:
                         raise e
                 else:
-                    lola["comparison_name"] = comp
-                    lola["direction"] = direction
+                    lola.loc[:, "comparison_name"] = comp
+                    lola.loc[:, "direction"] = direction
                     lola_enr = lola_enr.append(lola, ignore_index=True)
 
                 # ENRICHR
@@ -2844,8 +2901,8 @@ def collect_differential_enrichment(
                     else:
                         raise e
                 else:
-                    enr["comparison_name"] = comp
-                    enr["direction"] = direction
+                    enr.loc[:, "comparison_name"] = comp
+                    enr.loc[:, "direction"] = direction
                     pathway_enr = pathway_enr.append(enr, ignore_index=True)
 
     # write combined enrichments
@@ -2916,6 +2973,7 @@ def plot_differential_enrichment(
     :type z_score: number, optional
     """
     import numpy as np
+    import matplotlib
     import matplotlib.pyplot as plt
     import seaborn as sns
     from scipy.stats import zscore
@@ -2944,20 +3002,20 @@ def plot_differential_enrichment(
 
     if enrichment_type == "lola":
         # get a unique label for each lola region set
-        enrichment_table["label"] = (
+        enrichment_table.loc[:, "label"] = (
             enrichment_table["description"].astype(str) + ", " +
             enrichment_table["cellType"].astype(str) + ", " +
             enrichment_table["tissue"].astype(str) + ", " +
             enrichment_table["antibody"].astype(str) + ", " +
             enrichment_table["treatment"].astype(str))
-        enrichment_table["label"] = (
+        enrichment_table.loc[:, "label"] = (
             enrichment_table["label"]
             .str.replace("nan", "").str.replace("None", "")
             .str.replace(", , ", "").str.replace(", $", "")
             .str.decode('unicode_escape').str.encode('ascii', 'ignore'))
 
         # Replace inf values with maximum non-inf p-value observed
-        enrichment_table["pValueLog"] = enrichment_table["pValueLog"].replace(
+        enrichment_table.loc[:, "pValueLog"] = enrichment_table["pValueLog"].replace(
             np.inf,
             enrichment_table.loc[enrichment_table["pValueLog"] != np.inf, "pValueLog"].max())
 
@@ -3042,8 +3100,9 @@ def plot_differential_enrichment(
                 bbox_inches="tight", dpi=300)
 
     if enrichment_type == "motif":
-        enrichment_table["log_p_value"] = (-np.log10(enrichment_table["p_value"].astype(np.float64))
-                                           ).replace({np.inf: 300})
+        enrichment_table.loc[:, "log_p_value"] = (
+            (-np.log10(enrichment_table["p_value"].astype(np.float64)))
+            .replace({np.inf: 300}))
         # Plot top_n terms of each comparison in barplots
         top_data = enrichment_table.set_index("TF").groupby(
             comp_variable)["log_p_value"].nlargest(top_n).reset_index()
@@ -3125,7 +3184,7 @@ def plot_differential_enrichment(
                 bbox_inches="tight", dpi=300)
 
     if enrichment_type == "homer_consensus":
-        enrichment_table["log_p_value"] = (-np.log10(enrichment_table["P-value"].astype(np.float64))).replace({np.inf: 300})
+        enrichment_table.loc[:, "log_p_value"] = (-np.log10(enrichment_table["P-value"].astype(np.float64))).replace({np.inf: 300})
         # Plot top_n terms of each comparison in barplots
         top_n = min(top_n, enrichment_table.set_index("Motif Name").groupby(comp_variable)["log_p_value"].count().min() - 1)
         top_data = enrichment_table.set_index("Motif Name").groupby(comp_variable)["log_p_value"].nlargest(top_n).reset_index()
@@ -3151,7 +3210,7 @@ def plot_differential_enrichment(
                 bbox_inches="tight", dpi=300)
 
         # Significance vs fold enrichment over background
-        enrichment_table['enrichment_over_background'] = (
+        enrichment_table.loc[:, 'enrichment_over_background'] = (
             enrichment_table['% of Target Sequences with Motif'] /
             enrichment_table['% of Background Sequences with Motif'])
 
@@ -3161,9 +3220,9 @@ def plot_differential_enrichment(
         axis = axis.flatten()
         for i, comp in enumerate(enrichment_table[comp_variable].drop_duplicates().sort_values()):
             enr = enrichment_table[enrichment_table[comp_variable] == comp]
-            enr['Motif Name'] = enr['Motif Name'].str.replace(".*BestGuess:", "").str.replace(r"-ChIP-Seq.*", "")
+            enr.loc[:, 'Motif Name'] = enr['Motif Name'].str.replace(".*BestGuess:", "").str.replace(r"-ChIP-Seq.*", "")
 
-            enr['combined'] = enr[['enrichment_over_background', 'log_p_value']].apply(zscore).mean(axis=1)
+            enr.loc[:, 'combined'] = enr[['enrichment_over_background', 'log_p_value']].apply(zscore).mean(axis=1)
             cs = axis[i].scatter(
                 enr['enrichment_over_background'],
                 enr['log_p_value'],
@@ -3172,12 +3231,10 @@ def plot_differential_enrichment(
 
             # label top points
             for j in enr['combined'].sort_values().tail(5).index:
-                s = enr.loc[j, "Motif Name"]
-                s
                 axis[i].text(
                     enr.loc[j, 'enrichment_over_background'],
                     enr.loc[j, 'log_p_value'],
-                    s=s, ha="right", fontsize=5)
+                    s=enr.loc[j, "Motif Name"], ha="right", fontsize=5)
             axis[i].set_title(comp)
 
         for ax in axis.reshape((n_side, n_side))[:, 0]:
@@ -3236,8 +3293,9 @@ def plot_differential_enrichment(
 
     if enrichment_type == "enrichr":
         # enrichment_table["description"] = enrichment_table["description"].str.decode("utf-8")
-        enrichment_table["log_p_value"] = (-np.log10(enrichment_table["p_value"].astype(np.float64))
-                                           ).replace({np.inf: 300})
+        enrichment_table["log_p_value"] = (
+            (-np.log10(enrichment_table["p_value"].astype(np.float64)))
+            .replace({np.inf: 300}))
 
         for gene_set_library in enrichment_table["gene_set_library"].unique():
             print(gene_set_library)
@@ -3275,7 +3333,7 @@ def plot_differential_enrichment(
                 fig.savefig(os.path.join(output_dir, output_prefix + ".enrichr.{}.barplot.top_{}.svg".format(
                     gene_set_library, top_n)), bbox_inches="tight", dpi=300)
 
-                # # possible replacement
+                # # ^^ possible replacement
                 # grid = sns.catplot(
                 #     data=top_data, x='log_p_value', y="description",
                 #     order=top_data.groupby('description')['log_p_value'].mean().sort_values(ascending=False).index,
@@ -3375,8 +3433,9 @@ def plot_differential_enrichment(
 
     if enrichment_type == "great":
         # enrichment_table["description"] = enrichment_table["description"].str.decode("utf-8")
-        enrichment_table["log_q_value"] = (-np.log10(enrichment_table["HyperFdrQ"].astype(np.float64))
-                                           ).replace({np.inf: 300})
+        enrichment_table["log_q_value"] = (
+            (-np.log10(enrichment_table["HyperFdrQ"].astype(np.float64)))
+            .replace({np.inf: 300}))
 
         for gene_set_library in enrichment_table["Ontology"].unique():
             print(gene_set_library)
@@ -3516,6 +3575,30 @@ def z_score(x):
     :param numpy.array x: Numeric array.
     """
     return (x - x.mean()) / x.std()
+
+
+def count_dataframe_values(x):
+    """
+    Count number of non-null values in a dataframe.
+
+    :param x: Pandas DataFrame
+    :type x: pandas.DataFrame
+    :returns: Number of non-null values.
+    :rtype: int
+    """
+    return np.multiply(*x.shape) - x.isnull().sum().sum()
+
+
+def timedelta_to_years(x):
+    """
+    Convert a timedelta to years.
+
+    :param x: A timedelta.
+    :type x: 
+    :returns: [description]
+    :rtype: {[type]}
+    """
+    return x / np.timedelta64(60 * 60 * 24 * 365, 's')
 
 
 def signed_max(x, f=0.66, axis=0):

@@ -6,6 +6,8 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 
+from . import _LOGGER
+
 
 def pickle_me(function):
     """
@@ -182,12 +184,12 @@ class Analysis(object):
             # For empty levels (all values nan), return nan colour
             if len(level) == 0:
                 colors.append([nan_color] * len(index))
-                print(level.name, "NaN")
+                _LOGGER.warn("Level {} has only NaN values.".format(level.name))
                 continue
             # determine the type of data in each level
             # TODO: check this works in all cases
             most_common = Counter([type(x) for x in level]).most_common()[0][0]
-            print(level.name, most_common)
+            _LOGGER.info("{}, {}".format(level.name, most_common))
 
             # Add either colors based on categories or numerical scale
             if most_common in [int, float, np.float32, np.float64, np.int32, np.int64]:
@@ -256,7 +258,7 @@ class Analysis(object):
             if quant_matrix is None:
                 quant_matrix = "expression_annotated"
         else:
-            print("Data type of object not known, will not set as attribute.")
+            _LOGGER.warn("Data type of object not known, will not set as attribute.")
             assign = False
             output_matrix = ""
             if quant_matrix is None:
@@ -271,7 +273,7 @@ class Analysis(object):
 
         attrs = list()
         for attr in attributes:
-            print(attr)
+            _LOGGER.info(attr)
             l = list()
             for sample in samples:  # keep order of samples in matrix
                 try:
@@ -535,15 +537,16 @@ def unsupervised_analysis(
 
 
     # Pairwise correlations
-    g = sns.clustermap(
-        # yticklabels=sample_display_names,
-        X.astype(float).corr(), xticklabels=False, yticklabels=True, annot=display_corr_values,
-        cmap="Spectral_r", figsize=(0.2 * X.shape[1], 0.2 * X.shape[1]), cbar_kws={"label": "Pearson correlation"},
-        row_colors=color_dataframe.T, col_colors=color_dataframe.T)
-    g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize='xx-small')
-    g.ax_heatmap.set_xlabel(None, visible=False)
-    g.ax_heatmap.set_ylabel(None, visible=False)
-    g.fig.savefig(os.path.join(output_dir, "{}.{}.corr.clustermap.svg".format(analysis.name, plot_prefix)), bbox_inches='tight', dpi=dpi)
+    for method in ['pearson', 'spearman']:
+        g = sns.clustermap(
+            # yticklabels=sample_display_names,
+            X.astype(float).corr(method), xticklabels=False, yticklabels=True, annot=display_corr_values,
+            cmap="Spectral_r", figsize=(0.2 * X.shape[1], 0.2 * X.shape[1]), cbar_kws={"label": "{} correlation".format(method.capitalize())},
+            row_colors=color_dataframe.T, col_colors=color_dataframe.T)
+        g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize='xx-small')
+        g.ax_heatmap.set_xlabel(None, visible=False)
+        g.ax_heatmap.set_ylabel(None, visible=False)
+        g.fig.savefig(os.path.join(output_dir, "{}.{}.{}_correlation.clustermap.svg".format(analysis.name, plot_prefix, method)), bbox_inches='tight', dpi=dpi)
 
 
     # Manifolds
@@ -704,7 +707,7 @@ def unsupervised_analysis(
     associations = list()
     for pc in range(pcs):
         for attr in attributes_to_plot:
-            print("PC {}; Attribute {}.".format(pc + 1, attr))
+            _LOGGER.info("PC {}; Attribute {}.".format(pc + 1, attr))
 
             # Get all values of samples for this attr
             groups = xx.index.get_level_values(attr)
@@ -715,7 +718,7 @@ def unsupervised_analysis(
             elif all([type(i) in [int, float, np.int64, np.float64] for i in groups]):
                 variable_type = "numerical"
             else:
-                print("attr %s cannot be tested." % attr)
+                _LOGGER.warn("attr %s cannot be tested." % attr)
                 associations.append([pc + 1, attr, variable_type, np.nan, np.nan, np.nan])
                 continue
 
@@ -849,7 +852,7 @@ def deseq_analysis(
         out_file = os.path.join(output_dir, output_prefix + ".deseq_result.{}.csv".format(comp))
         if not overwrite and os.path.exists(out_file):
             continue
-        print("Doing comparison '{}'".format(comp))
+        _LOGGER.info("Doing comparison '{}'".format(comp))
         a = comparison_table.loc[
             (comparison_table["comparison_name"] == comp) &
             (comparison_table["comparison_side"] >= 1),
@@ -863,14 +866,15 @@ def deseq_analysis(
         try:
             res = _as_data_frame(_results(dds, contrast=contrast, alpha=alpha, independentFiltering=False, parallel=True))
         except RRuntimeError as e:
-            print("DESeq2 group contrast '{}' didn't work!".format(contrast))
-            print(e)
+            _LOGGER.warn("DESeq2 group contrast '{}' didn't work!".format(contrast))
+            _LOGGER.error(e)
             contrast = ["sample_group" + a, "sample_group" + b]
             try:
                 res = _as_data_frame(_results(dds, contrast=contrast, alpha=alpha, independentFiltering=False, parallel=True))
-                print("DESeq2 group contrast '{}' did work now!".format(", ".join(contrast)))
+                _LOGGER.warn("DESeq2 group contrast '{}' did work now!".format(", ".join(contrast)))
             except RRuntimeError as e2:
-                print("DESeq2 group contrast '{}' didn't work either!".format(", ".join(contrast)))
+                _LOGGER.warn("DESeq2 group contrast '{}' didn't work either!".format(", ".join(contrast)))
+                _LOGGER.error(e2)
                 raise e2
 
         if type(res) == rpy2.robjects.vectors.DataFrame:
@@ -1038,7 +1042,7 @@ def differential_from_bivariate_fit(
 
     results = pd.DataFrame()
     for i, comparison in enumerate(comparisons):
-        print("Doing comparison '{}'".format(comparison))
+        _LOGGER.info("Doing comparison '{}'".format(comparison))
         out_file = os.path.join(output_dir, output_prefix + ".fit_result.{}.csv".format(comparison))
 
         sa = comparison_table.loc[
@@ -1383,7 +1387,7 @@ def collect_differential_analysis(
 
     results_file = os.path.join(output_dir, output_prefix + ".deseq_result.all_comparisons.csv")
     if not overwrite and os.path.exists(results_file):
-        print("Differential analysis results '{}' already exist and argument `overwrite` is True.".format(results_file))
+        _LOGGER.warn("Differential analysis results '{}' already exist and argument `overwrite` is True.".format(results_file))
         return None
 
     comps = comparison_table["comparison_name"].drop_duplicates().sort_values()
@@ -1396,7 +1400,7 @@ def collect_differential_analysis(
             res2 = pd.read_csv(out_file, index_col=0)
         except IOError as e:
             if permissive:
-                print("Results file for comparison '{}' do not exist. Skipping.".format(comp))
+                _LOGGER.warn("Results file for comparison '{}' do not exist. Skipping.".format(comp))
                 continue
             else:
                 raise e
@@ -1444,7 +1448,7 @@ def differential_overlap(
         differential["direction"] = differential["log2FoldChange"].apply(lambda x: "up" if x > 0 else "down")
 
     differential.index.name = "index"
-    differential["intersect"] = 1
+    differential.loc[:, "intersect"] = 1
     piv = pd.pivot_table(differential.reset_index(), index='index', columns=['comparison_name', 'direction'], values='intersect', fill_value=0)
 
     intersections = pd.DataFrame(columns=["group1", "group2", "dir1", "dir2", "size1", "size2", "intersection", "union"])
@@ -1460,16 +1464,16 @@ def differential_overlap(
             ignore_index=True
         )
     # convert to %
-    intersections['intersection'] = intersections['intersection'].astype(float)
-    intersections['perc_1'] = intersections['intersection'] / intersections['size1'] * 100.
-    intersections['perc_2'] = intersections['intersection'] / intersections['size2'] * 100.
-    intersections['intersection_max_perc'] = intersections[['perc_1', 'perc_2']].max(axis=1)
+    intersections.loc[:, 'intersection'] = intersections['intersection'].astype(float)
+    intersections.loc[:, 'perc_1'] = intersections['intersection'] / intersections['size1'] * 100.
+    intersections.loc[:, 'perc_2'] = intersections['intersection'] / intersections['size2'] * 100.
+    intersections.loc[:, 'intersection_max_perc'] = intersections[['perc_1', 'perc_2']].max(axis=1)
 
     # calculate p-value from Fisher's exact test
-    intersections['a'] = total - intersections[['size1', 'size2', 'intersection']].sum(axis=1)
-    intersections['b'] = intersections['size1'] - intersections['intersection']
-    intersections['c'] = intersections['size2'] - intersections['intersection']
-    intersections['d'] = intersections['intersection']
+    intersections.loc[:, 'a'] = total - intersections[['size1', 'size2', 'intersection']].sum(axis=1)
+    intersections.loc[:, 'b'] = intersections['size1'] - intersections['intersection']
+    intersections.loc[:, 'c'] = intersections['size2'] - intersections['intersection']
+    intersections.loc[:, 'd'] = intersections['intersection']
 
     for i, row in intersections[['d', 'b', 'c', 'a']].astype(int).iterrows():
         odds, p = fisher_exact(
@@ -1480,9 +1484,9 @@ def differential_overlap(
         intersections.loc[i, 'odds_ratio'] = odds
         intersections.loc[i, 'p_value'] = p
     # intersections['q_value'] = intersections['p_value'] * intersections.shape[0]
-    intersections['q_value'] = multipletests(intersections['p_value'])[1]
-    intersections['log_p_value'] = (-np.log10(intersections['p_value'])).fillna(0).replace(np.inf, 300)
-    intersections['log_q_value'] = (-np.log10(intersections['q_value'])).fillna(0).replace(np.inf, 300)
+    intersections.loc[:, 'q_value'] = multipletests(intersections['p_value'])[1]
+    intersections.loc[:, 'log_p_value'] = (-np.log10(intersections['p_value'])).fillna(0).replace(np.inf, 300)
+    intersections.loc[:, 'log_q_value'] = (-np.log10(intersections['q_value'])).fillna(0).replace(np.inf, 300)
 
     # save
     intersections.to_csv(os.path.join(output_dir, output_prefix + ".differential_overlap.csv"), index=False)
@@ -1492,7 +1496,7 @@ def differential_overlap(
             ("intersection", "intersection", "total in intersection", 0),
             ("intersection_max_perc", "percentage_overlap", "max of intersection %", 0),
             ("log_p_value", "significance", "p-value", 0)]:
-        print(metric)
+        _LOGGER.info(metric)
         # make pivot tables
         piv_up = pd.pivot_table(
             intersections[(intersections['dir1'] == "up") & (intersections['dir2'] == "up")],
@@ -1811,7 +1815,7 @@ def plot_differential(
     results.loc[:, "direction"] = results.loc[:, log_fold_change_column].apply(lambda x: "up" if x >= 0 else "down")
 
     if results.loc[:, "diff"].sum() < 1:
-        print("No significantly different regions found in any comparison.")
+        _LOGGER.warn("No significantly different regions found in any comparison.")
         return
 
     # PLOTS
@@ -2003,8 +2007,9 @@ def plot_differential(
 
             n = groups.isnull().sum().sum()
             if n > 0:
-                print("WARNING! {} {} (across all comparisons) were not found in quantification matrix!".format(n, var_name))
-                print("Proceeding without those.")
+                _LOGGER.warn(
+                    "{} {} (across all comparisons) were not found in quantification matrix!".format(n, var_name)
+                    " Proceeding without those.")
                 groups = groups.dropna()
 
             figsize = (max(5, 0.12 * groups.shape[1]), 5)
@@ -2098,8 +2103,9 @@ def plot_differential(
 
     n = matrix2.isnull().sum().sum()
     if n > 0:
-        print("WARNING! {} {} (across all comparisons) were not found in quantification matrix!".format(n, var_name))
-        print("Proceeding without those.")
+        _LOGGER.warn(
+            "WARNING! {} {} (across all comparisons) were not found in quantification matrix!".format(n, var_name)
+            " Proceeding without those.")
         matrix2 = matrix2.dropna()
     figsize = (max(5, 0.12 * matrix2.shape[1]), 5)
     if group_wise_colours:
@@ -2384,7 +2390,7 @@ def homer_combine_motifs(
         for f in files:
             if ("similar" in f) or ("RV" in f):
                 continue
-            print(f)
+            _LOGGER.info(f)
             with open(f, "r") as infile:
                 for line in infile:
                     outfile.write(line)
@@ -2394,7 +2400,7 @@ def homer_combine_motifs(
             # delete previous results if existing
             results = os.path.join(dir_, "knownResults.txt")
             if os.path.exists(results):
-                print("WARNING: deleting previously existing results file: '{}'".format(results))
+                _LOGGER.warn("Deleting previously existing results file: '{}'".format(results))
                 os.remove(results)
             # prepare enrichment command with consensus set
             cmd = (
@@ -2449,7 +2455,7 @@ def enrichr(dataframe, gene_set_libraries=None, kind="genes"):
 
     results = pd.DataFrame()
     for gene_set_library in tqdm(gene_set_libraries, total=len(gene_set_libraries), desc="Gene set library"):
-        print("Using enricher on %s gene set library." % gene_set_library)
+        _LOGGER.info("Using enricher on %s gene set library." % gene_set_library)
 
         if kind == "genes":
             # Build payload with bed file
@@ -2669,8 +2675,9 @@ def differential_enrichment(
             # Add data_type specific info
             comparison_df = matrix.loc[diff, :]
             if comparison_df.shape != comparison_df.dropna().shape:
-                print("There are differential regions which are not in the set of annotated regions for comparison '{}'!".format(comp))
-                print("Continuing enrichment without those.")
+                _LOGGER.warn(
+                    "There are differential regions which are not in the set of annotated regions for comparison '{}'!".format(comp)
+                    " Continuing enrichment without those.")
                 comparison_df = comparison_df.dropna()
 
             # Characterize
@@ -2679,7 +2686,7 @@ def differential_enrichment(
                 os.makedirs(comparison_dir)
 
             if data_type == "RNA-seq":
-                print("Doing genes of comparison '{}', direction '{}'.".format(comp, direction))
+                _LOGGER.info("Doing genes of comparison '{}', direction '{}'.".format(comp, direction))
                 comparison_df.index.name = "gene_name"
                 # write gene names to file
                 (comparison_df
@@ -2697,7 +2704,7 @@ def differential_enrichment(
                         enr["comparison_name"] = comp
                         pathway_enr = pathway_enr.append(enr, ignore_index=True)
             else:
-                print("Doing regions of comparison '{}', direction '{}'.".format(comp, direction))
+                _LOGGER.info("Doing regions of comparison '{}', direction '{}'.".format(comp, direction))
 
                 # do the suite of enrichment analysis
                 characterize_regions_function(
@@ -2811,7 +2818,7 @@ def collect_differential_enrichment(
                     enr = pd.read_csv(os.path.join(comparison_dir, output_prefix + ".enrichr.csv"))
                 except IOError as e:
                     if permissive:
-                        print(error_msg.format("Enrichr", comp, direction))
+                        _LOGGER.error(error_msg.format("Enrichr", comp, direction))
                     else:
                         raise e
                 except pd.errors.EmptyDataError:
@@ -2830,7 +2837,7 @@ def collect_differential_enrichment(
                     ame_motifs.columns = ["TF", "p_value"]
                 except IOError as e:
                     if permissive:
-                        print(error_msg.format("MEME/AME motif", comp, direction))
+                        _LOGGER.error(error_msg.format("MEME/AME motif", comp, direction))
                     else:
                         raise e
                 else:
@@ -2847,14 +2854,14 @@ def collect_differential_enrichment(
                             annot.loc[:, "TF"] = annot['TF'].str.replace(r"_.*", "")
                             meme_enr = pd.merge(meme_enr, annot).drop("TF", axis=1).rename(columns={"TF_name": "TF"})
                     else:
-                        print("Comparison '{}' has no MEME enriched motifs.".format(comp))
+                        _LOGGER.warn("Comparison '{}' has no MEME enriched motifs.".format(comp))
 
                 # HOMER DE NOVO - de novo motif enrichment independent for each sample
                 try:
                     homer_motifs = parse_homer(os.path.join(comparison_dir, "homerResults"))
                 except IOError as e:
                     if permissive:
-                        print(error_msg.format("HOMER motif", comp, direction))
+                        _LOGGER.error(error_msg.format("HOMER motif", comp, direction))
                     else:
                         raise e
                 else:
@@ -2867,7 +2874,7 @@ def collect_differential_enrichment(
                     homer_cons = pd.read_table(os.path.join(comparison_dir, "knownResults.txt"))
                 except IOError as e:
                     if permissive:
-                        print(error_msg.format("HOMER consensus enrichment", comp, direction))
+                        _LOGGER.error(error_msg.format("HOMER consensus enrichment for comparison {}, direction {}, not found.", comp, direction))
                     else:
                         raise e
                 else:
@@ -2884,7 +2891,7 @@ def collect_differential_enrichment(
                     lola = pd.read_csv(os.path.join(comparison_dir, "allEnrichments.tsv"), sep="\t")
                 except IOError as e:
                     if permissive:
-                        print(error_msg.format("LOLA", comp, direction))
+                        _LOGGER.error(error_msg.format("LOLA", comp, direction))
                     else:
                         raise e
                 else:
@@ -2897,7 +2904,7 @@ def collect_differential_enrichment(
                     enr = pd.read_csv(os.path.join(comparison_dir, output_prefix + "_genes.enrichr.csv"))
                 except IOError as e:
                     if permissive:
-                        print(error_msg.format("Enrichr", comp, direction))
+                        _LOGGER.error(error_msg.format("Enrichr", comp, direction))
                     else:
                         raise e
                 else:
@@ -2932,7 +2939,8 @@ def plot_differential_enrichment(
         correlation_plots=True,
         clustermap_metric='correlation',
         top_n=5,
-        z_score=0):
+        z_score=0,
+        cmap=None):
     """
     Given a table of enrichment terms across several comparisons, produced
     plots illustrating these enrichments in the various comparisons.
@@ -2971,6 +2979,8 @@ def plot_differential_enrichment(
     :param z_score: Which dimention/axis to perform Z-score transformation for. Numpy/Pandas conventions are used:
                     `0` is row-wise (in this case across comparisons) and `1` is column-wise (across terms). Defaults to 0.
     :type z_score: number, optional
+    :param cmap: Colormap to use in heatmaps. Default None.
+    :type cmap: str, optional
     """
     import numpy as np
     import matplotlib
@@ -3075,7 +3085,7 @@ def plot_differential_enrichment(
             lola_pivot.loc[top_terms, :], figsize=(
                 max(6, 0.12 * shape[1]), max(6, 0.12 * shape[0])),
             metric=clustermap_metric,
-            xticklabels=True, yticklabels=True, rasterized=rasterized,
+            xticklabels=True, yticklabels=True, rasterized=rasterized, cmap=cmap,
             cbar_kws={"label": "-log10(p-value) of enrichment\nof differential regions"})
         g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(),
                                      rotation=90, ha="right", fontsize="xx-small")
@@ -3298,7 +3308,7 @@ def plot_differential_enrichment(
             .replace({np.inf: 300}))
 
         for gene_set_library in enrichment_table["gene_set_library"].unique():
-            print(gene_set_library)
+            _LOGGER.info(gene_set_library)
             if gene_set_library == "Epigenomics_Roadmap_HM_ChIP-seq":
                 continue
 
@@ -3408,9 +3418,9 @@ def plot_differential_enrichment(
                 xticklabels=True, yticklabels=True, rasterized=rasterized, metric='correlation',
                 cbar_kws={"label": "-log10(p-value) of enrichment\nof differential genes"}, vmin=0)
             g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(),
-                                         rotation=90, ha="right", fontsize="xx-small")
+                                         rotation=90, ha="center", fontsize="xx-small")
             g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(),
-                                         rotation=0, fontsize="xx-small")
+                                         ha="left", rotation=0, fontsize="xx-small")
             g.fig.savefig(
                 os.path.join(output_dir, output_prefix + ".enrichr.{}.cluster_specific.svg".format(gene_set_library)),
                 bbox_inches="tight", dpi=300)
@@ -3425,9 +3435,9 @@ def plot_differential_enrichment(
                     cmap="RdBu_r", center=0, z_score=z_score,
                     cbar_kws={"label": "{} Z-score of enrichment\nof differential regions".format(z_score_label)})
                 g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(
-                ), rotation=90, ha="right", fontsize="xx-small")
+                ), rotation=90, ha="center", fontsize="xx-small")
                 g.ax_heatmap.set_yticklabels(
-                    g.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small")
+                    g.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small", ha="left")
                 g.fig.savefig(os.path.join(output_dir, output_prefix + ".enrichr.{}.cluster_specific.{}_z_score.svg".format(
                     gene_set_library, z_score_label)), bbox_inches="tight", dpi=300)
 
@@ -3438,7 +3448,7 @@ def plot_differential_enrichment(
             .replace({np.inf: 300}))
 
         for gene_set_library in enrichment_table["Ontology"].unique():
-            print(gene_set_library)
+            _LOGGER.info(gene_set_library)
 
             # Plot top_n terms of each comparison in barplots
             top_data = (
@@ -3962,7 +3972,7 @@ def sralink2bam_job(sra_id, base_path):
 
     # Submit
     tk.slurm_submit_job(job_file)
-    print(job_file)
+    _LOGGER.info(job_file)
 
 
 def series_matrix2csv(matrix_url, prefix=None):
@@ -4076,7 +4086,7 @@ def project_to_geo(
                 cmd += "chmod 644 {}; ".format(md5_file)
                 annot.loc[sample.name, "bigwig_file_md5sum"] = md5_file
             else:
-                print("'{}' sample '{}' does not have a 'bigwig' attribute set. Skipping bigWig file.".format(sample.library, sample.name))
+                _LOGGER.warn("'{}' sample '{}' does not have a 'bigwig' attribute set. Skipping bigWig file.".format(sample.library, sample.name))
 
         # Copy peaks
         if sample.library == "ATAC-seq":
@@ -4096,7 +4106,7 @@ def project_to_geo(
                 cmd += "chmod 644 {}; ".format(md5_file)
                 annot.loc[sample.name, "peaks_file_md5sum"] = md5_file
             else:
-                print("'{}' sample '{}' does not have a 'peaks' attribute set. Skipping peaks file.".format(sample.library, sample.name))
+                _LOGGER.warn("'{}' sample '{}' does not have a 'peaks' attribute set. Skipping peaks file.".format(sample.library, sample.name))
 
         if distributed and not dry_run:
             from pypiper.ngstk import NGSTk
@@ -4121,7 +4131,7 @@ def project_to_geo(
 
     if not distributed and not dry_run:
         for i, cmd in enumerate(cmds):
-            print(i, cmd)
+            _LOGGER.info(i, cmd)
             os.system(cmd)
 
     return annot
@@ -4200,10 +4210,10 @@ def rename_sample_files(
             os.path.join(results_dir, n), t, n))
 
     if dry_run:
-        print("\n".join(cmds))
+        _LOGGER.info("\n".join(cmds))
     else:
         for i, cmd in enumerate(cmds):
-            print(i, cmd)
+            _LOGGER.info(i, cmd)
             if cmd.startswith("#"):
                 continue
             try:
@@ -4309,7 +4319,7 @@ def subtract_principal_component_by_attribute(df, pc=1, attributes=["CLL"]):
 
     X2 = pd.DataFrame(index=df.index, columns=df.columns)
     for attr in attributes:
-        print(attr)
+        _LOGGER.info(attr)
         sel = df.index[df.index.str.contains(attr)]
         X = df.loc[sel, :]
 

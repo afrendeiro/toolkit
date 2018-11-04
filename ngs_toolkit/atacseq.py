@@ -12,10 +12,8 @@ import pandas as pd
 import pybedtools
 import seaborn as sns
 
+from . import _LOGGER
 from .general import Analysis
-
-# Set settings
-pd.set_option("date_dayfirst", True)
 
 
 class ATACSeqAnalysis(Analysis):
@@ -159,14 +157,14 @@ class ATACSeqAnalysis(Analysis):
         for name, suffix in output_mapping.items():
             file = os.path.join(self.results_dir, self.name + suffix)
             if name in only_these_keys:
-                print("Loading '{}' analysis attribute.".format(name))
+                _LOGGER.info("Loading '{}' analysis attribute.".format(name))
                 try:
                     setattr(self, name, pd.read_csv(file, index_col=0))
                 except IOError as e:
                     if not permissive:
                         raise e
                     else:
-                        print(e)
+                        _LOGGER.warn(e)
 
         # Special cases
         if "sites" in only_these_keys:
@@ -177,7 +175,7 @@ class ATACSeqAnalysis(Analysis):
                 if not permissive:
                     raise e
                 else:
-                    print(e)
+                    _LOGGER.warn(e)
 
         if "accessibility" in only_these_keys:
             file = os.path.join(self.results_dir, self.name + ".accessibility.annotated_metadata.csv")
@@ -189,7 +187,7 @@ class ATACSeqAnalysis(Analysis):
                 if not permissive:
                     raise e
                 else:
-                    print(e)
+                    _LOGGER.warn(e)
 
     def get_consensus_sites(
             self, samples=None, region_type="summits", extension=250,
@@ -229,7 +227,7 @@ class ATACSeqAnalysis(Analysis):
                     peaks = pybedtools.BedTool(f).slop(b=extension, genome=sample.genome)
                 except ValueError as e:
                     if permissive:
-                        print("Summits for sample {} ({}) not found!".format(sample, f))
+                        _LOGGER.warn("Summits for sample {} ({}) not found!".format(sample, f))
                         continue
                     else:
                         raise e
@@ -238,7 +236,7 @@ class ATACSeqAnalysis(Analysis):
                     peaks = pybedtools.BedTool(sample.peaks)
                 except ValueError as e:
                     if permissive:
-                        print("Peaks for sample {} ({}) not found!".format(sample, sample.peaks))
+                        _LOGGER.warn("Peaks for sample {} ({}) not found!".format(sample, sample.peaks))
                         continue
                     else:
                         raise e
@@ -379,7 +377,7 @@ class ATACSeqAnalysis(Analysis):
 
         missing = [s for s in samples if not os.path.exists(s.filtered)]
         if len(missing) > 0:
-            print("Samples have missing BAM file: {}".format("\n".join([s.name for s in missing])))
+            _LOGGER.warn("Samples have missing BAM file: {}".format("\n".join([s.name for s in missing])))
             samples = [s for s in samples if s not in missing]
 
         if sites is None:
@@ -521,7 +519,9 @@ class ATACSeqAnalysis(Analysis):
             from ngs_toolkit.general import normalize_quantiles_p
             coverage_qnorm = normalize_quantiles_p(to_norm)
         else:
-            raise ValueError("Implementation of quantile normalization must be one of 'R' of 'Python'")
+            msg = "Implementation of quantile normalization must be one of 'R' of 'Python'"
+            _LOGGER.error(msg)
+            raise ValueError(msg)
 
         # Log2 transform
         if log_transform:
@@ -684,7 +684,9 @@ class ATACSeqAnalysis(Analysis):
         elif method == "gc_content":
             return self.normalize_gc_content(matrix=matrix, samples=samples, save=save, assign=assign)
         else:
-            raise ValueError("Requested normalization method is not available!")
+            msg = "Requested normalization method is not available!"
+            _LOGGER.error(msg)
+            raise ValueError(msg)
 
     def get_peak_gene_annotation(self, tss_file="refseq.refflat.tss.bed"):
         """
@@ -1230,7 +1232,7 @@ class ATACSeqAnalysis(Analysis):
             attrs = set([getattr(s, by_attribute) for s in samples])
             fig, axis = plt.subplots(len(attrs), 1, figsize=(8, len(attrs) * 6))
             for i, attr in enumerate(attrs):
-                print(attr)
+                _LOGGER.info(attr)
                 cov = pd.melt(
                     np.log2(1 + self.coverage[[s.name for s in samples if getattr(s, by_attribute) == attr]]),
                     var_name="sample_name", value_name="counts"
@@ -1360,7 +1362,7 @@ class ATACSeqAnalysis(Analysis):
         """
         from ngs_toolkit.general import unsupervised_analysis
 
-        print(PendingDeprecationWarning(
+        _LOGGER.warn(PendingDeprecationWarning(
             "ATACSeqAnalysis.unsupervised is provided for backward compatibility "
             "only and will be removed. Please use "
             "ngs_toolkit.general.unsupervised_analysis(ATACSeqAnalysis) "
@@ -1730,7 +1732,7 @@ def characterize_regions_function(analysis, df, output_dir, prefix, universe_fil
     try:
         lola(bed_file, universe_file, output_dir, genome=genome)
     except:
-        print("LOLA analysis for {} failed!".format(prefix))
+        _LOGGER.warn("LOLA analysis for {} failed!".format(prefix))
 
     # Enrichr
     results = enrichr(df[['chrom', 'start', 'end', "gene_name"]])
@@ -1828,14 +1830,14 @@ def nucleosome_changes(analysis, samples):
 
         counts = pd.Series()
         for i, group in enumerate(groups):
-            print(data_type, group)
+            _LOGGER.info("{}, {}".format(data_type, group))
             s = pd.read_csv(
                 os.path.join("results", "nucleoatac", group, group + ".{}.bed.gz".format(data_type)),
                 sep="\t", header=None)
             counts[group] = s.shape[0]
 
             for j, (metric, col) in enumerate(metrics.items()):
-                print(data_type, group, metric, col)
+                _LOGGER.info(data_type, group, metric, col)
                 sns.distplot(s[col - 1].dropna(), hist=False, ax=axizes[j][i])
                 axizes[j][i].set_title(group)
 
@@ -1857,7 +1859,7 @@ def nucleosome_changes(analysis, samples):
 
         data = pd.DataFrame()
         for i, group in enumerate(groups):
-            print(data_type, group)
+            _LOGGER.info("{}, {}".format(data_type, group))
             s = pd.read_csv(
                 os.path.join("results", "nucleoatac", group, group + ".{}.txt".format(data_type)),
                 sep="\t", header=None, squeeze=True, skiprows=5 if data_type == "fragmentsizes" else 0)
@@ -1879,7 +1881,7 @@ def nucleosome_changes(analysis, samples):
         fig, axis = plt.subplots(5, 6, figsize=(6 * 4, 5 * 4), sharey=True)
         axis = axis.flatten()
         for i, group in enumerate(groups):
-            print(data_type, group)
+            _LOGGER.info("{}, {}".format(data_type, group))
             axis[i].plot(norm_data[group])
             axis[i].set_title(group)
         sns.despine(fig)
@@ -1904,7 +1906,7 @@ def nucleosome_changes(analysis, samples):
         wt = wt.loc[0:300, :]
 
         for i, group in enumerate(groups):
-            print(data_type, group)
+            _LOGGER.info("{}, {}".format(data_type, group))
             m = pd.read_csv(
                 os.path.join("results", "nucleoatac", group, group + ".{}".format(data_type)),
                 sep="\t", header=None, skiprows=7)
@@ -2029,7 +2031,7 @@ def investigate_nucleosome_positions(self, samples, cluster=True):
         ]
         for region_name, bed_file in regions.items():
             for label, signal_file in signal_files:
-                print(group, region_name, label)
+                _LOGGER.info(group, region_name, label)
                 # run job
                 run_coverage_job(bed_file, signal_file, label, ".".join([group, region_name, label]), output_dir, window_size=2001)
                 # run vplot
@@ -2058,10 +2060,10 @@ def investigate_nucleosome_positions(self, samples, cluster=True):
                         (signals["region"] == region_name) &
                         (signals["label"] == label)
                 ]) > 0:
-                    print("Continuing", group, region_name, label)
+                    _LOGGER.warn("Continuing", group, region_name, label)
                     continue
 
-                print(group, region_name, label)
+                _LOGGER.info(group, region_name, label)
                 df = pd.read_csv(os.path.join(output_dir, "{}.coverage_matrix.csv".format(".".join([group, region_name, label, label]))), index_col=0)
                 df = df.mean(0).reset_index(name="value").rename(columns={"index": "distance"})
                 df["group"] = group
@@ -2165,7 +2167,7 @@ def investigate_nucleosome_positions(self, samples, cluster=True):
         ]
         for i, (region_name, bed_file) in enumerate(sel_regions.items()):
             for label, signal_file in signal_files:
-                print(group, region_name, label)
+                _LOGGER.info("{}, {}, {}".format(group, region_name, label))
                 df = pd.read_csv(os.path.join(output_dir, "{}.coverage_matrix.csv".format(".".join([group, region_name, label, label]))), index_col=0)
 
                 d = df.ix[region_order[region_name]]
@@ -2205,7 +2207,7 @@ def phasograms(self, samples, max_dist=10000, rolling_window=50, plotting_window
     distances = dict()
 
     for group in groups:
-        print(group)
+        _LOGGER.info(group)
         # Get dyad calls from nucleoatac
         df = pd.read_csv(os.path.join(self.results_dir, "nucleoatac", group, group + ".nucpos.bed.gz"), sep="\t", header=None)
 
@@ -2239,7 +2241,7 @@ def phasograms(self, samples, max_dist=10000, rolling_window=50, plotting_window
         # Find peaks
         y2 = pd.Series(gaussian_filter1d(y, 5), index=y.index)
         peak_indices = detect_peaks(y2.values, mpd=73.5)[:3]
-        print(group, y2.iloc[peak_indices].index)
+        _LOGGER.info("{}, {}".format(group, y2.iloc[peak_indices].index))
 
         # Plot distribution and peaks
         axis[i].plot(y.index, y, color="black", alpha=0.6, linewidth=0.5)
@@ -2266,7 +2268,7 @@ def phasograms(self, samples, max_dist=10000, rolling_window=50, plotting_window
     lengths = dict()
 
     for group in groups:
-        print(group)
+        _LOGGER.info(group)
         # Get NFR calls from nucleoatac
         df = pd.read_csv(os.path.join(self.results_dir, "nucleoatac", group, group + ".nfrpos.bed.gz"), sep="\t", header=None)
         # Get lengths
@@ -2291,7 +2293,7 @@ def phasograms(self, samples, max_dist=10000, rolling_window=50, plotting_window
         # Find peaks
         y2 = pd.Series(gaussian_filter1d(y, 5), index=y.index)
         peak_indices = [detect_peaks(y2.values, mpd=73.5)[0]]
-        print(group, y2.iloc[peak_indices].index)
+        _LOGGER.info("{}, {}".format(group, y2.iloc[peak_indices].index))
 
         # Plot distribution and peaks
         axis[i].plot(y.index, y, color="black", alpha=0.6, linewidth=0.5)
@@ -2626,7 +2628,7 @@ def footprint(
 
     for motif_number in motif_numbers:
         if not os.path.exists(os.path.join(motifs_dir, "{}.pwmout.RData".format(motif_number))):
-            print("PIQ file for motif {} does not exist".format(motif_number))
+            _LOGGER.warn("PIQ file for motif {} does not exist".format(motif_number))
             continue
 
         t_dir = os.path.join(tmp_dir, group_name)
@@ -2661,11 +2663,11 @@ def footprint(
         submit = (len(subprocess.check_output("squeue").split("\n")) - 1) < total_job_limit
         while not submit:
             time.sleep(refresh_time)
-            # print("Waited {}. Checking again...".format(refresh_time))
+            _LOGGER.info("Waited {}. Checking again...".format(refresh_time))
             submit = (len(subprocess.check_output("squeue").split("\n")) - 1) < total_job_limit
 
         tk.slurm_submit_job(job_file)
-        print("Submitted job of group {}, motif {}.".format(group_name, motif_number))
+        _LOGGER.info("Submitted job of group {}, motif {}.".format(group_name, motif_number))
         time.sleep(min_time_between_jobs)
 
 
@@ -2772,7 +2774,7 @@ def piq_to_network(
     files = os.listdir(group_foot_dir)
 
     if len(files) == 0:
-        print("There are not footprint calls for group '{}' in '{}'".format(group_name, group_foot_dir))
+        _LOGGER.warn("There are not footprint calls for group '{}' in '{}'".format(group_name, group_foot_dir))
 
     # use universe set of ATAC-seq peaks to filter data
     all_peaks = pybedtools.BedTool(peak_universe_file)
@@ -2788,7 +2790,7 @@ def piq_to_network(
 
     # loop through motifs/TFs, filter and establish relationship between TF and gene
     for motif in motif_numbers:
-        print("Gathering footprint calls of motif '{}' for group '{}'".format(motif, group_name))
+        _LOGGER.info("Gathering footprint calls of motif '{}' for group '{}'".format(motif, group_name))
         # get both forward and reverse complement PIQ output files
         result_files = list()
         for f in files:
@@ -2903,7 +2905,7 @@ def differential_interactions(
         axis.set_ylim(lims)
 
     if group_name1 == group_name2:
-        print("The two groups are the same! Skipping...")
+        _LOGGER.warn("The two groups are the same! Skipping...")
         return
 
     comparison_name = "{}-{}".format(group_name1, group_name2)

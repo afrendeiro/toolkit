@@ -11,6 +11,7 @@ import pybedtools
 import seaborn as sns
 
 from ngs_toolkit.atacseq import ATACSeqAnalysis
+from . import _LOGGER
 
 
 class ChIPSeqAnalysis(ATACSeqAnalysis):
@@ -70,7 +71,7 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
             ]["comparison_side"].tolist())) != 2:
                 error = "Comparison '{}' does not contain two sides.".format(comparison)
                 if permissive:
-                    print(error)
+                    _LOGGER.warn(error)
                     continue
                 else:
                     raise ValueError(error)
@@ -92,12 +93,12 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
             if len(signal_samples) == 0 or len(control_samples) == 0:
                 error = "Comparison side for '{}' comparison does not contain samples.".format(comparison)
                 if permissive:
-                    print(error)
+                    _LOGGER.warn(error)
                     continue
                 else:
                     raise ValueError(error)
 
-            print("Doing comparison '{}' with positive samples '{}' and background samples '{}'".format(
+            _LOGGER.info("Doing comparison '{}' with positive samples '{}' and background samples '{}'".format(
                 comparison, [s.name for s in signal_samples], [s.name for s in control_samples]
             ))
             # Call peaks
@@ -114,7 +115,7 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
                     homer_call_chipseq_peak_job(
                         signal_samples, control_samples, output_dir=output_dir, name=comparison)
                 else:
-                    print("Peak files for comparison '{}' already exist. Skipping.".format(comparison))
+                    _LOGGER.warn("Peak files for comparison '{}' already exist. Skipping.".format(comparison))
 
     def filter_peaks(self, comparison_table, filter_bed="blacklist.mm10_liftOver.bed", peaks_dir="{results_dir}/chipseq_peaks"):
         """
@@ -128,7 +129,7 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
         from ngs_toolkit.chipseq import homer_peaks_to_bed
 
         if filter_bed == "blacklist.mm10_liftOver.bed":
-            print("WARNING! Using blacklist features of mm10 genome!")
+            _LOGGER.warn("Using blacklist features of mm10 genome!")
 
         # Complement default `peaks_dir`
         if "{results_dir}" in peaks_dir:
@@ -181,7 +182,7 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
         # For each comparison, count called peaks
         peak_counts = pd.DataFrame()
         for comparison in comparison_table['comparison_name'].drop_duplicates().sort_values():
-            print(comparison)
+            _LOGGER.info(comparison)
             ending = ".filtered.bed" if filtered else ".narrowPeak"
             for peak_type, file in [
                     ("macs", os.path.join(output_dir, comparison, comparison + "_peaks" + ending)),
@@ -194,7 +195,7 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
                         homer_peaks_to_bed(file, file.replace("narrowPeak", "bed"))
                     except IOError:
                         if permissive:
-                            print(error)
+                            _LOGGER.warn(error)
                             peak_counts = peak_counts.append(
                                 pd.Series([comparison, peak_type, np.nan]), ignore_index=True)
                             continue
@@ -209,7 +210,7 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
                     df = pd.read_csv(file, sep="\t")
                 except IOError:
                     if permissive:
-                        print(error)
+                        _LOGGER.warn(error)
                         peak_counts = peak_counts.append(
                             pd.Series([comparison, peak_type, np.nan]), ignore_index=True)
                         continue
@@ -244,7 +245,7 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
 
         first = True
         comps = comparison_table["comparison_name"].drop_duplicates()
-        for comparison in tqdm(comps, total=comps, desc="Comparison"):
+        for comparison in tqdm(comps, total=len(comps), desc="Comparison"):
             peak_files = [
                 os.path.join(peak_dir, comparison, comparison + "_peaks.narrowPeak"),
                 os.path.join(peak_dir, comparison, comparison + "_homer_peaks.factor.bed"),
@@ -260,13 +261,13 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
                         f = re.sub("_peaks.narrowPeak", "_summits.bed", peak_file)
                         peaks = pybedtools.BedTool(f).slop(b=extension, genome=genome)
                     except ValueError:
-                        print("Summits for comparison {} ({}) not found!".format(comparison, f))
+                        _LOGGER.warn("Summits for comparison {} ({}) not found!".format(comparison, f))
                         continue
                 else:
                     try:
                         peaks = pybedtools.BedTool(peak_file)
                     except ValueError:
-                        print("Peaks for comparison {} ({}) not found!".format(comparison, peak_file))
+                        _LOGGER.warn("Peaks for comparison {} ({}) not found!".format(comparison, peak_file))
                         continue
                 # Merge overlaping peaks within a comparison
                 peaks = peaks.merge()

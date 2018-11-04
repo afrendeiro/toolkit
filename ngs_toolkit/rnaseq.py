@@ -9,6 +9,8 @@ import pandas as pd
 import pybedtools
 import seaborn as sns
 
+from . import _LOGGER
+
 
 class RNASeqAnalysis(Analysis):
     """
@@ -74,7 +76,7 @@ class RNASeqAnalysis(Analysis):
         for level in index.levels:
             # determine the type of data in each level
             most_common = Counter([type(x) for x in level]).most_common()[0][0]
-            print(level.name, most_common)
+            _LOGGER.info("{}, {}".format(level.name, most_common))
 
             # Add either colors based on categories or numerical scale
             if most_common in [int, float, np.float32, np.float64, np.int32, np.int64]:
@@ -124,7 +126,7 @@ class RNASeqAnalysis(Analysis):
                         names=["ensembl_gene_id", "ensembl_transcript_id", "v1", "v2"])
                 except IOError("Sample {} is missing.".format(sample.name)) as e:
                     if permissive:
-                        print(e)
+                        _LOGGER.warn(e)
                     else:
                         raise e
                 # add id index
@@ -149,7 +151,7 @@ class RNASeqAnalysis(Analysis):
                 else:
                     raise ValueError("Argument 'expression_type' must be one of {counts, rpkm}")
             except IOError:
-                print("Sample {} is missing.".format(sample.name))
+                _LOGGER.warn("Sample {} is missing.".format(sample.name))
                 continue
             e.index = expr.index
 
@@ -174,7 +176,7 @@ class RNASeqAnalysis(Analysis):
                         sample.paths.sample_root, "ESAT_{}".format(sample.genome), sample.name + ".gene.txt"), sep="\t")
             except IOError("Sample {} is missing.".format(sample.name)) as e:
                 if permissive:
-                    print(e)
+                    _LOGGER.warn(e)
                     continue
                 else:
                     raise e
@@ -386,7 +388,7 @@ class RNASeqAnalysis(Analysis):
         """
         from ngs_toolkit.general import unsupervised_analysis
 
-        print(PendingDeprecationWarning(
+        _LOGGER.warn(PendingDeprecationWarning(
             "RNASeqAnalysis.unsupervised is provided for backward compatibility "
             "only and will be removed. Please use "
             "ngs_toolkit.general.unsupervised_analysis(RNASeqAnalysis) "
@@ -432,7 +434,7 @@ def knockout_plot(
 
     missing = [k for k in knockout_genes if k not in expression_matrix.index]
     if len(missing) > 0:
-        print(Warning("The following `knockout_genes` were not found in the expression matrix: '{}'".format(", ".join(missing))))
+        _LOGGER.warn("The following `knockout_genes` were not found in the expression matrix: '{}'".format(", ".join(missing)))
     knockout_genes = [k for k in knockout_genes if k in expression_matrix.index]
 
     ko = expression_matrix.loc[knockout_genes, :]

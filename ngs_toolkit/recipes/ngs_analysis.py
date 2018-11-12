@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-This is the main script of the ngs_analysis recipe.
+This is "ngs_analysis" recipe for ngs_toolkit.
 """
 
 

@@ -1,7 +1,9 @@
 #!/usr/bin/env python
 
 """
-This is the main script of the ngs_analysis recipe.
+This is the "call_peaks" recipe for ngs_toolkit.
+
+This will call peaks for ChIP-seq samples given a comparison table mapping relationships between samples.
 """
 
 
@@ -12,7 +14,6 @@ import sys
 import pandas as pd
 
 from peppy import Project
-from ngs_toolkit.atacseq import ATACSeqAnalysis
 from ngs_toolkit.chipseq import ChIPSeqAnalysis
 
 

@@ -3,12 +3,9 @@
 
 import os
 
-import matplotlib
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import pybedtools
-import seaborn as sns
 
 from ngs_toolkit.atacseq import ATACSeqAnalysis
 from . import _LOGGER
@@ -145,9 +142,10 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
             :param str filter_bed: BED file with entries to filter from input_bed.
             :param str output_bed: Output BED file.
             """
-            (pybedtools.BedTool(input_bed)
-            .intersect(pybedtools.BedTool(filter_bed), v=True)
-            .saveas(output_bed))
+            (
+                pybedtools.BedTool(input_bed)
+                .intersect(pybedtools.BedTool(filter_bed), v=True)
+                .saveas(output_bed))
 
         for comparison in comparison_table['comparison_name'].unique():
             # MACS2
@@ -159,7 +157,6 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
             _filter(prefix + ".factor.bed", filter_bed, prefix + ".factor.filtered.bed")
             homer_peaks_to_bed(prefix + ".histone.narrowPeak", prefix + ".histone.bed")
             _filter(prefix + ".histone.bed", filter_bed, prefix + ".histone.filtered.bed")
-
 
     def summarize_peaks_from_comparisons(self, comparison_table, output_dir="{results_dir}/chipseq_peaks", filtered=True, permissive=True):
         """
@@ -483,6 +480,7 @@ def homer_peaks_to_bed(homer_peaks, output_bed):
     df['-log_pvalue'] = (-np.log10(df.iloc[:, -2])).replace(pd.np.inf, 1000)
     df['name'] = df[1] + ":" + df[2].astype(str) + "-" + df[3].astype(str)
 
-    (df[[1, 2, 3, 'name', '-log_pvalue']]
-    .sort_values([1, 2, 3], ascending=True)
-    .to_csv(output_bed, header=False, index=False, sep="\t"))
+    (
+        df[[1, 2, 3, 'name', '-log_pvalue']]
+        .sort_values([1, 2, 3], ascending=True)
+        .to_csv(output_bed, header=False, index=False, sep="\t"))

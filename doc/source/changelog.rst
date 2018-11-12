@@ -1,6 +1,10 @@
 Changelog
 ******************************
 
+- **v0.1.4.3** (*2018-11-XX*):
+
+  - add logger through "logging" library
+
 
 - **v0.1.4.2** (*2018-10-29*):
 
@@ -10,7 +14,7 @@ Changelog
   - add merge_signal recipe
   - add PEP badge
 
-  - ngs_toolkit.general
+  - ngs_toolkit.general:
 
     - fix when general.collect_differential_enrichment reads an empty motif enrichment file
     - delete existing files if existing in general.homer_combine_motifs
@@ -29,14 +33,19 @@ Changelog
     - quick fix for pypiper.ngstk >= 0.6 compatibility (tabs vs spaces) in general.differential_analysis - needs revision
     - resolve pandas warnings of setting without .loc
 
-  - ngs_toolkit.chipseq
+  - ngs_toolkit.chipseq:
+
     - add function to filter_peaks
     - add more descriptive labels to tqdm loops;
     - fix overaping peaks calling job files in chipseq.summarize_peaks_from_comparisons
 
-  - ngs_toolkit.atacseq
+  - ngs_toolkit.atacseq:
+
     - add more descriptive labels to tqdm loops;
 
+.. |br| raw:: html
+
+   <br />
 
 - **v0.1.4** (*2018-09-25*):
 

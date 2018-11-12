@@ -5,7 +5,6 @@ import os
 import pickle
 from collections import Counter
 
-import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -839,7 +838,7 @@ class ATACSeqAnalysis(Analysis):
         :param str permissive: Whether DataFrames that do not exist should be simply skipped \
                                or an error will be thrown.
         :raises AttributeError: If not `permissive` a required DataFrame does not exist as \
-                                an object attribute. 
+                                an object attribute.
         :var pd.DataFrame coverage_annotated: A pandas DataFrame containing annotations of
                                               the region features.
         :returns: None
@@ -1353,7 +1352,6 @@ class ATACSeqAnalysis(Analysis):
         sns.jointplot('mean', "qv2", data=filtered)
         plt.savefig(os.path.join(self.results_dir, self.name + ".norm_counts_per_sample.support_vs_qv2.filtered.svg"), bbox_inches="tight")
 
-
     def unsupervised(
             self, args, **kwargs):
         """
@@ -1370,235 +1368,236 @@ class ATACSeqAnalysis(Analysis):
 
         unsupervised_analysis(args, **kwargs)
 
-
-    def unsupervised_enrichment(self, samples, variables=["IL10_status", "subset", "replicate", "batch"]):
+    def unsupervised_enrichment(self, samples, variables=["subset", "replicate", "batch"]):
         """
         """
-        from sklearn.decomposition import PCA
-        import itertools
-        from statsmodels.sandbox.stats.multicomp import multipletests
+        raise NotImplementedError("Function is not yet ready to be integraded in ngs_toolkit.")
 
-        def jackstraw(data, pcs, n_vars, n_iter=100):
-            """
-            """
-            import rpy2.robjects as robj
-            from rpy2.robjects.vectors import IntVector
-            from rpy2.robjects import pandas2ri
-            pandas2ri.activate()
+        # from sklearn.decomposition import PCA
+        # import itertools
+        # from statsmodels.sandbox.stats.multicomp import multipletests
 
-            run = robj.r("""
-                run = function(data, pcs, n_vars, B) {
-                    library(jackstraw)
-                    out <- jackstraw.PCA(data, r1=pcs, r=n_vars, B=B)
-                    return(out$p.value)
-                }
-            """)
-            # save to disk just in case
-            data.to_csv("_tmp_matrix.jackstraw.csv", index=True)
+        # def jackstraw(data, pcs, n_vars, n_iter=100):
+        #     """
+        #     """
+        #     import rpy2.robjects as robj
+        #     from rpy2.robjects.vectors import IntVector
+        #     from rpy2.robjects import pandas2ri
+        #     pandas2ri.activate()
 
-            if type(pcs) is not int:
-                pcs = IntVector(pcs)
-            return run(data.values, pcs, n_vars, n_iter)
+        #     run = robj.r("""
+        #         run = function(data, pcs, n_vars, B) {
+        #             library(jackstraw)
+        #             out <- jackstraw.PCA(data, r1=pcs, r=n_vars, B=B)
+        #             return(out$p.value)
+        #         }
+        #     """)
+        #     # save to disk just in case
+        #     data.to_csv("_tmp_matrix.jackstraw.csv", index=True)
 
-        def lola(wd="~/projects/breg/results/plots/"):
-            """
-            Performs location overlap analysis (LOLA) on bedfiles with regions sets.
-            """
-            import rpy2.robjects as robj
+        #     if type(pcs) is not int:
+        #         pcs = IntVector(pcs)
+        #     return run(data.values, pcs, n_vars, n_iter)
 
-            run = robj.r("""
-                function(wd) {
-                    setwd(wd)
+        # def lola(wd="~/projects/breg/results/plots/"):
+        #     """
+        #     Performs location overlap analysis (LOLA) on bedfiles with regions sets.
+        #     """
+        #     import rpy2.robjects as robj
 
-                    library("LOLA")
+        #     run = robj.r("""
+        #         function(wd) {
+        #             setwd(wd)
 
-                    dbPath1 = "/data/groups/lab_bock/shared/resources/regions/LOLACore/mm10/"
-                    dbPath2 = "/data/groups/lab_bock/shared/resources/regions/customRegionDB/mm10/"
-                    regionDB = loadRegionDB(c(dbPath1, dbPath2))
+        #             library("LOLA")
 
-                    for (topdir in sample(list.dirs(".", recursive=FALSE))){
-                        if (!"allEnrichments.txt" %in% list.files(topdir, recursive=FALSE)){
-                            print(topdir)
-                            userSet <- LOLA::readBed(paste0(basename(topdir), "/", basename(topdir), ".bed"))
-                            userUniverse  <- LOLA::readBed(paste0(basename(topdir), "/", "universe_sites.bed"))
+        #             dbPath1 = "/data/groups/lab_bock/shared/resources/regions/LOLACore/mm10/"
+        #             dbPath2 = "/data/groups/lab_bock/shared/resources/regions/customRegionDB/mm10/"
+        #             regionDB = loadRegionDB(c(dbPath1, dbPath2))
 
-                            lolaResults = runLOLA(list(userSet), userUniverse, regionDB, cores=8)
-                            writeCombinedEnrichment(lolaResults, outFolder=topdir, includeSplits=FALSE)
-                        }
-                    }
-                }
-            """)
+        #             for (topdir in sample(list.dirs(".", recursive=FALSE))){
+        #                 if (!"allEnrichments.txt" %in% list.files(topdir, recursive=FALSE)){
+        #                     print(topdir)
+        #                     userSet <- LOLA::readBed(paste0(basename(topdir), "/", basename(topdir), ".bed"))
+        #                     userUniverse  <- LOLA::readBed(paste0(basename(topdir), "/", "universe_sites.bed"))
 
-            # convert the pandas dataframe to an R dataframe
-            run()
+        #                     lolaResults = runLOLA(list(userSet), userUniverse, regionDB, cores=8)
+        #                     writeCombinedEnrichment(lolaResults, outFolder=topdir, includeSplits=FALSE)
+        #                 }
+        #             }
+        #         }
+        #     """)
 
-        def vertical_line(x, **kwargs):
-            plt.axvline(x.mean(), **kwargs)
+        #     # convert the pandas dataframe to an R dataframe
+        #     run()
 
-        # Get accessibility matrix excluding sex chroms
-        X = self.coverage_qnorm_annotated[[s.name for s in samples]]
-        X = X.ix[X.index[~X.index.str.contains("chrX|chrY")]]
+        # def vertical_line(x, **kwargs):
+        #     plt.axvline(x.mean(), **kwargs)
 
-        # Now perform association analysis (jackstraw)
-        n_vars = 3
-        max_sig = 1000
-        alpha = 0.01
-        pcs = range(1, n_vars + 1)
-        pcs += list(itertools.combinations(pcs, 2))
+        # # Get accessibility matrix excluding sex chroms
+        # X = self.coverage_qnorm_annotated[[s.name for s in samples]]
+        # X = X.ix[X.index[~X.index.str.contains("chrX|chrY")]]
 
-        p_values = pd.DataFrame(index=X.index)
-        for pc in pcs:
-            print(pc)
-            out = jackstraw(X, pc, n_vars, 100).flatten()
-            if type(pc) is int:
-                p_values[pc] = out
-            else:
-                p_values["+".join([str(x) for x in pc])] = out
-        q_values = p_values.apply(lambda x: multipletests(x, method="fdr_bh")[1])
-        p_values.to_csv(os.path.join(self.results_dir, "PCA.PC_pvalues.csv"), index=True)
+        # # Now perform association analysis (jackstraw)
+        # n_vars = 3
+        # max_sig = 1000
+        # alpha = 0.01
+        # pcs = range(1, n_vars + 1)
+        # pcs += list(itertools.combinations(pcs, 2))
 
-        p_values = pd.read_csv(os.path.join(self.results_dir, "PCA.PC_pvalues.csv"), index_col=0)
+        # p_values = pd.DataFrame(index=X.index)
+        # for pc in pcs:
+        #     print(pc)
+        #     out = jackstraw(X, pc, n_vars, 100).flatten()
+        #     if type(pc) is int:
+        #         p_values[pc] = out
+        #     else:
+        #         p_values["+".join([str(x) for x in pc])] = out
+        # q_values = p_values.apply(lambda x: multipletests(x, method="fdr_bh")[1])
+        # p_values.to_csv(os.path.join(self.results_dir, "PCA.PC_pvalues.csv"), index=True)
 
-        # Get enrichments of each PC-regions
-        for pc in p_values.columns:
-            p = p_values[pc].sort_values()
-            sig = p[p < alpha].index
+        # p_values = pd.read_csv(os.path.join(self.results_dir, "PCA.PC_pvalues.csv"), index_col=0)
 
-            # Cap to a maximum number of regions
-            if len(sig) > max_sig:
-                sig = p.head(max_sig).index
+        # # Get enrichments of each PC-regions
+        # for pc in p_values.columns:
+        #     p = p_values[pc].sort_values()
+        #     sig = p[p < alpha].index
 
-            # Run LOLA
-            # save to bed
-            output_folder = os.path.join(self.results_dir, "PCA.PC{}_regions".format(pc))
-            if not os.path.exists(output_folder):
-                os.makedirs(output_folder)
-            universe_file = os.path.join(output_folder, "universe_sites.bed")
-            self.sites.saveas(universe_file)
-            bed_file = os.path.join(output_folder, "PCA.PC{}_regions.bed".format(pc))
-            self.coverage[['chrom', 'start', 'end']].ix[sig].to_csv(bed_file, sep="\t", header=False, index=False)
+        #     # Cap to a maximum number of regions
+        #     if len(sig) > max_sig:
+        #         sig = p.head(max_sig).index
 
-        lola("/home/arendeiro/projects/breg/results/plots/")
+        #     # Run LOLA
+        #     # save to bed
+        #     output_folder = os.path.join(self.results_dir, "PCA.PC{}_regions".format(pc))
+        #     if not os.path.exists(output_folder):
+        #         os.makedirs(output_folder)
+        #     universe_file = os.path.join(output_folder, "universe_sites.bed")
+        #     self.sites.saveas(universe_file)
+        #     bed_file = os.path.join(output_folder, "PCA.PC{}_regions.bed".format(pc))
+        #     self.coverage[['chrom', 'start', 'end']].ix[sig].to_csv(bed_file, sep="\t", header=False, index=False)
 
-        lola_enrichments = pd.DataFrame()
-        enrichr_enrichments = pd.DataFrame()
-        for pc in p_values.columns:
-            # # read lola
-            # output_folder = os.path.join(self.results_dir, "PCA.PC{}_regions".format(pc))
-            # lol = pd.read_csv(os.path.join(output_folder, "allEnrichments.txt"), sep="\t")
-            # lol["PC"] = pc
-            # lola_enrichments = lola_enrichments.append(lol)
+        # lola("/home/arendeiro/projects/breg/results/plots/")
 
-            # Get genes, run enrichr
-            p = p_values[pc].sort_values()
-            sig = p[p < alpha].index
+        # lola_enrichments = pd.DataFrame()
+        # enrichr_enrichments = pd.DataFrame()
+        # for pc in p_values.columns:
+        #     # # read lola
+        #     # output_folder = os.path.join(self.results_dir, "PCA.PC{}_regions".format(pc))
+        #     # lol = pd.read_csv(os.path.join(output_folder, "allEnrichments.txt"), sep="\t")
+        #     # lol["PC"] = pc
+        #     # lola_enrichments = lola_enrichments.append(lol)
 
-            # Cap to a maximum number of regions
-            if len(sig) > max_sig:
-                sig = p.head(max_sig).index
+        #     # Get genes, run enrichr
+        #     p = p_values[pc].sort_values()
+        #     sig = p[p < alpha].index
 
-            sig_genes = self.coverage_qnorm_annotated['gene_name'].ix[sig]
-            sig_genes = [x for g in sig_genes.dropna().astype(str).tolist() for x in g.split(',')]
+        #     # Cap to a maximum number of regions
+        #     if len(sig) > max_sig:
+        #         sig = p.head(max_sig).index
 
-            enr = enrichr(pd.DataFrame(sig_genes, columns=["gene_name"]))
-            enr["PC"] = pc
-            enrichr_enrichments = enrichr_enrichments.append(enr)
-        enrichr_enrichments.to_csv(os.path.join(self.results_dir, "PCA.enrichr.csv"), index=False, encoding="utf-8")
-        enrichr_enrichments = pd.read_csv(os.path.join(self.results_dir, "PCA.enrichr.csv"))
-        lola_enrichments.to_csv(os.path.join(self.results_dir, "PCA.lola.csv"), index=False, encoding="utf-8")
+        #     sig_genes = self.coverage_qnorm_annotated['gene_name'].ix[sig]
+        #     sig_genes = [x for g in sig_genes.dropna().astype(str).tolist() for x in g.split(',')]
 
-        # Plots
+        #     enr = enrichr(pd.DataFrame(sig_genes, columns=["gene_name"]))
+        #     enr["PC"] = pc
+        #     enrichr_enrichments = enrichr_enrichments.append(enr)
+        # enrichr_enrichments.to_csv(os.path.join(self.results_dir, "PCA.enrichr.csv"), index=False, encoding="utf-8")
+        # enrichr_enrichments = pd.read_csv(os.path.join(self.results_dir, "PCA.enrichr.csv"))
+        # lola_enrichments.to_csv(os.path.join(self.results_dir, "PCA.lola.csv"), index=False, encoding="utf-8")
 
-        # p-value distributions
-        g = sns.FacetGrid(data=pd.melt(-np.log10(p_values), var_name="PC", value_name="-log10(p-value)"), col="PC", col_wrap=5)
-        g.map(sns.distplot, "-log10(p-value)", kde=False)
-        g.map(plt.axvline, x=-np.log10(alpha), linestyle="--")
-        g.add_legend()
-        g.fig.savefig(os.path.join(self.results_dir, "PCA.PC_pvalues.distplot.svg"), bbox_inches="tight")
+        # # Plots
 
-        # Volcano plots (loading vs p-value)
-        # get PCA loadings
-        pca = PCA()
-        pca.fit(X.T)
-        loadings = pd.DataFrame(pca.components_.T, index=X.index, columns=range(1, X.shape[1] + 1))
-        loadings.to_csv(os.path.join(self.results_dir, "PCA.loadings.csv"), index=True, encoding="utf-8")
+        # # p-value distributions
+        # g = sns.FacetGrid(data=pd.melt(-np.log10(p_values), var_name="PC", value_name="-log10(p-value)"), col="PC", col_wrap=5)
+        # g.map(sns.distplot, "-log10(p-value)", kde=False)
+        # g.map(plt.axvline, x=-np.log10(alpha), linestyle="--")
+        # g.add_legend()
+        # g.fig.savefig(os.path.join(self.results_dir, "PCA.PC_pvalues.distplot.svg"), bbox_inches="tight")
 
-        melted_loadings = pd.melt(loadings.reset_index(), var_name="PC", value_name="loading", id_vars=["index"])
-        melted_loadings["PC"] = melted_loadings["PC"].astype(str)
-        melted_loadings = melted_loadings.set_index(["index", "PC"])
-        melted_p_values = pd.melt((-np.log10(p_values)).reset_index(), var_name="PC", value_name="-log10(p-value)", id_vars=["index"]).set_index(["index", "PC"])
-        melted = melted_loadings.join(melted_p_values)
+        # # Volcano plots (loading vs p-value)
+        # # get PCA loadings
+        # pca = PCA()
+        # pca.fit(X.T)
+        # loadings = pd.DataFrame(pca.components_.T, index=X.index, columns=range(1, X.shape[1] + 1))
+        # loadings.to_csv(os.path.join(self.results_dir, "PCA.loadings.csv"), index=True, encoding="utf-8")
 
-        g = sns.FacetGrid(data=melted.dropna().reset_index(), col="PC", col_wrap=5, sharey=False, sharex=False)
-        g.map(plt.scatter, "loading", "-log10(p-value)", s=2, alpha=0.5)
-        g.map(plt.axhline, y=-np.log10(alpha), linestyle="--")
-        g.add_legend()
-        g.fig.savefig(os.path.join(self.results_dir, "PCA.PC_pvalues_vs_loading.scatter.png"), bbox_inches="tight", dpi=300)
+        # melted_loadings = pd.melt(loadings.reset_index(), var_name="PC", value_name="loading", id_vars=["index"])
+        # melted_loadings["PC"] = melted_loadings["PC"].astype(str)
+        # melted_loadings = melted_loadings.set_index(["index", "PC"])
+        # melted_p_values = pd.melt((-np.log10(p_values)).reset_index(), var_name="PC", value_name="-log10(p-value)", id_vars=["index"]).set_index(["index", "PC"])
+        # melted = melted_loadings.join(melted_p_values)
 
-        # Plot enrichments
-        # LOLA
-        # take top n per PC
-        import string
-        lola_enrichments["set_id"] = lola_enrichments[
-            ["collection", "description", "cellType", "tissue", "antibody", "treatment"]].astype(str).apply(string.join, axis=1)
+        # g = sns.FacetGrid(data=melted.dropna().reset_index(), col="PC", col_wrap=5, sharey=False, sharex=False)
+        # g.map(plt.scatter, "loading", "-log10(p-value)", s=2, alpha=0.5)
+        # g.map(plt.axhline, y=-np.log10(alpha), linestyle="--")
+        # g.add_legend()
+        # g.fig.savefig(os.path.join(self.results_dir, "PCA.PC_pvalues_vs_loading.scatter.png"), bbox_inches="tight", dpi=300)
 
-        top = lola_enrichments.set_index('set_id').groupby("PC")['pValueLog'].nlargest(50)
-        top_ids = top.index.get_level_values('set_id').unique()
+        # # Plot enrichments
+        # # LOLA
+        # # take top n per PC
+        # import string
+        # lola_enrichments["set_id"] = lola_enrichments[
+        #     ["collection", "description", "cellType", "tissue", "antibody", "treatment"]].astype(str).apply(string.join, axis=1)
 
-        pivot = pd.pivot_table(
-            lola_enrichments,
-            index="set_id", columns="PC", values="pValueLog").fillna(0)
-        pivot.index = pivot.index.str.replace(" nan", "").str.replace("blueprint blueprint", "blueprint").str.replace("None", "")
-        top_ids = top_ids.str.replace(" nan", "").str.replace("blueprint blueprint", "blueprint").str.replace("None", "")
+        # top = lola_enrichments.set_index('set_id').groupby("PC")['pValueLog'].nlargest(50)
+        # top_ids = top.index.get_level_values('set_id').unique()
 
-        g = sns.clustermap(
-            pivot.ix[top_ids],
-            cbar_kws={"label": "Enrichment: -log10(p-value)"}, cmap="Spectral_r",
-            col_cluster=True)
-        for tick in g.ax_heatmap.get_xticklabels():
-            tick.set_rotation(90)
-        for tick in g.ax_heatmap.get_yticklabels():
-            tick.set_rotation(0)
-        g.fig.savefig(os.path.join(self.results_dir, "PCA.PC_pvalues.lola_enrichments.svg"), bbox_inches="tight", dpi=300)
+        # pivot = pd.pivot_table(
+        #     lola_enrichments,
+        #     index="set_id", columns="PC", values="pValueLog").fillna(0)
+        # pivot.index = pivot.index.str.replace(" nan", "").str.replace("blueprint blueprint", "blueprint").str.replace("None", "")
+        # top_ids = top_ids.str.replace(" nan", "").str.replace("blueprint blueprint", "blueprint").str.replace("None", "")
 
-        g = sns.clustermap(
-            pivot.ix[top_ids],
-            cbar_kws={"label": "Enrichment: p-value z-score"},
-            col_cluster=True, z_score=0)
-        for tick in g.ax_heatmap.get_xticklabels():
-            tick.set_rotation(90)
-        for tick in g.ax_heatmap.get_yticklabels():
-            tick.set_rotation(0)
-        g.fig.savefig(os.path.join(self.results_dir, "PCA.PC_pvalues.lola_enrichments.z_score.svg"), bbox_inches="tight", dpi=300)
+        # g = sns.clustermap(
+        #     pivot.ix[top_ids],
+        #     cbar_kws={"label": "Enrichment: -log10(p-value)"}, cmap="Spectral_r",
+        #     col_cluster=True)
+        # for tick in g.ax_heatmap.get_xticklabels():
+        #     tick.set_rotation(90)
+        # for tick in g.ax_heatmap.get_yticklabels():
+        #     tick.set_rotation(0)
+        # g.fig.savefig(os.path.join(self.results_dir, "PCA.PC_pvalues.lola_enrichments.svg"), bbox_inches="tight", dpi=300)
 
-        # Enrichr
-        for gene_set_library in enrichr_enrichments["gene_set_library"].drop_duplicates():
-            enr = enrichr_enrichments[enrichr_enrichments["gene_set_library"] == gene_set_library]
+        # g = sns.clustermap(
+        #     pivot.ix[top_ids],
+        #     cbar_kws={"label": "Enrichment: p-value z-score"},
+        #     col_cluster=True, z_score=0)
+        # for tick in g.ax_heatmap.get_xticklabels():
+        #     tick.set_rotation(90)
+        # for tick in g.ax_heatmap.get_yticklabels():
+        #     tick.set_rotation(0)
+        # g.fig.savefig(os.path.join(self.results_dir, "PCA.PC_pvalues.lola_enrichments.z_score.svg"), bbox_inches="tight", dpi=300)
 
-            top = enr.set_index('description').groupby("PC")['p_value'].nsmallest(20)
-            top_ids = top.index.get_level_values('description').unique()
+        # # Enrichr
+        # for gene_set_library in enrichr_enrichments["gene_set_library"].drop_duplicates():
+        #     enr = enrichr_enrichments[enrichr_enrichments["gene_set_library"] == gene_set_library]
 
-            pivot = pd.pivot_table(enr, index="description", columns="PC", values="p_value").fillna(1)
-            pivot.index = pivot.index.str.extract("(.*)[,\_\(].*", expand=False).str.replace("_Homo sapiens", "")
-            top_ids = top_ids.str.extract("(.*)[,\_\(].*", expand=False).str.replace("_Homo sapiens", "")
+        #     top = enr.set_index('description').groupby("PC")['p_value'].nsmallest(20)
+        #     top_ids = top.index.get_level_values('description').unique()
 
-            g = sns.clustermap(
-                -np.log10(pivot.ix[top_ids]), cmap='BuGn',
-                cbar_kws={"label": "Enrichment: -log10(p-value)"}, col_cluster=True, figsize=(6, 15))
-            for tick in g.ax_heatmap.get_xticklabels():
-                tick.set_rotation(90)
-            for tick in g.ax_heatmap.get_yticklabels():
-                tick.set_rotation(0)
-            g.fig.savefig(os.path.join(self.results_dir, "PCA.PC_pvalues.enrichr_enrichments.{}.svg".format(gene_set_library)), bbox_inches="tight", dpi=300)
+        #     pivot = pd.pivot_table(enr, index="description", columns="PC", values="p_value").fillna(1)
+        #     pivot.index = pivot.index.str.extract("(.*)[,\_\(].*", expand=False).str.replace("_Homo sapiens", "")
+        #     top_ids = top_ids.str.extract("(.*)[,\_\(].*", expand=False).str.replace("_Homo sapiens", "")
 
-            g = sns.clustermap(
-                -np.log10(pivot.ix[top_ids]),
-                cbar_kws={"label": "Enrichment: p-value z-score"}, col_cluster=True, z_score=0, figsize=(6, 15))
-            for tick in g.ax_heatmap.get_xticklabels():
-                tick.set_rotation(90)
-            for tick in g.ax_heatmap.get_yticklabels():
-                tick.set_rotation(0)
-            g.fig.savefig(os.path.join(self.results_dir, "PCA.PC_pvalues.enrichr_enrichments.{}.z_score.svg".format(gene_set_library)), bbox_inches="tight", dpi=300)
+        #     g = sns.clustermap(
+        #         -np.log10(pivot.ix[top_ids]), cmap='BuGn',
+        #         cbar_kws={"label": "Enrichment: -log10(p-value)"}, col_cluster=True, figsize=(6, 15))
+        #     for tick in g.ax_heatmap.get_xticklabels():
+        #         tick.set_rotation(90)
+        #     for tick in g.ax_heatmap.get_yticklabels():
+        #         tick.set_rotation(0)
+        #     g.fig.savefig(os.path.join(self.results_dir, "PCA.PC_pvalues.enrichr_enrichments.{}.svg".format(gene_set_library)), bbox_inches="tight", dpi=300)
+
+        #     g = sns.clustermap(
+        #         -np.log10(pivot.ix[top_ids]),
+        #         cbar_kws={"label": "Enrichment: p-value z-score"}, col_cluster=True, z_score=0, figsize=(6, 15))
+        #     for tick in g.ax_heatmap.get_xticklabels():
+        #         tick.set_rotation(90)
+        #     for tick in g.ax_heatmap.get_yticklabels():
+        #         tick.set_rotation(0)
+        #     g.fig.savefig(os.path.join(self.results_dir, "PCA.PC_pvalues.enrichr_enrichments.{}.z_score.svg".format(gene_set_library)), bbox_inches="tight", dpi=300)
 
 
 def characterize_regions_structure(analysis, df, prefix, output_dir, universe_df=None):
@@ -1676,24 +1675,26 @@ def characterize_regions_function(analysis, df, output_dir, prefix, universe_fil
     df[['chrom', 'start', 'end']].reset_index().to_csv(tsv_file, sep="\t", header=False, index=False)
 
     # export gene names
-    (df['gene_name']
-    .str.split(",")
-    .apply(pd.Series, 1)
-    .stack()
-    .drop_duplicates()
-    .to_csv(
-        os.path.join(output_dir, "{}_genes.symbols.txt".format(prefix)),
-        index=False))
-    if "ensembl_gene_id" in df.columns:
-        # export ensembl gene names
-        (df['ensembl_gene_id']
+    (
+        df['gene_name']
         .str.split(",")
         .apply(pd.Series, 1)
         .stack()
         .drop_duplicates()
         .to_csv(
-            os.path.join(output_dir, "{}_genes.ensembl.txt".format(prefix)),
+            os.path.join(output_dir, "{}_genes.symbols.txt".format(prefix)),
             index=False))
+    if "ensembl_gene_id" in df.columns:
+        # export ensembl gene names
+        (
+            df['ensembl_gene_id']
+            .str.split(",")
+            .apply(pd.Series, 1)
+            .stack()
+            .drop_duplicates()
+            .to_csv(
+                os.path.join(output_dir, "{}_genes.ensembl.txt".format(prefix)),
+                index=False))
 
     # export gene symbols with scaled absolute fold change
     if "log2FoldChange" in df.columns:
@@ -1982,7 +1983,10 @@ def investigate_nucleosome_positions(self, samples, cluster=True):
 
         # All accessible sites - that are distal
         out = os.path.join(self.results_dir, "nucleoatac", "distal_sites.bed")
-        center_window(self.sites.intersect(pybedtools.BedTool(promoter_sites), v=True, wa=True)).to_dataframe()[['chrom', 'start', 'end']].to_csv(out, index=False, header=None, sep="\t")
+        (
+            center_window(
+                self.sites.intersect(pybedtools.BedTool(promoter_sites), v=True, wa=True))
+            .to_dataframe()[['chrom', 'start', 'end']].to_csv(out, index=False, header=None, sep="\t"))
         regions["distal_sites"] = out
 
         # Differential sites
@@ -2605,8 +2609,6 @@ def footprint(
     and retry after `refresh_time` (seconds).
     """
     import os
-    import pybedtools
-    import pandas as pd
     import subprocess
     import time
     import textwrap
@@ -2675,7 +2677,7 @@ def tfbs_to_gene(
         bed_file,
         tss_file="data/external/ensembl.tss.bed",
         promoter_and_genesbody_file="data/external/ensembl.promoter_and_genesbody.bed"
-    ):
+        ):
     """
     Assign a TF binding site (output of PIQ footprinting) to a gene.
     TFBS are assigned to a gene if they overlap with their promoter or genebody,
@@ -2893,7 +2895,6 @@ def differential_interactions(
     Compare TF-gene interactions between two sets of groups (e.g. KO and WT)
     and visualize differences.
     """
-    import re
     from scipy.stats import mannwhitneyu
     from statsmodels.sandbox.stats.multicomp import multipletests
 

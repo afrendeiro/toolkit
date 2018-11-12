@@ -4,7 +4,6 @@ import os
 
 import numpy as np
 import pandas as pd
-from tqdm import tqdm
 
 from . import _LOGGER
 
@@ -239,7 +238,7 @@ class Analysis(object):
         :param bool save: Whether to write normalized DataFrame to disk.
         :param bool assign: Whether to assign the normalized DataFrame to an attribute ``.
         :var pd.DataFrame {accessibility,binding,expression}: A pandas DataFrame with
-        MultiIndex column index containing the sample's attributes specified. 
+        MultiIndex column index containing the sample's attributes specified.
         :returns pd.DataFrame: Annotated dataframe with requested sample attributes.
         """
         if attributes is None:
@@ -467,7 +466,6 @@ def unsupervised_analysis(
     from sklearn.decomposition import PCA
     from sklearn import manifold
     from collections import OrderedDict
-    import re
     import itertools
     from scipy.stats import kruskal
     from scipy.stats import pearsonr
@@ -541,12 +539,15 @@ def unsupervised_analysis(
         g = sns.clustermap(
             # yticklabels=sample_display_names,
             X.astype(float).corr(method), xticklabels=False, yticklabels=True, annot=display_corr_values,
-            cmap="Spectral_r", figsize=(0.2 * X.shape[1], 0.2 * X.shape[1]), cbar_kws={"label": "{} correlation".format(method.capitalize())},
+            cmap="Spectral_r", figsize=(0.2 * X.shape[1], 0.2 * X.shape[1]),
+            cbar_kws={"label": "{} correlation".format(method.capitalize())},
             row_colors=color_dataframe.T, col_colors=color_dataframe.T)
         g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize='xx-small')
         g.ax_heatmap.set_xlabel(None, visible=False)
         g.ax_heatmap.set_ylabel(None, visible=False)
-        g.fig.savefig(os.path.join(output_dir, "{}.{}.{}_correlation.clustermap.svg".format(analysis.name, plot_prefix, method)), bbox_inches='tight', dpi=dpi)
+        g.fig.savefig(os.path.join(
+            output_dir, "{}.{}.{}_correlation.clustermap.svg"
+            .format(analysis.name, plot_prefix, method)), bbox_inches='tight', dpi=dpi)
 
 
     # Manifolds
@@ -575,7 +576,8 @@ def unsupervised_analysis(
                 axis[i].scatter(
                     xx.loc[sample['sample_name'], 0],
                     xx.loc[sample['sample_name'], 1],
-                    s=50, color=color_dataframe.loc[attr, sample['sample_name']], alpha=0.75, label=label, rasterized=rasterized)
+                    s=50, color=color_dataframe.loc[attr, sample['sample_name']],
+                    alpha=0.75, label=label, rasterized=rasterized)
 
             # Plot groups
             if plot_group_centroids:
@@ -589,7 +591,8 @@ def unsupervised_analysis(
                     axis[i].scatter(
                         xx2.loc[group, 0],
                         xx2.loc[group, 1],
-                        marker="s", s=50, color=cd.loc[group].squeeze(), alpha=0.95, label=group, rasterized=rasterized)
+                        marker="s", s=50, color=cd.loc[group].squeeze(),
+                        alpha=0.95, label=group, rasterized=rasterized)
                     axis[i].text(
                         xx2.loc[group, 0],
                         xx2.loc[group, 1], group,
@@ -613,7 +616,9 @@ def unsupervised_analysis(
                 if any([type(c) in [str, unicode] for c in by_label.keys()]) and len(by_label) <= 20:
                     # if not any([re.match("^\d", c) for c in by_label.keys()]):
                     axis[i].legend(by_label.values(), by_label.keys())
-        fig.savefig(os.path.join(output_dir, "{}.{}.{}.svg".format(analysis.name, plot_prefix, algo.lower())), bbox_inches='tight', dpi=dpi)
+        fig.savefig(os.path.join(
+            output_dir, "{}.{}.{}.svg"
+            .format(analysis.name, plot_prefix, algo.lower())), bbox_inches='tight', dpi=dpi)
 
 
     # PCA
@@ -632,7 +637,9 @@ def unsupervised_analysis(
     axis.set_xlabel("PC")
     axis.set_ylabel("% variance")
     sns.despine(fig)
-    fig.savefig(os.path.join(output_dir, "{}.{}.pca.explained_variance.svg".format(analysis.name, plot_prefix)), bbox_inches='tight', dpi=dpi)
+    fig.savefig(os.path.join(
+        output_dir, "{}.{}.pca.explained_variance.svg"
+                    .format(analysis.name, plot_prefix)), bbox_inches='tight', dpi=dpi)
 
     # Write % variance expained to disk
     pd.Series((pca.explained_variance_ / pca.explained_variance_.sum()) * 100, name="PC").to_csv(
@@ -654,7 +661,8 @@ def unsupervised_analysis(
                 axis[pc, i].scatter(
                     xx.loc[sample['sample_name'], pc],
                     xx.loc[sample['sample_name'], pc + 1],
-                    s=30, color=color_dataframe.loc[attr, sample['sample_name']], alpha=0.75, label=label, rasterized=rasterized)
+                    s=30, color=color_dataframe.loc[attr, sample['sample_name']],
+                    alpha=0.75, label=label, rasterized=rasterized)
 
             # Plot groups
             if plot_group_centroids:
@@ -668,7 +676,8 @@ def unsupervised_analysis(
                     axis[pc, i].scatter(
                         xx2.loc[group, pc],
                         xx2.loc[group, pc + 1],
-                        marker="s", s=50, color=cd.loc[group].squeeze(), alpha=0.95, label=group, rasterized=rasterized)
+                        marker="s", s=50, color=cd.loc[group].squeeze(),
+                        alpha=0.95, label=group, rasterized=rasterized)
                     axis[pc, i].text(
                         xx2.loc[group, pc],
                         xx2.loc[group, pc + 1], group,
@@ -748,22 +757,38 @@ def unsupervised_analysis(
     associations = pd.DataFrame(associations, columns=["pc", "attribute", "variable_type", "group_1", "group_2", "p_value"])
 
     # write
-    associations.to_csv(os.path.join(output_dir, "{}.{}.pca.variable_principle_components_association.csv".format(analysis.name, plot_prefix)), index=False)
+    associations.to_csv(os.path.join(
+        output_dir, "{}.{}.pca.variable_principle_components_association.csv"
+                    .format(analysis.name, plot_prefix)), index=False)
 
     # Plot
     # associations[associations['p_value'] < 0.05].drop(['group_1', 'group_2'], axis=1).drop_duplicates()
     # associations.drop(['group_1', 'group_2'], axis=1).drop_duplicates().pivot(index="pc", columns="attribute", values="p_value")
-    pivot = associations.groupby(["pc", "attribute"]).min()['p_value'].reset_index().pivot(index="pc", columns="attribute", values="p_value").dropna(axis=1)
+    pivot = (
+        associations
+        .groupby(["pc", "attribute"])
+        .min()['p_value']
+        .reset_index()
+        .pivot(index="pc", columns="attribute", values="p_value")
+        .dropna(axis=1))
 
     # heatmap of -log p-values
-    g = sns.clustermap(-np.log10(pivot), row_cluster=False, annot=True, cbar_kws={"label": "-log10(p_value) of association"}, square=True, rasterized=rasterized)
+    g = sns.clustermap(
+        -np.log10(pivot), row_cluster=False,
+        annot=True, cbar_kws={"label": "-log10(p_value) of association"}, square=True, rasterized=rasterized)
     g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=45, ha="right")
-    g.fig.savefig(os.path.join(output_dir, "{}.{}.pca.variable_principle_components_association.svg".format(analysis.name, plot_prefix)), bbox_inches="tight", dpi=dpi)
+    g.fig.savefig(os.path.join(
+        output_dir, "{}.{}.pca.variable_principle_components_association.svg"
+                    .format(analysis.name, plot_prefix)), bbox_inches="tight", dpi=dpi)
 
     # heatmap of masked significant
-    g = sns.clustermap((pivot < 0.05).astype(int), row_cluster=False, cbar_kws={"label": "significant association"}, square=True, rasterized=rasterized)
+    g = sns.clustermap(
+        (pivot < 0.05).astype(int),
+        row_cluster=False, cbar_kws={"label": "significant association"}, square=True, rasterized=rasterized)
     g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=45, ha="right")
-    g.fig.savefig(os.path.join(output_dir, "{}.{}.pca.variable_principle_components_association.masked.svg".format(analysis.name, plot_prefix)), bbox_inches="tight", dpi=dpi)
+    g.fig.savefig(os.path.join(
+        output_dir, "{}.{}.pca.variable_principle_components_association.masked.svg"
+                    .format(analysis.name, plot_prefix)), bbox_inches="tight", dpi=dpi)
 
 
 def deseq_analysis(
@@ -1030,6 +1055,7 @@ def differential_from_bivariate_fit(
     from scipy.stats import gaussian_kde
     from statsmodels.sandbox.stats.multicomp import multipletests
     import matplotlib.pyplot as plt
+    import seaborn as sns
 
     comparisons = comparison_table['comparison_name'].drop_duplicates().sort_values()
     if plot:
@@ -1106,15 +1132,19 @@ def differential_from_bivariate_fit(
 
         if plot:
             axis[0, i].scatter(res["comparison_mean"],
-                               res["log2FoldChange"], alpha=0.2, s=5, color=sns.color_palette(palette)[0], rasterized=True)
+                               res["log2FoldChange"],
+                               alpha=0.2, s=5, color=sns.color_palette(palette)[0], rasterized=True)
             axis[0, i].axhline(0, color="black", linestyle="--")
             axis[1, i].scatter(res["comparison_mean"],
-                               res["norm_log2FoldChange"], alpha=0.2, s=5, color=sns.color_palette(palette)[0], rasterized=True)
+                               res["norm_log2FoldChange"],
+                               alpha=0.2, s=5, color=sns.color_palette(palette)[0], rasterized=True)
             diff = res.loc[(res['pvalue'] < 0.05) & (res['norm_log2FoldChange'].abs() >= 2), :].index
             axis[0, i].scatter(res.loc[diff, "comparison_mean"],
-                               res.loc[diff, "log2FoldChange"], alpha=0.2, s=5, color=sns.color_palette(palette)[1], rasterized=True)
+                               res.loc[diff, "log2FoldChange"],
+                               alpha=0.2, s=5, color=sns.color_palette(palette)[1], rasterized=True)
             axis[1, i].scatter(res.loc[diff, "comparison_mean"],
-                               res.loc[diff, "norm_log2FoldChange"], alpha=0.2, s=5, color=sns.color_palette(palette)[1], rasterized=True)
+                               res.loc[diff, "norm_log2FoldChange"],
+                               alpha=0.2, s=5, color=sns.color_palette(palette)[1], rasterized=True)
             axis[1, i].axhline(0, color="black", linestyle="--")
             axis[0, i].set_title(comparison + "\n" + ga + " vs " + gb)
             axis[1, i].set_xlabel("Comparison mean")
@@ -1593,7 +1623,7 @@ def differential_overlap(
 
         norm = matplotlib.colors.Normalize(vmin=0, vmax=piv_disagree.max().max())
         cmap = plt.get_cmap("Greens")
-        log_norm = matplotlib.colors.Normalize(vmin=np.log2(1 + piv_disagree).min().min(), vmax=np.log2(1 + piv_disagree).max().max())
+        # log_norm = matplotlib.colors.Normalize(vmin=np.log2(1 + piv_disagree).min().min(), vmax=np.log2(1 + piv_disagree).max().max())
         for j, g2 in enumerate(piv_disagree.index):
             for i, g1 in enumerate(piv_disagree.columns):
                 # print(len(piv_disagree.index) - (j + 0.5), len(piv_disagree.index) - (i + 0.5))
@@ -2008,7 +2038,7 @@ def plot_differential(
             n = groups.isnull().sum().sum()
             if n > 0:
                 _LOGGER.warn(
-                    "{} {} (across all comparisons) were not found in quantification matrix!".format(n, var_name)
+                    "{} {} (across all comparisons) were not found in quantification matrix!".format(n, var_name) +
                     " Proceeding without those.")
                 groups = groups.dropna()
 
@@ -2104,7 +2134,7 @@ def plot_differential(
     n = matrix2.isnull().sum().sum()
     if n > 0:
         _LOGGER.warn(
-            "WARNING! {} {} (across all comparisons) were not found in quantification matrix!".format(n, var_name)
+            "WARNING! {} {} (across all comparisons) were not found in quantification matrix!".format(n, var_name) +
             " Proceeding without those.")
         matrix2 = matrix2.dropna()
     figsize = (max(5, 0.12 * matrix2.shape[1]), 5)
@@ -2676,7 +2706,7 @@ def differential_enrichment(
             comparison_df = matrix.loc[diff, :]
             if comparison_df.shape != comparison_df.dropna().shape:
                 _LOGGER.warn(
-                    "There are differential regions which are not in the set of annotated regions for comparison '{}'!".format(comp)
+                    "There are differential regions which are not in the set of annotated regions for comparison '{}'!".format(comp) +
                     " Continuing enrichment without those.")
                 comparison_df = comparison_df.dropna()
 
@@ -2719,7 +2749,7 @@ def differential_enrichment(
                     lola = pd.read_csv(os.path.join(comparison_dir, "allEnrichments.tsv"), sep="\t")
                     enr = pd.read_csv(os.path.join(comparison_dir, output_prefix + "_regions.enrichr.csv"), index=False, encoding='utf-8')
                     # label
-                    for d in [lola, enr, motifs]:
+                    for d in [meme_motifs, homer_motifs, lola, enr]:
                         d["comparison_name"] = comp
                         d["direction"] = direction
                         d["label"] = "{}.{}".format(comp, direction)
@@ -2777,7 +2807,6 @@ def collect_differential_enrichment(
     :type permissive: bool, optional
     """
     import pandas as pd
-    import numpy as np
     from ngs_toolkit.general import parse_ame, parse_homer
     from tqdm import tqdm
 
@@ -3359,7 +3388,7 @@ def plot_differential_enrichment(
             axis = axis.flatten()
             # normalize color across comparisons
             d = enrichment_table.loc[(enrichment_table["gene_set_library"] == gene_set_library), "combined_score"].describe()
-            norm = matplotlib.colors.Normalize(vmin=d['min'],vmax=d['max'])
+            norm = matplotlib.colors.Normalize(vmin=d['min'], vmax=d['max'])
             for i, comparison in enumerate(enrichment_table[comp_variable].unique()):
                 enr = enrichment_table[
                         (enrichment_table["gene_set_library"] == gene_set_library) &
@@ -3564,6 +3593,7 @@ def sorted_nicely(l):
     :returns: Sorted interable
     :rtype: list
     """
+    import re
     convert = lambda text: int(text) if text.isdigit() else text
     alphanum_key = lambda key: [convert(c) for c in re.split('([0-9]+)', key)]
     return sorted(l, key=alphanum_key)
@@ -3604,7 +3634,7 @@ def timedelta_to_years(x):
     Convert a timedelta to years.
 
     :param x: A timedelta.
-    :type x: 
+    :type x:
     :returns: [description]
     :rtype: {[type]}
     """
@@ -3818,7 +3848,10 @@ def sra_id2geo_id(sra_ids):
     """Query SRA ID from GEO ID"""
     import subprocess
 
-    cmd = """esearch -db sra -query {} | efetch -format docsum | xtract -pattern DocumentSummary -element Runs |  perl -ne '@mt = ($_ =~ /SRR\d+/g); print "@mt"'"""
+    cmd = "esearch -db sra -query {}"
+    cmd += " | efetch -format docsum"
+    cmd += " | xtract -pattern DocumentSummary -element Runs"
+    cmd += """ |  perl -ne '@mt = ($_ =~ /SRR\\d+/g); print "@mt"'"""
 
     geo_ids = list()
     for id in sra_ids:
@@ -4186,10 +4219,10 @@ def rename_sample_files(
         cmds.append("mv {} {}".format(
             os.path.join(results_dir, o), os.path.join(results_dir, t)))
         # further directories
-        cmds.append("find {} -type d -exec rename {} {} {{}} \;".format(
+        cmds.append("find {} -type d -exec rename {} {} {{}} \\;".format(
             os.path.join(results_dir, t), o, t))
         # files
-        cmds.append("find {} -type f -exec rename {} {} {{}} \;".format(
+        cmds.append("find {} -type f -exec rename {} {} {{}} \\;".format(
             os.path.join(results_dir, t), o, t))
 
     # 2) move to new name
@@ -4203,10 +4236,10 @@ def rename_sample_files(
         cmds.append("mv {} {}".format(
             os.path.join(results_dir, t), os.path.join(results_dir, n)))
         # further directories
-        cmds.append("find {} -type d -exec rename {} {} {{}} \;".format(
+        cmds.append("find {} -type d -exec rename {} {} {{}} \\;".format(
             os.path.join(results_dir, n), t, n))
         # files
-        cmds.append("find {} -type f -exec rename {} {} {{}} \;".format(
+        cmds.append("find {} -type f -exec rename {} {} {{}} \\;".format(
             os.path.join(results_dir, n), t, n))
 
     if dry_run:
@@ -4289,7 +4322,6 @@ def subtract_principal_component(
     # plot
     if plot:
         import matplotlib.pyplot as plt
-        import seaborn as sns
         X2_hat = pca.fit_transform(X2)
         fig, axis = plt.subplots(pcs_to_plot, 2, figsize=(4 * 2, 4 * pcs_to_plot))
         for pc in range(pcs_to_plot):

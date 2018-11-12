@@ -1,12 +1,11 @@
 
 import os
-from ngs_toolkit.general import Analysis, pickle_me
+from ngs_toolkit.general import Analysis
 from collections import Counter
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import pybedtools
 import seaborn as sns
 
 from . import _LOGGER
@@ -259,8 +258,8 @@ class RNASeqAnalysis(Analysis):
 
         self.matrix_qnorm_log = np.log2((pseudocount + self.matrix_qnorm) / self.matrix_qnorm.sum(axis=0) * 1e6)
         self.matrix_qnorm_log.to_csv(
-            os.path.join(self.results_dir,
-            self.name + ".expression_{}.transcript_level.quantile_normalized.log2_tpm.csv").format(expression_type, index=False))
+            os.path.join(self.results_dir, self.name +
+                         ".expression_{}.transcript_level.quantile_normalized.log2_tpm.csv").format(expression_type, index=False))
 
         # Reduce to gene-level measurements by max of transcripts
         self.expression_matrix_counts = self.count_matrix.groupby("gene_name").max()
@@ -441,7 +440,8 @@ def knockout_plot(
     v = np.absolute(scipy.stats.zscore(ko, axis=1)).flatten().max()
     v += (v / 10.)
 
-    g = sns.clustermap(ko, cbar_kws={"label": "Expression"}, robust=True,
+    g = sns.clustermap(
+        ko, cbar_kws={"label": "Expression"}, robust=True,
         xticklabels=True, yticklabels=True, square=square)
     g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90)
     g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0)
@@ -455,7 +455,8 @@ def knockout_plot(
     g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0)
     g.savefig(os.path.join(output_dir, output_prefix + ".z_score.svg"), bbox_inches="tight")
 
-    g = sns.clustermap(ko, cbar_kws={"label": "Expression"}, row_cluster=False, col_cluster=False, robust=True,
+    g = sns.clustermap(
+        ko, cbar_kws={"label": "Expression"}, row_cluster=False, col_cluster=False, robust=True,
         xticklabels=True, yticklabels=True, square=square)
     g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90)
     g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0)
@@ -486,7 +487,8 @@ def knockout_plot(
     v = np.absolute(scipy.stats.zscore(p_table, axis=1)).flatten().max()
     v += (v / 10.)
 
-    g = sns.clustermap(p_table, cbar_kws={"label": "-log10(FDR p-value)"},
+    g = sns.clustermap(
+        p_table, cbar_kws={"label": "-log10(FDR p-value)"},
         xticklabels=True, yticklabels=True, square=square)
     g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90)
     g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0)
@@ -500,7 +502,8 @@ def knockout_plot(
     g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0)
     g.savefig(os.path.join(output_dir, output_prefix + ".p_value.z_score.svg"), bbox_inches="tight")
 
-    g = sns.clustermap(p_table, cbar_kws={"label": "-log10(FDR p-value)"}, row_cluster=False, col_cluster=False,
+    g = sns.clustermap(
+        p_table, cbar_kws={"label": "-log10(FDR p-value)"}, row_cluster=False, col_cluster=False,
         xticklabels=True, yticklabels=True, square=square)
     g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90)
     g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0)
@@ -514,14 +517,13 @@ def knockout_plot(
     g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0)
     g.savefig(os.path.join(output_dir, output_prefix + ".p_value.z_score.sorted.svg"), bbox_inches="tight")
 
-    g = sns.clustermap(p_table, cbar_kws={"label": "-log10(FDR p-value)"},
+    g = sns.clustermap(
+        p_table, cbar_kws={"label": "-log10(FDR p-value)"},
         row_cluster=False, col_cluster=False,
         xticklabels=True, yticklabels=True, square=square, vmax=1.3 * 5)
     g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90)
     g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0)
     g.savefig(os.path.join(output_dir, output_prefix + ".p_value.thresholded.svg"), bbox_inches="tight")
-
-
 
     # logfoldchanges
     fc_table = pd.pivot_table(
@@ -534,19 +536,22 @@ def knockout_plot(
     v = np.absolute(scipy.stats.zscore(fc_table, axis=1)).flatten().max()
     v += (v / 10.)
 
-    g = sns.clustermap(fc_table, center=0, cmap="RdBu_r", cbar_kws={"label": "log2(fold-change)"},
+    g = sns.clustermap(
+        fc_table, center=0, cmap="RdBu_r", cbar_kws={"label": "log2(fold-change)"},
         xticklabels=True, yticklabels=True, square=square)
     g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90)
     g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0)
     g.savefig(os.path.join(output_dir, output_prefix + ".log_fc.svg"), bbox_inches="tight")
 
-    g = sns.clustermap(fc_table, center=0, cmap="RdBu_r", cbar_kws={"label": "log2(fold-change)"}, row_cluster=False, col_cluster=False,
+    g = sns.clustermap(
+        fc_table, center=0, cmap="RdBu_r", cbar_kws={"label": "log2(fold-change)"}, row_cluster=False, col_cluster=False,
         xticklabels=True, yticklabels=True, square=square)
     g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90)
     g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0)
     g.savefig(os.path.join(output_dir, output_prefix + ".log_fc.sorted.svg"), bbox_inches="tight")
 
-    g = sns.clustermap(fc_table, center=0, vmin=-2, vmax=2, cmap="RdBu_r", cbar_kws={"label": "log2(fold-change)"}, row_cluster=False, col_cluster=False,
+    g = sns.clustermap(
+        fc_table, center=0, vmin=-2, vmax=2, cmap="RdBu_r", cbar_kws={"label": "log2(fold-change)"}, row_cluster=False, col_cluster=False,
         xticklabels=True, yticklabels=True, square=square)
     g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90)
     g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0)

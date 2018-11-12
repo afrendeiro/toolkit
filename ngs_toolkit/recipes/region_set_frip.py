@@ -1,15 +1,13 @@
 #!/usr/bin/env python
 
 """
-This is the main script of the region_set_frip recipe.
+This is the "region_set_frip" recipe for ngs_toolkit.
 """
 
 
 from argparse import ArgumentParser
 import os
 import sys
-
-import pandas as pd
 
 from peppy import Project
 from ngs_toolkit.atacseq import ATACSeqAnalysis

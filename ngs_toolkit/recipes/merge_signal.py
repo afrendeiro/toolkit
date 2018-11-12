@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-This is the main script of the merge_signal recipe.
+This is the "merge_signal" recipe for ngs_toolkit.
 """
 
 

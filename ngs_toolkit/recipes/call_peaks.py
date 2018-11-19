@@ -58,6 +58,12 @@ def add_args(parser):
         help="Whether only comparisons with 'toggle' value of '1' "
         "in the should be performed.")
     parser.add_argument(
+        "-qc", "--pass-qc",
+        action="store_true",
+        dest="pass_qc",
+        help="Whether only samples with a 'pass_qc' attribute should be included."
+        " Default is False.")
+    parser.add_argument(
         "-j", "--as-jobs",
         action="store_true",
         dest="as_job",
@@ -146,12 +152,16 @@ def main():
             raise ValueError("There were no valid samples for this analysis type!")
 
         print("Initializing ChIP-seq analysis")
+        if hasattr(prj, "project_name"):
+            name = prj.project_name
+        else:
+            name = os.path.basename(os.path.abspath(os.curdir))
         analysis = ChIPSeqAnalysis(
-            name=args.name + "_chipseq", prj=prj,
+            name=name + "_chipseq", prj=prj,
             samples=samples, results_dir=args.results_dir)
 
         # Call peaks
-        analysis.call_peaks_from_comparisons(comparison_table)
+        analysis.call_peaks_from_comparisons(comparison_table, as_jobs=args.as_jobs)
 
         # # Get summary of peak calls
         # peak_counts = analysis.summarize_peaks_from_comparisons(comparison_table)

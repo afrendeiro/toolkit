@@ -37,7 +37,9 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
 
         self.data_type = "ChIP-seq"
 
-    def call_peaks_from_comparisons(self, comparison_table, output_dir="{results_dir}/chipseq_peaks", permissive=True, overwrite=True):
+    def call_peaks_from_comparisons(
+            self, comparison_table, output_dir="{results_dir}/chipseq_peaks",
+            permissive=True, overwrite=True, as_jobs=True):
         """
         Call peaks for ChIP-seq samples using an annotation of which samples belong in each comparison and which
         samples represent signal or background.
@@ -99,20 +101,26 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
                 comparison, [s.name for s in signal_samples], [s.name for s in control_samples]
             ))
             # Call peaks
+            cmds = list()
             if overwrite:
-                macs2_call_chipseq_peak_job(
-                    signal_samples, control_samples, output_dir=output_dir, name=comparison)
-                homer_call_chipseq_peak_job(
-                    signal_samples, control_samples, output_dir=output_dir, name=comparison)
+                cmds += [macs2_call_chipseq_peak(
+                    signal_samples, control_samples, output_dir=output_dir, name=comparison, as_job=as_jobs)]
+                cmds += [homer_call_chipseq_peak_job(
+                    signal_samples, control_samples, output_dir=output_dir, name=comparison, as_job=as_jobs)]
             else:
                 if not os.path.exists(os.path.join(output_dir, comparison, comparison + "_peaks.narrowPeak")):
-                    macs2_call_chipseq_peak_job(
-                        signal_samples, control_samples, output_dir=output_dir, name=comparison)
+                    cmds += [macs2_call_chipseq_peak(
+                        signal_samples, control_samples, output_dir=output_dir, name=comparison, as_job=as_jobs)]
                 if not os.path.exists(os.path.join(output_dir, comparison, comparison + "_homer_peaks.narrowPeak")):
-                    homer_call_chipseq_peak_job(
-                        signal_samples, control_samples, output_dir=output_dir, name=comparison)
+                    cmds += [homer_call_chipseq_peak_job(
+                        signal_samples, control_samples, output_dir=output_dir, name=comparison, as_job=as_jobs)]
                 else:
                     _LOGGER.warn("Peak files for comparison '{}' already exist. Skipping.".format(comparison))
+
+            if not as_jobs:
+                for cmd in cmds:
+                    _LOGGER.info("Calling peaks for comparison '{}' with command: '{}'.\n".format(comparison, cmd))
+                    os.system(cmd)
 
     def filter_peaks(self, comparison_table, filter_bed="blacklist.mm10_liftOver.bed", peaks_dir="{results_dir}/chipseq_peaks"):
         """
@@ -356,7 +364,46 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
         return self.support[[c for c in comparisons]].sum(1) != 0
 
 
-def macs2_call_chipseq_peak_job(signal_samples, control_samples, output_dir, name):
+def macs2_call_chipseq_peak(signal_samples, control_samples, output_dir, name, as_job=True):
+    """
+    Call ChIP-seq peaks with MACS2 in a slurm job.
+
+    :param list signal_samples: Signal Sample objects.
+    :param list control_samples: Background Sample objects.
+    :param list output_dir: Parent directory where MACS2 outputs will be stored.
+    :param str name: Name of the MACS2 comparison being performed.
+    :param bool as_job: Whether to submit a SLURM job or to return a string with the runnable.
+    """
+    output_path = os.path.join(output_dir, name)
+    if not os.path.exists(output_path):
+        os.mkdir(output_path)
+
+    runnable = (
+        """macs2 callpeak -t {0} -c {1} -n {2} --outdir {3}"""
+        .format(
+            " ".join([s.filtered for s in signal_samples]),
+            " ".join([s.filtered for s in control_samples]), name, output_path))
+
+    if as_job:
+        from pypiper.ngstk import NGSTk
+        import textwrap
+        tk = NGSTk()
+        job_name = "macs2_{}".format(name)
+        cmd = tk.slurm_header(
+            job_name,
+            os.path.join(output_path, job_name + ".log"),
+            cpus_per_task=4)
+        cmd += "\t\t" + runnable
+        cmd += "\t\t" + tk.slurm_footer() + "\n"
+        job_file = os.path.join(output_path, name + ".macs2.sh")
+        with open(job_file, "w") as handle:
+            handle.write(textwrap.dedent(cmd))
+        tk.slurm_submit_job(job_file)
+    else:
+        return runnable
+
+
+def homer_call_chipseq_peak_job(signal_samples, control_samples, output_dir, name, as_job=True):
     """
     Call ChIP-seq peaks with MACS2 in a slurm job.
 
@@ -365,107 +412,43 @@ def macs2_call_chipseq_peak_job(signal_samples, control_samples, output_dir, nam
     :param list output_dir: Parent directory where MACS2 outputs will be stored.
     :param str name: Name of the MACS2 comparison being performed.
     """
-    from pypiper.ngstk import NGSTk
-    import textwrap
-
-    tk = NGSTk()
-
     output_path = os.path.join(output_dir, name)
-
     if not os.path.exists(output_path):
         os.mkdir(output_path)
 
-    job_name = "macs2_{}".format(name)
-
-    # Build job script
-    # slurm header
-    cmd = tk.slurm_header(
-        job_name,
-        os.path.join(output_path, job_name + ".log"),
-        cpus_per_task=4)
-
-    # load macs2
-    cmd += """
-\t\t/home/arendeiro/.local/bin/macs2 callpeak -t {0} -c {1} -n {2} --outdir {3}
-""".format(" ".join([s.filtered for s in signal_samples]), " ".join([s.filtered for s in control_samples]), name, output_path)
-
-    # Slurm footer
-    cmd += "\t\t" + tk.slurm_footer() + "\n"
-
-    # Write job to file
-    job_file = os.path.join(output_path, name + ".macs2.sh")
-    with open(job_file, "w") as handle:
-        handle.write(textwrap.dedent(cmd))
-
-    # Submit
-    tk.slurm_submit_job(job_file)
-
-
-def homer_call_chipseq_peak_job(signal_samples, control_samples, output_dir, name):
-    """
-    Call ChIP-seq peaks with MACS2 in a slurm job.
-
-    :param list signal_samples: Signal Sample objects.
-    :param list control_samples: Background Sample objects.
-    :param list output_dir: Parent directory where MACS2 outputs will be stored.
-    :param str name: Name of the MACS2 comparison being performed.
-    """
-    from pypiper.ngstk import NGSTk
-    import textwrap
-
-    tk = NGSTk()
-
-    output_path = os.path.join(output_dir, name)
-
-    if not os.path.exists(output_path):
-        os.mkdir(output_path)
-
-    job_name = "homer_findPeaks_{}".format(name)
-
-    # Build job script
-    # slurm header
-    cmd = tk.slurm_header(
-        job_name,
-        os.path.join(output_path, job_name + ".log"),
-        cpus_per_task=4)
-
-    # make tag directory for the signal samples
+    # make tag directory for the signal and background samples separately
     signal_tag_directory = os.path.join(output_dir, "homer_tag_dir_" + name + "_signal")
-    cmd += """
-\t\tmakeTagDirectory {0} {1}
-    """.format(signal_tag_directory, " ".join([s.filtered for s in signal_samples]))
-
-    # make tag directory for the background samples
+    fs = " ".join([s.filtered for s in signal_samples])
+    runnable = """makeTagDirectory {0} {1}\n""".format(signal_tag_directory, fs)
     background_tag_directory = os.path.join(output_dir, "homer_tag_dir_" + name + "_background")
-    cmd += """
-\t\tmakeTagDirectory {0} {1}
-    """.format(background_tag_directory, " ".join([s.filtered for s in control_samples]))
+    fs = " ".join([s.filtered for s in control_samples])
+    runnable += """makeTagDirectory {0} {1}\n""".format(background_tag_directory, fs)
 
     # call peaks
     output_file = os.path.join(output_dir, name, name + "_homer_peaks.factor.narrowPeak")
-    if not os.path.exists(os.path.join(output_dir, name)):
-        os.makedirs(os.path.join(output_dir, name))
-    cmd += """
-\t\tfindPeaks {signal} -style factor -o {output_file} -i {background}
-""".format(output_file=output_file, background=background_tag_directory, signal=signal_tag_directory)
-
+    runnable += """findPeaks {signal} -style factor -o {output_file} -i {background}\n""".format(
+        output_file=output_file, background=background_tag_directory, signal=signal_tag_directory)
     output_file = os.path.join(output_dir, name, name + "_homer_peaks.histone.narrowPeak")
-    if not os.path.exists(os.path.join(output_dir, name)):
-        os.makedirs(os.path.join(output_dir, name))
-    cmd += """
-\t\tfindPeaks {signal} -style histone -o {output_file} -i {background}
-""".format(output_file=output_file, background=background_tag_directory, signal=signal_tag_directory)
+    runnable += """findPeaks {signal} -style histone -o {output_file} -i {background}\n""".format(
+        output_file=output_file, background=background_tag_directory, signal=signal_tag_directory)
 
-    # Slurm footer
-    cmd += "\t\t" + tk.slurm_footer() + "\n"
-
-    # Write job to file
-    job_file = os.path.join(output_path, name + ".homer.sh")
-    with open(job_file, "w") as handle:
-        handle.write(textwrap.dedent(cmd))
-
-    # Submit
-    tk.slurm_submit_job(job_file)
+    if as_job:
+        from pypiper.ngstk import NGSTk
+        import textwrap
+        tk = NGSTk()
+        job_name = "homer_findPeaks_{}".format(name)
+        cmd = tk.slurm_header(
+            job_name,
+            os.path.join(output_path, job_name + ".log"),
+            cpus_per_task=4)
+        cmd += runnable.replace("\n", "\t\t\n")
+        cmd += "\t\t" + tk.slurm_footer() + "\n"
+        job_file = os.path.join(output_path, name + ".homer.sh")
+        with open(job_file, "w") as handle:
+            handle.write(textwrap.dedent(cmd))
+        tk.slurm_submit_job(job_file)
+    else:
+        return runnable
 
 
 def homer_peaks_to_bed(homer_peaks, output_bed):

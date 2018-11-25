@@ -1,9 +1,16 @@
 Changelog
 ******************************
 
-- **v0.1.4.3** (*2018-11-XX*):
+- **v0.1.5.1** (*2018-11-25*):
 
+  - add config file support for better system-independent operation (specially for enrichment analysis)
   - add logger through "logging" library
+  - add batch effect correction with limma
+  - add GREAT parser
+  - add colouring by p-value for plot_differential
+  - add set n. of PCs to calculate to PCA
+  - add better colorbars
+  - add serial processing of peak commands as option for ChIP-seq peak calling
 
 
 - **v0.1.4.2** (*2018-10-29*):

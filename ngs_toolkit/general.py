@@ -33,26 +33,26 @@ class Analysis(object):
     Generic class holding functions and data from a typical NGS analysis.
 
     Other modules implement classes inheriting from this that in general contain data type-specific
-    functions (e.g. `ngs_toolkit.atacseq.ATACSeqAnalysis` has a `get_consensus_sites` function to genrate a peak consensus map).
+    functions (e.g. ``ngs_toolkit.atacseq.ATACSeqAnalysis`` has a ``get_consensus_sites`` function to generate a peak consensus map).
 
     Objects of this type can be used to store data (e.g. dataframes), variables (e.g. paths to files or configurations) and are
     easily serializable (saved to a file as an object) for rapid loading and cross-environment portability.
-    See the `ngs_toolkit.general.Analysis.to_pickle`, `ngs_toolkit.general.Analysis.from_pickle` and `ngs_toolkit.general.Analysis.update` functions for this.
+    See the ``ngs_toolkit.general.Analysis.to_pickle``, ``ngs_toolkit.general.Analysis.from_pickle`` and ``ngs_toolkit.general.Analysis.update`` functions for this.
 
-    :param name: Name of the analysis. Defaults to "analysis".
+    :param name: Name of the analysis. Defaults to ``analysis``.
     :type name: str, optional
-    :param samples: List of `peppy.Sample` objects that this analysi is tied to. Defaults to None.
+    :param samples: List of ``peppy.Sample`` objects that this analysis is tied to. Defaults to ``None``.
     :type samples: list, optional
-    :param prj: A `peppy.Project` object that this analysis is tied to. Defaults to None.
+    :param prj: A ``peppy.Project`` object that this analysis is tied to. Defaults to ``None``.
     :type prj: peppy.Project, optional
     :param data_dir: Directory containing processed data that will be input to the analysis.
-                     This is in principle not required. Defaults to "data".
+                     This is in principle not required. Defaults to ``data``.
     :type data_dir: str, optional
-    :param results_dir: Directory to contain outputs produced by the analysis. Defaults to "results".
+    :param results_dir: Directory to contain outputs produced by the analysis. Defaults to ``results``.
     :type results_dir: str, optional
     :param pickle_file: A pickle file to serialize the object. Defaults to "`name`.pickle".
     :type pickle_file: str, optional
-    :param from_pickle: Whether the analysis should be loaded from an existing serialized analysis object in `pickle_file`. Defaults to False.
+    :param from_pickle: Whether the analysis should be loaded from an existing serialized analysis object in ``pickle_file``. Defaults to False.
     :type from_pickle: bool, optional
 
     Additional keyword arguments will simply be stored as object attributes.
@@ -134,26 +134,26 @@ class Analysis(object):
         Get tuples of floats representing a colour for a sample in a given variable in a dataframe's index
         (particularly useful with MultiIndex dataframes).
 
-        By default, will act on the columns and its levels of an `matrix` dataframe of self. Other `index` and `levels` can
+        By default, will act on the columns and its levels of an `matrix` dataframe of self. Other ``index`` and ``levels`` can
         be passed for customization.
 
-        Will try to guess if each variable is categorical or numerical and return either colours from a colour `pallete`
-        or a `cmap`, respectively with null values set to `nan_color` (a 4-value tuple with floats).
+        Will try to guess if each variable is categorical or numerical and return either colours from a colour ``pallete``
+        or a ``cmap``, respectively with null values set to ``nan_color`` (a 4-value tuple of floats).
 
-        :param index: Pandas Index to use. If not provided (default == None), this will be the column Index of the provided `matrix`.
+        :param index: Pandas Index to use. If not provided (default == None), this will be the column Index of the provided ``matrix``.
         :type index: pandas.Index, optional
         :param matrix: Name of analysis attribute containing a dataframe with pandas.MultiIndex columns to use.
-                       Defaults to "accessibility".
+                       Defaults to ``accessibility``.
         :type matrix: str, optional
         :param levels: Levels of multiindex to restrict to. Defaults to all in index.
         :type levels: list, optional
         :param pallete: Name of matplotlib color palete to use with categorical levels.
-                        See matplotlib.org/examples/color/colormaps_reference.html. Defaults to "Paired".
+                        See matplotlib.org/examples/color/colormaps_reference.html. Defaults to ``Paired``.
         :type pallete: str, optional
         :param cmap: Name of matplotlib color palete to use with numerical levels.
-                     See matplotlib.org/examples/color/colormaps_reference.html. Defaults to "RdBu_r".
+                     See matplotlib.org/examples/color/colormaps_reference.html. Defaults to ``RdBu_r``.
         :type cmap: str, optional
-        :param nan_color: Color for missing (i.e. NA) values. Defaults to (0.662745, 0.662745, 0.662745, 0.5) == grey.
+        :param nan_color: Color for missing (i.e. NA) values. Defaults to ``(0.662745, 0.662745, 0.662745, 0.5)`` == ``grey``.
         :type nan_color: tuple, optional
         :param as_dataframe: Whether a dataframe should be return. Defaults to False. Not implemented yet.
         :type as_dataframe: bool, optional
@@ -226,20 +226,27 @@ class Analysis(object):
             save=True,
             assign=True):
         """
-        Annotate matrix (n_regions, n_samples) with sample metadata (creates MultiIndex on columns).
-        Numerical attributes can be pass as a iterable to `numerical_attributes` to be converted.
+        Annotate matrix ``(n_regions, n_samples)`` with sample metadata (creates MultiIndex on columns).
+        Numerical attributes can be pass as a iterable to ``numerical_attributes`` to be converted.
 
         :param str quant_matrix: Attribute name of matrix to annotate. By default this will
-        be infered from the analysis data_type in the following way:
-            ATAC-seq or ChIP-seq: 'coverage_annotated'; RNA-seq: 'expression_annotated'.
+                                 be infered from the analysis data_type in the following way:
+                                 ATAC-seq or ChIP-seq: ``coverage_annotated``;
+                                 RNA-seq: ``expression_annotated``.
         :param list attributes: Desired attributes to be annotated. This defaults
-        to all attributes in the original sample annotation sheet of the analysis Project.
+                                to all attributes in the original sample annotation sheet
+                                of the analysis Project.
         :param list numerical_attributes: Attributes which are numeric even though they
-        might be so in the samples' attributes. Will attempt to convert values to numeric.
+                                          might be so in the samples' attributes. Will attempt
+                                          to convert values to numeric.
         :param bool save: Whether to write normalized DataFrame to disk.
-        :param bool assign: Whether to assign the normalized DataFrame to an attribute ``.
+        :param bool assign: Whether to assign the normalized DataFrame to an attribute
+                            ``accessibility`` if ``data_type`` is "ATAC-seq,
+                            ``binding`` if ``data_type`` is "ChIP-seq, or
+                            ``expression`` if ``data_type`` is "RNA-seq.
         :var pd.DataFrame {accessibility,binding,expression}: A pandas DataFrame with
-        MultiIndex column index containing the sample's attributes specified.
+                                                              MultiIndex column index
+                                                              containing the sample's attributes specified.
         :returns pd.DataFrame: Annotated dataframe with requested sample attributes.
         """
         if attributes is None:
@@ -305,11 +312,11 @@ class Analysis(object):
 def count_reads_in_intervals(bam, intervals):
     """
     Count total number of reads in a iterable holding strings
-    representing genomic intervals of the type chrom:start-end.
+    representing genomic intervals of the form ``"chrom:start-end"``.
 
     :param bam: BAM file.
     :type bam: str
-    :param intervals: List of strings with genomic coordinates in format "chrom:start-end".
+    :param intervals: List of strings with genomic coordinates in format ``"chrom:start-end"``.
     :type intervals: list
     :returns: Dict of read counts for each interval.
     :rtype: dict
@@ -335,11 +342,9 @@ def normalize_quantiles_r(array):
     Quantile normalization with a R implementation.
     Requires the "rpy2" library and the R library "preprocessCore".
 
-    Install in following way:
-    # install package
-    # R
-    # source('http://bioconductor.org/biocLite.R')
-    # biocLite('preprocessCore')
+    Requires the R package "cqn" to be installed:
+        >>> source('http://bioconductor.org/biocLite.R')
+        >>> biocLite('preprocessCore')
 
     :param array: Numeric array to normalize.
     :type array: numpy.array

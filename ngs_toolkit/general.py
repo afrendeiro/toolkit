@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 
 from . import _LOGGER
+from . import _CONFIG
 
 
 def pickle_me(function):
@@ -359,7 +360,6 @@ def normalize_quantiles_p(df_input):
     """
     Quantile normalization with a ure Python implementation.
     Code from https://github.com/ShawnLYU/Quantile_Normalize.
-    Not fully reviewed, use at own risk!
 
     :param df_input: Dataframe to normalize.
     :type df_input: pandas.DataFrame
@@ -458,7 +458,7 @@ def unsupervised_analysis(
     :type rasterized: bool, optional
     :param dpi: Definition of rasterized image in dots per inch. Defaults to 300dpi.
     :type dpi: number, optional
-    :param output_dir: Directory for generated files and plots. Defaults to "{results_dir}/unsupervised".
+    :param output_dir: Directory for generated files and plots. Defaults to "{results_dir}/unsupervised_analysis_{data_type}".
     :type output_dir: str, optional
     :returns: None
     """
@@ -486,7 +486,7 @@ def unsupervised_analysis(
         if plot_prefix is None:
             plot_prefix = "all_genes"
         if quant_matrix is None:
-            quant_matrix = "expression_annotated"
+            quant_matrix = "expression"
     elif data_type == "CNV":
         if plot_prefix is None:
             plot_prefix = "all_bins"
@@ -559,8 +559,12 @@ def unsupervised_analysis(
         "TSNE": {'init': 'pca'},
     }
     for algo in manifold_algorithms:
-        mds = getattr(manifold, algo)(**params[algo])
-        x_new = mds.fit_transform(X.T)
+        if (algo in ["Isomap", "LocallyLinearEmbedding"]) and (len(samples) <= 5):
+            _LOGGER.warn("Number of samples is too small to perform '{}'".format(algo))
+            continue
+
+        manif = getattr(manifold, algo)(**params[algo])
+        x_new = manif.fit_transform(X.T)
         xx = pd.DataFrame(x_new, index=X.columns, columns=list(range(x_new.shape[1])))
 
         fig, axis = plt.subplots(1, len(attributes_to_plot), figsize=(4 * len(attributes_to_plot), 4 * 1))
@@ -623,10 +627,10 @@ def unsupervised_analysis(
 
     # PCA
     # TODO: Restrict PCA analysis to plot_max_pcs.
-    pca = PCA()
+    pca = PCA(n_components=min(*X.shape) - 1, svd_solver="arpack")
     x_new = pca.fit_transform(X.T)
     # transform again
-    xx = pd.DataFrame(x_new, index=X.columns, columns=list(range(x_new.shape[0])))
+    xx = pd.DataFrame(x_new, index=X.columns, columns=list(range(x_new.shape[1])))
 
     # plot % explained variance per PC
     fig, axis = plt.subplots(1)
@@ -647,7 +651,7 @@ def unsupervised_analysis(
             analysis.name, plot_prefix)))
 
     # plot pca
-    pcs = min(xx.shape[0] - 1, plot_max_pcs)
+    pcs = min(xx.shape[1], plot_max_pcs)
     fig, axis = plt.subplots(pcs, len(attributes_to_plot), figsize=(
         4 * len(attributes_to_plot), 4 * pcs))
     for pc in range(pcs):
@@ -1890,6 +1894,8 @@ def plot_differential(
         ax.set_xlabel("N. diff")
     for ax in axis[:, 1]:
         ax.set_xlabel("N. diff (% of total)")
+        ax.set_xlabel("", visible=False)
+        ax.set_yticklabels(ax.get_yticklabels(), visible=False)
     for ax in axis[1:, :].flatten():
         ax.axvline(0, linestyle="--", color="black", alpha=0.6)
     m = split_diff['diff'].abs().max()
@@ -1904,7 +1910,9 @@ def plot_differential(
         # TODO: add different shadings of red for various levels of significance
         # TODO: do this for scatter, MA, volcano plots
         if comparison_table is not None:
-            fig, axes = plt.subplots(n_side, n_side, figsize=(n_side * 4, n_side * 4), sharex=True, sharey=True)
+            fig, axes = plt.subplots(
+                n_side, n_side,
+                figsize=(n_side * 4, n_side * 4), sharex=True, sharey=True)
             if n_side > 1 or n_side > 1:
                 axes = iter(axes.flatten())
             else:
@@ -1919,18 +1927,31 @@ def plot_differential(
 
                 # Hexbin plot
                 ax = next(axes)
-                ax.hexbin(b, a, alpha=0.85, cmap="Greys", color="black", edgecolors="white", linewidths=0, bins='log', mincnt=1, rasterized=True)
+                ax.hexbin(
+                    b, a,
+                    alpha=0.85, cmap="Greys", color="black", edgecolors="white",
+                    linewidths=0, bins='log', mincnt=1, rasterized=True)
 
                 # Scatter for significant
-                diff_vars = results[(results[comparison_column] == comparison) & (results["diff"] == True)].index
+                diff_vars = results[
+                    (results[comparison_column] == comparison) &
+                    (results["diff"] == True)].index
                 if diff_vars.shape[0] > 0:
-                    ax.scatter(b.loc[diff_vars], a.loc[diff_vars], alpha=0.1, color="red", s=2)
+                    collection = ax.scatter(
+                        b.loc[diff_vars],
+                        a.loc[diff_vars],
+                        alpha=0.1, s=2, c=-np.log10(c.loc[diff_vars, p_value_column]), cmap="Wistia", vmin=0)
+                    add_colorbar_to_axis(collection, label="-log10(p-value)")
                 ax.set_title(comparison)
                 ax.set_xlabel("Down")
                 ax.set_ylabel("Up")
                 # x = y square
-                lims = [np.min([ax.get_xlim(), ax.get_ylim()]), np.max([ax.get_xlim(), ax.get_ylim()])]
-                ax.plot(lims, lims, linestyle='--', alpha=0.5, zorder=0, color="black")
+                lims = [
+                    np.min([ax.get_xlim(), ax.get_ylim()]),
+                    np.max([ax.get_xlim(), ax.get_ylim()])]
+                ax.plot(
+                    lims, lims,
+                    linestyle='--', alpha=0.5, zorder=0, color="black")
                 ax.set_aspect('equal')
                 ax.set_xlim(lims)
                 ax.set_ylim(lims)
@@ -1957,10 +1978,14 @@ def plot_differential(
             # Scatter for significant
             diff_vars = t[t["diff"] == True].index
             if diff_vars.shape[0] > 0:
-                ax.scatter(t.loc[diff_vars, log_fold_change_column], -np.log10(t.loc[diff_vars, p_value_column]), alpha=0.1, color="red", s=2)
+                collection = ax.scatter(
+                    t.loc[diff_vars, log_fold_change_column],
+                    -np.log10(t.loc[diff_vars, p_value_column]),
+                    alpha=0.1, s=2, c=-np.log10(t.loc[diff_vars, p_value_column]), cmap="Wistia", vmin=0)
+                add_colorbar_to_axis(collection, label="-log10(p-value)")
             ax.set_title(comparison)
-            ax.set_xlabel("log2(Fold-change)")
-            ax.set_ylabel("-log10(P-value)")
+            ax.set_xlabel("log2(fold-change)")
+            ax.set_ylabel("-log10(p-value)")
             ax.axvline(0, linestyle='--', alpha=0.5, zorder=0, color="black")
             l = np.max([abs(i) for i in ax.get_xlim()])
             ax.set_xlim(-l, l)
@@ -1993,10 +2018,14 @@ def plot_differential(
             # Scatter for significant
             diff_vars = t[t["diff"] == True].index
             if diff_vars.shape[0] > 0:
-                ax.scatter(np.log10(t.loc[diff_vars, mean_column]), t.loc[diff_vars, log_fold_change_column], alpha=0.1, color="red", s=2)
+                ax.scatter(
+                    np.log10(t.loc[diff_vars, mean_column]),
+                    t.loc[diff_vars, log_fold_change_column],
+                    alpha=0.1, s=2, c=-np.log10(t.loc[diff_vars, p_value_column]))
+                add_colorbar_to_axis(collection, label="-log10(p-value)")
             ax.set_title(comparison)
-            ax.set_xlabel("Amplitude")
-            ax.set_ylabel("log2(Fold-change)")
+            ax.set_xlabel("Mean {}".format(quantity.lower()))
+            ax.set_ylabel("log2(fold-change)")
             ax.axhline(0, linestyle='--', alpha=0.5, zorder=0, color="black")
             l = np.max([abs(i) for i in ax.get_ylim()])
             ax.set_ylim(-l, l)
@@ -2196,29 +2225,50 @@ def lola(bed_files, universe_file, output_folder, genome="hg19", cpus=8):
     """
     import rpy2.robjects as robj
 
+    # Get region databases from config
+    _LOGGER.info("Getting LOLA databases for genome '{}' from configuration.".format(genome))
+
+    msg = "LOLA database values in configuration could not be found or understood. "
+    msg += "Please add a list of value(s) to this section 'resources:lola:region_databases:{}'. ".format(genome)
+    msg += "For an example, see https://github.com/afrendeiro/toolkit/tree/master/ngs_toolkit/config/example.yaml"
+    try:
+        databases = _CONFIG['resources']['lola']['region_databases'][genome]
+    except KeyError:
+        _LOGGER.error(msg)
+        return
+
+    if type(databases) is not list:
+        if type(databases) is str:
+            databases = list(databases)
+        else:
+            _LOGGER.error(msg)
+            return
+
+    if len(databases) < 1:
+        _LOGGER.error(msg)
+        return
+
     run = robj.r("""
-        function(bedFiles, universeFile, outputFolder) {
+        function(bedFiles, universeFile, outputFolder) {{
             library("LOLA")
 
             userUniverse  <- LOLA::readBed(universeFile)
 
-            dbPath1 = "/data/groups/lab_bock/shared/resources/regions/LOLACore/{genome}/"
-            dbPath2 = "/data/groups/lab_bock/shared/resources/regions/customRegionDB/{genome}/"
-            regionDB = loadRegionDB(c(dbPath1, dbPath2))
+            regionDB = loadRegionDB({databases})
 
-            if (typeof(bedFiles) == "character") {
+            if (typeof(bedFiles) == "character") {{
                 userSet <- LOLA::readBed(bedFiles)
                 lolaResults = runLOLA(list(userSet), userUniverse, regionDB, cores={cpus})
                 writeCombinedEnrichment(lolaResults, outFolder=outputFolder)
-            } else if (typeof(bedFiles) == "double") {
-                for (bedFile in bedFiles) {
+            }} else if (typeof(bedFiles) == "double") {{
+                for (bedFile in bedFiles) {{
                     userSet <- LOLA::readBed(bedFile)
                     lolaResults = runLOLA(list(userSet), userUniverse, regionDB, cores={cpus})
                     writeCombinedEnrichment(lolaResults, outFolder=outputFolder)
-                }
-            }
-        }
-    """.format(genome=genome, cpus=cpus))
+                }}
+            }}
+        }}
+    """.format(cpus=cpus, databases="c('" + "', '".join(databases) + "')"))
 
     # convert the pandas dataframe to an R dataframe
     run(bed_files, universe_file, output_folder)
@@ -2229,7 +2279,21 @@ def bed_to_fasta(bed_file, fasta_file, genome="hg19", genome_2bit=None):
     import pandas as pd
 
     if genome_2bit is None:
-        genome_2bit = "~/resources/genomes/{genome}/{genome}.2bit".format(genome=genome)
+        # Get region databases from config
+        _LOGGER.info("Getting 2bit reference genome for genome '{}' from configuration.".format(genome))
+
+        msg = "Reference genome in 2bit format value in configuration could not be found or understood. "
+        msg += "Please add a list of value(s) to this section 'resources:genomes:2bit:{}'. ".format(genome)
+        msg += "For an example, see https://github.com/afrendeiro/toolkit/tree/master/ngs_toolkit/config/example.yaml"
+        try:
+            genome_2bit = _CONFIG['resources']['genomes']['2bit'][genome]
+        except KeyError:
+            _LOGGER.error(msg)
+            return
+
+        if type(genome_2bit) is not str:
+            _LOGGER.error(msg)
+            return
 
     # write name column
     bed = pd.read_csv(bed_file, sep='\t', header=None)
@@ -2245,13 +2309,26 @@ def bed_to_fasta(bed_file, fasta_file, genome="hg19", genome_2bit=None):
     # os.system("rm %s" % bed_file + ".tmp.bed")
 
 
-def meme_ame(input_fasta, output_dir, background_fasta=None, organism="human"):
+def meme_ame(input_fasta, output_dir, background_fasta=None, organism="human", motif_database_file=None):
     import os
 
-    dbs = {
-        "human": "~/resources/motifs/motif_databases/HUMAN/HOCOMOCOv10.meme",
-        "mouse": "~/resources/motifs/motif_databases/MOUSE/uniprobe_mouse.meme"
-    }
+    if motif_database_file is None:
+        # Get region databases from config
+        _LOGGER.info("Getting 2bit reference genome for genome '{}' from configuration.".format(organism))
+
+        msg = "Reference genome in 2bit format value in configuration could not be found or understood. "
+        msg += "Please add a list of value(s) to this section 'resources:meme:motif_databases:{}'. ".format(organism)
+        msg += "For an example, see https://github.com/afrendeiro/toolkit/tree/master/ngs_toolkit/config/example.yaml"
+        try:
+            motif_database_file = _CONFIG['resources']['meme']['motif_databases'][organism]
+        except KeyError:
+            _LOGGER.error(msg)
+            return
+
+        if type(motif_database_file) is not str:
+            _LOGGER.error(msg)
+            return
+
     # shuffle input in no background is provided
     if background_fasta is None:
         shuffled = input_fasta + ".shuffled"
@@ -2265,7 +2342,7 @@ def meme_ame(input_fasta, output_dir, background_fasta=None, organism="human"):
     --control {0} -o {1} {2} {3}
     """.format(
         background_fasta if background_fasta is not None else shuffled,
-        output_dir, input_fasta, dbs[organism])
+        output_dir, input_fasta, motif_database_file)
     os.system(cmd)
     # os.system("rm %s" % shuffled)
 
@@ -2359,11 +2436,25 @@ def parse_homer(homer_dir):
     return output.sort_values("motif")
 
 
+def parse_great_enrichment(input_tsv):
+    """
+    Parse output from GREAT enrichment (http://great.stanford.edu).
+
+    :param input_tsv: TSV file exported from GREAT through the option "All data as .tsv" in "Global Controls".
+    :type input_tsv: str
+    :returns: Pandas dataframe with enrichment results.
+    :rtype: pandas.DataFrame
+    """
+    df = pd.read_csv(input_tsv, sep="\t", skiprows=3)
+    df.columns = df.columns.str.replace("# ", "")
+    return df.loc[~df.iloc[:, 0].str.startswith("#")]
+
+
 def homer_combine_motifs(
         comparison_dirs, output_dir,
         reduce_threshold=0.6, match_threshold=10, info_value=0.6, p_value_threshold=1e-25, fold_enrichment=None,
         cpus=8, run=False, as_jobs=True, genome="hg19",
-        known_vertebrates_TFs_only=False):
+        motif_database=None, known_vertebrates_TFs_only=False):
     """
     Create consensus of de novo discovered motifs from HOMER
 
@@ -2382,6 +2473,10 @@ def homer_combine_motifs(
     :type as_jobs: bool, optional
     :param genome: Genome assembly of the data. Default is 'hg19'.
     :type genome: str
+    :param known_vertebrates_TFs_only: Deprecated. Pass a given motif_database to `motif_database` directly.
+    :type known_vertebrates_TFs_only: bool
+    :param motif_database: Motif database to restrict motif matching too.
+    :type motif_database: str
     :returns: If `run` is `False`, returns path to consensus motif file. Otherwise `None`.
     :rtype: str
 
@@ -2394,6 +2489,9 @@ def homer_combine_motifs(
     """
     import glob
 
+    if known_vertebrates_TFs_only:
+        _LOGGER.warn("WARNING! `known_vertebrates_TFs_only` option is deprecated! Pass a given motif_database to `motif_database` directly.")
+
     # concatenate files
     out_file = os.path.join(output_dir, "homerMotifs.combined.motifs")
     with open(out_file, 'a') as outfile:
@@ -2404,8 +2502,8 @@ def homer_combine_motifs(
 
     # Filter and get motif consensus
     extra = ""
-    if known_vertebrates_TFs_only:
-        extra = " -known /home/arendeiro/workspace/homer_4.8/data/knownTFs/vertebrates/known.motifs"
+    if motif_database:
+        extra = " -known {}".format(motif_database)
     if fold_enrichment is None:
         fold_enrichment = ""
     else:
@@ -2460,28 +2558,28 @@ def enrichr(dataframe, gene_set_libraries=None, kind="genes"):
     query_string = '?userListId=%s&backgroundType=%s'
 
     if gene_set_libraries is None:
-        gene_set_libraries = [
-            'GO_Biological_Process_2015',
-            "ChEA_2015",
-            "KEGG_2016",
-            "ESCAPE",
-            # "Epigenomics_Roadmap_HM_ChIP-seq",
-            "ENCODE_TF_ChIP-seq_2015",
-            "ENCODE_and_ChEA_Consensus_TFs_from_ChIP-X",
-            # "ENCODE_Histone_Modifications_2015",
-            # "OMIM_Expanded",
-            # "TF-LOF_Expression_from_GEO",
-            "Single_Gene_Perturbations_from_GEO_down",
-            "Single_Gene_Perturbations_from_GEO_up",
-            # "Disease_Perturbations_from_GEO_down",
-            # "Disease_Perturbations_from_GEO_up",
-            "Drug_Perturbations_from_GEO_down",
-            "Drug_Perturbations_from_GEO_up",
-            "WikiPathways_2016",
-            "Reactome_2016",
-            "BioCarta_2016",
-            "NCI-Nature_2016"
-        ]
+        # Get region databases from config
+        _LOGGER.info("Getting Enrichr gene set libraries from configuration.")
+
+        msg = "Enrichr gene set libraries value in configuration could not be found or understood. "
+        msg += "Please add a list of value(s) to this section 'resources:mem:motif_databases'. "
+        msg += "For an example, see https://github.com/afrendeiro/toolkit/tree/master/ngs_toolkit/config/example.yaml"
+        try:
+            gene_set_libraries = _CONFIG['resources']['enrichr']['gene_set_libraries']
+        except KeyError:
+            _LOGGER.error(msg)
+            return
+
+        if type(gene_set_libraries) is not list:
+            if type(gene_set_libraries) is str:
+                gene_set_libraries = list(gene_set_libraries)
+            else:
+                _LOGGER.error(msg)
+                return
+
+        if len(gene_set_libraries) < 1:
+            _LOGGER.error(msg)
+            return
 
     results = pd.DataFrame()
     for gene_set_library in tqdm(gene_set_libraries, total=len(gene_set_libraries), desc="Gene set library"):
@@ -4365,3 +4463,45 @@ def subtract_principal_component_by_attribute(df, pc=1, attributes=["CLL"]):
         if X2.loc[sample, :].isnull().all():
             X2.loc[sample, :] = df.loc[sample, :]
     return X2
+
+
+def fix_batch_effect_limma(matrix, batch_variable="batch", covariates=[]):
+    """
+    Fix batch effect in matrix using limma.
+
+    Requires the R package "limma" to be installed:
+        >>> source('http://bioconductor.org/biocLite.R')
+        >>> biocLite('limma')
+
+    :param matrix: DataFrame with multiindex for potential covariate annotations
+    :type matrix: [type]
+    :param formula: [description], defaults to "~knockout"
+    :type formula: str, optional
+    :returns: [description]
+    :rtype: {[type]}
+    """
+    import patsy
+    import pandas as pd
+    import rpy2
+    from rpy2.robjects import numpy2ri, pandas2ri
+    import rpy2.robjects as robjects
+    numpy2ri.activate()
+    pandas2ri.activate()
+
+    robjects.r('require("limma")')
+    _removeBatchEffect = robjects.r('removeBatchEffect')
+
+    if len(covariates) > 0:
+        cov = patsy.dmatrix("~{} - 1".format(" + ".join(covariates)), matrix.columns.to_frame())
+    else:
+        cov = None
+    fixed = _removeBatchEffect(
+        x=matrix.values,
+        batch=matrix.columns.get_level_values(batch_variable),
+        design=cov)
+    fixed = pd.DataFrame(
+        np.asarray(fixed),
+        index=matrix.index,
+        columns=matrix.columns)
+    return fixed
+    # fixed.to_csv(os.path.join(analysis.results_dir, analysis.name + "_peaks.limma_fixed.csv"))

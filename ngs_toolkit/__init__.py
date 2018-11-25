@@ -60,7 +60,7 @@ def setup_config(custom_yaml_config=None):
     import os
     import yaml
 
-    global config
+    global _CONFIG
 
     default_config_path = 'config/default.yaml'
     default_config_path = pkg_resources.resource_filename(__name__, default_config_path)
@@ -101,8 +101,7 @@ def setup_config(custom_yaml_config=None):
             _LOGGER.error("Pased configuration file from '{}' exists but is not readable.".format(custom_yaml_config))
             raise e
 
-    config = _CONFIG
-    return config
+    return _CONFIG
 
 
 setup_logger()

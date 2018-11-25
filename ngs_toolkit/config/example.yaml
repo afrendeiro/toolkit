@@ -14,6 +14,7 @@ resources:
       mm10: /scratch/lab_bock/shared/resources/genomes/mm10/mm10.fa
   lola:
     region_databases:
+      # under each section, there should be a list of items
       hg19:
         - /data/groups/lab_bock/shared/resources/regions/LOLACore/hg19/
         - /data/groups/lab_bock/shared/resources/regions/customRegionDB/hg19/
@@ -32,6 +33,7 @@ resources:
       mouse: /scratch/lab_bock/shared/resources/motifs/motif_databases/MOUSE/uniprobe_mouse.id_mapping.tsv
   enrichr:
     gene_set_libraries:
+      # this should be a list of items
       - "GO_Biological_Process_2015"
       - "ChEA_2015"
       - "KEGG_2016"

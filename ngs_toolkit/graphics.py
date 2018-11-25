@@ -221,13 +221,13 @@ def radar_plot(
 
         # add legend relative to top-left plot
         legend = ax.legend(loc=(0.9, .95),
-                        labelspacing=0.1, fontsize='small')
+                           labelspacing=0.1, fontsize='small')
 
     return fig
 
 
-def add_colorbar_to_axis(points, axis):
+def add_colorbar_to_axis(collection, label=None, position="right", size="5%", pad=0.05):
     from mpl_toolkits.axes_grid1 import make_axes_locatable
-    divider = make_axes_locatable(axis)
-    cax = divider.append_axes("right", size="5%", pad=0.05)
-    plt.colorbar(mappable=cs, cax=cax)
+    divider = make_axes_locatable(collection.axes)
+    cax = divider.append_axes(position, size=size, pad=pad)
+    plt.colorbar(mappable=collection, cax=cax, label=label, alpha=1)

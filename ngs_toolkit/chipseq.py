@@ -35,7 +35,7 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
             from_pickle=from_pickle,
             **kwargs)
 
-        self.data_type = "ChIP-seq"
+        self.data_type = self.__data_type__ = "ChIP-seq"
 
     def call_peaks_from_comparisons(
             self, comparison_table, output_dir="{results_dir}/chipseq_peaks",

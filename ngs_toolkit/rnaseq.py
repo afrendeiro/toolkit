@@ -35,13 +35,13 @@ class RNASeqAnalysis(Analysis):
             from_pickle=from_pickle,
             **kwargs)
 
-        self.data_type = "RNA-seq"
+        self.data_type = self.__data_type__ = "RNA-seq"
 
     def annotate_with_sample_metadata(
             self,
-            attributes=["sample_name"]):
+            attributes=["sample_name"], quant_matrix="expression"):
 
-        samples = [s for s in self.samples if s.name in self.coverage_annotated.columns]
+        samples = [s for s in self.samples if s.name in getattr(self, quant_matrix).columns]
 
         attrs = list()
         for attr in attributes:
@@ -55,7 +55,7 @@ class RNASeqAnalysis(Analysis):
 
         # Generate multiindex columns
         index = pd.MultiIndex.from_arrays(attrs, names=attributes)
-        self.expression = self.coverage_annotated[[s.name for s in samples]]
+        self.expression = getattr(self, quant_matrix)[[s.name for s in samples]]
         self.expression.columns = index
 
         # Save
@@ -437,6 +437,9 @@ def knockout_plot(
     knockout_genes = [k for k in knockout_genes if k in expression_matrix.index]
 
     ko = expression_matrix.loc[knockout_genes, :]
+    if ko.empty:
+        _LOGGER.warn("None of the `knockout_genes` were found in the expression matrix.\nCannot proceed.")
+        return
     v = np.absolute(scipy.stats.zscore(ko, axis=1)).flatten().max()
     v += (v / 10.)
 

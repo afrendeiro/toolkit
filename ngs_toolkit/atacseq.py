@@ -95,7 +95,7 @@ class ATACSeqAnalysis(Analysis):
             from_pickle=from_pickle,
             **kwargs)
 
-        self.data_type = "ATAC-seq"
+        self.data_type = self.__data_type__ = "ATAC-seq"
 
     def load_data(self, output_mapping=None, only_these_keys=None, permissive=True, n_header_vars=5):
         """

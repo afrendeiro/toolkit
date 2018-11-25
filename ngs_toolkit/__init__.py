@@ -7,7 +7,7 @@ def setup_logger(level="INFO", logfile=None):
 
     :param level: Level of logging to display. Defaults to "INFO". See possible levels here: https://docs.python.org/2/library/logging.html#levels
     :type level: str, optional
-    :param logfile: File to write log to. Defaults to "~/ngs_toolkit.log.txt"
+    :param logfile: File to write log to. Defaults to ``~/ngs_toolkit.log.txt``
     :type logfile: str, optional
     :returns: The logger
     :rtype: logging.Logger
@@ -50,8 +50,8 @@ def setup_config(custom_yaml_config=None):
     Set up global library configuration.
 
     It reads ngs_toolkit's package data to load a default configuration,
-    tries to update it by reading a file in ~/.ngs_toolkit.config.yaml if present,
-    and lastly, updates it by reading a possible passed yaml file `custom_yaml_config`.
+    tries to update it by reading a file in ``~/.ngs_toolkit.config.yaml`` if present,
+    and lastly, updates it by reading a possible passed yaml file ``custom_yaml_config``.
 
     :returns: Dictionary with configurations
     :rtype: dict

@@ -9,6 +9,10 @@ The ``general`` module provides a generic ``Analysis`` model from which the more
 
 More documentation on each method will hopefully come soon. For now I hope the docstring is descriptive enough.
 
+ngs_toolkit
+-----------------------
+.. automodule:: ngs_toolkit
+    :members:
 
 ngs_toolkit.general
 -----------------------

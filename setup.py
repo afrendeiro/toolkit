@@ -69,7 +69,10 @@ setup(
     author_email='afrendeiro@gmail.com',
     license="GPL3",
     install_requires=requirements,
-    extras_require = {
+    extras_require={
         'deseq2':  ["rpy2==2.8.6"]},
+    package_data={
+        'ngs_toolkit': ['config/*.yaml']
+    },
     **extra
 )

@@ -1,0 +1,60 @@
+username: 
+email: 
+metadata:
+  root_projects_dir: 
+resources:
+  genomes:
+    2bit:
+      hg19: 
+      hg38: 
+      mm10: 
+    fasta:
+      hg19: 
+      hg38: 
+      mm10: 
+  lola:
+    region_databases:
+      hg19:
+        - 
+        - 
+      hg38:
+        - 
+        - 
+      mm10:
+        - 
+        - 
+  meme:
+    motif_databases:
+      human: 
+      mouse: 
+      vertebrate: 
+    motif_id_mapping:
+      mouse: 
+  enrichr:
+    gene_set_libraries:
+      - "GO_Biological_Process_2015"
+      - "ChEA_2015"
+      - "KEGG_2016"
+      - "ESCAPE"
+      - "Epigenomics_Roadmap_HM_ChIP-seq"
+      - "ENCODE_TF_ChIP-seq_2015"
+      - "ENCODE_and_ChEA_Consensus_TFs_from_ChIP-X"
+      - "ENCODE_Histone_Modifications_2015"
+      - "OMIM_Expanded"
+      - "TF-LOF_Expression_from_GEO"
+      - "Single_Gene_Perturbations_from_GEO_down"
+      - "Single_Gene_Perturbations_from_GEO_up"
+      - "Disease_Perturbations_from_GEO_down"
+      - "Disease_Perturbations_from_GEO_up"
+      - "Drug_Perturbations_from_GEO_down"
+      - "Drug_Perturbations_from_GEO_up"
+      - "WikiPathways_2016"
+      - "Reactome_2016"
+      - "BioCarta_2016"
+      - "NCI-Nature_2016"
+executables:
+  twoBitToFa: twoBitToFa
+  fasta-dinucleotide-shuffle: fasta-dinucleotide-shuffle
+  ame: ame
+  findMotifsGenome.pl: findMotifsGenome.pl
+  compareMotifs.pl: compareMotifs.pl

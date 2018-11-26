@@ -4410,13 +4410,15 @@ def query_biomart(
         attributes=["ensembl_gene_id", "external_gene_name", "hgnc_id", "hgnc_symbol"],
         species="hsapiens", ensembl_version="grch37"):
     """
+    Query Biomart (https://www.ensembl.org/biomart/martview/).
 
-    Query Biomart for gene attributes.
-    Returns pandas dataframe with query results.
+    Query Biomart for gene attributes. Returns pandas dataframe with query results.
+    If a certain field contains commas, it will attemp to return dataframe but it might fail.
 
-    :param attributes: List of ensembl atrributes to query. Defaults to ["ensembl_gene_id", "external_gene_name", "hgnc_id", "hgnc_symbol"].
+    :param attributes: List of ensembl atrributes to query.
+                       Defaults to ["ensembl_gene_id", "external_gene_name", "hgnc_id", "hgnc_symbol"].
     :type attributes: list, optional
-    :param species: Ensembl string of species to query. Defaults to "hsapiens".
+    :param species: Ensembl string of species to query. Must be vertebrate. Defaults to "hsapiens".
     :type species: str, optional
     :param ensembl_version: Ensembl version to query. Defaults to "grch37".
     :type ensembl_version: str, optional
@@ -4427,9 +4429,16 @@ def query_biomart(
     import pandas as pd
     import numpy as np
 
+    if ensembl_version not in ['grch37', 'grch38']:
+        msg = "Ensembl version might not be supported."
+        msg += " Tested versions are 'grch37' 'and 'grch38'."
+        msg += " Will try anyway."
+        _LOGGER.warn(msg)
+
     # Build request XML
+    ens_ver = "" if ensembl_version == "grch38" else ensembl_version + "."
     url_query = "".join([
-        """http://{}ensembl.org/biomart/martservice?query=""".format(ensembl_version + "." if ensembl_version == "grch37" else ""),
+        """http://{}ensembl.org/biomart/martservice?query=""".format(ens_ver),
         """<?xml version="1.0" encoding="UTF-8"?>""",
         """<!DOCTYPE Query>""",
         """<Query  virtualSchemaName="default" formatter="CSV" header="0" uniqueRows="0" count="" datasetConfigVersion="0.6" >""",
@@ -4438,11 +4447,42 @@ def query_biomart(
         ["""</Dataset>""",
          """</Query>"""])
     req = requests.get(url_query, stream=True)
+    if not req.ok:
+        _LOGGER.error("Request to Biomart API was not successful.")
+        return
     content = list(req.iter_lines())
+
     if type(content[0]) == bytes:
-        mapping = pd.DataFrame((x.decode("utf-8").strip().split(",") for x in content), columns=attributes)
-    else:
-        mapping = pd.DataFrame((x.strip().split(",") for x in content), columns=attributes)
+        content = [x.decode("utf-8") for x in content]
+
+    try:
+        mapping = pd.DataFrame([x.strip().split(",") for x in content], columns=attributes)
+    except AssertionError as e:
+        msg = "Could not simply return dataframe with results."
+        msg += " It is likely this is because one of the requested attributes has commas as is quoted."
+        msg += " Or because querying an organism not present in vertebrate database."
+        msg += " Will try to replace these fields and parse."
+        _LOGGER.warn(msg)
+        # input probably contains commas inside fields
+        c = pd.Series([x.strip() for x in content])
+        # well's assume that fields with commas have been quoted
+        # get text inside double quotes
+        cc = c.str.extract("\"(.*)\"")
+        if cc.shape[1] > 1:
+            _LOGGER.error("Attempt to fix failed.")
+            raise e
+        cc = cc.squeeze().str.replace(",", "")
+        # now get text until first quote and concatenate with clean text
+        f = c.str.extract("(.*),\"").fillna("").squeeze() + "," + cc
+        # now get back together with instances that didn't have quotes
+        c.update(f)
+        try:
+            mapping = pd.DataFrame([x.strip().split(",") for x in c], columns=attributes)
+        except AssertionError as e2:
+            _LOGGER.error("Attempt to fix failed.")
+            raise (e, e2)
+        _LOGGER.info("Attempt to fix successful.")
+
     return mapping.replace("", np.nan)
 
 

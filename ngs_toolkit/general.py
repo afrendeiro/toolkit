@@ -840,15 +840,9 @@ def deseq_analysis(
     from rpy2.robjects import numpy2ri, pandas2ri
     import rpy2.robjects as robjects
     from rpy2.rinterface import RRuntimeError
+    from ngs_toolkit.general import r2pandas_df
     numpy2ri.activate()
     pandas2ri.activate()
-
-    def r2pandas_df(r_df):
-        import numpy as np
-        df = pd.DataFrame(np.asarray(r_df)).T
-        df.columns = [str(x) for x in r_df.colnames]
-        df.index = [str(x) for x in r_df.rownames]
-        return df
 
     robjects.r('require("DESeq2")')
     _as_formula = robjects.r('as.formula')
@@ -2225,11 +2219,48 @@ def plot_differential(
     g.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.samples.sorted.clustermap.z0.svg".format(var_name)), bbox_inches="tight", dpi=dpi)
 
 
-def lola(bed_files, universe_file, output_folder, genome="hg19", cpus=8):
+def lola(bed_files, universe_file, output_folder, output_prefixes=None, genome="hg19", cpus=8):
     """
-    Performs location overlap analysis (LOLA) on bedfiles with regions sets.
+    Perform location overlap analysis (LOLA).
+
+    If bed_files is a list with more than one element, use ``output_prefixes`` to pass a list of
+    prefixes to label the output files for each input BED file.
+
+    Files will be created in ``output_folder`` mimicking the output that the R function
+    LOLA::writeCombinedEnrichment writes.
+
+    Requires the R package "LOLA" to be installed:
+        >>> source('http://bioconductor.org/biocLite.R')
+        >>> biocLite('LOLA')
+
+    :param bed_files: A string path to a BED file or a list of paths.
+    :type bed_files: {str, list}
+    :param universe_file: A path to a BED file representing the universe from where the
+                          BED file(s) come from.
+    :type universe_file: str
+    :param output_folder: Output folder for resulting files
+    :type output_folder: str
+    :param output_prefixes: A list of strings with prefixes to be used in case
+                          ``bed_files`` is a list. Defaults to None
+    :type output_prefixes: list, optional
+    :param genome: Genome assembly from which the BED files come from. This is used
+                   to get the LOLA databases from the ngs_toolkit._CONFIG parameters. Defaults to "hg19".
+    :type genome: str
+    :param cpus: Number of CPUs/threads to use. Defaults to 8
+    :type cpus: int, optional
     """
-    import rpy2.robjects as robj
+    from rpy2.robjects import numpy2ri, pandas2ri
+    import rpy2.robjects as robjects
+    from ngs_toolkit.general import r2pandas_df
+    numpy2ri.activate()
+    pandas2ri.activate()
+
+    _LOGGER.info("Loading LOLA R library thorugh rpy2.")
+    robjects.r('require("LOLA")')
+    _loadRegionDB = robjects.r('LOLA::loadRegionDB')
+    _readBed = robjects.r('LOLA::readBed')
+    _runLOLA = robjects.r('LOLA::runLOLA')
+    # _writeCombinedEnrichment = robjects.r('LOLA::writeCombinedEnrichment')
 
     # Get region databases from config
     _LOGGER.info("Getting LOLA databases for genome '{}' from configuration.".format(genome))
@@ -2254,30 +2285,36 @@ def lola(bed_files, universe_file, output_folder, genome="hg19", cpus=8):
         _LOGGER.error(msg)
         return
 
-    run = robj.r("""
-        function(bedFiles, universeFile, outputFolder) {{
-            library("LOLA")
+    if type(bed_files) is str:
+        bed_files = [bed_files]
+    if output_prefixes is None:
+        if len(bed_files) > 1:
+            msg = "Running more than one BED file at once while only specifying `output_folder` argument"
+            msg += " will cause output files to be named in the form '{output_folder}/{region_database}.{input_file}.tsv'."
+            msg += " To prevent this behaviour, pass a list of arguments to `output_prefixes`."
+            _LOGGER.warn(msg)
+            output_prefixes = [r.replace(os.path.sep, "__").replace(".bed", ".") for r in bed_files]
+        else:
+            output_prefixes = ["."]
 
-            userUniverse  <- LOLA::readBed(universeFile)
-
-            regionDB = loadRegionDB({databases})
-
-            if (typeof(bedFiles) == "character") {{
-                userSet <- LOLA::readBed(bedFiles)
-                lolaResults = runLOLA(list(userSet), userUniverse, regionDB, cores={cpus})
-                writeCombinedEnrichment(lolaResults, outFolder=outputFolder)
-            }} else if (typeof(bedFiles) == "double") {{
-                for (bedFile in bedFiles) {{
-                    userSet <- LOLA::readBed(bedFile)
-                    lolaResults = runLOLA(list(userSet), userUniverse, regionDB, cores={cpus})
-                    writeCombinedEnrichment(lolaResults, outFolder=outputFolder)
-                }}
-            }}
-        }}
-    """.format(cpus=cpus, databases="c('" + "', '".join(databases) + "')"))
-
-    # convert the pandas dataframe to an R dataframe
-    run(bed_files, universe_file, output_folder)
+    _LOGGER.info("Reading up universe file '{}'.".format(universe_file))
+    universe = _readBed(universe_file)
+    _LOGGER.info("Loading region set databases.")
+    regionDB = _loadRegionDB(np.array(databases))
+    for suffix, bed_file in zip(output_prefixes, bed_files):
+        _LOGGER.info("Reading up BED file '{}'.".format(bed_file))
+        user_set = _readBed(bed_file)
+        _LOGGER.info("Running LOLA testing for file '{}'.".format(bed_file))
+        _lola_results = _runLOLA(user_set, universe, regionDB, cores=cpus)
+        _LOGGER.info("Converting results from R to Python")
+        lola_results = r2pandas_df(_lola_results)
+        _LOGGER.info("Saving all results for file '{}'.".format(bed_file))
+        lola_results.to_csv(
+            os.path.join(output_folder, "allEnrichments" + suffix + "tsv"), index=False)
+        for region_set in lola_results['collection'].drop_duplicates():
+            _LOGGER.info("Saving results for collection '{}' only.".format(region_set))
+            lola_results[lola_results['collection'] == region_set].to_csv(
+                os.path.join(output_folder, "col_" + region_set + suffix + "tsv"), index=False)
 
 
 def bed_to_fasta(bed_file, fasta_file, genome="hg19", genome_2bit=None):
@@ -3795,6 +3832,14 @@ def signed_max(x, f=0.66, axis=0):
             res[v] = signed_max(x.loc[:, v])
 
         return res
+
+
+def r2pandas_df(r_df):
+    import numpy as np
+    df = pd.DataFrame(np.asarray(r_df)).T
+    df.columns = [str(x) for x in r_df.colnames]
+    df.index = [str(x) for x in r_df.rownames]
+    return df
 
 
 # def detect_peaks(x, mph=None, mpd=1, threshold=0, edge='rising',

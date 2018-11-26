@@ -1775,6 +1775,7 @@ def plot_differential(
     import numpy as np
     import matplotlib.pyplot as plt
     import seaborn as sns
+    from ngs_toolkit.graphics import add_colorbar_to_axis
 
     req_attrs = [mean_column, log_fold_change_column, p_value_column, adjusted_p_value_column, comparison_column]
     if not all([x in results.columns for x in req_attrs]):

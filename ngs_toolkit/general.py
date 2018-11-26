@@ -1918,7 +1918,7 @@ def plot_differential(
             else:
                 axes = iter([axes])
             for comparison in comparisons:
-                c = comparison_table[comparison_table[comparison_column] == comparison]
+                c = comparison_table.loc[comparison_table[comparison_column] == comparison, :]
                 a = c.loc[c['comparison_side'] >= 1, "sample_name"]
                 b = c.loc[c['comparison_side'] <= 0, "sample_name"]
 
@@ -1933,9 +1933,9 @@ def plot_differential(
                     linewidths=0, bins='log', mincnt=1, rasterized=True)
 
                 # Scatter for significant
-                diff_vars = results[
+                diff_vars = results.loc[
                     (results[comparison_column] == comparison) &
-                    (results["diff"] == True)].index
+                    (results["diff"] == True), :].index
                 if diff_vars.shape[0] > 0:
                     collection = ax.scatter(
                         b.loc[diff_vars],
@@ -1976,7 +1976,7 @@ def plot_differential(
                 alpha=0.85, cmap="Greys", color="black", edgecolors="white", linewidths=0, bins='log', mincnt=1, rasterized=True)
 
             # Scatter for significant
-            diff_vars = t[t["diff"] == True].index
+            diff_vars = t.loc[t["diff"] == True, :].index
             if diff_vars.shape[0] > 0:
                 collection = ax.scatter(
                     t.loc[diff_vars, log_fold_change_column],
@@ -2016,7 +2016,7 @@ def plot_differential(
                 alpha=0.85, cmap="Greys", color="black", edgecolors="white", linewidths=0, bins='log', mincnt=1, rasterized=True)
 
             # Scatter for significant
-            diff_vars = t[t["diff"] == True].index
+            diff_vars = t.loc[t["diff"] == True, :].index
             if diff_vars.shape[0] > 0:
                 ax.scatter(
                     np.log10(t.loc[diff_vars, mean_column]),

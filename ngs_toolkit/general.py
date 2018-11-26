@@ -656,7 +656,7 @@ def unsupervised_analysis(
             analysis.name, plot_prefix)))
 
     # plot pca
-    pcs = min(xx.shape[1], plot_max_pcs)
+    pcs = min(xx.shape[1] - 1, plot_max_pcs)
     fig, axis = plt.subplots(pcs, len(attributes_to_plot), figsize=(
         4 * len(attributes_to_plot), 4 * pcs))
     for pc in range(pcs):
@@ -712,7 +712,7 @@ def unsupervised_analysis(
                     if always_legend:
                         axis[pc, i].legend(by_label.values(), by_label.keys())
                     else:
-                        if pc == pcs - 1:
+                        if pc == (pcs - 1):
                             axis[pc, i].legend(
                                 by_label.values(), by_label.keys())
     fig.savefig(os.path.join(output_dir, "{}.{}.pca.svg".format(

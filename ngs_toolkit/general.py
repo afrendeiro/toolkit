@@ -95,7 +95,9 @@ class Analysis(object):
         if from_pickle:
             self.update()
 
-        self.data_type = None
+        self.data_type = self.__data_type__ = self._var_names = None
+        self._quantity = self._norm_units = None
+        self._raw_matrix_name = self._norm_matrix_name = self._annot_matrix_name = None
 
     @pickle_me
     def to_pickle(self):
@@ -2633,7 +2635,8 @@ def enrichr(dataframe, gene_set_libraries=None, kind="genes"):
             attr = "\n".join(dataframe["gene_name"].dropna().tolist())
         elif kind == "regions":
             # Build payload with bed file
-            attr = "\n".join(dataframe[['chrom', 'start', 'end']].apply(lambda x: "\t".join([str(i) for i in x]), axis=1).tolist())
+            attr = "\n".join(dataframe[['chrom', 'start', 'end']].apply(
+                lambda x: "\t".join([str(i) for i in x]), axis=1).tolist())
 
         payload = {
             'list': (None, attr),
@@ -2664,10 +2667,12 @@ def enrichr(dataframe, gene_set_libraries=None, kind="genes"):
         res = pd.DataFrame([pd.Series(s) for s in res[gene_set_library]])
         if res.shape[0] == 0:
             continue
+        cols = ["rank", "description", "p_value", "z_score",
+                "combined_score", "genes", "adjusted_p_value"]
         if len(res.columns) == 7:
-            res.columns = ["rank", "description", "p_value", "z_score", "combined_score", "genes", "adjusted_p_value"]
+            res.columns = cols
         elif len(res.columns) == 9:
-            res.columns = ["rank", "description", "p_value", "z_score", "combined_score", "genes", "adjusted_p_value", "old_p_value", "old_adjusted_p_value"]
+            res.columns = cols + ["old_p_value", "old_adjusted_p_value"]
 
         # Remember gene set library used
         res["gene_set_library"] = gene_set_library
@@ -2902,6 +2907,7 @@ def differential_enrichment(
 
     if serial:
         # write combined enrichments
+        _LOGGER.info("Saving combined enrichments for all comparisons.")
         if data_type == "ATAC-seq":
             meme_enr.to_csv(
                 os.path.join(output_dir, output_prefix + ".meme_ame.csv"), index=False)
@@ -2914,8 +2920,11 @@ def differential_enrichment(
     else:
         try:
             background = getattr(analysis, "sites").fn
-        except:
+            _LOGGER.info("Using background region set '{}'.".format(background))
+        except AttributeError:
             background = ""
+            _LOGGER.warn("Using no background region set because 'analysis.sites' is not set!")
+        _LOGGER.info("Submitting enrichment jobs.")
         run_enrichment_jobs(
             analysis_name=analysis.name, results_dir=output_dir,
             genome=genome, background_bed=background)

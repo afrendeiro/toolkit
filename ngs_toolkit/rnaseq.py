@@ -36,6 +36,12 @@ class RNASeqAnalysis(Analysis):
             **kwargs)
 
         self.data_type = self.__data_type__ = "RNA-seq"
+        self._var_names = "gene"
+        self._quantity = "expression"
+        self._norm_units = "RPM"
+        self._raw_matrix_name = "count_matrix"
+        self._norm_matrix_name = "expression"
+        self._annot_matrix_name = "expression_annotated"
 
     def annotate_with_sample_metadata(
             self,
@@ -61,49 +67,6 @@ class RNASeqAnalysis(Analysis):
         # Save
         self.expression.to_csv(os.path.join(self.results_dir, self.name + ".expression.annotated_metadata.csv"), index=True)
 
-    def get_level_colors(self, index=None, levels=None, pallete="Paired", cmap="RdBu_r", nan_color=(0.662745, 0.662745, 0.662745, 0.5)):
-        if index is None:
-            index = self.expression.columns
-
-        if levels is not None:
-            index = index.droplevel([l.name for l in index.levels if l.name not in levels])
-
-        _cmap = plt.get_cmap(cmap)
-        _pallete = plt.get_cmap(pallete)
-
-        colors = list()
-        for level in index.levels:
-            # determine the type of data in each level
-            most_common = Counter([type(x) for x in level]).most_common()[0][0]
-            _LOGGER.info("{}, {}".format(level.name, most_common))
-
-            # Add either colors based on categories or numerical scale
-            if most_common in [int, float, np.float32, np.float64, np.int32, np.int64]:
-                values = index.get_level_values(level.name)
-                # Create a range of either 0-100 if only positive values are found
-                # or symmetrically from the maximum absolute value found
-                if not any(values.dropna() < 0):
-                    norm = matplotlib.colors.Normalize(vmin=0, vmax=100)
-                else:
-                    r = max(abs(values.min()), abs(values.max()))
-                    norm = matplotlib.colors.Normalize(vmin=-r, vmax=r)
-
-                col = _cmap(norm(values))
-                # replace color for nan cases
-                col[np.where(index.get_level_values(level.name).to_series().isnull().tolist())] = nan_color
-                colors.append(col.tolist())
-            else:
-                n = len(set(index.get_level_values(level.name)))
-                # get n equidistant colors
-                p = [_pallete(1. * i / n) for i in range(n)]
-                color_dict = dict(zip(list(set(index.get_level_values(level.name))), p))
-                # color for nan cases
-                color_dict[np.nan] = nan_color
-                col = [color_dict[x] for x in index.get_level_values(level.name)]
-                colors.append(col)
-
-        return colors
-
     def collect_bitseq_output(self, samples=None, permissive=True, expression_type="counts"):
         """
         Collect gene expression (read counts, transcript-level) output from Bitseq into expression matrix for `samples`.
@@ -114,6 +77,7 @@ class RNASeqAnalysis(Analysis):
         first = True
         for i, sample in enumerate(samples):
             if first:
+                msg = "Sample {} is missing.".format(sample.name)
                 try:
                     # read the "tr" file of one sample to get indexes
                     tr = pd.read_csv(
@@ -123,7 +87,7 @@ class RNASeqAnalysis(Analysis):
                             sample.name + ".tr"),
                         sep=" ", header=None, skiprows=1,
                         names=["ensembl_gene_id", "ensembl_transcript_id", "v1", "v2"])
-                except IOError("Sample {} is missing.".format(sample.name)) as e:
+                except IOError(msg) as e:
                     if permissive:
                         _LOGGER.warn(e)
                     else:
@@ -168,12 +132,13 @@ class RNASeqAnalysis(Analysis):
 
         first = True
         for i, sample in enumerate(samples):
+            msg = "Sample {} is missing.".format(sample.name)
             try:
                 # read the "tr" file of one sample to get indexes
                 c = pd.read_csv(
                     os.path.join(
                         sample.paths.sample_root, "ESAT_{}".format(sample.genome), sample.name + ".gene.txt"), sep="\t")
-            except IOError("Sample {} is missing.".format(sample.name)) as e:
+            except IOError(msg) as e:
                 if permissive:
                     _LOGGER.warn(e)
                     continue

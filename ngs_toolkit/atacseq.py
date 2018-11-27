@@ -96,6 +96,14 @@ class ATACSeqAnalysis(Analysis):
             **kwargs)
 
         self.data_type = self.__data_type__ = "ATAC-seq"
+        self._var_names = "region"
+        self._quantity = "accessibility"
+        self._norm_units = "RPM"
+        self._raw_matrix_name = "coverage"
+        self._norm_matrix_name = "coverage_qnorm"  # or coverage_gc_corrected
+        # TODO: have normalization method reset the above value, with info to user
+        # or just overwrite
+        self._annot_matrix_name = "accessibility"
 
     def load_data(self, output_mapping=None, only_these_keys=None, permissive=True, n_header_vars=5):
         """

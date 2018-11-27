@@ -1942,7 +1942,7 @@ def plot_differential(
                     collection = ax.scatter(
                         b.loc[diff_vars],
                         a.loc[diff_vars],
-                        alpha=0.1, s=2, c=-np.log10(c.loc[diff_vars, p_value_column]), cmap="Wistia", vmin=0)
+                        alpha=0.1, s=2, color="red")  # , c=-np.log10(c.loc[diff_vars, p_value_column]), cmap="Wistia", vmin=0
                     add_colorbar_to_axis(collection, label="-log10(p-value)")
                 ax.set_title(comparison)
                 ax.set_xlabel("Down")
@@ -1983,7 +1983,7 @@ def plot_differential(
                 collection = ax.scatter(
                     t.loc[diff_vars, log_fold_change_column],
                     -np.log10(t.loc[diff_vars, p_value_column]),
-                    alpha=0.1, s=2, c=-np.log10(t.loc[diff_vars, p_value_column]), cmap="Wistia", vmin=0)
+                    alpha=0.1, s=2, color="red")  # , c=-np.log10(t.loc[diff_vars, p_value_column]), cmap="Wistia", vmin=0
                 add_colorbar_to_axis(collection, label="-log10(p-value)")
             ax.set_title(comparison)
             ax.set_xlabel("log2(fold-change)")
@@ -2023,7 +2023,7 @@ def plot_differential(
                 ax.scatter(
                     np.log10(t.loc[diff_vars, mean_column]),
                     t.loc[diff_vars, log_fold_change_column],
-                    alpha=0.1, s=2, c=-np.log10(t.loc[diff_vars, p_value_column]))
+                    alpha=0.1, s=2, color="red")  # , c=-np.log10(t.loc[diff_vars, p_value_column])
                 add_colorbar_to_axis(collection, label="-log10(p-value)")
             ax.set_title(comparison)
             ax.set_xlabel("Mean {}".format(quantity.lower()))

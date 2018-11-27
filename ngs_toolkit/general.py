@@ -2685,12 +2685,16 @@ def enrichr(dataframe, gene_set_libraries=None, kind="genes"):
 
 def run_enrichment_jobs(
         analysis_name, results_dir, genome,
-        background_bed="results/{PROJECT_NAME}_peak_set.bed"):
+        background_bed="results/{PROJECT_NAME}_peak_set.bed",
+        steps=['lola', 'meme', 'homer', 'enrichr']):
     """
     Submit enrichment jobs for a specifc analysis.
     """
+    cmds = list()
+
     # LOLA
-    cmds = ["""for F in `find {results_dir} -name "*_regions.bed"`; do
+    if 'lola' in steps:
+        cmds += ["""for F in `find {results_dir} -name "*_regions.bed"`; do
 DIR=`dirname $F`
 if [ ! -f ${{DIR}}/allEnrichments.tsv ]; then
 echo $DIR $F
@@ -2700,12 +2704,13 @@ fi
 done""".format(results_dir=results_dir, background_bed=background_bed, GENOME=genome)]
 
     # AME
-    dbs = {
-        "human": "~/resources/motifs/motif_databases/HUMAN/HOCOMOCOv10.meme",
-        "mouse": "~/resources/motifs/motif_databases/MOUSE/uniprobe_mouse.meme"}
-    omap = {"hg38": "human", "hg19": "human", "mm10": "mouse"}
+    if 'meme' in steps:
+        dbs = {
+            "human": "~/resources/motifs/motif_databases/HUMAN/HOCOMOCOv10.meme",
+            "mouse": "~/resources/motifs/motif_databases/MOUSE/uniprobe_mouse.meme"}
+        omap = {"hg38": "human", "hg19": "human", "mm10": "mouse"}
 
-    cmds += ["""for F in `find {results_dir} -name "*_regions.fa"`; do
+        cmds += ["""for F in `find {results_dir} -name "*_regions.fa"`; do
 DIR=`dirname $F`
 if [ ! -f ${{DIR}}/ame.html ]; then
 echo $DIR $F
@@ -2717,7 +2722,8 @@ fi
 done""".format(results_dir=results_dir, motifs=dbs[omap[genome]])]
 
     # HOMER
-    cmds += ["""for F in `find {results_dir} -name "*_regions.bed"`; do
+    if 'homer' in steps:
+        cmds += ["""for F in `find {results_dir} -name "*_regions.bed"`; do
 DIR=`dirname $F`
 if [ ! -f ${{DIR}}/homerResults.html ]; then
 echo $DIR $F
@@ -2727,14 +2733,15 @@ fi
 done""".format(results_dir=results_dir, GENOME=genome)]
 
     # Enrichr
-    cmds += ["""for F in `find {results_dir} -name "*.gene_symbols.txt"`; do
+    if 'enrichr' in steps:
+        cmds += ["""for F in `find {results_dir} -name "*.gene_symbols.txt"`; do
 if [ ! -f ${{F/gene_symbols.txt/enrichr.csv}} ]; then
 echo $F
 sbatch -J enrichr.$F -o $F.enrichr.log -p shortq -c 1 --mem 4000 \
 --wrap "python -u ~/jobs/run_Enrichr.py --input-file "$F" --output-file "${{F/gene_symbols.txt/enrichr.csv}}" "
 fi
 done""".format(results_dir=results_dir)]
-    cmds += ["""for F in `find {results_dir} -name "*_genes.symbols.txt"`; do
+        cmds += ["""for F in `find {results_dir} -name "*_genes.symbols.txt"`; do
 if [ ! -f ${{F/symbols.txt/enrichr.csv}} ]; then
 echo $F
 sbatch -J enrichr.$F -o $F.enrichr.log -p shortq -c 1 --mem 4000 \
@@ -2753,6 +2760,7 @@ def differential_enrichment(
         output_dir="results/differential_analysis_{data_type}",
         output_prefix="differential_analysis",
         genome="hg19",
+        steps=['lola', 'meme', 'homer', 'enrichr'],
         directional=True,
         max_diff=1000,
         sort_var="pvalue",
@@ -2804,6 +2812,10 @@ def differential_enrichment(
         pathway_enr = pd.DataFrame()
     else:
         raise AssertionError("`data_type` must match one of 'ATAC-seq' or 'RNA-seq'.")
+
+    known = ['lola', 'meme', 'homer', 'enrichr']
+    if not all([x in known for x in steps]):
+        _LOGGER.warn("Not all provided steps for enrichment are known! Proceeding anyway.")
 
     if "{data_type}" in output_dir:
         output_dir = output_dir.format(data_type=data_type)
@@ -2865,58 +2877,70 @@ def differential_enrichment(
                 _LOGGER.info("Doing genes of comparison '{}', direction '{}'.".format(comp, direction))
                 comparison_df.index.name = "gene_name"
                 # write gene names to file
-                (comparison_df
-                    .reset_index()['gene_name']
-                    .drop_duplicates()
-                    .sort_values()
-                    .to_csv(os.path.join(comparison_dir, output_prefix + ".gene_symbols.txt"), header=None, index=False))
+                clean = comparison_df.reset_index()['gene_name'].drop_duplicates().sort_values()
+                clean.to_csv(os.path.join(comparison_dir, output_prefix + ".gene_symbols.txt"), header=None, index=False)
 
-                if serial:
-                    if not os.path.exists(os.path.join(comparison_dir, output_prefix + ".enrichr.csv")):
-                        enr = enrichr(comparison_df.reset_index())
-                        enr.to_csv(os.path.join(comparison_dir, output_prefix + ".enrichr.csv"), index=False)
-                    else:
-                        enr = pd.read_csv(os.path.join(comparison_dir, output_prefix + ".enrichr.csv"))
-                        enr["comparison_name"] = comp
-                        pathway_enr = pathway_enr.append(enr, ignore_index=True)
+                if 'enrichr' in steps:
+                    if serial:
+                        if not os.path.exists(os.path.join(comparison_dir, output_prefix + ".enrichr.csv")):
+                            enr = enrichr(comparison_df.reset_index())
+                            enr.to_csv(os.path.join(comparison_dir, output_prefix + ".enrichr.csv"), index=False)
+                        else:
+                            enr = pd.read_csv(os.path.join(comparison_dir, output_prefix + ".enrichr.csv"))
+                            enr["comparison_name"] = comp
+                            pathway_enr = pathway_enr.append(enr, ignore_index=True)
             else:
                 _LOGGER.info("Doing regions of comparison '{}', direction '{}'.".format(comp, direction))
 
                 # do the suite of enrichment analysis
                 characterize_regions_function(
                     analysis, comparison_df,
-                    output_dir=comparison_dir, prefix=output_prefix, run=serial, genome=genome)
+                    output_dir=comparison_dir, prefix=output_prefix, run=serial, genome=genome, steps=steps)
 
                 # collect enrichments
                 if serial:
-                    # read/parse
-                    meme_motifs = parse_ame(comparison_dir)
-                    homer_motifs = parse_homer(os.path.join(comparison_dir, "homerResults"))
-                    lola = pd.read_csv(os.path.join(comparison_dir, "allEnrichments.tsv"), sep="\t")
-                    enr = pd.read_csv(os.path.join(comparison_dir, output_prefix + "_regions.enrichr.csv"), index=False, encoding='utf-8')
-                    # label
-                    for d in [meme_motifs, homer_motifs, lola, enr]:
-                        d["comparison_name"] = comp
-                        d["direction"] = direction
-                        d["label"] = "{}.{}".format(comp, direction)
-                    # append
-                    meme_enr = meme_enr.append(meme_motifs, ignore_index=True)
-                    homer_enr = homer_enr.append(homer_motifs, ignore_index=True)
-                    lola_enr = lola_enr.append(lola, ignore_index=True)
-                    pathway_enr = pathway_enr.append(enr, ignore_index=True)
+                    # read/parse, label and append
+                    if 'meme' in steps:
+                        meme_motifs = parse_ame(comparison_dir)
+                        meme_motifs["comparison_name"] = comp
+                        meme_motifs["direction"] = direction
+                        meme_motifs["label"] = "{}.{}".format(comp, direction)
+                        meme_enr = meme_enr.append(meme_motifs, ignore_index=True)
+                    if 'homer' in steps:
+                        homer_motifs = parse_homer(os.path.join(comparison_dir, "homerResults"))
+                        homer_motifs["comparison_name"] = comp
+                        homer_motifs["direction"] = direction
+                        homer_motifs["label"] = "{}.{}".format(comp, direction)
+                        homer_enr = homer_enr.append(homer_motifs, ignore_index=True)
+                    if 'lola' in steps:
+                        lola = pd.read_csv(os.path.join(comparison_dir, "allEnrichments.tsv"), sep="\t")
+                        lola["comparison_name"] = comp
+                        lola["direction"] = direction
+                        lola["label"] = "{}.{}".format(comp, direction)
+                        lola_enr = lola_enr.append(lola, ignore_index=True)
+                    if 'enrichr' in steps:
+                        enr = pd.read_csv(os.path.join(comparison_dir, output_prefix + "_regions.enrichr.csv"), index=False, encoding='utf-8')
+                        enr["comparison_name"] = comp
+                        enr["direction"] = direction
+                        enr["label"] = "{}.{}".format(comp, direction)
+                        pathway_enr = pathway_enr.append(enr, ignore_index=True)
 
     if serial:
         # write combined enrichments
         _LOGGER.info("Saving combined enrichments for all comparisons.")
         if data_type == "ATAC-seq":
-            meme_enr.to_csv(
-                os.path.join(output_dir, output_prefix + ".meme_ame.csv"), index=False)
-            homer_enr.to_csv(
-                os.path.join(output_dir, output_prefix + ".homer_motifs.csv"), index=False)
-            lola.to_csv(
-                os.path.join(output_dir, output_prefix + ".lola.csv"), index=False)
-        pathway_enr.to_csv(
-            os.path.join(output_dir, output_prefix + ".enrichr.csv"), index=False)
+            if 'meme' in steps:
+                meme_enr.to_csv(
+                    os.path.join(output_dir, output_prefix + ".meme_ame.csv"), index=False)
+            if 'homer' in steps:
+                homer_enr.to_csv(
+                    os.path.join(output_dir, output_prefix + ".homer_motifs.csv"), index=False)
+            if 'lola' in steps:
+                lola.to_csv(
+                    os.path.join(output_dir, output_prefix + ".lola.csv"), index=False)
+        if 'enrichr' in steps:
+            pathway_enr.to_csv(
+                os.path.join(output_dir, output_prefix + ".enrichr.csv"), index=False)
     else:
         try:
             background = getattr(analysis, "sites").fn
@@ -2927,7 +2951,7 @@ def differential_enrichment(
         _LOGGER.info("Submitting enrichment jobs.")
         run_enrichment_jobs(
             analysis_name=analysis.name, results_dir=output_dir,
-            genome=genome, background_bed=background)
+            genome=genome, background_bed=background, steps=steps)
 
 
 def collect_differential_enrichment(

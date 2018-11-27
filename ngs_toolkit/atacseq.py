@@ -1651,7 +1651,9 @@ def characterize_regions_structure(analysis, df, prefix, output_dir, universe_df
     enrichments.to_csv(os.path.join(output_dir, "%s_regions.region_enrichment.csv" % prefix), index=True)
 
 
-def characterize_regions_function(analysis, df, output_dir, prefix, universe_file=None, run=True, genome="hg19"):
+def characterize_regions_function(
+        analysis, df, output_dir, prefix, universe_file=None,
+        run=True, genome="hg19", steps=['lola', 'meme', 'homer', 'enrichr']):
     """
     Performs a range of functional enrichments of a set of regions given in `df`
     (a dataframe with 'chrom', 'start', 'end', 'gene_name', 'ensebl_gene_id' columns - typically the coverage_annotated dataframe).
@@ -1665,7 +1667,9 @@ def characterize_regions_function(analysis, df, output_dir, prefix, universe_fil
 
     Additionally, some genome-specific databases are needed to run these programs.
     """
-    from ngs_toolkit.general import bed_to_fasta, meme_ame, homer_motifs, lola, enrichr, standard_score
+    from ngs_toolkit.general import (
+        bed_to_fasta, meme_ame, homer_motifs,
+        lola, enrichr, standard_score)
 
     # use all sites as universe
     if universe_file is None:
@@ -1683,26 +1687,16 @@ def characterize_regions_function(analysis, df, output_dir, prefix, universe_fil
     df[['chrom', 'start', 'end']].reset_index().to_csv(tsv_file, sep="\t", header=False, index=False)
 
     # export gene names
-    (
-        df['gene_name']
-        .str.split(",")
-        .apply(pd.Series, 1)
-        .stack()
-        .drop_duplicates()
-        .to_csv(
+    clean = df['gene_name'].str.split(",").apply(pd.Series, 1).stack().drop_duplicates()
+    clean.to_csv(
             os.path.join(output_dir, "{}_genes.symbols.txt".format(prefix)),
-            index=False))
+            index=False)
     if "ensembl_gene_id" in df.columns:
         # export ensembl gene names
-        (
-            df['ensembl_gene_id']
-            .str.split(",")
-            .apply(pd.Series, 1)
-            .stack()
-            .drop_duplicates()
-            .to_csv(
-                os.path.join(output_dir, "{}_genes.ensembl.txt".format(prefix)),
-                index=False))
+        clean = df['ensembl_gene_id'].str.split(",").apply(pd.Series, 1).stack().drop_duplicates()
+        clean.to_csv(
+            os.path.join(output_dir, "{}_genes.ensembl.txt".format(prefix)),
+            index=False)
 
     # export gene symbols with scaled absolute fold change
     if "log2FoldChange" in df.columns:
@@ -1712,18 +1706,15 @@ def characterize_regions_function(analysis, df, output_dir, prefix, universe_fil
         d = df[['gene_name', 'score']].sort_values('score', ascending=False)
 
         # split gene names from score if a reg.element was assigned to more than one gene
-        a = (
-            d['gene_name']
-            .str.split(",")
-            .apply(pd.Series, 1)
-            .stack()
-        )
+        a = d['gene_name'].str.split(",").apply(pd.Series, 1).stack()
         a.index = a.index.droplevel(1)
         a.name = 'gene_name'
         d = d[['score']].join(a)
         # reduce various ranks to mean per gene
         d = d.groupby('gene_name').mean().reset_index()
-        d.to_csv(os.path.join(output_dir, "{}_genes.symbols.score.csv".format(prefix)), index=False)
+        d.to_csv(
+            os.path.join(output_dir, "{}_genes.symbols.score.csv".format(prefix)),
+            index=False)
 
     # Motifs
     # de novo motif finding - enrichment
@@ -1733,19 +1724,29 @@ def characterize_regions_function(analysis, df, output_dir, prefix, universe_fil
     if not run:
         return
 
-    omap = {"hg38": "human", "hg19": "human", "mm10": "mouse"}
-    meme_ame(fasta_file, output_dir, organism=omap[genome])
-    homer_motifs(bed_file, output_dir, genome=genome)
+    if "meme" in steps:
+        _LOGGER.info("Running MEME-AME for '{}'".format(prefix))
+        omap = {"hg38": "human", "hg19": "human", "mm10": "mouse"}
+        meme_ame(fasta_file, output_dir, organism=omap[genome])
+    if "homer" in steps:
+        _LOGGER.info("Running HOMER for '{}'".format(prefix))
+        homer_motifs(bed_file, output_dir, genome=genome)
 
     # Lola
-    try:
-        lola(bed_file, universe_file, output_dir, genome=genome)
-    except:
-        _LOGGER.warn("LOLA analysis for {} failed!".format(prefix))
+    if 'lola' in steps:
+        _LOGGER.info("Running LOLA for '{}'".format(prefix))
+        try:
+            lola(bed_file, universe_file, output_dir, genome=genome)
+        except:
+            _LOGGER.error("LOLA analysis for '{}' failed!".format(prefix))
 
     # Enrichr
-    results = enrichr(df[['chrom', 'start', 'end', "gene_name"]])
-    results.to_csv(os.path.join(output_dir, "{}_regions.enrichr.csv".format(prefix)), index=False, encoding='utf-8')
+    if 'enrichr' in steps:
+        _LOGGER.info("Running Enrichr for '{}'".format(prefix))
+        results = enrichr(df[['chrom', 'start', 'end', "gene_name"]])
+        results.to_csv(
+            os.path.join(output_dir, "{}_regions.enrichr.csv".format(prefix)),
+            index=False, encoding='utf-8')
 
 
 def metagene_plot(bams, labels, output_prefix, region="genebody", genome="hg19"):

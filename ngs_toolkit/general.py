@@ -543,6 +543,7 @@ def unsupervised_analysis(
 
     # Pairwise correlations
     for method in ['pearson', 'spearman']:
+        _LOGGER.info("Plotting pairwise correlation for with '{}' metric.".format(method))
         g = sns.clustermap(
             # yticklabels=sample_display_names,
             X.astype(float).corr(method), xticklabels=False, yticklabels=True, annot=display_corr_values,
@@ -566,6 +567,7 @@ def unsupervised_analysis(
         "TSNE": {'init': 'pca'},
     }
     for algo in manifold_algorithms:
+        _LOGGER.info("Learning manifold with '{}' algorithm.".format(algo))
         if (algo in ["Isomap", "LocallyLinearEmbedding"]) and (len(samples) <= 5):
             _LOGGER.warn("Number of samples is too small to perform '{}'".format(algo))
             continue
@@ -574,9 +576,12 @@ def unsupervised_analysis(
         x_new = manif.fit_transform(X.T)
         xx = pd.DataFrame(x_new, index=X.columns, columns=list(range(x_new.shape[1])))
 
+        _LOGGER.info("Plotting projection of manifold with '{}' algorithm.".format(algo))
         fig, axis = plt.subplots(1, len(attributes_to_plot), figsize=(4 * len(attributes_to_plot), 4 * 1))
         if len(attributes_to_plot) != 1:
             axis = axis.flatten()
+        else:
+            axis = np.array([axis])
         for i, attr in enumerate(attributes_to_plot):
             for j, sample in enumerate(xx.index):
                 sample = pd.Series(sample, index=X.columns.names)
@@ -633,13 +638,15 @@ def unsupervised_analysis(
 
 
     # PCA
-    # TODO: Restrict PCA analysis to plot_max_pcs.
-    pca = PCA(n_components=min(*X.shape) - 1, svd_solver="arpack")
+    pcs = min(*X.shape) - 1
+    _LOGGER.info("Decomposing data with 'PCA' algorithm for {} dimensions.".format(pcs))
+    pca = PCA(n_components=pcs, svd_solver="arpack")
     x_new = pca.fit_transform(X.T)
     # transform again
     xx = pd.DataFrame(x_new, index=X.columns, columns=list(range(x_new.shape[1])))
 
     # plot % explained variance per PC
+    _LOGGER.info("Plotting variance explained with PCA.")
     fig, axis = plt.subplots(1)
     axis.plot(
         range(1, len(pca.explained_variance_) + 1),  # all PCs
@@ -659,8 +666,11 @@ def unsupervised_analysis(
 
     # plot pca
     pcs = min(xx.shape[1] - 1, plot_max_pcs)
+    _LOGGER.info("Plotting PCA up to {} dimensions.".format(pcs))
     fig, axis = plt.subplots(pcs, len(attributes_to_plot), figsize=(
         4 * len(attributes_to_plot), 4 * pcs))
+    if len(attributes_to_plot) == 1:
+        axis = axis.reshape((pcs, 1))
     for pc in range(pcs):
         for i, attr in enumerate(attributes_to_plot):
             for j, sample in enumerate(xx.index):
@@ -722,8 +732,10 @@ def unsupervised_analysis(
 
     # Test association of PCs with attributes
     if not test_pc_association:
+        _LOGGER.info("Not testing association of attributes with principal components.")
         return
 
+    _LOGGER.info("Computing association of given attributes with principal components.")
     associations = list()
     for pc in range(pcs):
         for attr in attributes_to_plot:
@@ -768,10 +780,14 @@ def unsupervised_analysis(
     associations = pd.DataFrame(associations, columns=["pc", "attribute", "variable_type", "group_1", "group_2", "p_value"])
 
     # write
+    _LOGGER.info("Saving associations.")
     associations.to_csv(os.path.join(
         output_dir, "{}.{}.pca.variable_principle_components_association.csv"
                     .format(analysis.name, plot_prefix)), index=False)
 
+    if len(attributes_to_plot) < 2:
+        _LOGGER.info("Only one attribute given, can't plot associations.")
+        return
     # Plot
     # associations[associations['p_value'] < 0.05].drop(['group_1', 'group_2'], axis=1).drop_duplicates()
     # associations.drop(['group_1', 'group_2'], axis=1).drop_duplicates().pivot(index="pc", columns="attribute", values="p_value")
@@ -4552,12 +4568,12 @@ def subtract_principal_component(
         for pc in range(pcs_to_plot):
             # before
             for j, sample in enumerate(X.index):
-                axis[pc, 0].scatter(X_hat[j, pc], X_hat[j, pc + 1], s=50)
+                axis[pc, 0].scatter(X_hat[j, pc], X_hat[j, pc + 1], s=50, rasterized=True)
             axis[pc, 0].set_xlabel("PC{}".format(pc + 1))
             axis[pc, 0].set_ylabel("PC{}".format(pc + 2))
             # after
             for j, sample in enumerate(X2.index):
-                axis[pc, 1].scatter(X2_hat[j, pc], X2_hat[j, pc + 1], s=35, alpha=0.8)
+                axis[pc, 1].scatter(X2_hat[j, pc], X2_hat[j, pc + 1], s=35, alpha=0.8, rasterized=True)
             axis[pc, 1].set_xlabel("PC{}".format(pc + 1))
             axis[pc, 1].set_ylabel("PC{}".format(pc + 2))
         fig.savefig(plot_name)
@@ -4620,12 +4636,14 @@ def fix_batch_effect_limma(matrix, batch_variable="batch", covariates=[]):
 
     if len(covariates) > 0:
         cov = patsy.dmatrix("~{} - 1".format(" + ".join(covariates)), matrix.columns.to_frame())
+        fixed = _removeBatchEffect(
+            x=matrix.values,
+            batch=matrix.columns.get_level_values(batch_variable),
+            design=cov)
     else:
-        cov = None
-    fixed = _removeBatchEffect(
-        x=matrix.values,
-        batch=matrix.columns.get_level_values(batch_variable),
-        design=cov)
+        fixed = _removeBatchEffect(
+            x=matrix.values,
+            batch=matrix.columns.get_level_values(batch_variable))
     fixed = pd.DataFrame(
         np.asarray(fixed),
         index=matrix.index,

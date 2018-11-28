@@ -1673,7 +1673,12 @@ def characterize_regions_function(
 
     # use all sites as universe
     if universe_file is None:
-        universe_file = analysis.sites
+        try:
+            universe_file = getattr(analysis, "sites").fn
+            _LOGGER.info("Using default background region set from 'analysis.sites': {}'.".format(universe_file))
+        except AttributeError as e:
+            _LOGGER.error("Background region set 'analysis.sites' is not set! Cannot run LOLA!")
+            raise e
 
     # make output dirs
     if not os.path.exists(output_dir):

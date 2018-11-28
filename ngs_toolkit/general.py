@@ -2943,7 +2943,7 @@ def differential_enrichment(
                     os.path.join(output_dir, output_prefix + ".lola.csv"), index=False)
         if 'enrichr' in steps:
             pathway_enr.to_csv(
-                os.path.join(output_dir, output_prefix + ".enrichr.csv"), index=False)
+                os.path.join(output_dir, output_prefix + ".enrichr.csv"), index=False, encoding="utf-8")
     else:
         try:
             background = getattr(analysis, "sites").fn

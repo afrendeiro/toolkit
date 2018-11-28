@@ -2796,11 +2796,13 @@ def differential_enrichment(
     """
     import pandas as pd
     from tqdm import tqdm
+    from ngs_toolkit.general import run_enrichment_jobs
 
     serial = not as_jobs
 
     if data_type == "ATAC-seq":
         from ngs_toolkit.atacseq import characterize_regions_function
+        from ngs_toolkit.general import parse_ame, parse_homer
         matrix = analysis.coverage_annotated
         lola_enr = pd.DataFrame()
         meme_enr = pd.DataFrame()
@@ -2886,12 +2888,11 @@ def differential_enrichment(
                             enr = enrichr(comparison_df.reset_index())
                             enr.to_csv(os.path.join(comparison_dir, output_prefix + ".enrichr.csv"), index=False)
                         else:
-                            enr = pd.read_csv(os.path.join(comparison_dir, output_prefix + ".enrichr.csv"))
+                            enr = pd.read_csv(os.path.join(comparison_dir, output_prefix + ".enrichr.csv"), encoding="utf-8")
                             enr["comparison_name"] = comp
                             pathway_enr = pathway_enr.append(enr, ignore_index=True)
             else:
                 _LOGGER.info("Doing regions of comparison '{}', direction '{}'.".format(comp, direction))
-
                 # do the suite of enrichment analysis
                 characterize_regions_function(
                     analysis, comparison_df,
@@ -2919,7 +2920,9 @@ def differential_enrichment(
                         lola["label"] = "{}.{}".format(comp, direction)
                         lola_enr = lola_enr.append(lola, ignore_index=True)
                     if 'enrichr' in steps:
-                        enr = pd.read_csv(os.path.join(comparison_dir, output_prefix + "_regions.enrichr.csv"), index=False, encoding='utf-8')
+                        enr = pd.read_csv(
+                            os.path.join(comparison_dir, output_prefix + "_regions.enrichr.csv"),
+                            encoding='utf-8')
                         enr["comparison_name"] = comp
                         enr["direction"] = direction
                         enr["label"] = "{}.{}".format(comp, direction)
@@ -3117,7 +3120,7 @@ def collect_differential_enrichment(
 
     # write combined enrichments
     pathway_enr.to_csv(
-        os.path.join(output_dir, output_prefix + ".enrichr.csv"), index=False)
+        os.path.join(output_dir, output_prefix + ".enrichr.csv"), index=False, encoding="utf-8")
     if data_type == "ATAC-seq":
         meme_enr.to_csv(
             os.path.join(output_dir, output_prefix + ".meme_ame.csv"), index=False)

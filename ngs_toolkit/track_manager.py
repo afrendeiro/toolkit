@@ -7,6 +7,10 @@ import textwrap
 
 import pandas as pd
 from peppy import Project
+import ngs_toolkit
+
+
+_LOGGER = ngs_toolkit._LOGGER
 
 
 def parse_arguments():
@@ -30,6 +34,9 @@ def parse_arguments():
     parser.add_argument(
         '-l', '--link', dest="link", action="store_true",
         help="Whether bigWig files should be soft-linked to the track database directory. Default=False.")
+    parser.add_argument("-V", "--version", action="version",
+                        version=ngs_toolkit.__version__)
+
     args = parser.parse_args()
 
     return args

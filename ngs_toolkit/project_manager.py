@@ -8,6 +8,10 @@ import argparse
 import os
 import sys
 import textwrap
+import ngs_toolkit
+
+
+_LOGGER = ngs_toolkit._LOGGER
 
 
 def parse_arguments():
@@ -20,8 +24,9 @@ def parse_arguments():
     parser = argparse.ArgumentParser(
         description=description, epilog=epilog,
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    # parser.add_argument("-V", "--version", action="version",
-    #               version="%(prog)s {v}".format(v=__version__))
+
+    parser.add_argument("-V", "--version", action="version",
+                        version=ngs_toolkit.__version__)
 
     subparsers = parser.add_subparsers(dest="command")
 
@@ -57,10 +62,14 @@ def parse_arguments():
         help="Recipe name.")
     recipe_subparser.add_argument(
         dest="project_config",
-        help="Project config.")
+        help="Project configuration file.")
 
-    # To enable the loop to pass args directly on to the pipelines...
+    for p in [create_subparser, recipe_subparser]:
+        p.add_argument("-V", "--version", action="version",
+                       version=ngs_toolkit.__version__)
+
     args = parser.parse_args()
+    args.root_dir = os.path.abspath(args.root_dir)
 
     return args
 
@@ -76,7 +85,7 @@ def create_project(
 
     if os.path.exists(project_dir):
         if not overwrite:
-            print("Detected existing project directory, skipping.")
+            _LOGGER.error("Detected existing project directory, skipping.")
             return 1
 
     metadata_dir = os.path.join(project_dir, "metadata")
@@ -87,9 +96,8 @@ def create_project(
     src_dir = os.path.join(project_dir, "src")
 
     # make dirs
-    os.makedirs(project_dir)
-    os.makedirs(metadata_dir)
-    os.makedirs(src_dir)
+    for d in [project_dir, metadata_dir, src_dir]:
+        os.makedirs(d, exist_ok=True)
 
     if "{project_name}" in url:
         url = url.format(username=username, project_name=project_name)
@@ -105,39 +113,46 @@ def create_project(
         output_dir: /scratch/lab_bock/shared/projects/{project_name}
         results_subdir: data
         submission_subdir: submission
-        # pipelines_dir: /home/arendeiro/workspace/pipelines
-        pipeline_interfaces: /home/arendeiro/workspace/open_pipelines/pipeline_interface.yaml
+        pipeline_interfaces: /home/{username}/workspace/open_pipelines/pipeline_interface.yaml
         sample_annotation: /scratch/lab_bock/shared/projects/{project_name}/metadata/annotation.csv
         sample_subannotation: /scratch/lab_bock/shared/projects/{project_name}/metadata/merge_table.csv
     data_sources:
-        local: "/scratch/users/arendeiro/data/external/atac-seq/{{sample_name}}.bam"
+        local: "/scratch/users/{username}/data/external/atac-seq/{{sample_name}}.bam"
         bsf: /scratch/lab_bsf/samples/{{flowcell}}/{{flowcell}}_{{lane}}_samples/{{flowcell}}_{{lane}}#{{BSF_name}}.bam
-    genomes:
-        human: hg19
-        mouse: mm10
-    transcriptomes:
-        human: hg19_cdna
-        mouse: mm10_cdna
+    implied_columns:
+        organism:
+            "Homo sapiens":
+                genome: hg19
+                transcriptome: hg19_cdna
+            "human":
+                genome: hg19
+                transcriptome: hg19_cdna
+            "Mus musculus":
+                genome: mm10
+                transcriptome: mm10_cdna
+            "mouse":
+                genome: mm10
+                transcriptome: mm10_cdna
     pipeline_config:
         atacseq: null
     compute:
         submission_template: slurm_template.sub
         submission_command: sbatch
     trackhubs:
-        trackhub_dir: /data/groups/lab_bock/public_html/arendeiro/{project_name}/
+        trackhub_dir: /data/groups/lab_bock/public_html/{username}/{project_name}/
         url: {url}""".format(
         project_name=project_name, username=username, email=email, url=url)
 
     merge_table_template = ",".join([
         "sample_name", "flowcell", "lane", "BSF_name", "data_source"])
     annotation_table_template = ",".join([
-        "sample_name", "toggle", "pass_qc", "library",
+        "sample_name", "toggle", "pass_qc", "protocol", "library",
         "cell_line", "cell_type", "condition",
         "experimental_batch", "experiment_name", "replicate",
         "organism", "flowcell", "lane", "BSF_name", "data_source"])
     comparison_table_template = ",".join([
-        "data_type", "comparison_name", "comparison_side",
-        "sample_name", "sample_group", "toggle"])
+        "comparison_type", "data_type", "comparison_name", "comparison_side",
+        "sample_name", "sample_group", "comparison_genome", "toggle"])
 
     # write config and tables
     with open(project_config, "w") as handle:
@@ -150,34 +165,39 @@ def create_project(
         handle.write(comparison_table_template)
 
     # Initialize git repository
-    return os.system("cd {}; git init".format(project_name))
+    os.chdir(project_dir)
+    return os.system("git init")
 
 
 def create_requirements_file(
         project_name,
-        libraries=["numpy==1.14.0",
-                   "scipy==1.0.0",
-                   "pandas==0.22.0",
-                   "matplotlib==2.1.1",
-                   "seaborn==0.8.1",
-                   "pysam==0.13",
-                   "pybedtools==0.7.10",
-                   "scikit-learn==0.19.1",
-                   "statsmodels==0.8.0",
-                   "patsy==0.4.1",
+        project_dir,
+        libraries=["numpy>=1.14.5",
+                   "scipy>=1.0.1",
+                   "pandas>=0.23.3",
+                   "matplotlib>=2.1.2",
+                   "seaborn>=0.9.0",
+                   "pysam>=0.14.1",
+                   "pybedtools>=0.7.10",
+                   "scikit-learn>=0.20.0",
+                   "statsmodels>=0.9.0",
+                   "patsy>=0.5.0",
                    "rpy2==2.8.6",
                    "peppy==v0.9.2",
-                   "piper==0.8.1"],
+                   "piper==0.6.0",
+                   "ngs-toolkit>={__version__}"],
         overwrite=False):
     """
     Create a requirements.txt file with pip requirements.
     """
-    project_dir = os.path.join(os.path.curdir, project_name)
+    libraries = [l.format(__version__=ngs_toolkit.__version__)
+                 if "__version__" in l else l for l in libraries]
+
     requirements_file = os.path.join(project_dir, "requirements.txt")
 
     if os.path.exists(requirements_file):
         if not overwrite:
-            print("Detected existing, skipping.")
+            _LOGGER.warn("'requirements.txt' file already existing, skipping.")
             return
 
     requirements_filecontent = "\n".join(libraries)
@@ -188,11 +208,10 @@ def create_requirements_file(
 
 
 def create_makefile(
-        project_name, overwrite=False):
+        project_name, project_dir, overwrite=False):
     """
     Create a Makefile to manage the project execution.
     """
-    project_dir = os.path.join(os.path.curdir, project_name)
     makefile = os.path.join(project_dir, "Makefile")
     src_dir = "src"
     log_dir = "log"
@@ -245,31 +264,44 @@ def main():
     Program's main entry point.
     """
     # Parse command-line arguments.
+    _LOGGER.debug("Parsing command-line arguments")
     args = parse_arguments()
 
     if args.command == "create":
+        _LOGGER.info("Creating project '{}' in '{}'.".format(
+            args.project_name, args.root_dir))
         # Create project.
         git_ok = create_project(
             project_name=args.project_name,
             root_dir=args.root_dir,
             overwrite=args.overwrite)
         if git_ok != 0:
+            _LOGGER.error("Initialization of project failed.")
             return git_ok
 
         # Create requirements file.
+        _LOGGER.info("Creating requirements file for project '{}'.".format(
+            args.project_name))
         create_requirements_file(
             project_name=args.project_name,
+            project_dir=os.path.join(args.root_dir, args.project_name),
             overwrite=args.overwrite)
 
         # Create Makefile.
+        _LOGGER.info("Creating Makefile file for project '{}'.".format(
+            args.project_name))
         create_makefile(
             project_name=args.project_name,
+            project_dir=os.path.join(args.root_dir, args.project_name),
             overwrite=args.overwrite)
 
     elif args.command == "recipe":
+        _LOGGER.info("Running recipe '{}'.".format(args.recipe_name))
         run_recipe(
             recipe_name=args.recipe_name,
             project_config=args.project_config)
+
+    _LOGGER.info("Completed.")
 
 
 if __name__ == '__main__':

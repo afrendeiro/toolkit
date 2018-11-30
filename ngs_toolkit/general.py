@@ -1948,6 +1948,7 @@ def plot_differential(
             else:
                 axes = iter([axes])
             for comparison in comparisons:
+                _LOGGER.debug("Comparison '{}'...".format(comparison))
                 c = comparison_table.loc[comparison_table[comparison_column] == comparison, :]
                 a = c.loc[c['comparison_side'] >= 1, "sample_name"]
                 b = c.loc[c['comparison_side'] <= 0, "sample_name"]
@@ -1965,12 +1966,15 @@ def plot_differential(
                 # Scatter for significant
                 diff_vars = results.loc[
                     (results[comparison_column] == comparison) &
-                    (results["diff"] == True), :].index
+                    (results["diff"] == True), :]
                 if diff_vars.shape[0] > 0:
+                    c = -np.log10(results.loc[
+                        (results[comparison_column] == comparison) &
+                        (results["diff"] == True), p_value_column].squeeze())
                     collection = ax.scatter(
-                        b.loc[diff_vars],
-                        a.loc[diff_vars],
-                        alpha=0.1, s=2, c=-np.log10(results.loc[diff_vars, p_value_column]), cmap=cmap, vmin=0)
+                        b.loc[diff_vars.index],
+                        a.loc[diff_vars.index],
+                        alpha=0.1, s=2, c=c, cmap=cmap, vmin=0)
                     add_colorbar_to_axis(collection, label="-log10(p-value)")
                 ax.set_title(comparison)
                 ax.set_xlabel("Down")
@@ -1998,6 +2002,7 @@ def plot_differential(
         else:
             axes = iter([axes])
         for comparison in comparisons:
+            _LOGGER.debug("Comparison '{}'...".format(comparison))
             t = results.loc[results[comparison_column] == comparison, :]
 
             # Hexbin plot
@@ -2007,12 +2012,12 @@ def plot_differential(
                 alpha=0.85, cmap="Greys", color="black", edgecolors="white", linewidths=0, bins='log', mincnt=1, rasterized=True)
 
             # Scatter for significant
-            diff_vars = t.loc[t["diff"] == True, :].index
+            diff_vars = t.loc[t["diff"] == True, :]
             if diff_vars.shape[0] > 0:
                 collection = ax.scatter(
-                    t.loc[diff_vars, log_fold_change_column],
-                    -np.log10(t.loc[diff_vars, p_value_column]),
-                    alpha=0.1, s=2, c=-np.log10(t.loc[diff_vars, p_value_column]), cmap=cmap, vmin=0)
+                    t.loc[diff_vars.index, log_fold_change_column],
+                    -np.log10(t.loc[diff_vars.index, p_value_column]),
+                    alpha=0.1, s=2, c=-np.log10(t.loc[diff_vars.index, p_value_column]), cmap=cmap, vmin=0)
                 add_colorbar_to_axis(collection, label="-log10(p-value)")
             ax.set_title(comparison)
             ax.set_xlabel("log2(fold-change)")
@@ -2039,6 +2044,7 @@ def plot_differential(
         else:
             axes = iter([axes])
         for comparison in comparisons:
+            _LOGGER.debug("Comparison '{}'...".format(comparison))
             t = results.loc[results[comparison_column] == comparison, :]
 
             # Hexbin plot
@@ -2048,12 +2054,12 @@ def plot_differential(
                 alpha=0.85, cmap="Greys", color="black", edgecolors="white", linewidths=0, bins='log', mincnt=1, rasterized=True)
 
             # Scatter for significant
-            diff_vars = t.loc[t["diff"] == True, :].index
+            diff_vars = t.loc[t["diff"] == True, :]
             if diff_vars.shape[0] > 0:
                 collection = ax.scatter(
-                    np.log10(t.loc[diff_vars, mean_column]),
-                    t.loc[diff_vars, log_fold_change_column],
-                    alpha=0.1, s=2, c=-np.log10(t.loc[diff_vars, p_value_column]), cmap=cmap, vmin=0)
+                    np.log10(t.loc[diff_vars.index, mean_column]),
+                    t.loc[diff_vars.index, log_fold_change_column],
+                    alpha=0.1, s=2, c=-np.log10(t.loc[diff_vars.index, p_value_column]), cmap=cmap, vmin=0)
                 add_colorbar_to_axis(collection, label="-log10(p-value)")
             ax.set_title(comparison)
             ax.set_xlabel("Mean {}".format(quantity.lower()))

@@ -2237,7 +2237,7 @@ def plot_differential(
     g = sns.clustermap(
         matrix2,
         yticklabels=feature_labels, cbar_kws={"label": "{} of\ndifferential {}s".format(quantity, var_name)},
-        xticklabels=True, vmin=0, cmap="RdBu_r", metric="correlation", figsize=figsize, rasterized=rasterized, robust=robust, **extra)
+        xticklabels=True, vmin=0, cmap="BuGn", metric="correlation", figsize=figsize, rasterized=rasterized, robust=robust, **extra)
     g.ax_heatmap.set_ylabel("Differential {}s (n = {})".format(var_name, matrix2.shape[0]))
     g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90, fontsize="xx-small")
     g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small")
@@ -2256,7 +2256,7 @@ def plot_differential(
         matrix2,
         col_cluster=False,
         yticklabels=feature_labels, cbar_kws={"label": "{} of\ndifferential {}s".format(quantity, var_name)},
-        xticklabels=True, vmin=0, cmap="RdBu_r", metric="correlation", figsize=figsize, rasterized=rasterized, robust=robust, **extra)
+        xticklabels=True, vmin=0, cmap="BuGn", metric="correlation", figsize=figsize, rasterized=rasterized, robust=robust, **extra)
     g.ax_heatmap.set_ylabel("Differential {}s (n = {})".format(var_name, matrix2.shape[0]))
     g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90, fontsize="xx-small")
     g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small")
@@ -2364,11 +2364,11 @@ def lola(bed_files, universe_file, output_folder, output_prefixes=None, genome="
         lola_results = r2pandas_df(_lola_results)
         _LOGGER.info("Saving all results for file '{}'.".format(bed_file))
         lola_results.to_csv(
-            os.path.join(output_folder, "allEnrichments" + suffix + "tsv"), index=False)
+            os.path.join(output_folder, "allEnrichments" + suffix + "tsv"), index=False, sep="\t")
         for region_set in lola_results['collection'].drop_duplicates():
             _LOGGER.info("Saving results for collection '{}' only.".format(region_set))
             lola_results[lola_results['collection'] == region_set].to_csv(
-                os.path.join(output_folder, "col_" + region_set + suffix + "tsv"), index=False)
+                os.path.join(output_folder, "col_" + region_set + suffix + "tsv"), index=False, sep="\t")
 
 
 def bed_to_fasta(bed_file, fasta_file, genome="hg19", genome_2bit=None):

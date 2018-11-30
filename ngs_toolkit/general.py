@@ -1974,7 +1974,7 @@ def plot_differential(
                     collection = ax.scatter(
                         b.loc[diff_vars.index],
                         a.loc[diff_vars.index],
-                        alpha=0.1, s=2, c=c, cmap=cmap, vmin=0)
+                        alpha=0.5, s=2, c=c, cmap=cmap, vmin=0)
                     add_colorbar_to_axis(collection, label="-log10(p-value)")
                 ax.set_title(comparison)
                 ax.set_xlabel("Down")
@@ -2017,7 +2017,7 @@ def plot_differential(
                 collection = ax.scatter(
                     t.loc[diff_vars.index, log_fold_change_column],
                     -np.log10(t.loc[diff_vars.index, p_value_column]),
-                    alpha=0.1, s=2, c=-np.log10(t.loc[diff_vars.index, p_value_column]), cmap=cmap, vmin=0)
+                    alpha=0.5, s=2, c=-np.log10(t.loc[diff_vars.index, p_value_column]), cmap=cmap, vmin=0)
                 add_colorbar_to_axis(collection, label="-log10(p-value)")
             ax.set_title(comparison)
             ax.set_xlabel("log2(fold-change)")
@@ -2059,7 +2059,7 @@ def plot_differential(
                 collection = ax.scatter(
                     np.log10(t.loc[diff_vars.index, mean_column]),
                     t.loc[diff_vars.index, log_fold_change_column],
-                    alpha=0.1, s=2, c=-np.log10(t.loc[diff_vars.index, p_value_column]), cmap=cmap, vmin=0)
+                    alpha=0.5, s=2, c=-np.log10(t.loc[diff_vars.index, p_value_column]), cmap=cmap, vmin=0)
                 add_colorbar_to_axis(collection, label="-log10(p-value)")
             ax.set_title(comparison)
             ax.set_xlabel("Mean {}".format(quantity.lower()))
@@ -2391,6 +2391,9 @@ def bed_to_fasta(bed_file, fasta_file, genome="hg19", genome_2bit=None):
         if type(genome_2bit) is not str:
             _LOGGER.error(msg)
             return
+
+    if not os.path.exists(genome_2bit):
+        _LOGGER.error("Reference genome in 2bit does not exist or can't be open: '{}'".format(genome_2bit))
 
     # write name column
     bed = pd.read_csv(bed_file, sep='\t', header=None)
@@ -2948,7 +2951,8 @@ def differential_enrichment(
                 # do the suite of enrichment analysis
                 characterize_regions_function(
                     analysis, comparison_df,
-                    output_dir=comparison_dir, prefix=output_prefix, run=serial, genome=genome, steps=steps)
+                    output_dir=comparison_dir, prefix=output_prefix, run=serial,
+                    genome=genome, steps=steps)
 
                 # collect enrichments
                 if serial:
@@ -3131,10 +3135,9 @@ def collect_differential_enrichment(
                 try:
                     homer_cons = pd.read_table(os.path.join(comparison_dir, "knownResults.txt"))
                 except IOError as e:
-                    if permissive:
-                        _LOGGER.error(error_msg.format("HOMER consensus enrichment for comparison {}, direction {}, not found.", comp, direction))
-                    else:
-                        raise e
+                    # Homer consensus is always permissive
+                    _LOGGER.error(error_msg.format("HOMER consensus", comp, direction))
+
                 else:
                     homer_cons.columns = homer_cons.columns.str.replace(r"\(of .*", "")
                     homer_cons["# of Background Sequences with Motif"]
@@ -3381,7 +3384,10 @@ def plot_differential_enrichment(
 
             fig, axis = plt.subplots(n_side, n_side, figsize=(
                 4 * n_side, n_side * max(5, 0.12 * top_n)), sharex=False, sharey=False)
-            axis = iter(axis.flatten())
+            if type(axis) == np.ndarray:
+                axis = iter(axis.flatten())
+            else:
+                axis = iter(np.array([axis]))
             for i, comp in enumerate(top_data[comp_variable].drop_duplicates().sort_values()):
                 df2 = top_data.loc[top_data[comp_variable] == comp, :]
                 ax = next(axis)

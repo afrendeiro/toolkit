@@ -5,13 +5,13 @@ metadata:
 resources:
   genomes:
     2bit:
-      hg19: /scratch/lab_bock/shared/resources/genomes/hg19/hg19.2bit
-      hg38: /scratch/lab_bock/shared/resources/genomes/hg38/hg38.2bit
-      mm10: /scratch/lab_bock/shared/resources/genomes/mm10/mm10.2bit
+      hg19: /data/groups/lab_bock/shared/resources/genomes/hg19/hg19.2bit
+      hg38: /data/groups/lab_bock/shared/resources/genomes/hg38/hg38.2bit
+      mm10: /data/groups/lab_bock/shared/resources/genomes/mm10/mm10.2bit
     fasta:
-      hg19: /scratch/lab_bock/shared/resources/genomes/hg19/hg19.fa
-      hg38: /scratch/lab_bock/shared/resources/genomes/hg38/hg38.fa
-      mm10: /scratch/lab_bock/shared/resources/genomes/mm10/mm10.fa
+      hg19: /data/groups/lab_bock/shared/resources/genomes/hg19/hg19.fa
+      hg38: /data/groups/lab_bock/shared/resources/genomes/hg38/hg38.fa
+      mm10: /data/groups/lab_bock/shared/resources/genomes/mm10/mm10.fa
   lola:
     region_databases:
       # under each section, there should be a list of items
@@ -26,11 +26,11 @@ resources:
         - /data/groups/lab_bock/shared/resources/regions/customRegionDB/mm10/
   meme:
     motif_databases:
-      human: /scratch/lab_bock/shared/resources/motifs/motif_databases/HUMAN/HOCOMOCOv10.meme
-      mouse: /scratch/lab_bock/shared/resources/motifs/motif_databases/MOUSE/uniprobe_mouse.meme
+      human: /data/groups/lab_bock/shared/resources/motifs/motif_databases/HUMAN/HOCOMOCOv10.meme
+      mouse: /data/groups/lab_bock/shared/resources/motifs/motif_databases/MOUSE/uniprobe_mouse.meme
       vertebrate: /home/arendeiro/workspace/homer_4.8/data/knownTFs/vertebrates/known.motifs
     motif_id_mapping:
-      mouse: /scratch/lab_bock/shared/resources/motifs/motif_databases/MOUSE/uniprobe_mouse.id_mapping.tsv
+      mouse: /data/groups/lab_bock/shared/resources/motifs/motif_databases/MOUSE/uniprobe_mouse.id_mapping.tsv
   enrichr:
     gene_set_libraries:
       # this should be a list of items

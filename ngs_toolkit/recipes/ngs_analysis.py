@@ -394,7 +394,7 @@ def main_analysis_pipeline(
             (analysis.differential_results['log2FoldChange'].abs() > abs_fold_change)],
         data_type=data_type,
         output_dir="{}/differential_analysis_{}".format(analysis.results_dir, data_type),
-        genome=genome,  # not all is possible for mm10
+        genome=genome,
         directional=True,
         max_diff=1000,
         sort_var="pvalue",

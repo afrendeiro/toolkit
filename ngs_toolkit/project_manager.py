@@ -241,7 +241,10 @@ def create_makefile(
         ngs_analysis.py {project_config}
 
     analysis_job: summarize mklog
-        sbatch -p longq --time 8-00:00:00 -c 12 --mem 80000 -J {project_name}.analysis -o {log_dir}/$(shell date +"%Y%m%d-%H%M%S").{project_name}.analysis.log --wrap "ngs_analysis.py {project_config}"
+        sbatch -p longq --time 8-00:00:00 -c 12 --mem 80000 \\
+        -J {project_name}.analysis \\
+        -o {log_dir}/$(shell date +"%Y%m%d-%H%M%S").{project_name}.analysis.log \\
+        --x11 --wrap "ngs_analysis {project_config}"
 
     all: requirements process analysis
 

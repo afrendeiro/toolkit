@@ -29,6 +29,11 @@ ngs_toolkit.chipseq
 .. automodule:: ngs_toolkit.chipseq
     :members:
 
+ngs_toolkit.cnv
+-----------------------
+.. automodule:: ngs_toolkit.cnv
+    :members:
+
 ngs_toolkit.rnaseq
 -----------------------
 .. automodule:: ngs_toolkit.rnaseq

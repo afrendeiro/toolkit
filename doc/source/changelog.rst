@@ -1,6 +1,41 @@
 Changelog
 ******************************
 
+
+- **v0.1.6.0** (*2018-12-05*):
+
+  - New CNV module
+  - many fixes and improvements to run various enrichment analysis in serial
+  - add specific attributes to classes - this will be the basis of the new API revamp
+  - add support for running specific steps of enrichment analysis
+  - better utf8 encoding support to all Enrichr inputs/outputs
+  - add support for plotting 1 attribute in unsupervised_analysis
+  - add support for limma regression without covariates; more help messages
+  - fix bug in plot_differential when plotting scatter with colours per p-value
+  - improved general.query_biomart to handle fields with multiple values  
+  - update requirements
+
+  - minor:
+
+    - now plotting MA, scatter and volcano plots even if there are no significant variables
+    - plot log variance in PCA
+    - better docstring styling (in progress)
+    - plotting signed p-value heatmap
+    - support case when only one feature is differential
+    - add option to turn on independnent filtering in DESeq2
+    - add y log scale to p-value and fold-change distplots
+    - homogeneize range of p-value colouring of scatter, volcano and MA plots across comparisons - new colormap
+    - better handling of missing comparisons in general.plot_differential
+    - better plotting of plot_differential p-values
+    - fix example config to correct paths
+    - add verbosity to manager programs
+    - reporting more info for plot_differential
+
+
+.. |br| raw:: html
+
+   <br />
+
 - **v0.1.5.1** (*2018-11-25*):
 
   - add config file support for better system-independent operation (specially for enrichment analysis)
@@ -11,6 +46,10 @@ Changelog
   - add set n. of PCs to calculate to PCA
   - add better colorbars
   - add serial processing of peak commands as option for ChIP-seq peak calling
+
+.. |br| raw:: html
+
+   <br />
 
 
 - **v0.1.4.2** (*2018-10-29*):

@@ -305,6 +305,15 @@ class Analysis(object):
             output_matrix = "binding"
             if quant_matrix is None:
                 quant_matrix = "coverage_annotated"
+        elif self.data_type == "CNV":
+            output_matrix = "cnv"
+            if quant_matrix is None:
+                if type(getattr(self, quant_matrix)) is not pd.DataFrame:
+                    _LOGGER.error("For CNV data type, the matrix to be annotated must be" +
+                                  " directly passed to the function throught the `quant_matrix` argument!")
+                    raise ValueError
+            if quant_matrix is None:
+                quant_matrix = "coverage_norm"
         elif self.data_type == "RNA-seq":
             output_matrix = "expression"
             if quant_matrix is None:
@@ -567,16 +576,16 @@ def unsupervised_analysis(
             plot_prefix = "all_sites"
         if quant_matrix is None:
             quant_matrix = "binding"
-    elif data_type == "RNA-seq":
-        if plot_prefix is None:
-            plot_prefix = "all_genes"
-        if quant_matrix is None:
-            quant_matrix = "expression"
     elif data_type == "CNV":
         if plot_prefix is None:
             plot_prefix = "all_bins"
         if quant_matrix is None:
             quant_matrix = "cnv"
+    elif data_type == "RNA-seq":
+        if plot_prefix is None:
+            plot_prefix = "all_genes"
+        if quant_matrix is None:
+            quant_matrix = "expression"
     else:
         raise ValueError("Data types can only be 'ATAC-seq', 'RNA-seq' or 'CNV'.")
 
@@ -1408,7 +1417,7 @@ def differential_analysis(
     elif data_type == "RNA-seq":
         count_matrix = analysis.expression_matrix_counts
     else:
-        raise AssertionError("Given data type does not match 'ATAC-seq' or 'RNA-seq'.")
+        raise ValueError("Differential analysis is only implemented for data types 'ATAC-seq' or 'RNA-seq'.")
 
     if samples is None:
         samples = analysis.samples
@@ -1443,7 +1452,6 @@ def differential_analysis(
         results = deseq_analysis(
             count_matrix, experiment_matrix, comparison_table,
             formula, output_dir, output_prefix, alpha=alpha, overwrite=overwrite)
-
         try:
             results = results.set_index("index")
         except KeyError:
@@ -1585,10 +1593,15 @@ def differential_overlap(
     if "{data_type}" in output_dir:
         output_dir = output_dir.format(data_type=data_type)
 
-    if data_type == "ATAC-seq":
+    if data_type in ["ATAC-seq", "ChIP-seq"]:
         unit = "region"
+    if data_type == "CNV":
+        unit = "bin"
     elif data_type == "RNA-seq":
         unit = "gene"
+    else:
+        _LOGGER.warn("Unknown data type. Will not use data-specific units.")
+        unit = "feature"
 
     if "direction" not in differential.columns:
         differential["direction"] = differential["log2FoldChange"].apply(lambda x: "up" if x > 0 else "down")
@@ -1948,7 +1961,7 @@ def plot_differential(
         quantity = "Expression"
         unit = "TPM"
     else:
-        raise AssertionError("Given data type does not match 'ATAC-seq' or 'RNA-seq'.")
+        raise AssertionError("Plot differential is only implemented for data types 'ATAC-seq' or 'RNA-seq'.")
 
     if samples is None:
         samples = analysis.samples
@@ -3051,7 +3064,7 @@ def differential_enrichment(
         matrix = analysis.expression
         pathway_enr = pd.DataFrame()
     else:
-        raise AssertionError("`data_type` must match one of 'ATAC-seq' or 'RNA-seq'.")
+        raise ValueError("Differential enrichment is only implemented for data types 'ATAC-seq' and 'RNA-seq'.")
 
     known = ['lola', 'meme', 'homer', 'enrichr']
     if not all([x in known for x in steps]):
@@ -3227,7 +3240,7 @@ def collect_differential_enrichment(
     from tqdm import tqdm
 
     if data_type not in ["ATAC-seq", "RNA-seq"]:
-        raise AssertionError("`data_type` must match one of 'ATAC-seq' or 'RNA-seq'.")
+        raise ValueError("`data_type` must match one of 'ATAC-seq' or 'RNA-seq'.")
 
     if "{data_type}" in output_dir:
         output_dir = output_dir.format(data_type=data_type)

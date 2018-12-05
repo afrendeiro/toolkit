@@ -116,6 +116,11 @@ def create_project(
         pipeline_interfaces: /home/{username}/workspace/open_pipelines/pipeline_interface.yaml
         sample_annotation: /scratch/lab_bock/shared/projects/{project_name}/metadata/annotation.csv
         sample_subannotation: /scratch/lab_bock/shared/projects/{project_name}/metadata/merge_table.csv
+        comparison_table: /scratch/lab_bock/shared/projects/{project_name}/metadata/comcomparison_table.csv
+    sample_attributes:
+        - sample_name
+    group_attributes:
+        - sample_name
     data_sources:
         local: "/scratch/users/{username}/data/external/atac-seq/{{sample_name}}.bam"
         bsf: /scratch/lab_bsf/samples/{{flowcell}}/{{flowcell}}_{{lane}}_samples/{{flowcell}}_{{lane}}#{{BSF_name}}.bam

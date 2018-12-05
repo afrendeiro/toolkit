@@ -199,7 +199,6 @@ def main():
             print("Group-wise labeling of samples will not be possible!")
             group_attributes = ['sample_name']
 
-
         if "comparison_table" in prj.metadata.keys():
             comparison_table_file = prj.metadata['comparison_table']
             print("Using comparison table specified in project configuration file: '{}'.".format(comparison_table_file))
@@ -278,7 +277,10 @@ def main_analysis_pipeline(
         # Annotate peaks with closest gene, chromatin state,
         # genomic location, mean and variance measurements across samples
         analysis.annotate()
-        analysis.annotate_with_sample_metadata(attributes=sample_attributes)
+        attrs = (
+            ['sample_name'] + sample_attributes
+            if "sample_name" not in sample_attributes else sample_attributes)
+        analysis.annotate_with_sample_metadata(attributes=attrs)
         analysis.to_pickle()
 
         # QC plots
@@ -304,17 +306,14 @@ def main_analysis_pipeline(
     unsupervised_analysis(
         analysis,
         quant_matrix=quant_matrix,
-        samples=None,
         attributes_to_plot=plotting_attributes,
-        plot_prefix="all_{}".format(feature_name),
         plot_max_attr=20,
         plot_max_pcs=6,
         plot_group_centroids=True,
         axis_ticklabels=False,
         axis_lines=True,
         always_legend=False,
-        display_corr_values=False,
-        output_dir="{results_dir}/unsupervised_analysis")
+        display_corr_values=False)
 
     # Supervised analysis
     comps = comparison_table[
@@ -332,7 +331,6 @@ def main_analysis_pipeline(
             comps,
             data_type=data_type,
             samples=[s for s in analysis.samples if s.name in comps['sample_name'].tolist()],
-            output_dir="{}/differential_analysis_{}".format(analysis.results_dir, data_type),
             covariates=None,
             alpha=0.05,
             overwrite=True)
@@ -348,7 +346,6 @@ def main_analysis_pipeline(
                 comp,
                 data_type=data_type,
                 samples=[s for s in analysis.samples if s.name in comp['sample_name'].tolist()],
-                output_dir="{}/differential_analysis_{}".format(analysis.results_dir, data_type),
                 covariates=None, alpha=alpha, overwrite=True)
             analysis.differential_results = analysis.differential_results.append(res, ignore_index=True)
         analysis.differential_results = analysis.differential_results.set_index("index")
@@ -368,7 +365,6 @@ def main_analysis_pipeline(
         differential_overlap(
             diff,
             getattr(analysis, quant_matrix).shape[0],
-            output_dir="{}/differential_analysis_{}".format(analysis.results_dir, data_type),
             data_type=data_type)
 
     plot_differential(
@@ -376,8 +372,6 @@ def main_analysis_pipeline(
         analysis.differential_results,
         matrix=getattr(analysis, quant_matrix),
         comparison_table=comps,
-        output_dir="{}/differential_analysis_{}".format(analysis.results_dir, data_type),
-        output_prefix="differential_analysis",
         data_type=data_type,
         alpha=alpha,
         corrected_p_value=True,
@@ -393,7 +387,6 @@ def main_analysis_pipeline(
             (analysis.differential_results['padj'] < alpha) &
             (analysis.differential_results['log2FoldChange'].abs() > abs_fold_change)],
         data_type=data_type,
-        output_dir="{}/differential_analysis_{}".format(analysis.results_dir, data_type),
         genome=genome,
         directional=True,
         max_diff=1000,
@@ -406,7 +399,6 @@ def main_analysis_pipeline(
             (analysis.differential_results['log2FoldChange'].abs() > abs_fold_change)],
         directional=True,
         data_type=data_type,
-        output_dir="{}/differential_analysis_{}".format(analysis.results_dir, data_type),
         permissive=False)
 
     if data_type == "RNA-seq":
@@ -418,7 +410,6 @@ def main_analysis_pipeline(
             enrichment_table,
             "enrichr",
             data_type=data_type,
-            output_dir="{}/differential_analysis_{}".format(analysis.results_dir, data_type),
             output_prefix="differential_analysis",
             direction_dependent=True,
             top_n=5)
@@ -438,7 +429,6 @@ def main_analysis_pipeline(
                 enrichment_table,
                 enrichment_name,
                 data_type=data_type,
-                output_dir="{}/differential_analysis_{}".format(analysis.results_dir, data_type),
                 direction_dependent=True,
                 top_n=5 if enrichment_name != "motif" else 300)
 

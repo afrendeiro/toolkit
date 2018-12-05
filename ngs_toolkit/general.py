@@ -32,27 +32,38 @@ class Analysis(object):
     """
     Generic class holding functions and data from a typical NGS analysis.
 
-    Other modules implement classes inheriting from this that in general contain data type-specific
-    functions (e.g. ``ngs_toolkit.atacseq.ATACSeqAnalysis`` has a ``get_consensus_sites`` function to generate a peak consensus map).
+    Other modules implement classes inheriting from this that in general contain
+    data type-specific functions (e.g. ``ngs_toolkit.atacseq.ATACSeqAnalysis``
+    has a ``get_consensus_sites`` function to generate a peak consensus map).
 
-    Objects of this type can be used to store data (e.g. dataframes), variables (e.g. paths to files or configurations) and are
-    easily serializable (saved to a file as an object) for rapid loading and cross-environment portability.
-    See the ``ngs_toolkit.general.Analysis.to_pickle``, ``ngs_toolkit.general.Analysis.from_pickle`` and ``ngs_toolkit.general.Analysis.update`` functions for this.
+    Objects of this type can be used to store data (e.g. dataframes), variables
+    (e.g. paths to files or configurations) and are easily serializable (saved
+    to a file as an object) for rapid loading and cross-environment portability.
+    See the ``ngs_toolkit.general.Analysis.to_pickle``,
+    ``ngs_toolkit.general.Analysis.from_pickle`` and
+    ``ngs_toolkit.general.Analysis.update`` functions for this.
 
     :param name: Name of the analysis. Defaults to ``analysis``.
     :type name: str, optional
-    :param samples: List of ``peppy.Sample`` objects that this analysis is tied to. Defaults to ``None``.
+    :param samples: List of ``peppy.Sample`` objects that this analysis is tied to.
+                    Defaults to ``None``.
     :type samples: list, optional
-    :param prj: A ``peppy.Project`` object that this analysis is tied to. Defaults to ``None``.
+    :param prj: A ``peppy.Project`` object that this analysis is tied to.
+                Defaults to ``None``.
     :type prj: peppy.Project, optional
-    :param data_dir: Directory containing processed data that will be input to the analysis.
-                     This is in principle not required. Defaults to ``data``.
+    :param data_dir: Directory containing processed data (e.g. by looper) that will
+                     be input to the analysis. This is in principle not required.
+                     Defaults to ``data``.
     :type data_dir: str, optional
-    :param results_dir: Directory to contain outputs produced by the analysis. Defaults to ``results``.
+    :param results_dir: Directory to contain outputs produced by the analysis.
+                        Defaults to ``results``.
     :type results_dir: str, optional
-    :param pickle_file: A pickle file to serialize the object. Defaults to "`name`.pickle".
+    :param pickle_file: A pickle file to serialize the object.
+                        Defaults to "`name`.pickle".
     :type pickle_file: str, optional
-    :param from_pickle: Whether the analysis should be loaded from an existing serialized analysis object in ``pickle_file``. Defaults to False.
+    :param from_pickle: Whether the analysis should be loaded from an existing
+                        serialized analysis object in ``pickle_file``.
+                        Defaults to False.
     :type from_pickle: bool, optional
 
     Additional keyword arguments will simply be stored as object attributes.
@@ -77,27 +88,46 @@ class Analysis(object):
             pickle_file = os.path.join(results_dir, "{}.pickle".format(self.name))
         self.pickle_file = pickle_file
 
-        # If no samples are provided but the prj object has samples,
-        # set them as well
-        if self.samples is None:
-            if self.prj is not None:
-                if hasattr(self.prj, "samples"):
-                    self.samples = prj.samples
-
         for directory in [self.data_dir, self.results_dir]:
             if not os.path.exists(directory):
                 os.makedirs(directory)
 
+        # Store projects attributes in self
+        msg = "Setting project's samples as the analysis samples."
+        # # for samples, only if not provided already
+        if self.samples is None:
+            if hasattr(self.prj, "samples"):
+                _LOGGER.info(msg)
+                self.samples = prj.samples
+        # # for the others, get them
+        for attr in ["comparison_table"]:
+            msg = "Setting project's '{0}' as the analysis '{0}'.".format(attr)
+            if hasattr(self.prj.metadata, attr):
+                _LOGGER.info(msg)
+                setattr(self, attr, getattr(self.prj, attr))
+        for attr in ["sample_attributes", "group_attributes"]:
+            msg = "Setting project's '{0}' as the analysis '{0}'.".format(attr)
+            if hasattr(self.prj, attr):
+                _LOGGER.info(msg)
+                setattr(self, attr, getattr(self.prj, attr))
+
         # parse remaining kwargs
+        _LOGGER.debug("Adding additional kwargs to analysis object.")
         self.__dict__.update(kwargs)
 
         # reload itself if required
         if from_pickle:
-            self.update()
+            _LOGGER.info("Updating analysis object from pickle file: '{}'.".format(self.pickle_file))
+            self.update(pickle_file=self.pickle_file)
 
-        self.data_type = self.__data_type__ = self._var_names = None
-        self._quantity = self._norm_units = None
-        self._raw_matrix_name = self._norm_matrix_name = self._annot_matrix_name = None
+        _LOGGER.debug("Setting data type-specific attributes to None.")
+        self.data_type = self.__data_type__ = None
+        self._var_names = None
+        self._quantity = None
+        self._norm_units = None
+        self._raw_matrix_name = None
+        self._norm_matrix_name = None
+        self._annot_matrix_name = None
 
     @pickle_me
     def to_pickle(self):
@@ -110,7 +140,8 @@ class Analysis(object):
         """
         Load object from pickle file.
 
-        :param pickle_file: Pickle file to load. By default this is the object's attribute `pickle_file`.
+        :param pickle_file: Pickle file to load. By default this is the object's
+                            attribute `pickle_file`.
         :type pickle_file: str, optional
         """
         import pickle
@@ -120,9 +151,11 @@ class Analysis(object):
 
     def update(self, pickle_file=None):
         """
-        Update all of the object's attributes with the attributes from a serialized object (i.e. object stored in a file) object.
+        Update all of the object's attributes with the attributes from a serialized
+        object (i.e. object stored in a file) object.
 
-        :param pickle_file: Pickle file to load. By default this is the object's attribute `pickle_file`.
+        :param pickle_file: Pickle file to load. By default this is the object's attribute
+                            `pickle_file`.
         :type pickle_file: str, optional
         """
         self.__dict__.update(self.from_pickle(pickle_file=pickle_file).__dict__)
@@ -133,33 +166,40 @@ class Analysis(object):
             # TODO: implement dataframe return
             as_dataframe=False):
         """
-        Get tuples of floats representing a colour for a sample in a given variable in a dataframe's index
-        (particularly useful with MultiIndex dataframes).
+        Get tuples of floats representing a colour for a sample in a given variable in a
+        dataframe's index (particularly useful with MultiIndex dataframes).
 
-        By default, will act on the columns and its levels of an `matrix` dataframe of self. Other ``index`` and ``levels`` can
-        be passed for customization.
+        By default, will act on the columns and its levels of an `matrix` dataframe of self.
+        Other ``index`` and ``levels`` can be passed for customization.
 
-        Will try to guess if each variable is categorical or numerical and return either colours from a colour ``pallete``
-        or a ``cmap``, respectively with null values set to ``nan_color`` (a 4-value tuple of floats).
+        Will try to guess if each variable is categorical or numerical and return either colours
+        from a colour ``pallete`` or a ``cmap``, respectively with null values set to ``nan_color``
+        (a 4-value tuple of floats).
 
-        :param index: Pandas Index to use. If not provided (default == None), this will be the column Index of the provided ``matrix``.
+        :param index: Pandas Index to use. If not provided (default == None), this will be
+        the column Index of the provided ``matrix``.
         :type index: pandas.Index, optional
-        :param matrix: Name of analysis attribute containing a dataframe with pandas.MultiIndex columns to use.
-                       Defaults to ``accessibility``.
+        :param matrix: Name of analysis attribute containing a dataframe with pandas.MultiIndex
+                       columns to use. Defaults to ``accessibility``.
         :type matrix: str, optional
         :param levels: Levels of multiindex to restrict to. Defaults to all in index.
         :type levels: list, optional
         :param pallete: Name of matplotlib color palete to use with categorical levels.
-                        See matplotlib.org/examples/color/colormaps_reference.html. Defaults to ``Paired``.
+                        See matplotlib.org/examples/color/colormaps_reference.html.
+                        Defaults to ``Paired``.
         :type pallete: str, optional
         :param cmap: Name of matplotlib color palete to use with numerical levels.
-                     See matplotlib.org/examples/color/colormaps_reference.html. Defaults to ``RdBu_r``.
+                     See matplotlib.org/examples/color/colormaps_reference.html.
+                     Defaults to ``RdBu_r``.
         :type cmap: str, optional
-        :param nan_color: Color for missing (i.e. NA) values. Defaults to ``(0.662745, 0.662745, 0.662745, 0.5)`` == ``grey``.
+        :param nan_color: Color for missing (i.e. NA) values.
+                          Defaults to ``(0.662745, 0.662745, 0.662745, 0.5)`` == ``grey``.
         :type nan_color: tuple, optional
-        :param as_dataframe: Whether a dataframe should be return. Defaults to False. Not implemented yet.
+        :param as_dataframe: Whether a dataframe should be return. Defaults to False.
+                             Not implemented yet.
         :type as_dataframe: bool, optional
-        :returns: List of list tuples (matrix) of shape (level, sample) with rgb values of each of the variable.
+        :returns: List of list tuples (matrix) of shape (level, sample) with rgb values of
+                  each of the variable.
         :rtype: {list}
         """
         import numpy as np
@@ -191,7 +231,8 @@ class Analysis(object):
             # determine the type of data in each level
             # TODO: check this works in all cases
             most_common = Counter([type(x) for x in level]).most_common()[0][0]
-            _LOGGER.info("{}, {}".format(level.name, most_common))
+            _LOGGER.debug("Getting colours for level '{}', which has type '{}'."
+                          .format(level.name, most_common))
 
             # Add either colors based on categories or numerical scale
             if most_common in [int, float, np.float32, np.float64, np.int32, np.int64]:
@@ -228,8 +269,9 @@ class Analysis(object):
             save=True,
             assign=True):
         """
-        Annotate matrix ``(n_regions, n_samples)`` with sample metadata (creates MultiIndex on columns).
-        Numerical attributes can be pass as a iterable to ``numerical_attributes`` to be converted.
+        Annotate matrix ``(n_regions, n_samples)`` with sample metadata
+        (creates MultiIndex on columns). Numerical attributes can be pass as a iterable
+        to ``numerical_attributes`` to be converted.
 
         :param str quant_matrix: Attribute name of matrix to annotate. By default this will
                                  be infered from the analysis data_type in the following way:
@@ -248,7 +290,8 @@ class Analysis(object):
                             ``expression`` if ``data_type`` is "RNA-seq.
         :var pd.DataFrame {accessibility,binding,expression}: A pandas DataFrame with
                                                               MultiIndex column index
-                                                              containing the sample's attributes specified.
+                                                              containing the sample's
+                                                              attributes specified.
         :returns pd.DataFrame: Annotated dataframe with requested sample attributes.
         """
         if attributes is None:
@@ -271,7 +314,8 @@ class Analysis(object):
             assign = False
             output_matrix = ""
             if quant_matrix is None:
-                raise ValueError("Data type of object not known, must specify `quant_matrix` to annotate!")
+                msg = "Data type of object not known, must specify `quant_matrix` to annotate!"
+                raise ValueError(msg)
 
         matrix = getattr(self, quant_matrix)
 
@@ -305,7 +349,8 @@ class Analysis(object):
                 os.path.join(
                     self.results_dir,
                     self.name + "{}.annotated_metadata.csv"
-                        .format("." + output_matrix if output_matrix != "" else output_matrix)), index=True)
+                        .format("." + output_matrix if output_matrix != "" else output_matrix)),
+                index=True)
         if assign:
             setattr(self, output_matrix, df)
         return df
@@ -318,7 +363,8 @@ def count_reads_in_intervals(bam, intervals):
 
     :param bam: BAM file.
     :type bam: str
-    :param intervals: List of strings with genomic coordinates in format ``"chrom:start-end"``.
+    :param intervals: List of strings with genomic coordinates in format
+                      ``"chrom:start-end"``.
     :type intervals: list
     :returns: Dict of read counts for each interval.
     :rtype: dict
@@ -392,7 +438,7 @@ def unsupervised_analysis(
         data_type="ATAC-seq",
         quant_matrix=None,
         samples=None,
-        attributes_to_plot=["cell_type"],
+        attributes_to_plot=["sample_name"],
         plot_prefix=None,
         standardize_matrix=False,
         manifold_algorithms=['MDS', "Isomap", "LocallyLinearEmbedding", "SpectralEmbedding", "TSNE"],
@@ -412,60 +458,92 @@ def unsupervised_analysis(
         dpi=300,
         output_dir="{results_dir}/unsupervised_analysis_{data_type}"):
     """
-    Apply unsupervised clustering and dimensionality reduction methods (MDS, PCA) on numeric matrix.
+    Unsupervised analysis for several data types.
+
+    Apply unsupervised clustering, manifold learning and dimensionality reduction
+    methods on numeric matrix.
     Colours and labels samples by their attributes as given in `attributes_to_plot`.
-    For PCA analysis, if `test_pc_association` is `True`, will compute association of PCs with sample
-    attributes given in `attributes_to_plot`. For numeric attributes, the Pearson correlation will be computed
-    and for categoriacal, a pairwise Kruskal-Wallis H-test (ANOVA).
+
+    For PCA analysis, if `test_pc_association` is `True`, will compute association of PCs
+    with sample attributes given in `attributes_to_plot`. For numeric attributes,
+    the Pearson correlation will be computed and for categoriacal, a pairwise
+    Kruskal-Wallis H-test (ANOVA).
+
     :param analysis: Analysis object to perform analysis for.
     :type analysis: ngs_toolkit.general.Analysis
     :param data_type: Data type. One of "ATAC-seq" or "RNA-seq". Defaults to "ATAC-seq".
     :type data_type: str, optional
-    :param quant_matrix: Name of analysis attribute contatining the numeric dataframe to perform analysis on.
-                         Defaults to "accessibility" if data_type is ATAC-seq and "expression_annotated" if data_type is RNA-seq.
+    :param quant_matrix: Name of analysis attribute contatining the numeric dataframe
+                         to perform analysis on.
+                         Defaults to "accessibility" if data_type is ATAC-seq and
+                         "expression_annotated" if data_type is RNA-seq.
                          This matrix should have a pandas.MultiIndex as column index.
     :type quant_matrix: str, optional
     :param samples: List of sample objects to restrict analysis to. Defaults to None.
     :type samples: list, optional
-    :param attributes_to_plot: List of attributes shared between sample groups should be plotted. Defaults to ["cell_type"].
+    :param attributes_to_plot: List of attributes shared between sample groups should be plotted.
+                               Defaults to ["cell_type"].
     :type attributes_to_plot: list, optional
     :param plot_prefix: Prefix for output files.
-                        Defaults to "all_sites" if data_type is ATAC-seq and "all_genes" if data_type is RNA-seq.
+                        Defaults to "all_sites" if data_type is ATAC-seq and "all_genes" if
+                        data_type is RNA-seq.
     :type plot_prefix: str, optional
-    :param standardize_matrix: Whether to standardize variables in `quant_matrix` by removing the mean and scaling to unit variance.
+    :param standardize_matrix: Whether to standardize variables in `quant_matrix` by removing
+                               the mean and scaling to unit variance.
     :type standardize_matrix: bool, optional
-    :param manifold_algorithms: List of manifold algorithms to use. See available algorithms here: http://scikit-learn.org/stable/modules/classes.html#module-sklearn.manifold
+    :param manifold_algorithms: List of manifold algorithms to use. See available algorithms here:
+                        http://scikit-learn.org/stable/modules/classes.html#module-sklearn.manifold
     :type manifold_algorithms: list, optional
-    :param test_pc_association: Whether a test of association of principal components and variables in `attributes_to_plot` should be conducted. Defaults to True.
+    :param test_pc_association: Whether a test of association of principal components and variables
+                                in `attributes_to_plot` should be conducted.
+                                Defaults to True.
     :type test_pc_association: bool, optional
-    :param display_corr_values: Whether values in heatmap of sample correlations should be displayed overlaid on top of colours. Defaults to False.
+    :param display_corr_values: Whether values in heatmap of sample correlations should be
+                                displayed overlaid on top of colours. Defaults to False.
     :type display_corr_values: bool, optional
-    :param plot_max_attr: Maximum number of sample attributes to plot for each factor in plot legend. Defaults to 20.
+    :param plot_max_attr: Maximum number of sample attributes to plot for each factor in plot legend.
+                          Defaults to 20.
     :type plot_max_attr: int, optional
-    :param plot_max_pcs: Maximum number of principal components to plot. This only affects plotting. All PCs will be calculated. Defaults to 8.
+    :param plot_max_pcs: Maximum number of principal components to plot. This only affects plotting.
+                         All PCs will be calculated.
+                         Defaults to 8.
     :type plot_max_pcs: number, optional
-    :param plot_group_centroids: Whether centroids of each sample group should be plotted alongside samples. Will be square shaped. Defaults to True.
+    :param plot_group_centroids: Whether centroids of each sample group should be plotted alongside
+                                 samples. Will be square shaped.
+                                 Defaults to True.
     :type plot_group_centroids: bool, optional
-    :param axis_ticklabels: Whether MDS and PCA axis ticks and ticklabels should be plotted. Defaults to False.
+    :param axis_ticklabels: Whether MDS and PCA axis ticks and ticklabels should be plotted.
+                            Defaults to False.
     :type axis_ticklabels: bool, optional
-    :param axis_lines: Whether (0, 0) dashed lines should be plotted in MDS and PCA. Defaults to True.
+    :param axis_lines: Whether (0, 0) dashed lines should be plotted in MDS and PCA.
+                       Defaults to True.
     :type axis_lines: bool, optional
-    :param legends: Whether legends for group colours should be plotted in MDS and PCA. Defaults to False.
+    :param legends: Whether legends for group colours should be plotted in MDS and PCA.
+                    Defaults to False.
     :type legends: bool, optional
-    :param always_legend: Whether legends for group colours should be plotted in every figure panel in MDS and PCA.
-                          If False, will plot just on first/last figure panel. Defaults to False.
+    :param always_legend: Whether legends for group colours should be plotted in every figure
+                          panel in MDS and PCA.
+                          If False, will plot just on first/last figure panel.
+                          Defaults to False.
     :type always_legend: bool, optional
-    :param prettier_sample_names: Whether it should attempt to prettify sample names by removing the data type from plots. Defaults to True.
+    :param prettier_sample_names: Whether it should attempt to prettify sample names by
+                                  removing the data type from plots.
+                                  Defaults to True.
     :type prettier_sample_names: bool, optional
-    :param pallete: Color pallete to use in levels of `attributes_to_plot`. Will be passed to `analysis.get_level_colors`.
+    :param pallete: Color pallete to use in levels of `attributes_to_plot`. Will be passed to
+                    `analysis.get_level_colors`.
     :type pallete: str
-    :param cmap: Color map to use in numerical levels of `attributes_to_plot`. Will be passed to `analysis.get_level_colors`.
+    :param cmap: Color map to use in numerical levels of `attributes_to_plot`. Will be passed
+                 to `analysis.get_level_colors`.
     :type cmap: str
-    :param rasterized: Whether elements with many objects should be rasterized. Defaults to False.
+    :param rasterized: Whether elements with many objects should be rasterized.
+                       Defaults to False.
     :type rasterized: bool, optional
-    :param dpi: Definition of rasterized image in dots per inch. Defaults to 300dpi.
+    :param dpi: Definition of rasterized image in dots per inch.
+                       Defaults to 300dpi.
     :type dpi: number, optional
-    :param output_dir: Directory for generated files and plots. Defaults to "{results_dir}/unsupervised_analysis_{data_type}".
+    :param output_dir: Directory for generated files and plots.
+                       Defaults to "{results_dir}/unsupervised_analysis_{data_type}".
     :type output_dir: str, optional
     :returns: None
     """
@@ -540,10 +618,9 @@ def unsupervised_analysis(
     #         .str.replace("RNA-seq_", "")
     #         .str.replace("ChIP-seq_", ""))
 
-
     # Pairwise correlations
     for method in ['pearson', 'spearman']:
-        _LOGGER.info("Plotting pairwise correlation for with '{}' metric.".format(method))
+        _LOGGER.info("Plotting pairwise correlation with '{}' metric.".format(method))
         g = sns.clustermap(
             # yticklabels=sample_display_names,
             X.astype(float).corr(method), xticklabels=False, yticklabels=True, annot=display_corr_values,
@@ -556,7 +633,6 @@ def unsupervised_analysis(
         g.fig.savefig(os.path.join(
             output_dir, "{}.{}.{}_correlation.clustermap.svg"
             .format(analysis.name, plot_prefix, method)), bbox_inches='tight', dpi=dpi)
-
 
     # Manifolds
     params = {
@@ -636,7 +712,6 @@ def unsupervised_analysis(
             output_dir, "{}.{}.{}.svg"
             .format(analysis.name, plot_prefix, algo.lower())), bbox_inches='tight', dpi=dpi)
 
-
     # PCA
     pcs = min(*X.shape) - 1
     _LOGGER.info("Decomposing data with 'PCA' algorithm for {} dimensions.".format(pcs))
@@ -647,13 +722,18 @@ def unsupervised_analysis(
 
     # plot % explained variance per PC
     _LOGGER.info("Plotting variance explained with PCA.")
-    fig, axis = plt.subplots(1)
-    axis.plot(
+    fig, axis = plt.subplots(1, 2, figsize=(4 * 2, 4))
+    axis[0].plot(
         range(1, len(pca.explained_variance_) + 1),  # all PCs
-        (pca.explained_variance_ / pca.explained_variance_.sum()) * 100, 'o-')  # % of total variance
-    axis.axvline(len(attributes_to_plot), linestyle='--')
-    axis.set_xlabel("PC")
-    axis.set_ylabel("% variance")
+        (pca.explained_variance_ / pca.explained_variance_.sum()) * 100, 'o-')
+    axis[1].plot(
+        range(1, len(pca.explained_variance_) + 1),  # all PCs
+        np.log10(pca.explained_variance_), 'o-')
+    for ax in axis:
+        ax.axvline(len(attributes_to_plot), linestyle='--')
+        ax.set_xlabel("PC")
+    axis[0].set_ylabel("% variance")
+    axis[1].set_ylabel("log variance")
     sns.despine(fig)
     fig.savefig(os.path.join(
         output_dir, "{}.{}.pca.explained_variance.svg"
@@ -777,7 +857,8 @@ def unsupervised_analysis(
 
                 associations.append([pc + 1, attr, variable_type, np.nan, np.nan, p])
 
-    associations = pd.DataFrame(associations, columns=["pc", "attribute", "variable_type", "group_1", "group_2", "p_value"])
+    associations = pd.DataFrame(
+        associations, columns=["pc", "attribute", "variable_type", "group_1", "group_2", "p_value"])
 
     # write
     _LOGGER.info("Saving associations.")
@@ -802,7 +883,8 @@ def unsupervised_analysis(
     # heatmap of -log p-values
     g = sns.clustermap(
         -np.log10(pivot), row_cluster=False,
-        annot=True, cbar_kws={"label": "-log10(p_value) of association"}, square=True, rasterized=rasterized)
+        annot=True, cbar_kws={"label": "-log10(p_value) of association"},
+        square=True, rasterized=rasterized)
     g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=45, ha="right")
     g.fig.savefig(os.path.join(
         output_dir, "{}.{}.pca.variable_principle_components_association.svg"
@@ -811,7 +893,8 @@ def unsupervised_analysis(
     # heatmap of masked significant
     g = sns.clustermap(
         (pivot < 0.05).astype(int),
-        row_cluster=False, cbar_kws={"label": "significant association"}, square=True, rasterized=rasterized)
+        row_cluster=False, cbar_kws={"label": "significant association"},
+        square=True, rasterized=rasterized)
     g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=45, ha="right")
     g.fig.savefig(os.path.join(
         output_dir, "{}.{}.pca.variable_principle_components_association.masked.svg"
@@ -821,7 +904,7 @@ def unsupervised_analysis(
 def deseq_analysis(
         count_matrix, experiment_matrix, comparison_table, formula,
         output_dir, output_prefix,
-        overwrite=True, alpha=0.05):
+        overwrite=True, alpha=0.05, independent_filtering=False):
     """
     Perform differential comparison analysis with DESeq2.
 
@@ -910,13 +993,17 @@ def deseq_analysis(
 
         contrast = np.array(["sample_group", a, b])
         try:
-            res = _as_data_frame(_results(dds, contrast=contrast, alpha=alpha, independentFiltering=False, parallel=True))
+            res = _as_data_frame(
+                _results(dds, contrast=contrast, alpha=alpha,
+                         independentFiltering=independent_filtering, parallel=True))
         except RRuntimeError as e:
             _LOGGER.warn("DESeq2 group contrast '{}' didn't work!".format(contrast))
             _LOGGER.error(e)
             contrast = ["sample_group" + a, "sample_group" + b]
             try:
-                res = _as_data_frame(_results(dds, contrast=contrast, alpha=alpha, independentFiltering=False, parallel=True))
+                res = _as_data_frame(
+                    _results(dds, contrast=contrast, alpha=alpha,
+                             independentFiltering=independent_filtering, parallel=True))
                 _LOGGER.warn("DESeq2 group contrast '{}' did work now!".format(", ".join(contrast)))
             except RRuntimeError as e2:
                 _LOGGER.warn("DESeq2 group contrast '{}' didn't work either!".format(", ".join(contrast)))
@@ -1275,7 +1362,7 @@ def differential_analysis(
     :type output_dir: str, optional
     :param output_prefix: Prefix for output files. Defaults to "differential_analysis".
     :type output_prefix: str, optional
-    :param alpha: Significance level to use in diferential analysis.
+    :param alpha: Significance level to use in differential analysis.
                   Results for all features will be returned nonetheless. Defaults to 0.05.
     :type alpha: float, optional
     :param overwrite: Whether results should be overwritten in case they already exist. Defaults to True.
@@ -1288,6 +1375,7 @@ def differential_analysis(
     :type cpus: int, optional
     :param memory: Memory to use when using distributed jobs. Default: 16000 (16Gb).
     :type memory: int, optional
+    :var pandas.DataFrame differential_results: Pandas dataframe with results.
     :returns pandas.DataFrame: DataFrame with analysis results for all comparisons.
                                Will be `None` if `distributed` is `True`.
     """
@@ -1355,6 +1443,13 @@ def differential_analysis(
         results = deseq_analysis(
             count_matrix, experiment_matrix, comparison_table,
             formula, output_dir, output_prefix, alpha=alpha, overwrite=overwrite)
+
+        try:
+            results = results.set_index("index")
+        except KeyError:
+            pass
+        _LOGGER.info("Setting results of differential analysis to a variable 'differential_results'.")
+        analysis.differential_results = results
         return results
 
     else:
@@ -1713,74 +1808,111 @@ def plot_differential(
         group_wise_colours=False,
         group_variables=None,
         pallete="tab20",
-        cmap="RdBu_r"):
+        cmap="RdBu_r"
+        ):
     """
-    Plot differential features (e.g. chromatin region, genes) discovered with supervised group comparisons
-    by ``ngs_toolkit.general.differential_analysis``.
-    This will plot number and direction of discovered features, scatter, MA and volcano plots for each comparison
-    and joint heatmaps of log fold changes, normalized values or Z-scores of individual samples or groups in the differential features.
-
+    Plot differential features (e.g. chromatin region, genes) discovered with supervised
+    group comparisons by ``ngs_toolkit.general.differential_analysis``.
+    This will plot number and direction of discovered features, scatter, MA and volcano
+    plots for each comparison and joint heatmaps of log fold changes, normalized values
+    or Z-scores of individual samples or groups in the differential features.
 
     :param analysis: Analysis object.
     :type analysis: ngs_toolkit.general.Analysis
-    :param results: Data frame with differential analysis results. See ``ngs_toolkit.general.differential_analysis`` for more information.
+    :param results: Data frame with differential analysis results.
+                    See ``ngs_toolkit.general.differential_analysis`` for more information.
     :type results: pandas.DataFrame
-    :param comparison_table: Comparison table, defaults to None. If provided, group-wise plots will be produced.
+    :param comparison_table: Comparison table, defaults to None. If provided, group-wise
+                             plots will be produced.
     :type comparison_table: pandas.DataFrame, optional
-    :param samples: List of sample objects to restrict analysis to. Defaults to all samples in analysis object.
+    :param samples: List of sample objects to restrict analysis to. Defaults to all samples
+                    in analysis object.
     :type samples: list, optional
-    :param matrix: Matrix of quantification to use for plotting feature values across samples/groups.
+    :param matrix: Matrix of quantification to use for plotting feature values across
+                   samples/groups.
                    Defaults to either "accessibility" for ATAC-seq analysis or "expression" for RNA-seq.
     :type matrix: str, optional
-    :param only_comparison_samples: Whether to use only samples present in the `comparison_table`. Defaults to False.
+    :param only_comparison_samples: Whether to use only samples present in the `comparison_table`.
+                                    Defaults to False.
     :type only_comparison_samples: bool, optional
-    :param data_type: The data type being analyzed. Currently supported is "ATAC-seq" or "RNA-seq". Defaults to "ATAC-seq".
+    :param data_type: The data type being analyzed. Currently supported is "ATAC-seq" or "RNA-seq".
+                      Defaults to "ATAC-seq".
     :type data_type: str, optional
-    :param alpha: Significance level to consider a feature differential. Defaults to 0.05.
+    :param alpha: Significance level to consider a feature differential.
+                  Defaults to 0.05.
     :type alpha: float, optional
-    :param corrected_p_value: Whether to use a corrected p-valueto consider a feature differential. Defaults to True.
+    :param corrected_p_value: Whether to use a corrected p-valueto consider a feature differential.
+                              Defaults to True.
     :type corrected_p_value: bool, optional
-    :param fold_change: Effect size (log2 fold change) to consider a feature differential. Considers absolute values. Defaults to None.
+    :param fold_change: Effect size (log2 fold change) to consider a feature differential.
+                        Considers absolute values.
+                        Defaults to None.
     :type fold_change: float, optional
-    :param diff_based_on_rank: Whether a feature should be considered differential based on its rank. Defaults to False
+    :param diff_based_on_rank: Whether a feature should be considered differential based on its rank.
+                               Defaults to False
     :type diff_based_on_rank: bool, optional
-    :param max_rank: Rank to use when using `diff_based_on_rank`. Defaults to 1000.
+    :param max_rank: Rank to use when using `diff_based_on_rank`.
+                     Defaults to 1000.
     :type max_rank: int, optional
-    :param ranking_variable: Which variable to use for ranking when using `diff_based_on_rank`. Defaults to "padj".
+    :param ranking_variable: Which variable to use for ranking when using `diff_based_on_rank`.
+                             Defaults to "padj".
     :type ranking_variable: str, optional
-    :param respect_stat_thresholds: Whether the statistical thresholds from `alpha` and `fold_change` should still be respected when using `diff_based_on_rank`. Defaults to True
+    :param respect_stat_thresholds: Whether the statistical thresholds from `alpha` and
+                                    `fold_change` should still be respected when using
+                                    `diff_based_on_rank`.
+                                    Defaults to True
     :type respect_stat_thresholds: bool, optional
-    :param output_dir: Directory to create output files. Defaults to "results/differential_analysis_{data_type}"
+    :param output_dir: Directory to create output files.
+                       Defaults to "results/differential_analysis_{data_type}"
     :type output_dir: str, optional
-    :param output_prefix: Prefix to use when creating output files. Defaults to "differential_analysis".
+    :param output_prefix: Prefix to use when creating output files.
+                                  Defaults to "differential_analysis".
     :type output_prefix: str, optional
-    :param plot_each_comparison: Whether each comparison should be plotted in scatter, MA and volcano plots. Useful to turn off with many comparisons. Defaults to True.
+    :param plot_each_comparison: Whether each comparison should be plotted in scatter, MA and
+                                 volcano plots. Useful to turn off with many comparisons.
+                                 Defaults to True.
     :type plot_each_comparison: bool, optional
-    :param mean_column: Column  in `results` data frame containing values for mean values across samples. Defaults to "baseMean".
+    :param mean_column: Column  in `results` data frame containing values for mean values across
+                        samples. Defaults to "baseMean".
     :type mean_column: str, optional
-    :param log_fold_change_column: Column  in `results` data frame containing values for log2FoldChange values across samples. Defaults to "log2FoldChange".
+    :param log_fold_change_column: Column in `results` data frame containing values for
+                                   log2FoldChange values across samples.
+                                   Defaults to "log2FoldChange".
     :type log_fold_change_column: str, optional
-    :param p_value_column: Column  in `results` data frame containing values for p-values across samples. Defaults to "pvalue".
+    :param p_value_column: Column  in `results` data frame containing values for p-values
+                           across samples. Defaults to "pvalue".
     :type p_value_column: str, optional
-    :param adjusted_p_value_column: Column  in `results` data frame containing values for adjusted p-values across samples. Defaults to "padj".
+    :param adjusted_p_value_column: Column  in `results` data frame containing values for
+                                    adjusted p-values across samples.
+                                    Defaults to "padj".
     :type adjusted_p_value_column: str, optional
-    :param comparison_column: Column  in `results` data frame containing the name of the comparison. Defaults to "comparison_name".
+    :param comparison_column: Column  in `results` data frame containing the name of the comparison.
+                              Defaults to "comparison_name".
     :type comparison_column: str, optional
-    :param rasterized: Whether plots with many objects should be rasterized. Defaults to True.
+    :param rasterized: Whether plots with many objects should be rasterized.
+                       Defaults to True.
     :type rasterized: bool, optional
-    :param dpi: Rasterization resolution (dpi). Defaults to 300.
+    :param dpi: Rasterization resolution (dpi).
+                Defaults to 300.
     :type dpi: number, optional
-    :param robust: Whether heatmap color scale ranges should be robust (using quantiles) rather than extreme values. Useful for noisy/extreme data. Defaults to False.
+    :param robust: Whether heatmap color scale ranges should be robust (using quantiles) rather
+                   than extreme values. Useful for noisy/extreme data.
+                   Defaults to False.
     :type robust: bool, optional
-    :param feature_labels: Whether features (regions/genes) should be labeled in heatmaps. Defaults to False.
+    :param feature_labels: Whether features (regions/genes) should be labeled in heatmaps.
+                                  Defaults to False.
     :type feature_labels: bool, optional
-    :param group_wise_colours: Whether groups of samples should be coloured in heatmaps. Defaults to False.
+    :param group_wise_colours: Whether groups of samples should be coloured in heatmaps.
+                                  Defaults to False.
     :type group_wise_colours: bool, optional
-    :param group_variables: Which variables to colour if `group_wise_colours` if True. Defaults to None (must be given).
+    :param group_variables: Which variables to colour if `group_wise_colours` if True.
+                                  Defaults to None (must be given).
     :type group_variables: list, optional
-    :param pallete: Color pallete to use in levels of `group_variables`. Will be passed to `analysis.get_level_colors`.
+    :param pallete: Color pallete to use in levels of `group_variables`. Will be passed to
+                    `analysis.get_level_colors`.
     :type pallete: str
-    :param cmap: Color map to use in numerical levels of `group_variables`. Will be passed to `analysis.get_level_colors`.
+    :param cmap: Color map to use in numerical levels of `group_variables`. Will be passed to
+                 `analysis.get_level_colors`.
     :type cmap: str
     """
     import pandas as pd
@@ -1893,6 +2025,7 @@ def plot_differential(
             g = sns.FacetGrid(data=results, col=comparison_column, col_wrap=n_side)
             g.map(sns.distplot, variable, kde=False)
             for ax in g.axes:
+                ax.set_yscale("log")
                 if axvline:
                     ax.axvline(0, color="black", alpha=0.5)
                 ax.set_xlabel(label)
@@ -1935,6 +2068,11 @@ def plot_differential(
 
     if plot_each_comparison:
         _LOGGER.info("Doing detailed plotting per comparison:")
+
+        smallest_p_value = -np.log10(np.percentile(results[p_value_column], 1e-5))
+        if smallest_p_value == np.inf:
+            smallest_p_value = 300
+        pval_cmap = "Reds"
         # Pairwise scatter plots
         # TODO: add different shadings of red for various levels of significance
         # TODO: do this for scatter, MA, volcano plots
@@ -1963,22 +2101,34 @@ def plot_differential(
                     alpha=0.85, cmap="Greys", color="black", edgecolors="white",
                     linewidths=0, bins='log', mincnt=1, rasterized=True)
 
-                # Scatter for significant
+                # Scatter for significant features
                 diff_vars = results.loc[
                     (results[comparison_column] == comparison) &
                     (results["diff"] == True), :]
                 if diff_vars.shape[0] > 0:
-                    c = -np.log10(results.loc[
+                    # get color vector based on p-value
+                    col = -np.log10(results.loc[
                         (results[comparison_column] == comparison) &
                         (results["diff"] == True), p_value_column].squeeze())
+                    # in case there's just one significant feature:
+                    if type(col) is np.float_:
+                        col = np.array([col])
                     collection = ax.scatter(
                         b.loc[diff_vars.index],
                         a.loc[diff_vars.index],
-                        alpha=0.5, s=2, c=c, cmap=cmap, vmin=0)
+                        alpha=0.5, s=2, c=col, cmap=pval_cmap,
+                        vmin=0, vmax=smallest_p_value)
                     add_colorbar_to_axis(collection, label="-log10(p-value)")
                 ax.set_title(comparison)
-                ax.set_xlabel("Down")
-                ax.set_ylabel("Up")
+                # Name groups
+                xl = c.loc[c['comparison_side'] == 1, 'comparison_name'].drop_duplicates().squeeze()
+                yl = c.loc[c['comparison_side'] == 0, 'comparison_name'].drop_duplicates().squeeze()
+                if not (type(xl) is str) and (type(yl) is str):
+                    xl = "Down-regulated"
+                    yl = "Up-regulated"
+                ax.set_xlabel(xl)
+                ax.set_ylabel(yl)
+
                 # x = y square
                 lims = [
                     np.min([ax.get_xlim(), ax.get_ylim()]),
@@ -2017,7 +2167,8 @@ def plot_differential(
                 collection = ax.scatter(
                     t.loc[diff_vars.index, log_fold_change_column],
                     -np.log10(t.loc[diff_vars.index, p_value_column]),
-                    alpha=0.5, s=2, c=-np.log10(t.loc[diff_vars.index, p_value_column]), cmap=cmap, vmin=0)
+                    alpha=0.5, s=2, c=-np.log10(t.loc[diff_vars.index, p_value_column]), cmap=pval_cmap,
+                    vmin=0, vmax=smallest_p_value)
                 add_colorbar_to_axis(collection, label="-log10(p-value)")
             ax.set_title(comparison)
             ax.set_xlabel("log2(fold-change)")
@@ -2059,7 +2210,8 @@ def plot_differential(
                 collection = ax.scatter(
                     np.log10(t.loc[diff_vars.index, mean_column]),
                     t.loc[diff_vars.index, log_fold_change_column],
-                    alpha=0.5, s=2, c=-np.log10(t.loc[diff_vars.index, p_value_column]), cmap=cmap, vmin=0)
+                    alpha=0.5, s=2, c=-np.log10(t.loc[diff_vars.index, p_value_column]), cmap=pval_cmap,
+                    vmin=0, vmax=smallest_p_value)
                 add_colorbar_to_axis(collection, label="-log10(p-value)")
             ax.set_title(comparison)
             ax.set_xlabel("Mean {}".format(quantity.lower()))
@@ -2113,59 +2265,75 @@ def plot_differential(
             n = groups.isnull().sum().sum()
             if n > 0:
                 _LOGGER.warn(
-                    "{} {} (across all comparisons) were not found in quantification matrix!".format(n, var_name) +
-                    " Proceeding without those.")
-                groups = groups.dropna()
+                    "{} {}s (across all comparisons) were not found in quantification matrix!".format(n, var_name))
+                m = groups.columns[groups.isnull().sum() == groups.shape[0]]
+                if len(m) > 0:
+                    _LOGGER.warn(
+                        "{} comparison groups were not found in quantification matrix: '{}'!"
+                        .format(len(m), ", ".join(m)) +
+                        " Proceeding without those.")
+                    groups = groups.loc[:, ~groups.columns.isin(m)]
+                f = groups.index[groups.isnull().sum(1) == groups.shape[1]]
+                if len(f) > 0:
+                    _LOGGER.warn(
+                        "{} {}s were not found in quantification matrix!"
+                        .format(len(m), var_name) +
+                        " Proceeding without those.")
+                    groups = groups.dropna()
+                n = groups.isnull().sum().sum()
+                if n != 0:
+                    _LOGGER.error(
+                        "{} {}s (across all comparisons) still have NaNs. Cannot proceed!".format(n, var_name))
+                else:
+                    _LOGGER.info("Plotting clustered heatmaps of sample groups in all differential {}s found.".format(var_name))
+                    figsize = (max(5, 0.12 * groups.shape[1]), 5)
+                    # Heatmaps
+                    # Comparison level
+                    g = sns.clustermap(
+                        groups.corr(),
+                        xticklabels=False, yticklabels=True, cbar_kws={"label": "Pearson correlation\non differential {}s".format(var_name)},
+                        cmap="BuGn", metric="correlation", rasterized=True, figsize=(figsize[0], figsize[0]))
+                    g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small")
+                    g.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.groups.clustermap.corr.svg".format(var_name)), bbox_inches="tight", dpi=dpi, metric="correlation")
 
-            _LOGGER.info("Plotting clustered heatmaps of sample groups in all diferential {}s found.".format(var_name))
-            figsize = (max(5, 0.12 * groups.shape[1]), 5)
-            # Heatmaps
-            # Comparison level
-            g = sns.clustermap(
-                groups.corr(),
-                xticklabels=False, yticklabels=True, cbar_kws={"label": "Pearson correlation\non differential {}s".format(var_name)},
-                cmap="BuGn", metric="correlation", rasterized=True, figsize=(figsize[0], figsize[0]))
-            g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small")
-            g.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.groups.clustermap.corr.svg".format(var_name)), bbox_inches="tight", dpi=dpi, metric="correlation")
+                    g = sns.clustermap(
+                        groups,
+                        xticklabels=True, yticklabels=feature_labels, cbar_kws={"label": "{} of\ndifferential {}s".format(quantity, var_name)},
+                        cmap="BuGn", robust=robust, metric="correlation", rasterized=True, figsize=figsize)
+                    g.ax_heatmap.set_ylabel("Differential {}s (n = {})".format(var_name, groups.shape[0]))
+                    g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90, fontsize="xx-small")
+                    g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small")
+                    g.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.groups.clustermap.svg".format(var_name)), bbox_inches="tight", dpi=dpi)
 
-            g = sns.clustermap(
-                groups,
-                xticklabels=True, yticklabels=feature_labels, cbar_kws={"label": "{} of\ndifferential {}s".format(quantity, var_name)},
-                cmap="BuGn", robust=robust, metric="correlation", rasterized=True, figsize=figsize)
-            g.ax_heatmap.set_ylabel("Differential {}s (n = {})".format(var_name, groups.shape[0]))
-            g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90, fontsize="xx-small")
-            g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small")
-            g.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.groups.clustermap.svg".format(var_name)), bbox_inches="tight", dpi=dpi)
+                    g = sns.clustermap(
+                        groups,
+                        xticklabels=True, yticklabels=feature_labels, z_score=0, cbar_kws={"label": "Z-score of {}\non differential {}s".format(quantity, var_name)},
+                        cmap="RdBu_r", robust=robust, metric="correlation", rasterized=True, figsize=figsize)
+                    g.ax_heatmap.set_ylabel("Differential {}s (n = {})".format(var_name, groups.shape[0]))
+                    g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90, fontsize="xx-small")
+                    g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small")
+                    g.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.groups.clustermap.z0.svg".format(var_name)), bbox_inches="tight", dpi=dpi)
 
-            g = sns.clustermap(
-                groups,
-                xticklabels=True, yticklabels=feature_labels, z_score=0, cbar_kws={"label": "Z-score of {}\non differential {}s".format(quantity, var_name)},
-                cmap="RdBu_r", robust=robust, metric="correlation", rasterized=True, figsize=figsize)
-            g.ax_heatmap.set_ylabel("Differential {}s (n = {})".format(var_name, groups.shape[0]))
-            g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90, fontsize="xx-small")
-            g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small")
-            g.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.groups.clustermap.z0.svg".format(var_name)), bbox_inches="tight", dpi=dpi)
+                    # same without clustering
+                    g = sns.clustermap(
+                        groups,
+                        col_cluster=False,
+                        xticklabels=True, yticklabels=feature_labels, cbar_kws={"label": "{} of\ndifferential {}s".format(quantity, var_name)},
+                        cmap="BuGn", robust=robust, metric="correlation", rasterized=True, figsize=figsize)
+                    g.ax_heatmap.set_ylabel("Differential {}s (n = {})".format(var_name, groups.shape[0]))
+                    g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90, fontsize="xx-small")
+                    g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small")
+                    g.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.groups.sorted.clustermap.svg".format(var_name)), bbox_inches="tight", dpi=dpi)
 
-            # same without clustering
-            g = sns.clustermap(
-                groups,
-                col_cluster=False,
-                xticklabels=True, yticklabels=feature_labels, cbar_kws={"label": "{} of\ndifferential {}s".format(quantity, var_name)},
-                cmap="BuGn", robust=robust, metric="correlation", rasterized=True, figsize=figsize)
-            g.ax_heatmap.set_ylabel("Differential {}s (n = {})".format(var_name, groups.shape[0]))
-            g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90, fontsize="xx-small")
-            g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small")
-            g.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.groups.sorted.clustermap.svg".format(var_name)), bbox_inches="tight", dpi=dpi)
-
-            g = sns.clustermap(
-                groups,
-                col_cluster=False,
-                xticklabels=True, yticklabels=feature_labels, z_score=0, cbar_kws={"label": "Z-score of {}\non differential {}s".format(quantity, var_name)},
-                cmap="RdBu_r", center=0, robust=robust, metric="correlation", rasterized=True, figsize=figsize)
-            g.ax_heatmap.set_ylabel("Differential {}s (n = {})".format(var_name, groups.shape[0]))
-            g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90, fontsize="xx-small")
-            g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small")
-            g.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.groups.sorted.clustermap.z0.svg".format(var_name)), bbox_inches="tight", dpi=dpi)
+                    g = sns.clustermap(
+                        groups,
+                        col_cluster=False,
+                        xticklabels=True, yticklabels=feature_labels, z_score=0, cbar_kws={"label": "Z-score of {}\non differential {}s".format(quantity, var_name)},
+                        cmap="RdBu_r", center=0, robust=robust, metric="correlation", rasterized=True, figsize=figsize)
+                    g.ax_heatmap.set_ylabel("Differential {}s (n = {})".format(var_name, groups.shape[0]))
+                    g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90, fontsize="xx-small")
+                    g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small")
+                    g.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.groups.sorted.clustermap.z0.svg".format(var_name)), bbox_inches="tight", dpi=dpi)
 
     # Fold-changes and P-values
     # pivot table of genes vs comparisons
@@ -2179,34 +2347,49 @@ def plot_differential(
         index=results.index.name, columns=comparison_column,
         values=adjusted_p_value_column))
 
-    # fold
-    if fold_changes.shape[1] > 1:
+    # get a signed p-value
+    if fold_changes.shape == p_values.shape:
+        p_values *= (fold_changes > 0).astype(int).replace(0, -1)
 
-        _LOGGER.info("Plotting group-wise correlation of log fold change values per sample groups in all diferential {}s found.".format(var_name))
-        figsize = (max(5, 0.12 * fold_changes.shape[1]), 5)
-        g = sns.clustermap(
-            fold_changes.corr(),
-            xticklabels=False, yticklabels=True, cbar_kws={"label": "Pearson correlation\non fold-changes"},
-            cmap="BuGn", vmin=0, vmax=1, metric="correlation", rasterized=True, figsize=(figsize[0], figsize[0]))
-        g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small")
-        g.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.groups.fold_changes.clustermap.corr.svg".format(var_name)), bbox_inches="tight", dpi=dpi, metric="correlation")
-
-        _LOGGER.info("Plotting clustered heatmaps of log fold change values per sample groups in all diferential {}s found.".format(var_name))
-        try:
-            g = sns.clustermap(
-                fold_changes.loc[all_diff, :],
-                xticklabels=True, yticklabels=feature_labels, cbar_kws={"label": "Fold-change of\ndifferential {}s".format(var_name)},
-                cmap="RdBu_r", center=0, robust=robust, metric="correlation", rasterized=True, figsize=figsize)
-            g.ax_heatmap.set_ylabel("Differential {}s (n = {})".format(var_name, fold_changes.loc[all_diff, :].shape[0]))
-            g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90, fontsize="xx-small")
-            g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small")
-            g.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.groups.fold_changes.clustermap.svg".format(var_name)), bbox_inches="tight", dpi=dpi)
-        except FloatingPointError as e:
-            _LOGGER.error("Log fold change values contain null of infinite values. Cannot plot.")
-            pass
+    for matrix_, label, desc in [
+        (fold_changes, "log fold change", "log fold change"),
+        (p_values, "p value", "-log10(signed p-value)"),
+    ]:
+        if matrix_.shape[1] > 1:
+            _LOGGER.info("Plotting group-wise correlation of {}s per sample groups in all differential {}s found.".format(var_name, label))
+            figsize = (max(5, 0.12 * matrix_.shape[1]), 5)
+            grid = sns.clustermap(
+                matrix_.corr(),
+                xticklabels=False, yticklabels=True,
+                cbar_kws={"label": "Pearson correlation\non {}s".format(desc)},
+                cmap="BuGn", vmin=0, vmax=1, metric="correlation", rasterized=True, figsize=(figsize[0], figsize[0]))
+            grid.ax_heatmap.set_yticklabels(grid.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small")
+            grid.ax_heatmap.set_xlabel("Comparison groups")
+            grid.ax_heatmap.set_ylabel("Comparison groups")
+            grid.fig.savefig(
+                os.path.join(output_dir,
+                             output_prefix + ".diff_{}.groups.{}.clustermap.corr.svg".format(var_name, label.replace(" ", "_"))),
+                bbox_inches="tight", dpi=dpi, metric="correlation")
+            _LOGGER.info("Plotting clustered heatmaps of {}s per sample groups in all differential {}s found.".format(var_name, label))
+            try:
+                grid = sns.clustermap(
+                    matrix_.loc[all_diff, :],
+                    xticklabels=True, yticklabels=feature_labels,
+                    cbar_kws={"label": "{} of\ndifferential {}s".format(desc, var_name)},
+                    cmap="RdBu_r", center=0, robust=robust, metric="correlation", rasterized=True, figsize=figsize)
+                grid.ax_heatmap.set_ylabel("Differential {}s (n = {})".format(var_name, matrix_.loc[all_diff, :].shape[0]))
+                grid.ax_heatmap.set_xticklabels(grid.ax_heatmap.get_xticklabels(), rotation=90, fontsize="xx-small")
+                grid.ax_heatmap.set_yticklabels(grid.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small")
+                grid.ax_heatmap.set_xlabel("Comparison groups")
+                grid.fig.savefig(
+                    os.path.join(output_dir,
+                                 output_prefix + ".diff_{}.groups.{}.clustermap.svg".format(var_name, label.replace(" ", "_"))),
+                    bbox_inches="tight", dpi=dpi)
+            except FloatingPointError:
+                _LOGGER.error("{} contain null of infinite values. Cannot plot.".format(label))
 
     # Sample level
-    _LOGGER.info("Getting per sample values of {} in all diferential {}s found.".format(quantity, var_name))
+    _LOGGER.info("Getting per sample values of {} in all differential {}s found.".format(quantity, var_name))
     if type(matrix.columns) is pd.core.indexes.multi.MultiIndex:
         matrix.columns = matrix.columns.get_level_values("sample_name")
 
@@ -2224,53 +2407,53 @@ def plot_differential(
     else:
         extra = {}
 
-    _LOGGER.info("Plotting sample-wise correlation heatmaps of {} values per sample in all diferential {}s found.".format(quantity, var_name))
-    g = sns.clustermap(
+    _LOGGER.info("Plotting sample-wise correlation heatmaps of {} values per sample in all differential {}s found.".format(quantity, var_name))
+    grid = sns.clustermap(
         matrix2.corr(),
         yticklabels=True, xticklabels=False,
         cbar_kws={"label": "Pearson correlation\non differential {}s".format(var_name)},
         cmap="BuGn", metric="correlation", figsize=(figsize[0], figsize[0]), rasterized=rasterized, robust=robust, **extra)
-    g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small")
-    g.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.samples.clustermap.corr.svg".format(var_name)), bbox_inches="tight", dpi=dpi)
+    grid.ax_heatmap.set_yticklabels(grid.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small")
+    grid.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.samples.clustermap.corr.svg".format(var_name)), bbox_inches="tight", dpi=dpi)
 
-    _LOGGER.info("Plotting clustered heatmaps of {} values per sample in all diferential {}s found.".format(quantity, var_name))
-    g = sns.clustermap(
+    _LOGGER.info("Plotting clustered heatmaps of {} values per sample in all differential {}s found.".format(quantity, var_name))
+    grid = sns.clustermap(
         matrix2,
         yticklabels=feature_labels, cbar_kws={"label": "{} of\ndifferential {}s".format(quantity, var_name)},
         xticklabels=True, vmin=0, cmap="BuGn", metric="correlation", figsize=figsize, rasterized=rasterized, robust=robust, **extra)
-    g.ax_heatmap.set_ylabel("Differential {}s (n = {})".format(var_name, matrix2.shape[0]))
-    g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90, fontsize="xx-small")
-    g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small")
-    g.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.samples.clustermap.svg".format(var_name)), bbox_inches="tight", dpi=dpi)
+    grid.ax_heatmap.set_ylabel("Differential {}s (n = {})".format(var_name, matrix2.shape[0]))
+    grid.ax_heatmap.set_xticklabels(grid.ax_heatmap.get_xticklabels(), rotation=90, fontsize="xx-small")
+    grid.ax_heatmap.set_yticklabels(grid.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small")
+    grid.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.samples.clustermap.svg".format(var_name)), bbox_inches="tight", dpi=dpi)
 
-    g = sns.clustermap(
+    grid = sns.clustermap(
         matrix2,
         yticklabels=feature_labels, z_score=0, cbar_kws={"label": "Z-score of {}\non differential {}s".format(quantity, var_name)},
         xticklabels=True, cmap="RdBu_r", center=0, metric="correlation", figsize=figsize, rasterized=rasterized, robust=robust, **extra)
-    g.ax_heatmap.set_ylabel("Differential {}s (n = {})".format(var_name, matrix2.shape[0]))
-    g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90, fontsize="xx-small")
-    g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small")
-    g.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.samples.clustermap.z0.svg".format(var_name)), bbox_inches="tight", dpi=dpi)
+    grid.ax_heatmap.set_ylabel("Differential {}s (n = {})".format(var_name, matrix2.shape[0]))
+    grid.ax_heatmap.set_xticklabels(grid.ax_heatmap.get_xticklabels(), rotation=90, fontsize="xx-small")
+    grid.ax_heatmap.set_yticklabels(grid.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small")
+    grid.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.samples.clustermap.z0.svg".format(var_name)), bbox_inches="tight", dpi=dpi)
 
-    g = sns.clustermap(
+    grid = sns.clustermap(
         matrix2,
         col_cluster=False,
         yticklabels=feature_labels, cbar_kws={"label": "{} of\ndifferential {}s".format(quantity, var_name)},
         xticklabels=True, vmin=0, cmap="BuGn", metric="correlation", figsize=figsize, rasterized=rasterized, robust=robust, **extra)
-    g.ax_heatmap.set_ylabel("Differential {}s (n = {})".format(var_name, matrix2.shape[0]))
-    g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90, fontsize="xx-small")
-    g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small")
-    g.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.samples.sorted.clustermap.svg".format(var_name)), bbox_inches="tight", dpi=dpi)
+    grid.ax_heatmap.set_ylabel("Differential {}s (n = {})".format(var_name, matrix2.shape[0]))
+    grid.ax_heatmap.set_xticklabels(grid.ax_heatmap.get_xticklabels(), rotation=90, fontsize="xx-small")
+    grid.ax_heatmap.set_yticklabels(grid.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small")
+    grid.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.samples.sorted.clustermap.svg".format(var_name)), bbox_inches="tight", dpi=dpi)
 
-    g = sns.clustermap(
+    grid = sns.clustermap(
         matrix2,
         col_cluster=False,
         yticklabels=feature_labels, z_score=0, cbar_kws={"label": "Z-score of {}\non differential {}s".format(quantity, var_name)},
         xticklabels=True, cmap="RdBu_r", center=0, metric="correlation", figsize=figsize, rasterized=rasterized, robust=robust, **extra)
-    g.ax_heatmap.set_ylabel("Differential {}s (n = {})".format(var_name, matrix2.shape[0]))
-    g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90, fontsize="xx-small")
-    g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small")
-    g.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.samples.sorted.clustermap.z0.svg".format(var_name)), bbox_inches="tight", dpi=dpi)
+    grid.ax_heatmap.set_ylabel("Differential {}s (n = {})".format(var_name, matrix2.shape[0]))
+    grid.ax_heatmap.set_xticklabels(grid.ax_heatmap.get_xticklabels(), rotation=90, fontsize="xx-small")
+    grid.ax_heatmap.set_yticklabels(grid.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small")
+    grid.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.samples.sorted.clustermap.z0.svg".format(var_name)), bbox_inches="tight", dpi=dpi)
 
 
 def lola(bed_files, universe_file, output_folder, output_prefixes=None, genome="hg19", cpus=8):

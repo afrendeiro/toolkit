@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 cp doc/source/usage_template.rst usage_template.rst
 
 for program in projectmanager trackmanager; do

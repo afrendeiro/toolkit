@@ -41,31 +41,6 @@ class RNASeqAnalysis(Analysis):
         self._norm_matrix_name = "expression"
         self._annot_matrix_name = "expression_annotated"
 
-    def annotate_with_sample_metadata(
-            self,
-            attributes=["sample_name"], quant_matrix="expression"):
-
-        samples = [s for s in self.samples if s.name in getattr(self, quant_matrix).columns]
-
-        attrs = list()
-        for attr in attributes:
-            l = list()
-            for sample in samples:  # keep order of samples in matrix
-                try:
-                    l.append(getattr(sample, attr))
-                except AttributeError:
-                    l.append(np.nan)
-            attrs.append(l)
-
-        # Generate multiindex columns
-        index = pd.MultiIndex.from_arrays(attrs, names=attributes)
-        self.expression = getattr(self, quant_matrix)[[s.name for s in samples]]
-        self.expression.columns = index
-
-        # Save
-        self.expression.to_csv(os.path.join(
-            self.results_dir, self.name + ".expression.annotated_metadata.csv"), index=True)
-
     def collect_bitseq_output(self, samples=None, permissive=True, expression_type="counts"):
         """
         Collect gene expression (read counts, transcript-level) output from Bitseq

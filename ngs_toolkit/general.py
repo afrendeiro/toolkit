@@ -913,7 +913,8 @@ def unsupervised_analysis(
 def deseq_analysis(
         count_matrix, experiment_matrix, comparison_table, formula,
         output_dir, output_prefix,
-        overwrite=True, alpha=0.05, independent_filtering=False):
+        overwrite=True, alpha=0.05, independent_filtering=False,
+        create_subdirectories=False):
     """
     Perform differential comparison analysis with DESeq2.
 
@@ -941,6 +942,8 @@ def deseq_analysis(
                   This in practice has no effect as results for all features will be returned.
                   Defaults to 0.05.
     :type alpha: number, optional
+    :param create_subdirectories: Whether to create subdirectories for the result of each comparison.
+    :type create_subdirectories: bool
     :returns: Data frame with results, statistics for each feature.
     :rtype: pandas.DataFrame
     """
@@ -987,7 +990,13 @@ def deseq_analysis(
     results = pd.DataFrame()
     comps = comparison_table["comparison_name"].drop_duplicates().sort_values()
     for comp in tqdm(comps, total=len(comps), desc="Comparison"):
-        out_file = os.path.join(output_dir, output_prefix + ".deseq_result.{}.csv".format(comp))
+        if create_subdirectories:
+            out_file = os.path.join(output_dir, output_prefix + ".deseq_result.{}.csv".format(comp))
+        else:
+            out_file = os.path.join(output_dir, comp, output_prefix + ".deseq_result.{}.csv".format(comp))
+            if not os.path.exists(os.path.join(output_dir, comp)):
+                os.makedirs(os.path.join(output_dir, comp))
+
         if not overwrite and os.path.exists(out_file):
             continue
         _LOGGER.info("Doing comparison '{}'".format(comp))
@@ -1358,7 +1367,8 @@ def differential_analysis(
 
     :param analysis: A ngs_toolkit Analysis object.
     :type analysis: ngs_toolkit.general.Analysis
-    :param comparison_table: A dataframe with 'comparison_name', 'comparison_side' and 'sample_name', 'sample_group' columns.
+    :param comparison_table: A dataframe with 'comparison_name', 'comparison_side' and
+                             'sample_name', 'sample_group' columns.
     :type comparison_table: pandas.DataFrame
     :param data_type: Type of data under analysis. One of "ATAC-seq" or "RNA-seq". Defaults to "ATAC-seq".
     :type data_type: str, optional
@@ -1392,7 +1402,8 @@ def differential_analysis(
     # check comparison table has required columns
     req_attrs = ['comparison_name', 'comparison_side', 'sample_name', 'sample_group']
     if not all([x in comparison_table.columns for x in req_attrs]):
-        raise AssertionError("Given comparison table does not have all of '{}' columns.".format("', '".join(req_attrs)))
+        raise AssertionError("Given comparison table does not have all of '{}' columns."
+                             .format("', '".join(req_attrs)))
     # check all comparisons have samples in two sides
     if not all(comparison_table.groupby("comparison_name")["comparison_side"].nunique() == 2):
         raise AssertionError("All comparisons must have samples in each side of the comparison.")
@@ -2064,10 +2075,9 @@ def plot_differential(
     sns.barplot(data=split_diff, x="diff_perc", y="label", orient="h", ax=axis[1, 1])
     sns.barplot(data=split_diff, x="diff", y="comparison_name", hue="direction", orient="h", ax=axis[2, 0])
     sns.barplot(data=split_diff, x="diff_perc", y="comparison_name", hue="direction", orient="h", ax=axis[2, 1])
-    for ax in axis[:, 0]:
-        ax.set_xlabel("N. diff")
+    axis[-1, 0].set_xlabel("N. diff")
+    axis[-1, 1].set_xlabel("N. diff (% of total)")
     for ax in axis[:, 1]:
-        ax.set_xlabel("N. diff (% of total)")
         ax.set_xlabel("", visible=False)
         ax.set_yticklabels(ax.get_yticklabels(), visible=False)
     for ax in axis[1:, :].flatten():
@@ -2134,8 +2144,8 @@ def plot_differential(
                     add_colorbar_to_axis(collection, label="-log10(p-value)")
                 ax.set_title(comparison)
                 # Name groups
-                xl = c.loc[c['comparison_side'] == 1, 'comparison_name'].drop_duplicates().squeeze()
-                yl = c.loc[c['comparison_side'] == 0, 'comparison_name'].drop_duplicates().squeeze()
+                xl = c.loc[c['comparison_side'] == 0, 'comparison_name'].drop_duplicates().squeeze()
+                yl = c.loc[c['comparison_side'] == 1, 'comparison_name'].drop_duplicates().squeeze()
                 if not (type(xl) is str) and (type(yl) is str):
                     xl = "Down-regulated"
                     yl = "Up-regulated"
@@ -2748,20 +2758,23 @@ def parse_great_enrichment(input_tsv):
 
 def homer_combine_motifs(
         comparison_dirs, output_dir,
-        reduce_threshold=0.6, match_threshold=10, info_value=0.6, p_value_threshold=1e-25, fold_enrichment=None,
+        reduce_threshold=0.6, match_threshold=10, info_value=0.6,
+        p_value_threshold=1e-25, fold_enrichment=None,
         cpus=8, run=False, as_jobs=True, genome="hg19",
         motif_database=None, known_vertebrates_TFs_only=False):
     """
     Create consensus of de novo discovered motifs from HOMER
 
     :param comparison_dirs: Iterable of comparison directories where homer was run.
-    Should contain a "homerMotifs.all.motifs" file.
+                            Should contain a "homerMotifs.all.motifs" file.
     :type comparison_dirs: list
     :param output_dir: Output directory.
     :type output_dir: str
-    :param p_value_threshold: Threshold for inclusion of a motif in the consensus set. Defaults to 1e-5
+    :param p_value_threshold: Threshold for inclusion of a motif in the consensus set.
+                              Defaults to 1e-5
     :type p_value_threshold: number, optional
-    :param cpus: Number of available CPUS/threads for multithread processing. Defaults to 8
+    :param cpus: Number of available CPUS/threads for multithread processing.
+                 Defaults to 8
     :type cpus: number, optional
     :param run: Whether to run enrichment of each comparison in the consensus motifs. Default is False
     :type run: bool, optional
@@ -2786,7 +2799,8 @@ def homer_combine_motifs(
     import glob
 
     if known_vertebrates_TFs_only:
-        _LOGGER.warn("WARNING! `known_vertebrates_TFs_only` option is deprecated! Pass a given motif_database to `motif_database` directly.")
+        _LOGGER.warn("WARNING! `known_vertebrates_TFs_only` option is deprecated!" +
+                     "Pass a given motif_database to `motif_database` directly.")
 
     # concatenate files
     out_file = os.path.join(output_dir, "homerMotifs.combined.motifs")
@@ -2805,7 +2819,8 @@ def homer_combine_motifs(
     else:
         fold_enrichment = " -F " + str(fold_enrichment)
     os.popen("compareMotifs.pl {} {} -reduceThresh {} -matchThresh {}{} -pvalue {} -info {}{} -nofacts -cpu {}"
-             .format(out_file, output_dir, reduce_threshold, match_threshold, extra, p_value_threshold, info_value, fold_enrichment, cpus))
+             .format(out_file, output_dir, reduce_threshold, match_threshold,
+                     extra, p_value_threshold, info_value, fold_enrichment, cpus))
 
     # concatenate consensus motif files
     files = glob.glob(os.path.join(output_dir, "homerResults/*motif"))
@@ -3713,7 +3728,7 @@ def plot_differential_enrichment(
             ax.set_xlabel("Enrichment over background")
         sns.despine(fig)
         fig.savefig(
-            os.path.join(output_dir, output_prefix + ".homer_consensus.scatterplot.svg".format(top_n)),
+            os.path.join(output_dir, output_prefix + ".homer_consensus.scatterplot.svg"),
             bbox_inches="tight", dpi=300)
 
         # Plot heatmaps of terms for each comparison
@@ -4768,9 +4783,9 @@ def query_biomart(
         c.update(f)
         try:
             mapping = pd.DataFrame([x.strip().split(",") for x in c], columns=attributes)
-        except AssertionError as e2:
+        except AssertionError:
             _LOGGER.error("Attempt to fix failed.")
-            raise (e, e2)
+            raise e
         _LOGGER.info("Attempt to fix successful.")
 
     return mapping.replace("", np.nan)
@@ -4846,7 +4861,7 @@ def subtract_principal_component_by_attribute(df, pc=1, attributes=["CLL"]):
     return X2
 
 
-def fix_batch_effect_limma(matrix, batch_variable="batch", covariates=[]):
+def fix_batch_effect_limma(matrix, batch_variable="batch", covariates=None):
     """
     Fix batch effect in matrix using limma.
 
@@ -4871,6 +4886,9 @@ def fix_batch_effect_limma(matrix, batch_variable="batch", covariates=[]):
 
     robjects.r('require("limma")')
     _removeBatchEffect = robjects.r('removeBatchEffect')
+
+    if covariates is None:
+        covariates = []
 
     if len(covariates) > 0:
         cov = patsy.dmatrix("~{} - 1".format(" + ".join(covariates)), matrix.columns.to_frame())

@@ -106,3 +106,6 @@ def setup_config(custom_yaml_config=None):
 
 setup_logger()
 setup_config()
+
+_LOGGER
+_CONFIG

@@ -569,10 +569,8 @@ class CNVAnalysis(Analysis):
 
         # TODO: implement as_job
 
-        import rpy2
         from rpy2.robjects import numpy2ri, pandas2ri
         import rpy2.robjects as robjects
-        from rpy2.rinterface import RRuntimeError
         numpy2ri.activate()
         pandas2ri.activate()
 
@@ -746,7 +744,6 @@ class CNVAnalysis(Analysis):
         for resolution in resolutions:
             segments = segmentation[resolution]
             segments['log_p_value'] = -np.log10(segments['p_value'].astype(float))
-            fig, axis = plt.subplots(1, 1, figsize=(4 * 1, 4 * 1))
 
             grid = sns.pairplot(
                 segments[metric_vars + ['log_p_value']].dropna(),

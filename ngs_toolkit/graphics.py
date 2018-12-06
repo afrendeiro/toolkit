@@ -148,7 +148,8 @@ def radar_plot(
                 for line in lines:
                     self._close_line(line)
 
-            def _close_line(self, line):
+            @staticmethod
+            def _close_line(line):
                 x, y = line.get_data()
                 # FIXME: markers at x[0], y[0] get doubled-up
                 if x[0] != x[-1]:

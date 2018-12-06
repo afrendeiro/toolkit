@@ -608,6 +608,8 @@ class ATACSeqAnalysis(Analysis):
         # Fix R's stupid colnames replacement
         sed -i 's/ATAC.seq_/ATAC-seq_/g' coverage_gc_corrected.csv
         """
+
+        @staticmethod
         def cqn(cov, gc_content, lengths):
             # install R package
             # source('http://bioconductor.org/biocLite.R')
@@ -978,21 +980,26 @@ class ATACSeqAnalysis(Analysis):
 
         Provides plots with Samples grouped `by_attribute` if given (a string or a list of strings).
         """
+        @staticmethod
         def get_sample_reads(bam_file):
             import pysam
             return pysam.AlignmentFile(bam_file).count()
 
+        @staticmethod
         def get_peak_number(bed_file):
             return len(open(bed_file, "r").read().split("\n"))
 
+        @staticmethod
         def get_total_open_chromatin(bed_file):
             peaks = pd.read_csv(bed_file, sep="\t", header=None)
             return (peaks.iloc[:, 2] - peaks.iloc[:, 1]).sum()
 
+        @staticmethod
         def get_peak_lengths(bed_file):
             peaks = pd.read_csv(bed_file, sep="\t", header=None)
             return (peaks.iloc[:, 2] - peaks.iloc[:, 1])
 
+        @staticmethod
         def get_peak_chroms(bed_file):
             peaks = pd.read_csv(bed_file, sep="\t", header=None)
             return peaks.iloc[:, 0].value_counts()
@@ -1980,7 +1987,7 @@ def investigate_nucleosome_positions(self, samples, cluster=True):
 
     # Regions to look at
     regions_pickle = os.path.join(self.results_dir, "nucleoatac", "all_types_of_regions.pickle")
-    if os.path.exists():
+    if os.path.exists(regions_pickle):
         regions = pickle.load(open(regions_pickle, "rb"))
     else:
         regions = dict()
@@ -2078,7 +2085,7 @@ def investigate_nucleosome_positions(self, samples, cluster=True):
                         (signals["region"] == region_name) &
                         (signals["label"] == label)
                 ]) > 0:
-                    _LOGGER.warn("Continuing", group, region_name, label)
+                    print("Continuing", group, region_name, label)
                     continue
 
                 _LOGGER.info(group, region_name, label)
@@ -2894,9 +2901,9 @@ def piq_to_network(
         assignments = assignments.append(gene_assignments, ignore_index=True)
 
     # save
-    assignments.to_csv(os.path.join(group_foot_dir, "assignments.all_motifs.csv".format(motif)), index=False)
-    interactions.to_csv(os.path.join(group_foot_dir, "interactions.all_motifs.csv".format(motif)), index=False)
-    stats.to_csv(os.path.join(group_foot_dir, "stats.all_motifs.csv".format(motif)), index=False)
+    assignments.to_csv(os.path.join(group_foot_dir, "assignments.all_motifs.csv"), index=False)
+    interactions.to_csv(os.path.join(group_foot_dir, "interactions.all_motifs.csv"), index=False)
+    stats.to_csv(os.path.join(group_foot_dir, "stats.all_motifs.csv"), index=False)
 
     return (assignments, interactions, stats)
 
@@ -2998,7 +3005,7 @@ def differential_interactions(
         alpha=0.5,
         rasterized=True)
     axis.axhline(0, linestyle="--", alpha=0.5, zorder=0)
-    axis.set_xlabel("Intensity (A)".format(group_name1))
+    axis.set_xlabel("Intensity (A)")
     axis.set_ylabel("Log2 fold change ({} / {})".format(group_name1, group_name2))
     sns.despine(fig)
     fig.savefig(

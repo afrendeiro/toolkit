@@ -32,8 +32,7 @@ def setup_logger(level="INFO", logfile=None):
            .format(__version__))
     formatter = logging.Formatter(fmt, datefmt='%Y-%m-%d %H:%M:%S')
     fh.setFormatter(formatter)
-    fmt = ("ngs_toolkit.v{}:%(module)s:L%(lineno)d (%(funcName)s) [%(levelname)s] > %(message)s"
-           .format(__version__))
+    fmt = "ngs_toolkit:%(module)s:L%(lineno)d (%(funcName)s) [%(levelname)s] > %(message)s"
     formatter = logging.Formatter(fmt)
     ch.setFormatter(formatter)
     # add the handlers to the logger
@@ -64,9 +63,9 @@ def setup_config(custom_yaml_config=None):
 
     default_config_path = 'config/default.yaml'
     default_config_path = pkg_resources.resource_filename(__name__, default_config_path)
-    _LOGGER.info("Reading default configuration file distributed with package from '{}'.".format(default_config_path))
+    _LOGGER.debug("Reading default configuration file distributed with package from '{}'.".format(default_config_path))
     try:
-        _CONFIG = yaml.load(open(default_config_path, 'r'))
+        _CONFIG = yaml.safe_load(open(default_config_path, 'r'))
         _LOGGER.debug("Default config: {}".format(_CONFIG))
     except IOError:
         _LOGGER.error("Couldn't read configuration file from '{}'.".format(default_config_path))
@@ -75,26 +74,26 @@ def setup_config(custom_yaml_config=None):
     user_config_path = os.path.join(os.path.expanduser("~"), ".ngs_toolkit.config.yaml")
     if os.path.exists(user_config_path):
         # Read up
-        _LOGGER.info("Found custom user config: {}".format(user_config_path))
+        _LOGGER.debug("Found custom user config: {}".format(user_config_path))
         try:
-            custom_config = yaml.load(open(user_config_path, "r"))
+            custom_config = yaml.safe_load(open(user_config_path, "r"))
             _LOGGER.debug("Custom user config: {}".format(custom_config))
             # Update config
-            _LOGGER.info("Updating configuration with custom file from '{}'.".format(user_config_path))
+            _LOGGER.debug("Updating configuration with custom file from '{}'.".format(user_config_path))
             _CONFIG.update(custom_config)
             _LOGGER.debug("Current config: {}".format(custom_config))
         except IOError:
             _LOGGER.error("Configuration file from '{}' exists but is not readable. Ignoring.".format(user_config_path))
     else:
-        _LOGGER.info("To use custom configurations including paths to static files, create a '{}' file.".format(user_config_path))
+        _LOGGER.debug("To use custom configurations including paths to static files, create a '{}' file.".format(user_config_path))
 
     if custom_yaml_config is not None:
         # Read up
         try:
-            custom_config = yaml.load(open(custom_yaml_config, "r"))
+            custom_config = yaml.safe_load(open(custom_yaml_config, "r"))
             _LOGGER.debug("Custom passed config: {}".format(custom_config))
             # Update config
-            _LOGGER.info("Updating configuration with custom file from '{}'.".format(custom_yaml_config))
+            _LOGGER.debug("Updating configuration with custom file from '{}'.".format(custom_yaml_config))
             _CONFIG.update(custom_config)
             _LOGGER.debug("Current config: {}".format(custom_config))
         except IOError as e:

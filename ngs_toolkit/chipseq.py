@@ -8,7 +8,7 @@ import pandas as pd
 import pybedtools
 
 from ngs_toolkit.atacseq import ATACSeqAnalysis
-from . import _LOGGER
+from ngs_toolkit import _LOGGER
 
 
 class ChIPSeqAnalysis(ATACSeqAnalysis):
@@ -150,6 +150,7 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
         if not os.path.exists(peaks_dir):
             os.makedirs(peaks_dir)
 
+        @staticmethod
         def _filter(input_bed, filter_bed, output_bed):
             """
             Filter BED file for entries that overlap another BED file.
@@ -337,7 +338,8 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
             for peak_type, peak_file in peak_files:
                 try:
                     sample_support = self.sites.intersect(peak_file, wa=True, c=True).to_dataframe()
-                except:
+                except (ValueError, pybedtools.MalformedBedLineError, pybedtools.helpers.BEDToolsError):
+                    _LOGGER.warn("Peaks for comparison {} ({}) not found!".format(comparison, peak_file))
                     continue
                 sample_support.index = index
                 support[(comparison, peak_type)] = sample_support.iloc[:, 3]

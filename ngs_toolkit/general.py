@@ -5,8 +5,8 @@ import os
 import numpy as np
 import pandas as pd
 
-from . import _LOGGER
-from . import _CONFIG
+from ngs_toolkit import _LOGGER
+from ngs_toolkit import _CONFIG
 
 
 def pickle_me(function):

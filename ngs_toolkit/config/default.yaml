@@ -58,3 +58,8 @@ executables:
   ame: ame
   findMotifsGenome.pl: findMotifsGenome.pl
   compareMotifs.pl: compareMotifs.pl
+graphics:
+  settings:
+    figure_saving:
+      - dpi: 300
+      - bbox_inches: "tight"

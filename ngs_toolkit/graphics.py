@@ -3,24 +3,31 @@
 
 import matplotlib.pyplot as plt
 import pandas as pd
+import seaborn as sns
+
+from ngs_toolkit import _CONFIG
 
 
 def barmap(x, figsize=None, square=False, row_colors=None, z_score=None, ylims=None):
     """
     Plot a heatmap-style grid with barplots.
 
-    :param pandas.DataFrame x: DataFrame with numerical values to plot. If DataFrame, indexes will be used as labels.
+    :param pandas.DataFrame x: DataFrame with numerical values to plot. If DataFrame,
+                               indexes will be used as labels.
     :param tuple figsize: Size in inches (width, height) of figure to produce.
     :param bool square: Whether resulting figure should be square.
     :param list row_colors: Iterable of colors to use for each row.
-    :param int z_score: Whether input matrix `x` should be Z-score transformed row-wise (0) or column-wise (1).
-    :raises AssertionError: if length of `row_colors` does not match size of provided Y axis from matrix `x`.
+    :param int z_score: Whether input matrix `x` should be Z-score transformed row-wise (0)
+                        or column-wise (1).
+    :raises AssertionError: if length of `row_colors` does not match size of provided Y axis
+                            from matrix `x`.
     """
     y_size, x_size = x.shape
 
     # Check provided row_colors match provided matrix
     if row_colors is not None:
-        assert len(row_colors) == y_size, "Length of row_colors does not match size of provided Y axis."
+        msg = "Length of row_colors does not match size of provided Y axis."
+        assert len(row_colors) == y_size, msg
 
     # Z-score transform
     if z_score is not None:
@@ -41,7 +48,9 @@ def barmap(x, figsize=None, square=False, row_colors=None, z_score=None, ylims=N
     # Plot row-by-row
     for i, row in enumerate(range(y_size)):
         color = row_colors[i] if row_colors is not None else None
-        axis[i].bar(left=range(x_size), height=x.iloc[i, :], width=0.95, align="center", color=[color] * x_size if row_colors is not None else None)
+        axis[i].bar(
+            left=range(x_size), height=x.iloc[i, :],
+            width=0.95, align="center", color=[color] * x_size if row_colors is not None else None)
         # axis[i].set_yticklabels(axis[i].get_yticklabels(), visible=False)
         axis[i].axhline(0, linestyle="--", color="black", linewidth=0.5)
         if i != y_size - 1:
@@ -51,13 +60,17 @@ def barmap(x, figsize=None, square=False, row_colors=None, z_score=None, ylims=N
             axis[i].set_ylim(ylims)
 
     axis[-1].set_xticks(range(x_size))
-    axis[-1].set_xticklabels(x.columns, rotation='vertical', ha="center", va="top", fontsize=figsize[1])
+    axis[-1].set_xticklabels(
+        x.columns, rotation='vertical', ha="center", va="top", fontsize=figsize[1])
 
     for i, ax in enumerate(axis):
-        m = max(ax.get_yticks())
+        # m = max(ax.get_yticks())
         # ax.set_yticks([m])
-        # ax.set_yticklabels([str(m)], rotation='horizontal', ha="center", va="center", visible=True, fontsize=figsize[1])
-        ax.set_ylabel(str(x.index[i]), rotation='horizontal', ha="right", va="center", visible=True, fontsize=figsize[1])
+        # ax.set_yticklabels([str(m)], rotation='horizontal', ha="center",
+        #                    va="center", visible=True, fontsize=figsize[1])
+        ax.set_ylabel(
+            str(x.index[i]), rotation='horizontal', ha="right", va="center",
+            visible=True, fontsize=figsize[1])
 
     return fig
 
@@ -93,7 +106,6 @@ def radar_plot(
 
     Heavy inspiration from here: https://matplotlib.org/examples/api/radar_chart.html
     """
-
     import numpy as np
     from matplotlib.path import Path
     from matplotlib.spines import Spine
@@ -207,7 +219,8 @@ def radar_plot(
         case_data = data[data[subplot_var] == subplot_title]
 
         if scale_to_max:
-            case_data.loc[:, radial_vars] = case_data.loc[:, radial_vars] / case_data.loc[:, radial_vars].max()
+            case_data.loc[:, radial_vars] = (
+                case_data.loc[:, radial_vars] / case_data.loc[:, radial_vars].max())
 
         ax.set_rgrids([0.2, 0.4, 0.6, 0.8])
         ax.set_title(subplot_title, weight='bold', size='medium', position=(0.5, 1.1),
@@ -221,8 +234,8 @@ def radar_plot(
         ax.set_varlabels(radial_vars)
 
         # add legend relative to top-left plot
-        legend = ax.legend(loc=(0.9, .95),
-                           labelspacing=0.1, fontsize='small')
+        ax.legend(loc=(0.9, .95),
+                  labelspacing=0.1, fontsize='small')
 
     return fig
 
@@ -232,3 +245,18 @@ def add_colorbar_to_axis(collection, label=None, position="right", size="5%", pa
     divider = make_axes_locatable(collection.axes)
     cax = divider.append_axes(position, size=size, pad=pad)
     plt.colorbar(mappable=collection, cax=cax, label=label, alpha=1)
+
+
+def clustermap_fix_label_orientation(grid, fontsize="xx-small", **kwargs):
+    grid.ax_heatmap.set_xticklabels(
+        grid.ax_heatmap.get_xticklabels(), rotation=90, fontsize=fontsize, **kwargs)
+    grid.ax_heatmap.set_yticklabels(
+        grid.ax_heatmap.get_yticklabels(), rotation=0, fontsize=fontsize, **kwargs)
+
+
+def savefig(fig, fname, **kwargs):
+    if isinstance(fig, sns.axisgrid.Grid):
+        fig = fig.fig
+    default_kwargs = _CONFIG['graphics']['settings']['figure_saving']
+    default_kwargs.update(kwargs)
+    fig.savefig(fname, **default_kwargs)

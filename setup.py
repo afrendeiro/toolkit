@@ -74,5 +74,6 @@ setup(
     package_data={
         'ngs_toolkit': ['config/*.yaml']
     },
+    data_files=["requirements.txt"],
     **extra
 )

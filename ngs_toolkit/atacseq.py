@@ -319,9 +319,10 @@ class ATACSeqAnalysis(Analysis):
         try:
             support = support.to_dataframe()
         except (ValueError, pybedtools.MalformedBedLineError, pybedtools.helpers.BEDToolsError):
-            _LOGGER
+            _LOGGER.debug("Could not convert support intersection directly to dataframe, saving temporarly file.")
             support.saveas("_tmp.peaks.bed")
             support = pd.read_csv("_tmp.peaks.bed", sep="\t", header=None)
+            os.remove("_tmp.peaks.bed")
 
         support.columns = ["chrom", "start", "end"] + [sample.name for sample in samples]
         support.index = support['chrom'] + ":" + support['start'].astype(str) + "-" + support['end'].astype(str)

@@ -9,25 +9,6 @@ from ngs_toolkit import _LOGGER
 from ngs_toolkit import _CONFIG
 
 
-def pickle_me(function):
-    """
-    Decorator for some methods of Analysis class.
-    Important: Pickled function cannot have positional arguments!
-    """
-    def wrapper(obj, timestamp=False, *args, **kwargs):
-        import pickle
-        function(obj, *args, **kwargs)
-        if timestamp:
-            import time
-            import datetime
-            ts = datetime.datetime.fromtimestamp(time.time()).strftime('%Y%m%d-%H%M%S')
-            p = obj.pickle_file.replace(".pickle", ".{}.pickle".format(ts))
-        else:
-            p = obj.pickle_file
-        pickle.dump(obj, open(p, 'wb'), protocol=pickle.HIGHEST_PROTOCOL)
-    return wrapper
-
-
 class Analysis(object):
     """
     Generic class holding functions and data from a typical NGS analysis.
@@ -73,6 +54,7 @@ class Analysis(object):
             name="analysis",
             samples=None,
             prj=None,
+            genome=None,
             data_dir="data",
             results_dir="results",
             pickle_file=None,
@@ -84,57 +66,129 @@ class Analysis(object):
         self.results_dir = results_dir
         self.samples = samples
         self.prj = prj
-        if pickle_file is None:
-            pickle_file = os.path.join(results_dir, "{}.pickle".format(self.name))
+        self.genome = genome
         self.pickle_file = pickle_file
+
+        # parse remaining kwargs
+        _LOGGER.debug("Adding additional kwargs to analysis object.")
+        self.__dict__.update(kwargs)
+
+        # Set default location for the pickle
+        if self.pickle_file is None:
+            self.pickle_file = os.path.join(results_dir, "{}.pickle".format(self.name))
+        # reload itself if required
+        if from_pickle:
+            _LOGGER.info("Updating analysis object from pickle file: '{}'.".format(self.pickle_file))
+            self.update(pickle_file=self.pickle_file)
 
         for directory in [self.data_dir, self.results_dir]:
             if not os.path.exists(directory):
                 os.makedirs(directory)
 
         # Store projects attributes in self
-        msg = "Setting project's samples as the analysis samples."
-        # # for samples, only if not provided already
-        if self.samples is None:
-            if hasattr(self.prj, "samples"):
-                _LOGGER.info(msg)
-                self.samples = prj.samples
-        # # for the others, get them
-        for attr in ["comparison_table"]:
-            msg = "Setting project's '{0}' as the analysis '{0}'.".format(attr)
-            if hasattr(self.prj.metadata, attr):
-                _LOGGER.info(msg)
-                setattr(self, attr, getattr(self.prj, attr))
-        for attr in ["sample_attributes", "group_attributes"]:
-            msg = "Setting project's '{0}' as the analysis '{0}'.".format(attr)
-            if hasattr(self.prj, attr):
-                _LOGGER.info(msg)
-                setattr(self, attr, getattr(self.prj, attr))
+        self.set_attributes(overwrite=False)
 
-        # parse remaining kwargs
-        _LOGGER.debug("Adding additional kwargs to analysis object.")
-        self.__dict__.update(kwargs)
-
-        # reload itself if required
-        if from_pickle:
-            _LOGGER.info("Updating analysis object from pickle file: '{}'.".format(self.pickle_file))
-            self.update(pickle_file=self.pickle_file)
+        # Try to set genome if not set
+        if self.genome is None:
+            _LOGGER.debug("Trying to get analysis genome.")
+            self.set_genome_assembly()
+        # TODO: if genome is set, get required static files for that genome assembly
 
         _LOGGER.debug("Setting data type-specific attributes to None.")
-        self.data_type = self.__data_type__ = None
-        self._var_names = None
-        self._quantity = None
-        self._norm_units = None
-        self._raw_matrix_name = None
-        self._norm_matrix_name = None
-        self._annot_matrix_name = None
+        attrs = [
+            "data_type", "var_names",
+            "quantity", "norm_units", "raw_matrix_name",
+            "norm_matrix_name", "annot_matrix_name"]
+        for attr in attrs:
+            if not hasattr(self, attr):
+                setattr(self, attr, None)
 
-    @pickle_me
-    def to_pickle(self):
+    def __repr__(self):
+        t = "'{}' analysis".format(self.data_type) if self.data_type is not None else "Analysis"
+        samples = " with {} samples".format(len(self.samples)) if self.samples is not None else ""
+        genome = " of genome '{}'".format(self.genome) if self.genome is not None else ""
+        suffix = "."
+        return t + " object named '{}'".format(self.name) + samples + genome + suffix
+
+    def update(self, pickle_file=None):
         """
-        Serialize object (i.e. save to disk).
+        Update all of the object's attributes with the attributes from a serialized
+        object (i.e. object stored in a file) object.
+
+        :param pickle_file: Pickle file to load. By default this is the object's attribute
+                            `pickle_file`.
+        :type pickle_file: str, optional
         """
-        pass
+        self.__dict__.update(self.from_pickle(pickle_file=pickle_file).__dict__)
+
+    def set_genome_assembly(self):
+        if self.samples is None:
+            _LOGGER.warn("Genome assembly for analysis was not set and cannot be derived from samples.")
+        else:
+            genomes = list(set([s.genome for s in self.samples]))
+            if len(genomes) == 1:
+                _LOGGER.info("Setting analysis genome as '{}'.".format(genomes[0]))
+                self.genome = genomes[0]
+            else:
+                _LOGGER.warn("Found several genome assemblies for the various analysis samples. " +
+                             "Will not set a genome for analysis.")
+
+    def set_attributes(self, overwrite=True):
+        """
+        Set Analysis object attributes ``samples``, ``sample_attributes`` and ``group_atrributes``
+        to the values in the associated Project object if existing.
+        """
+        hint = " Adding a '{}' section to your project configuration file allows the analysis"
+        hint += " object to use those attributes during the analysis."
+        if self.prj is not None:
+            for attr in ["samples", "sample_attributes", "group_attributes"]:
+                if not hasattr(self.prj, "samples"):
+                    _LOGGER.warn("Associated project does not have any '{}'.".format(attr) +
+                                 hint.format(attr) if attr != "samples" else "")
+                else:
+                    msg = "Setting project's '{0}' as the analysis '{0}'.".format(attr)
+                    if overwrite:
+                        _LOGGER.info(msg)
+                        setattr(self, attr, getattr(self.prj, attr))
+                    else:
+                        if self.samples is None:
+                            _LOGGER.info(msg)
+                            setattr(self, attr, getattr(self.prj, attr))
+                        else:
+                            _LOGGER.debug("Samples already exist for analysis, not overwriting.")
+            # comparison table is under "prj.metadata"
+            for attr in ["comparison_table"]:
+                if not hasattr(self.prj, "samples"):
+                    _LOGGER.warn("Associated project does not have any '{}'.".format(attr))
+                else:
+                    msg = "Setting project's '{0}' as the analysis '{0}'.".format(attr)
+                    if overwrite:
+                        _LOGGER.info(msg)
+                        setattr(self, attr, getattr(self.prj.metadata, attr))
+                    else:
+                        if self.samples is None:
+                            _LOGGER.info(msg)
+                            setattr(self, attr, pd.read_csv(getattr(self.prj.metadata, attr)))
+                        else:
+                            _LOGGER.debug("Samples already exist for analysis, not overwriting.")
+        else:
+            _LOGGER.warn("Analysis object does not have an attached Project. " +
+                         "Will not add special attributes to analysis such as " +
+                         "samples, their attributes and comparison table.")
+
+    def to_pickle(self, timestamp=False):
+        """
+        Serialize object (i.e. save to disk) to hickle format.
+        """
+        import pickle
+        if timestamp:
+            import time
+            import datetime
+            ts = datetime.datetime.fromtimestamp(time.time()).strftime('%Y%m%d-%H%M%S')
+            p = self.pickle_file.replace(".pickle", ".{}.pickle".format(ts))
+        else:
+            p = self.pickle_file
+        pickle.dump(self, open(p, 'wb'), protocol=pickle.HIGHEST_PROTOCOL)
 
     def from_pickle(self, pickle_file=None):
         """
@@ -148,17 +202,6 @@ class Analysis(object):
         if pickle_file is None:
             pickle_file = self.pickle_file
         return pickle.load(open(pickle_file, 'rb'))
-
-    def update(self, pickle_file=None):
-        """
-        Update all of the object's attributes with the attributes from a serialized
-        object (i.e. object stored in a file) object.
-
-        :param pickle_file: Pickle file to load. By default this is the object's attribute
-                            `pickle_file`.
-        :type pickle_file: str, optional
-        """
-        self.__dict__.update(self.from_pickle(pickle_file=pickle_file).__dict__)
 
     def get_level_colors(
             self, index=None, matrix="accessibility", levels=None,

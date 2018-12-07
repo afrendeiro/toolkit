@@ -921,7 +921,10 @@ class ATACSeqAnalysis(Analysis):
         )
 
         # Pair indexes
-        assert self.coverage.shape[0] == self.coverage_annotated.shape[0]
+        msg = "Annotated matrix does not have same feature length as coverage matrix."
+        if not self.coverage.shape[0] == self.coverage_annotated.shape[0]:
+            _LOGGER.error(msg)
+            raise AssertionError(msg)
         self.coverage_annotated.index = self.coverage.index
 
         # Save
@@ -930,13 +933,17 @@ class ATACSeqAnalysis(Analysis):
     def get_gene_level_accessibility(self, matrix="accessibility", reduce_func=np.mean):
         """
         Get gene-level measurements of coverage.
-        Requires a 'gene_annotation' attribute to be set containing a mapping between the index of `matrix` and genes
-        (produced from `get_peak_gene_annotation`).
+        Requires a 'gene_annotation' attribute to be set containing a mapping between the
+        index of `matrix` and genes (produced from `get_peak_gene_annotation`).
 
         :param str matrix: Quantification matrix to be used (e.g. 'coverage' or 'accessibility')
-        :param def reduce_func: Function to apply to reduce values. Default is mean
+        :param func reduce_func: Function to apply to reduce values. Default is mean
         """
-        assert hasattr(self, "gene_annotation"), """Analysis object lacks "gene_annotation" dataframe."""
+        msg = "Analysis object lacks 'gene_annotation' dataframe."
+        hint = " Call 'analysis.get_peak_gene_annotation' to have region-gene associations."
+        if not hasattr(self, "gene_annotation"):
+            _LOGGER.error(msg + hint)
+            raise AssertionError(msg)
 
         matrix = getattr(self, matrix).copy()
 
@@ -954,13 +961,18 @@ class ATACSeqAnalysis(Analysis):
     def get_gene_level_changes(self, differential_results=None, reduce_func=np.mean):
         """
         Redcuce changes in regulatory elements to gene-level by aggregating across regulatory elements.
-        Requires a 'gene_annotation' attribute to be set containing a mapping between the index of `matrix` and genes
-        (produced from `get_peak_gene_annotation`).
+        Requires a 'gene_annotation' attribute to be set containing a mapping between
+        the index of `matrix` and genes (produced from `get_peak_gene_annotation`).
+
         :param pandas.DataFrame differential_results: Matrix with differential results to use.
             Default is a 'differential_results' attribute of self.
-        :param def reduce_func: Function to apply to reduce values. Default is mean
+        :param func reduce_func: Function to apply to reduce values. Default is mean
         """
-        assert hasattr(self, "gene_annotation"), """Analysis object lacks "gene_annotation" dataframe."""
+        msg = "Analysis object lacks 'gene_annotation' dataframe."
+        hint = " Call 'analysis.get_peak_gene_annotation' to have region-gene associations."
+        if not hasattr(self, "gene_annotation"):
+            _LOGGER.error(msg + hint)
+            raise AssertionError(msg)
 
         if differential_results is None:
             differential_results = self.differential_results

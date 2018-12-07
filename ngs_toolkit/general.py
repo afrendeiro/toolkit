@@ -1100,7 +1100,10 @@ def deseq_results_to_bed_file(
 
     df = pd.read_csv(deseq_result_file, index_col=0)
 
-    assert "log2FoldChange" in df.columns.tolist()
+    msg = "DESeq2 results do not have a 'log2FoldChange' column."
+    if not ("log2FoldChange" in df.columns.tolist()):
+        _LOGGER.error(msg)
+        raise AssertionError(msg)
 
     if sort is True:
         df = df.sort_values("log2FoldChange", ascending=ascending)

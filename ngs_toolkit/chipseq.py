@@ -61,7 +61,10 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
         from tqdm import tqdm
 
         req_columns = ["comparison_name", "sample_name", "comparison_side", "sample_group"]
-        assert all([col in comparison_table.columns for col in req_columns]), "Comparison table is missing some of the following columns: '{}'.".format(",".join(req_columns))
+        msg = "Comparison table is missing some of the following columns: '{}'.".format(",".join(req_columns))
+        if not all([col in comparison_table.columns for col in req_columns]):
+            _LOGGER.error(msg)
+            raise AssertionError(msg)
 
         # Complement default `output_dir`
         if "{results_dir}" in output_dir:
@@ -187,7 +190,10 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
         :raises ValueError: Will be raised if not `permissive` and incomplete/incoherent comparisons are detected.
         """
         req_columns = ["comparison_name", "sample_name", "comparison_side", "sample_group"]
-        assert all([col in comparison_table.columns for col in req_columns]), "Comparison table is missing some of the following columns: '{}'.".format(",".join(req_columns))
+        msg = "Comparison table is missing some of the following columns: '{}'.".format(",".join(req_columns))
+        if not all([col in comparison_table.columns for col in req_columns]):
+            _LOGGER.error(msg)
+            raise AssertionError(msg)
 
         # Complement default `output_dir`
         if "{results_dir}" in output_dir:
@@ -267,7 +273,10 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
             for peak_file in peak_files:
                 genome = comparison_table.loc[comparison_table["comparison_name"] == comparison, "comparison_genome"].drop_duplicates().squeeze()
 
-                assert type(genome) is str, "Could not determine genome of comparison '{}'.".format(comparison)
+                msg = "Could not determine genome of comparison '{}'.".format(comparison)
+                if type(genome) is not str:
+                    _LOGGER.error(msg)
+                    raise AssertionError(msg)
 
                 # Get peaks
                 if region_type == "summits":

@@ -6,6 +6,7 @@ import pandas as pd
 import seaborn as sns
 
 from ngs_toolkit import _CONFIG
+from ngs_toolkit import _LOGGER
 
 
 def barmap(x, figsize=None, square=False, row_colors=None, z_score=None, ylims=None):
@@ -27,11 +28,15 @@ def barmap(x, figsize=None, square=False, row_colors=None, z_score=None, ylims=N
     # Check provided row_colors match provided matrix
     if row_colors is not None:
         msg = "Length of row_colors does not match size of provided Y axis."
-        assert len(row_colors) == y_size, msg
+        if not len(row_colors) == y_size:
+            _LOGGER.error(msg)
+            raise AssertionError(msg)
 
     # Z-score transform
     if z_score is not None:
-        assert z_score in [1, 0], "z_score must be one of 0 (row-wise) or 1 (column-wise)."
+        if z_score not in [1, 0]:
+            _LOGGER.error("z_score must be one of 0 (row-wise) or 1 (column-wise).")
+            raise AssertionError(msg)
         from scipy.stats import zscore
         rows, cols = x.index, x.columns
         x = zscore(x, axis=z_score)

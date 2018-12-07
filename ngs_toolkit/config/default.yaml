@@ -63,3 +63,6 @@ graphics:
     figure_saving:
       - dpi: 300
       - bbox_inches: "tight"
+    matplotlib:
+      backend: TkAgg # Agg
+    close_saved_figures: True

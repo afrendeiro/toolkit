@@ -490,7 +490,7 @@ def unsupervised_analysis(
         data_type="ATAC-seq",
         quant_matrix=None,
         samples=None,
-        attributes_to_plot=["sample_name"],
+        attributes_to_plot=None,
         plot_prefix=None,
         standardize_matrix=False,
         manifold_algorithms=['MDS', "Isomap", "LocallyLinearEmbedding", "SpectralEmbedding", "TSNE"],
@@ -637,20 +637,32 @@ def unsupervised_analysis(
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
+    msg = "`attributes_to_plot` were not specified and the analysis does not have a "
+    msg += " 'group_attributes' variable."
+    if attributes_to_plot is None:
+        try:
+            attributes_to_plot = analysis.group_attributes
+        except AttributeError:
+            _LOGGER.error(msg)
+
     matrix = getattr(analysis, quant_matrix)
 
     if type(matrix.columns) is not pd.core.indexes.multi.MultiIndex:
         raise TypeError("Provided quantification matrix must have columns with MultiIndex.")
 
     if samples is None:
-        samples = [s for s in analysis.samples if s.name in matrix.columns.get_level_values("sample_name")]
+        samples = [s for s in analysis.samples
+                   if s.name in matrix.columns.get_level_values("sample_name")]
 
     # remove attributes with all NaNs
-    attributes_to_plot = [attr for attr in attributes_to_plot if not pd.isnull(matrix.columns.get_level_values(attr)).all()]
+    attributes_to_plot = [attr for attr in attributes_to_plot
+                          if not pd.isnull(matrix.columns.get_level_values(attr)).all()]
 
     # This will always be a matrix for all samples
     color_dataframe = pd.DataFrame(
-        analysis.get_level_colors(index=matrix.columns, levels=attributes_to_plot, pallete=pallete, cmap=cmap),
+        analysis.get_level_colors(
+            index=matrix.columns, levels=attributes_to_plot,
+            pallete=pallete, cmap=cmap),
         index=attributes_to_plot, columns=matrix.columns)
     # will be filtered now by the requested samples if needed
     color_dataframe = color_dataframe[[s.name for s in samples]]
@@ -662,6 +674,10 @@ def unsupervised_analysis(
         std = StandardScaler()
         X = pd.DataFrame(std.fit_transform(X.T).T, index=X.index, columns=X.columns)
 
+    if isinstance(X.columns, pd.MultiIndex):
+        sample_display_names = X.columns.get_level_values("sample_name")
+    else:
+        sample_display_names = X.columns
     # TODO: Re-implement to accomodate multiindex
     # if prettier_sample_names:
     #     X.columns = (
@@ -674,8 +690,8 @@ def unsupervised_analysis(
     for method in ['pearson', 'spearman']:
         _LOGGER.info("Plotting pairwise correlation with '{}' metric.".format(method))
         g = sns.clustermap(
-            # yticklabels=sample_display_names,
-            X.astype(float).corr(method), xticklabels=False, yticklabels=True, annot=display_corr_values,
+            X.astype(float).corr(method),
+            xticklabels=False, yticklabels=sample_display_names, annot=display_corr_values,
             cmap="Spectral_r", figsize=(0.2 * X.shape[1], 0.2 * X.shape[1]),
             cbar_kws={"label": "{} correlation".format(method.capitalize())},
             row_colors=color_dataframe.T, col_colors=color_dataframe.T)
@@ -1392,7 +1408,7 @@ def differential_from_bivariate_fit(
 
 def differential_analysis(
         analysis,
-        comparison_table,
+        comparison_table=None,
         data_type="ATAC-seq",
         samples=None,
         covariates=None,
@@ -1444,6 +1460,16 @@ def differential_analysis(
     :returns pandas.DataFrame: DataFrame with analysis results for all comparisons.
                                Will be `None` if `distributed` is `True`.
     """
+    if comparison_table is None:
+        msg = "`comparison_table` was not given and is not set in analysis object."
+        hint = "Add a `comparison_table` attribute to the analysis object."
+        try:
+            comparison_table = analysis.comparison_table
+        except AttributeError as e:
+            _LOGGER.error(msg)
+            _LOGGER.info(hint)
+            raise e
+
     # Check comparisons
     # check comparison table has required columns
     req_attrs = ['comparison_name', 'comparison_side', 'sample_name', 'sample_group']
@@ -1560,11 +1586,12 @@ def differential_analysis(
 
 
 def collect_differential_analysis(
-        comparison_table,
+        comparison_table=None,
         data_type="ATAC-seq",
         output_dir="results/differential_analysis_{data_type}",
         output_prefix="differential_analysis",
         permissive=True,
+        assign=True, save=True, analysis=None,
         overwrite=False):
     """
     Collect results from DESeq2 differential analysis.
@@ -1589,6 +1616,16 @@ def collect_differential_analysis(
                                Will be `None` if `overwrite` is `False` and a results file already exists.
     """
     from tqdm import tqdm
+
+    if comparison_table is None:
+        msg = "`comparison_table` was not given and is not set in analysis object."
+        hint = "Add a `comparison_table` attribute to the analysis object."
+        try:
+            comparison_table = analysis.comparison_table
+        except AttributeError as e:
+            _LOGGER.error(msg)
+            _LOGGER.info(hint)
+            raise e
 
     # Make output dir
     if "{data_type}" in output_dir:
@@ -1618,12 +1655,20 @@ def collect_differential_analysis(
         # append
         results = results.append(res2.reset_index(), ignore_index=True)
 
-    # save all
-    results.to_csv(results_file, index=False)
+    if save:
+        # save all
+        results.to_csv(results_file, index=False)
 
     # set index
     if "index" in results.columns:
         results = results.set_index("index")
+
+    if assign:
+        # TODO: change input args to add function to main Analysis object
+        if analysis is not None:
+            analysis.differential_results = results
+        else:
+            _LOGGER.warn("Cannot assign results to analysis object as this was not provided.")
     return results
 
 
@@ -1661,7 +1706,7 @@ def differential_overlap(
         unit = "feature"
 
     if "direction" not in differential.columns:
-        differential["direction"] = differential["log2FoldChange"].apply(lambda x: "up" if x > 0 else "down")
+        differential.loc[:, "direction"] = differential["log2FoldChange"].apply(lambda x: "up" if x > 0 else "down")
 
     differential.index.name = "index"
     differential.loc[:, "intersect"] = 1
@@ -2018,11 +2063,23 @@ def plot_differential(
         quantity = "Expression"
         unit = "TPM"
     else:
-        raise AssertionError("Plot differential is only implemented for data types 'ATAC-seq' or 'RNA-seq'.")
+        msg = "Plot differential is only implemented for data types 'ATAC-seq' or 'RNA-seq'."
+        raise AssertionError(msg)
 
     if samples is None:
         samples = analysis.samples
     samples = [s for s in samples if s.name in matrix.columns]
+
+    if comparison_table is None:
+        msg = "`comparison_table` was not given and is not set in analysis object."
+        hint = "Will skip certain plots done at comparison level. "
+        hint += "Add a `comparison_table` attribute to the analysis object."
+        try:
+            comparison_table = analysis.comparison_table
+        except AttributeError:
+            _LOGGER.warn(msg)
+            _LOGGER.info(hint)
+
     if only_comparison_samples and comparison_table is not None:
         samples = [s for s in samples if s.name in comparison_table['sample_name'].tolist()]
     matrix = matrix[[s.name for s in samples]]
@@ -2030,11 +2087,14 @@ def plot_differential(
     # Handle group colouring
     if group_wise_colours:
         if type(group_variables) is None:
-            raise AssertionError("If `group_wise_colours` is True, a list of `group_variables` must be passed.")
+            msg = "If `group_wise_colours` is True, a list of `group_variables` must be passed."
+            raise AssertionError(msg)
 
         # This will always be a matrix for all samples
         color_dataframe = pd.DataFrame(
-            analysis.get_level_colors(index=matrix.columns, levels=group_variables, pallete=pallete, cmap=cmap),
+            analysis.get_level_colors(
+                index=matrix.columns, levels=group_variables,
+                pallete=pallete, cmap=cmap),
             index=group_variables, columns=matrix.columns)
         # will be filtered now by the requested samples if needed
         color_dataframe = color_dataframe[[s.name for s in samples]]
@@ -2066,7 +2126,8 @@ def plot_differential(
             results.loc[:, 'diff'] = results.loc[:, 'diff_rank']
 
     # Annotate direction of change
-    results.loc[:, "direction"] = results.loc[:, log_fold_change_column].apply(lambda x: "up" if x >= 0 else "down")
+    results.loc[:, "direction"] = results.loc[
+        :, log_fold_change_column].apply(lambda x: "up" if x >= 0 else "down")
 
     # PLOTS
     _LOGGER.info("Starting to generate plots for differential comparisons.")
@@ -2088,7 +2149,9 @@ def plot_differential(
         axis.set_xlabel(label)
         axis.set_ylabel(var_name.capitalize() + "s (frequency)")
         sns.despine(fig)
-        fig.savefig(os.path.join(output_dir, output_prefix + "." + variable + ".distribution.svg"), bbox_inches="tight")
+        fig.savefig(
+            os.path.join(output_dir, output_prefix + "." + variable + ".distribution.svg"),
+            bbox_inches="tight")
 
         if plot_each_comparison:
             # per comparison
@@ -2101,13 +2164,17 @@ def plot_differential(
                 ax.set_xlabel(label)
                 ax.set_ylabel(var_name.capitalize() + "s (frequency)")
             sns.despine(g.fig)
-            g.fig.savefig(os.path.join(output_dir, output_prefix + "." + variable + ".distribution.per_comparison.svg"), bbox_inches="tight")
+            g.fig.savefig(
+                os.path.join(output_dir, output_prefix + "." + variable + ".distribution.per_comparison.svg"),
+                box_inches="tight")
 
     # Number of differential vars
     _LOGGER.info("Calculating number of differential {}s per comparison.".format(var_name))
     n_vars = float(matrix.shape[0])
-    total_diff = results.groupby([comparison_column])['diff'].sum().sort_values(ascending=False).reset_index()
-    split_diff = results.groupby([comparison_column, "direction"])['diff'].sum().sort_values(ascending=False).reset_index()
+    total_diff = results.groupby(
+        [comparison_column])['diff'].sum().sort_values(ascending=False).reset_index()
+    split_diff = results.groupby(
+        [comparison_column, "direction"])['diff'].sum().sort_values(ascending=False).reset_index()
     split_diff.loc[split_diff['direction'] == 'down', "diff"] *= -1
     split_diff['label'] = split_diff['comparison_name'] + ", " + split_diff['direction']
     total_diff['diff_perc'] = (total_diff['diff'] / n_vars) * 100
@@ -2133,7 +2200,9 @@ def plot_differential(
     m = split_diff['diff_perc'].abs().max()
     axis[2, 1].set_xlim((-m, m))
     sns.despine(fig)
-    fig.savefig(os.path.join(output_dir, output_prefix + ".number_differential.directional.svg"), bbox_inches="tight")
+    fig.savefig(
+        os.path.join(output_dir, output_prefix + ".number_differential.directional.svg"),
+        bbox_inches="tight")
 
     if plot_each_comparison:
         _LOGGER.info("Doing detailed plotting per comparison:")
@@ -2146,7 +2215,8 @@ def plot_differential(
         # TODO: add different shadings of red for various levels of significance
         # TODO: do this for scatter, MA, volcano plots
         if comparison_table is not None:
-            _LOGGER.info("Plotting scatter of {} distribution for each group in each comparison.".format(var_name))
+            _LOGGER.info(
+                "Plotting scatter of {} distribution for each group in each comparison.".format(var_name))
             fig, axes = plt.subplots(
                 n_side, n_side,
                 figsize=(n_side * 4, n_side * 4), sharex=True, sharey=True)
@@ -2160,8 +2230,8 @@ def plot_differential(
                 a = c.loc[c['comparison_side'] >= 1, "sample_name"]
                 b = c.loc[c['comparison_side'] <= 0, "sample_name"]
 
-                a = matrix[[s.name for s in samples if s.name in a.tolist() and s.library == data_type]].mean(axis=1)
-                b = matrix[[s.name for s in samples if s.name in b.tolist() and s.library == data_type]].mean(axis=1)
+                a = matrix.loc[:, [s.name for s in samples if s.name in a.tolist() and s.library == data_type]].mean(axis=1)
+                b = matrix.loc[:, [s.name for s in samples if s.name in b.tolist() and s.library == data_type]].mean(axis=1)
 
                 # Hexbin plot
                 ax = next(axes)
@@ -2211,7 +2281,9 @@ def plot_differential(
             for ax in axes:
                 ax.set_visible(False)
             sns.despine(fig)
-            fig.savefig(os.path.join(output_dir, output_prefix + ".scatter_plots.svg"), bbox_inches="tight", dpi=dpi)
+            fig.savefig(
+                os.path.join(output_dir, output_prefix + ".scatter_plots.svg"),
+                bbox_inches="tight", dpi=dpi)
 
         # Volcano plots
         _LOGGER.info("Plotting volcano plots for each comparison.")
@@ -2228,7 +2300,8 @@ def plot_differential(
             ax = next(axes)
             ax.hexbin(
                 t[log_fold_change_column], -np.log10(t[p_value_column]),
-                alpha=0.85, cmap="Greys", color="black", edgecolors="white", linewidths=0, bins='log', mincnt=1, rasterized=True)
+                alpha=0.85, cmap="Greys", color="black", edgecolors="white",
+                linewidths=0, bins='log', mincnt=1, rasterized=True)
 
             # Scatter for significant
             diff_vars = t.loc[t["diff"] == True, :]
@@ -2247,14 +2320,18 @@ def plot_differential(
             ax.set_xlim(-l, l)
 
             # Add lines of significance
-            ax.axhline(-np.log10(t.loc[t["diff"] == True, p_value_column].max()), linestyle='--', alpha=0.5, zorder=0, color="black")
+            ax.axhline(
+                -np.log10(t.loc[t["diff"] == True, p_value_column].max()),
+                linestyle='--', alpha=0.5, zorder=0, color="black")
             if fold_change is not None:
                 ax.axvline(-fold_change, linestyle='--', alpha=0.5, zorder=0, color="black")
                 ax.axvline(fold_change, linestyle='--', alpha=0.5, zorder=0, color="black")
         for ax in axes:
             ax.set_visible(False)
         sns.despine(fig)
-        fig.savefig(os.path.join(output_dir, output_prefix + ".volcano_plots.svg"), bbox_inches="tight", dpi=dpi)
+        fig.savefig(
+            os.path.join(output_dir, output_prefix + ".volcano_plots.svg"),
+            bbox_inches="tight", dpi=dpi)
 
         # MA plots
         _LOGGER.info("Plotting MA plots for each comparison.")
@@ -2271,7 +2348,8 @@ def plot_differential(
             ax = next(axes)
             ax.hexbin(
                 np.log10(t[mean_column]), t[log_fold_change_column],
-                alpha=0.85, cmap="Greys", color="black", edgecolors="white", linewidths=0, bins='log', mincnt=1, rasterized=True)
+                alpha=0.85, cmap="Greys", color="black", edgecolors="white",
+                linewidths=0, bins='log', mincnt=1, rasterized=True)
 
             # Scatter for significant
             diff_vars = t.loc[t["diff"] == True, :]
@@ -2317,7 +2395,8 @@ def plot_differential(
             _LOGGER.info("Getting per-group values for each comparison.")
             groups = pd.DataFrame()
             for sample_group in comparison_table["sample_group"].drop_duplicates():
-                c = comparison_table.loc[comparison_table["sample_group"] == sample_group, "sample_name"].drop_duplicates()
+                c = comparison_table.loc[
+                    comparison_table["sample_group"] == sample_group, "sample_name"].drop_duplicates()
                 if c.shape[0] > 0:
                     groups.loc[:, sample_group] = matrix[[d for d in c if d in sample_cols]].mean(axis=1)
 
@@ -3069,7 +3148,7 @@ def differential_enrichment(
         analysis,
         differential,
         data_type="ATAC-seq",
-        output_dir="results/differential_analysis_{data_type}",
+        output_dir="results/differential_analysis_{data_type}/enrichments",
         output_prefix="differential_analysis",
         genome="hg19",
         steps=['lola', 'meme', 'homer', 'enrichr'],
@@ -3274,7 +3353,7 @@ def collect_differential_enrichment(
         differential,
         directional=True,
         data_type="ATAC-seq",
-        output_dir="results/differential_analysis_{data_type}",
+        output_dir="results/differential_analysis_{data_type}/enrichments",
         output_prefix="differential_analysis",
         permissive=True):
     """
@@ -3465,6 +3544,8 @@ def plot_differential_enrichment(
 
     # TODO: add plotting of genomic region and chromatin state enrichment.
     `comp_variable` is the column in the enrichment table that labels groups.
+
+    # TODO: split function in its smaller parts and call them appropriately.
 
     :param enrichment_table: Data frame with enrichment results as produced by
                              ``ngs_toolkit.general.differential_enrichment`` or

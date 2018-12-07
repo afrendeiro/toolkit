@@ -1,0 +1,11 @@
+scanpy
+scanorama
+phate
+scvelo
+loompy
+fbpca
+MulticoreTSNE  # https://github.com/DmitryUlyanov/Multicore-TSNE/issues/32#issuecomment-368588074
+python-igraph
+louvain>=0.6
+leidenalg
+fa2

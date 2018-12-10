@@ -3206,7 +3206,7 @@ def differential_enrichment(
                 homer_enr.to_csv(
                     os.path.join(output_dir, output_prefix + ".homer_motifs.csv"), index=False)
             if 'lola' in steps:
-                lola.to_csv(
+                lola_enr.to_csv(
                     os.path.join(output_dir, output_prefix + ".lola.csv"), index=False)
         if 'enrichr' in steps:
             pathway_enr.to_csv(

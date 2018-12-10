@@ -164,7 +164,7 @@ class Analysis(object):
                     msg = "Setting project's '{0}' as the analysis '{0}'.".format(attr)
                     if overwrite:
                         _LOGGER.info(msg)
-                        setattr(self, attr, getattr(self.prj.metadata, attr))
+                        setattr(self, attr, pd.read_csv(getattr(self.prj.metadata, attr)))
                     else:
                         if self.samples is None:
                             _LOGGER.info(msg)
@@ -175,6 +175,13 @@ class Analysis(object):
             _LOGGER.warn("Analysis object does not have an attached Project. " +
                          "Will not add special attributes to analysis such as " +
                          "samples, their attributes and comparison table.")
+
+    @staticmethod
+    def _overwride_sample_representation():
+        from peppy import Sample
+
+        def r(self): return self.name
+        Sample.__repr__ = r
 
     def to_pickle(self, timestamp=False):
         """
@@ -2134,7 +2141,7 @@ def plot_differential(
     comparisons = sorted(results[comparison_column].drop_duplicates())
     n_side = int(np.ceil(np.sqrt(len(comparisons))))
 
-    # P-value distributions
+    # P-value and Fold-change distributions
     for variable, label, axvline in [
             (p_value_column, "P-value", False),
             (adjusted_p_value_column, "Adjusted p-value", False),
@@ -2181,24 +2188,23 @@ def plot_differential(
     split_diff['diff_perc'] = (split_diff['diff'] / n_vars) * 100
 
     _LOGGER.info("Plotting number of differential {}s per comparison.".format(var_name))
-    fig, axis = plt.subplots(3, 2, figsize=(4 * 2, 4 * 3))
+    fig, axis = plt.subplots(2, 2, figsize=(4 * 2, 4 * 2))
     sns.barplot(data=total_diff, x="diff", y="comparison_name", orient="h", ax=axis[0, 0])
     sns.barplot(data=total_diff, x="diff_perc", y="comparison_name", orient="h", ax=axis[0, 1])
-    sns.barplot(data=split_diff, x="diff", y="label", orient="h", ax=axis[1, 0])
-    sns.barplot(data=split_diff, x="diff_perc", y="label", orient="h", ax=axis[1, 1])
-    sns.barplot(data=split_diff, x="diff", y="comparison_name", hue="direction", orient="h", ax=axis[2, 0])
-    sns.barplot(data=split_diff, x="diff_perc", y="comparison_name", hue="direction", orient="h", ax=axis[2, 1])
-    axis[-1, 0].set_xlabel("N. diff")
-    axis[-1, 1].set_xlabel("N. diff (% of total)")
-    for ax in axis[:, 1]:
+    sns.barplot(data=split_diff, x="diff", y="comparison_name", hue="direction", dodge=False, orient="h", ax=axis[1, 0])
+    sns.barplot(data=split_diff, x="diff_perc", y="comparison_name", hue="direction", dodge=False, orient="h", ax=axis[1, 1])
+    for ax in axis[0, :]:
         ax.set_xlabel("", visible=False)
+    for ax in axis[:, 1]:
         ax.set_yticklabels(ax.get_yticklabels(), visible=False)
-    for ax in axis[1:, :].flatten():
+    axis[-1, 0].set_xlabel("Frequency of differential {}s".format(var_name))
+    axis[-1, 1].set_xlabel("Frequency of differential {}s (% of total)".format(var_name))
+    for ax in axis[1, :].flatten():
         ax.axvline(0, linestyle="--", color="black", alpha=0.6)
     m = split_diff['diff'].abs().max()
-    axis[2, 0].set_xlim((-m, m))
+    axis[1, 0].set_xlim((-m, m))
     m = split_diff['diff_perc'].abs().max()
-    axis[2, 1].set_xlim((-m, m))
+    axis[1, 1].set_xlim((-m, m))
     sns.despine(fig)
     fig.savefig(
         os.path.join(output_dir, output_prefix + ".number_differential.directional.svg"),
@@ -2207,13 +2213,14 @@ def plot_differential(
     if plot_each_comparison:
         _LOGGER.info("Doing detailed plotting per comparison:")
 
-        smallest_p_value = -np.log10(np.percentile(results[p_value_column], 1e-5))
-        if smallest_p_value == np.inf:
+        # Add same colour scale to all plots/comparisons
+        smallest_p_value = -np.log10(np.nanpercentile(results[p_value_column], 1e-5))
+        if smallest_p_value in [np.inf, np.nan]:
             smallest_p_value = 300
+        _LOGGER.debug("Maximum -log10(p-value) across comparisons is {}".format(smallest_p_value))
         pval_cmap = "Reds"
+
         # Pairwise scatter plots
-        # TODO: add different shadings of red for various levels of significance
-        # TODO: do this for scatter, MA, volcano plots
         if comparison_table is not None:
             _LOGGER.info(
                 "Plotting scatter of {} distribution for each group in each comparison.".format(var_name))
@@ -2249,6 +2256,7 @@ def plot_differential(
                     col = -np.log10(results.loc[
                         (results[comparison_column] == comparison) &
                         (results["diff"] == True), p_value_column].squeeze())
+                    _LOGGER.debug("Shapes: {} {} {}".format(a.shape, b.shape, diff_vars.shape))
                     # in case there's just one significant feature:
                     if type(col) is np.float_:
                         col = np.array([col])
@@ -3331,7 +3339,7 @@ def differential_enrichment(
                 homer_enr.to_csv(
                     os.path.join(output_dir, output_prefix + ".homer_motifs.csv"), index=False)
             if 'lola' in steps:
-                lola.to_csv(
+                lola_enr.to_csv(
                     os.path.join(output_dir, output_prefix + ".lola.csv"), index=False)
         if 'enrichr' in steps:
             pathway_enr.to_csv(
@@ -3354,6 +3362,7 @@ def collect_differential_enrichment(
         directional=True,
         data_type="ATAC-seq",
         output_dir="results/differential_analysis_{data_type}/enrichments",
+        input_prefix="differential_analysis",
         output_prefix="differential_analysis",
         permissive=True):
     """
@@ -3413,7 +3422,7 @@ def collect_differential_enrichment(
             if data_type == "RNA-seq":
                 # print("Collecting enrichments of comparison '{}', direction '{}'.".format(comp, direction))
                 try:
-                    enr = pd.read_csv(os.path.join(comparison_dir, output_prefix + ".enrichr.csv"))
+                    enr = pd.read_csv(os.path.join(comparison_dir, input_prefix + ".enrichr.csv"))
                 except IOError as e:
                     if permissive:
                         _LOGGER.error(error_msg.format("Enrichr", comp, direction))
@@ -3498,7 +3507,7 @@ def collect_differential_enrichment(
 
                 # ENRICHR
                 try:
-                    enr = pd.read_csv(os.path.join(comparison_dir, output_prefix + "_genes.enrichr.csv"))
+                    enr = pd.read_csv(os.path.join(comparison_dir, input_prefix + "_genes.enrichr.csv"))
                 except IOError as e:
                     if permissive:
                         _LOGGER.error(error_msg.format("Enrichr", comp, direction))

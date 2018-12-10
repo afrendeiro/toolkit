@@ -12,6 +12,7 @@ import sys
 import pandas as pd
 
 from peppy import Project
+from ngs_toolkit import _LOGGER, __version__
 
 
 class Unbuffered(object):
@@ -66,7 +67,7 @@ def add_args(parser):
         default=8,
         help="CPUs/Threads to use per job if `--as-jobs` is on.")
     parser.add_argument(
-        "-n", "--normalize",
+        "--normalize",
         action="store_true",
         dest="normalize",
         help="Whether tracks should be normalized to total sequenced "
@@ -88,27 +89,42 @@ def add_args(parser):
         help="Directory for output files. "
         "Default is 'merged' under the project root directory.",
         type=str)
+    parser.add_argument(
+        "-d", "--dry-run",
+        action="store_true",
+        dest="dry_run",
+        help="Whether to do everything except running commands.")
     return parser
 
 
 def main():
-    parser = ArgumentParser(
-        prog="merge_signal",
-        description="Merge signal recipe."
-    )
+    desc = """
+    Merge signal recipe.
+    This recipe will merge signal from various ATAC-seq or ChIP-seq samples \
+    given a set of attributes to group samples by.
+
+    It produces merged BAM and bigWig files for all signal in the samples but \
+    is also capable of producing this for nucleosomal/nucleosomal free signal \
+    based on fragment length distribution if data is paired-end sequenced. \
+    This signal may optionally be normalized for each group. \
+    It is also capable of parallelizing work in jobs if a SLURM cluster is available."""
+
+    parser = ArgumentParser(prog="merge_signal", description=desc)
     parser = add_args(parser)
     args = parser.parse_args()
     # args = parser.parse_args('-t ATAC-seq metadata/project_config.yaml'.split(" "))
 
+    _LOGGER.info("This is the 'merge_signal' recipe from ngs_toolkit, version: {}".format(__version__))
     # Start project
-    print("Starting peppy project with project configuration file: '{}'".format(args.config_file))
+    _LOGGER.debug("Starting peppy project with project configuration file: '{}'".format(args.config_file))
     prj = Project(args.config_file)
-    print("Changing directory to project root directory: '{}'.".format(prj.metadata.output_dir))
+    _LOGGER.debug("Changing directory to project root directory: '{}'.".format(prj.metadata.output_dir))
     os.chdir(prj.metadata.output_dir)
     if args.pass_qc:
-        print("Filtering samples out which didn't pass QC as specified in sample annotation in column 'pass_qc'")
+        _LOGGER.info("Filtering samples out which didn't pass QC as specified in sample \
+                      annotation in column 'pass_qc'")
         prj._samples = [s for s in prj._samples if s.pass_qc not in ['0', 0, 'False', False]]
-    print("Setting location of sample files dependent on sample types.")
+    _LOGGER.debug("Setting location of sample files dependent on sample types.")
     for sample in prj.samples:
         if hasattr(sample, "protocol"):
             sample.library = sample.protocol
@@ -134,7 +150,8 @@ def main():
     # Get only samples with signal
     key = "protocol" if 'protocol' in prj.sheet.columns else 'library'
     sheet = prj.sheet[prj.sheet[key].isin(["ATAC-seq", "ChIP-seq", "ChIPmentation"])]
-    print(
+    sheet = sheet.loc[sheet['sample_name'].isin([s.name for s in prj.samples])]
+    _LOGGER.info(
         "Selecting samples with appropriate data type." +
         "Samples under consideration: '{}'. ".format(",".join(sheet['sample_name'].tolist())) +
         "Total of {} samples.".format(sheet.shape[0]))
@@ -144,19 +161,22 @@ def main():
         if "group_attributes" in prj:
             args.attributes = prj.group_attributes
         else:
-            print("Sample attributes to group by were not set and none could be found in project configuration file!")
-            print("Aborting!")
-            return
+            _LOGGER.error("Sample attributes to group by were not set and none could be found in project \
+                          configuration file!" + " Aborting!")
+            return 1
     else:
-        args.attributes = args.attributes.split(",")
+        if "," in args.attributes:
+            args.attributes = args.attributes.split(",")
+        else:
+            args.attributes = [args.attributes]
 
-    print("Using the following attributes to merge samples: '{}', resulting in a total of {} groups.".format(
-        ", ".join(args.attributes), len(sheet.groupby(args.attributes).groups.items())))
+    _LOGGER.info("Using the following attributes to merge samples: '{}', resulting in a total of {} groups."
+                 .format(", ".join(args.attributes), len(sheet.groupby(args.attributes).groups.items())))
 
-    print("Starting to merge sample signals.")
     merge_signal(
         sheet, prj.samples, args.attributes, output_dir=args.output_dir,
-        normalize=args.normalize, nucleosome=args.nucleosome, overwrite=args.overwrite, cpus=args.cpus, as_job=args.as_job)
+        normalize=args.normalize, nucleosome=args.nucleosome,
+        overwrite=args.overwrite, cpus=args.cpus, as_job=args.as_job, dry_run=args.dry_run)
 
 
 def merge_signal(
@@ -165,7 +185,7 @@ def merge_signal(
         normalize=True,
         nucleosome=False,
         overwrite=False,
-        cpus=8, as_job=False):
+        cpus=8, as_job=False, dry_run=False):
     """
     """
     import re
@@ -183,7 +203,10 @@ def merge_signal(
         os.makedirs(output_dir)
 
     for attrs, index in sheet.groupby(attributes).groups.items():
-        name = "_".join([a for a in attrs if not pd.isnull(a)])
+        if isinstance(attrs, list):
+            name = "_".join([a for a in attrs if not pd.isnull(a)])
+        else:
+            name = attrs
         name = re.sub(r"_{2}", "_", name)
         name = re.sub(r"_$", "", name)
         sample_subset = [s for s in samples if s.name in sheet.loc[index, "sample_name"].tolist()]
@@ -204,16 +227,16 @@ def merge_signal(
         output_nucleosome_reads = os.path.join(output_dir, name + ".nucleosome_free_reads.bam")
 
         genome_sizes = "/data/groups/lab_bock/shared/resources/genomes/{g}/{g}.chromSizes".format(g=genome)
-        transient_file = os.path.abspath(re.sub("\.bigWig", "", output_bigwig))
+        transient_file = os.path.abspath(re.sub(r"\.bigWig", "", output_bigwig))
 
         # Prepare commands
         cmds = ["#!/bin/sh", "date"]
 
-        ## merge bams
+        # # merge bams
         cmd = """samtools merge {0} {1}; sambamba sort -t 8 {0}""".format(output_bam, " ".join(bams))
         cmds += [add_cmd(cmd, target=output_sorted_bam, overwrite=overwrite)]
 
-        ## bigWig file
+        # # bigWig file
         cmd = "; ".join([
             "bedtools bamtobed -i {0} |".format(output_sorted_bam) +
             " bedtools slop -i stdin -g {0} -s -l 0 -r 130 |".format(genome_sizes) +
@@ -227,10 +250,10 @@ def merge_signal(
 
         if nucleosome:
             cmd = ("""sambamba view -f bam -t {} -o {} -F "(template_length < 100) and (template_length > -100)" {}"""
-                .format(cpus, output_nucleosome_free_reads, output_sorted_bam))
+                   .format(cpus, output_nucleosome_free_reads, output_sorted_bam))
             cmds += [add_cmd(cmd, target=output_nucleosome_free_reads, overwrite=overwrite)]
             cmd = ("""sambamba view -f bam -t {} -o {} -F "((template_length > 180) and (template_length < 247)) or ((template_length < -180) and (template_length > -247))" {}"""
-                .format(cpus, output_nucleosome_reads, output_sorted_bam))
+                   .format(cpus, output_nucleosome_reads, output_sorted_bam))
             cmds += [add_cmd(cmd, target=output_nucleosome_reads, overwrite=overwrite)]
 
         job = "\n".join(cmds + ['date'])
@@ -238,8 +261,11 @@ def merge_signal(
         with open(job_file, "w") as handle:
             handle.write(job)
 
+        if dry_run:
+            continue
         if as_job:
-            os.system("sbatch -p longq --time 4-00:00:00 -J merge_signal.{} -o {} -c {} --mem 80000 {}".format(name, log_file, cpus, job_file))
+            os.system("sbatch -p longq --time 4-00:00:00 " +
+                      "-J merge_signal.{} -o {} -c {} --mem 80000 {}".format(name, log_file, cpus, job_file))
         else:
             os.system("sh {}".format(job_file))
 

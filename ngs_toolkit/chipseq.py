@@ -274,7 +274,7 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
                 genome = comparison_table.loc[comparison_table["comparison_name"] == comparison, "comparison_genome"].drop_duplicates().squeeze()
 
                 msg = "Could not determine genome of comparison '{}'.".format(comparison)
-                if type(genome) is not str:
+                if not isinstance(genome, str):
                     _LOGGER.error(msg)
                     raise AssertionError(msg)
 

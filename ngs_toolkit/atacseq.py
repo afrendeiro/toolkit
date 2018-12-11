@@ -391,18 +391,14 @@ class ATACSeqAnalysis(Analysis):
 
         if sites is None:
             sites = self.sites
-            if output_file is None:
-                default = True
-            else:
-                default = False
 
         # Count reads with pysam
         # make strings with intervals
-        if type(sites) is pybedtools.bedtool.BedTool:
+        if isinstance(sites, pybedtools.bedtool.BedTool):
             sites_str = [str(i.chrom) + ":" + str(i.start) + "-" + str(i.stop) for i in self.sites]
-        elif type(sites) is pd.core.frame.DataFrame:
+        elif isinstance(sites, pd.core.frame.DataFrame):
             sites_str = (sites.iloc[:, 0] + ":" + sites.iloc[:, 1].astype(str) + "-" + sites.iloc[:, 2].astype(str)).astype(str).tolist()
-        elif type(sites) is str:
+        elif isinstance(sites, str):
             sites_str = [str(i.chrom) + ":" + str(i.start) + "-" + str(i.stop) for i in pybedtools.bedtool.BedTool(sites)]
 
         # count, create dataframe
@@ -2298,7 +2294,7 @@ def piq_prepare_bams(
     from pypiper import NGSTk
     tk = NGSTk()
 
-    if type(bam_files) is str:
+    if isinstance(bam_files, str):
         bam_files = [bam_files]
 
     output_dir = os.path.abspath(output_dir)

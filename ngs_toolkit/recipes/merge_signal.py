@@ -12,7 +12,7 @@ import sys
 import pandas as pd
 
 from peppy import Project
-from ngs_toolkit import _LOGGER, __version__
+from ngs_toolkit import _LOGGER, _CONFIG, __version__
 
 
 class Unbuffered(object):
@@ -143,7 +143,7 @@ def main():
     if len(prj.samples) > 0:
         print(
             "Samples under consideration: '{}'. ".format(",".join([s.name for s in prj.samples])) +
-            "Total of {} samples.".format(len([s.name for s in prj.samples])))
+            "\nTotal of {} samples.".format(len([s.name for s in prj.samples])))
     else:
         raise ValueError("There were no valid samples after filtering for quality!")
 
@@ -153,8 +153,8 @@ def main():
     sheet = sheet.loc[sheet['sample_name'].isin([s.name for s in prj.samples])]
     _LOGGER.info(
         "Selecting samples with appropriate data type." +
-        "Samples under consideration: '{}'. ".format(",".join(sheet['sample_name'].tolist())) +
-        "Total of {} samples.".format(sheet.shape[0]))
+        "\nSamples under consideration: '{}'. ".format(",".join(sheet['sample_name'].tolist())) +
+        "\nTotal of {} samples.".format(sheet.shape[0]))
 
     # Get default attributes if not set
     if args.attributes is None:
@@ -162,7 +162,7 @@ def main():
             args.attributes = prj.group_attributes
         else:
             _LOGGER.error("Sample attributes to group by were not set and none could be found in project \
-                          configuration file!" + " Aborting!")
+                          configuration file!" + "\nAborting!")
             return 1
     else:
         if "," in args.attributes:
@@ -226,7 +226,17 @@ def merge_signal(
         output_nucleosome_free_reads = os.path.join(output_dir, name + ".nucleosome_free_reads.bam")
         output_nucleosome_reads = os.path.join(output_dir, name + ".nucleosome_free_reads.bam")
 
-        genome_sizes = "/data/groups/lab_bock/shared/resources/genomes/{g}/{g}.chromSizes".format(g=genome)
+        # Get region databases from config
+        _LOGGER.debug("Getting genome assembly chromosome sizes for genome '{}' from configuration.".format(genome))
+
+        msg = "Genome assembly chromosome sizes database values in configuration could not be found or understood. "
+        msg += "Please add a path to this file to this section 'resources:genomes:chrom_sizes:{}'. ".format(genome)
+        msg += "For an example, see https://github.com/afrendeiro/toolkit/tree/master/ngs_toolkit/config/example.yaml"
+        try:
+            chrom_sizes = _CONFIG['resources']['genomes']['chrom_sizes'][genome]
+        except KeyError:
+            _LOGGER.error(msg)
+            return
         transient_file = os.path.abspath(re.sub(r"\.bigWig", "", output_bigwig))
 
         # Prepare commands
@@ -237,15 +247,15 @@ def merge_signal(
         cmds += [add_cmd(cmd, target=output_sorted_bam, overwrite=overwrite)]
 
         # # bigWig file
-        cmd = "; ".join([
+        cmd = "\n".join([
             "bedtools bamtobed -i {0} |".format(output_sorted_bam) +
-            " bedtools slop -i stdin -g {0} -s -l 0 -r 130 |".format(genome_sizes) +
+            " bedtools slop -i stdin -g {0} -s -l 0 -r 130 |".format(chrom_sizes) +
             " fix_bedfile_genome_boundaries.py {0} |".format(genome) +
-            " genomeCoverageBed -bg -g {0} -i stdin > {1}.cov".format(genome_sizes, transient_file),
+            " genomeCoverageBed -bg -g {0} -i stdin > {1}.cov".format(chrom_sizes, transient_file),
             "awk 'NR==FNR{{sum+= $4; next}}{{ $4 = ($4 / sum) * 1000000; print}}' {0}.cov {0}.cov > {0}.normalized.cov".format(transient_file) if normalize else "",
-            "bedGraphToBigWig {0}{1}.cov {2} {3}".format(transient_file, ".normalized" if normalize else "", genome_sizes, output_bigwig),
-            "if [[ -s {0}.cov ]]; then rm {0}.cov; fi".format(transient_file),
-            "if [[ -s {0}.normalized.cov ]]; then rm {0}.normalized.cov; fi".format(transient_file)])
+            "bedGraphToBigWig {0}{1}.cov {2} {3}".format(transient_file, ".normalized" if normalize else "", chrom_sizes, output_bigwig),
+            "if [[ -s {0}.cov ]]\nthen rm {0}.cov\nfi".format(transient_file),
+            "if [[ -s {0}.normalized.cov ]]\nthen rm {0}.normalized.cov\nfi".format(transient_file)])
         cmds += [add_cmd(cmd, target=output_bigwig, overwrite=overwrite)]
 
         if nucleosome:
@@ -256,7 +266,7 @@ def merge_signal(
                    .format(cpus, output_nucleosome_reads, output_sorted_bam))
             cmds += [add_cmd(cmd, target=output_nucleosome_reads, overwrite=overwrite)]
 
-        job = "\n".join(cmds + ['date'])
+        job = "\n".join(cmds + ['date']) + "\n"
 
         with open(job_file, "w") as handle:
             handle.write(job)

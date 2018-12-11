@@ -11,7 +11,7 @@ scikit-learn>=0.19.1
 statsmodels>=0.8.0
 patsy>=0.4.1
 tqdm>=4.19.5
-peppy>=v0.18.2
+peppy>=0.18.2
 piper>=0.8.1
 # scanpy
 # scanorama

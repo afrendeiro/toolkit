@@ -89,6 +89,7 @@ setup(
     },
     data_files=[
         "requirements/requirements.txt",
+        "requirements/requirements.rpy2.txt",
         "requirements/requirements.single_cell.txt"],
     **extra
 )

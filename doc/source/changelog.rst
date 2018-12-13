@@ -2,6 +2,38 @@ Changelog
 ******************************
 
 
+- **v0.2.0** (*2018-12-13*):
+
+  - minor:
+
+    - change default directory for enrichment results
+    - add class method to overwrite Sample object representation
+    - add configuration to merge_signal recipe
+    - add graphics functions
+    - add optional requirements for single cell analysis
+    - add possibility of different prefixes when collecting enrichments
+    - remove requirement of some comparison_table and attributes_to_plot arguments
+    - remove obsolete functions
+    - more powerful Analysis objects by leveraging on known Project attributes
+    - simplify plot of number of differential regions per comparison in plot_differential
+
+  - bug fixes:
+
+    - fix pipy install on Python 3: requirements.txt is now distributed with package
+    - update merge_signal recipe - fix bug when grouping samples by only one attribute
+    - better error catching
+    - fix LOLA output collection saving when running in serial mode
+    - fix choice of common p-value color overlay to plot in plot_differential
+    - fix creating job in merge_signal recipe
+    - fix invalid yaml in configs
+    - fix mistake in requirements for peppy
+    - fix some security issues
+
+
+.. |br| raw:: html
+
+   <br />
+
 - **v0.1.6.0** (*2018-12-05*):
 
   - New CNV module

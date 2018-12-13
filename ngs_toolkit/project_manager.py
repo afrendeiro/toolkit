@@ -97,7 +97,8 @@ def create_project(
 
     # make dirs
     for d in [project_dir, metadata_dir, src_dir]:
-        os.makedirs(d, exist_ok=True)
+        if not os.path.exists(d):
+            os.makedirs(d)
 
     if "{project_name}" in url:
         url = url.format(username=username, project_name=project_name)

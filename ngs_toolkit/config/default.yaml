@@ -64,14 +64,14 @@ executables:
   compareMotifs.pl: compareMotifs.pl
 samples:
   ATAC-seq:
-    aligned_bam: {data_dir}/{sample_name}/mapped/{sample_name}.bowtie2.filtered.bam
-    peaks: {data_dir}/{sample_name}/peaks/{sample_name}_peaks.narrowPeak
+    aligned_bam: "{data_dir}/{sample_name}/mapped/{sample_name}.bowtie2.filtered.bam"
+    peaks: "{data_dir}/{sample_name}/peaks/{sample_name}_peaks.narrowPeak"
   ChIP-seq:
-    aligned_bam: {data_dir}/{sample_name}/mapped/{sample_name}.bowtie2.filtered.bam
+    aligned_bam: "{data_dir}/{sample_name}/mapped/{sample_name}.bowtie2.filtered.bam"
   CNV:
-    aligned_bam: {data_dir}/{sample_name}/mapped/{sample_name}.bowtie2.filtered.bam
+    aligned_bam: "{data_dir}/{sample_name}/mapped/{sample_name}.bowtie2.filtered.bam"
   RNA-seq:
-    aligned_bam: {data_dir}/{sample_name}/mapped/{sample_name}.bowtie2.filtered.bam
+    aligned_bam: "{data_dir}/{sample_name}/mapped/{sample_name}.bowtie2.filtered.bam"
 graphics:
   settings:
     figure_saving:

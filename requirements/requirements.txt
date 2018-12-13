@@ -13,14 +13,3 @@ patsy>=0.4.1
 tqdm>=4.19.5
 peppy>=0.18.2
 piper>=0.8.1
-# scanpy
-# scanorama
-# phate
-# scvelo
-# loompy
-# fbpca
-# MulticoreTSNE  # https://github.com/DmitryUlyanov/Multicore-TSNE/issues/32#issuecomment-368588074
-# python-igraph
-# louvain>=0.6
-# leidenalg
-# fa2

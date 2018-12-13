@@ -123,15 +123,15 @@ class Analysis(object):
 
     def set_genome_assembly(self):
         if self.samples is None:
-            _LOGGER.warn("Genome assembly for analysis was not set and cannot be derived from samples.")
+            _LOGGER.warning("Genome assembly for analysis was not set and cannot be derived from samples.")
         else:
             genomes = list(set([s.genome for s in self.samples]))
             if len(genomes) == 1:
                 _LOGGER.info("Setting analysis genome as '{}'.".format(genomes[0]))
                 self.genome = genomes[0]
             else:
-                _LOGGER.warn("Found several genome assemblies for the various analysis samples. " +
-                             "Will not set a genome for analysis.")
+                _LOGGER.warning("Found several genome assemblies for the various analysis samples. " +
+                                "Will not set a genome for analysis.")
 
     def set_attributes(self, overwrite=True):
         """
@@ -143,8 +143,8 @@ class Analysis(object):
         if self.prj is not None:
             for attr in ["samples", "sample_attributes", "group_attributes"]:
                 if not hasattr(self.prj, "samples"):
-                    _LOGGER.warn("Associated project does not have any '{}'.".format(attr) +
-                                 hint.format(attr) if attr != "samples" else "")
+                    _LOGGER.warning("Associated project does not have any '{}'.".format(attr) +
+                                    hint.format(attr) if attr != "samples" else "")
                 else:
                     msg = "Setting project's '{0}' as the analysis '{0}'.".format(attr)
                     if overwrite:
@@ -159,7 +159,7 @@ class Analysis(object):
             # comparison table is under "prj.metadata"
             for attr in ["comparison_table"]:
                 if not hasattr(self.prj, "samples"):
-                    _LOGGER.warn("Associated project does not have any '{}'.".format(attr))
+                    _LOGGER.warning("Associated project does not have any '{}'.".format(attr))
                 else:
                     msg = "Setting project's '{0}' as the analysis '{0}'.".format(attr)
                     if overwrite:
@@ -172,9 +172,9 @@ class Analysis(object):
                         else:
                             _LOGGER.debug("Samples already exist for analysis, not overwriting.")
         else:
-            _LOGGER.warn("Analysis object does not have an attached Project. " +
-                         "Will not add special attributes to analysis such as " +
-                         "samples, their attributes and comparison table.")
+            _LOGGER.warning("Analysis object does not have an attached Project. " +
+                            "Will not add special attributes to analysis such as " +
+                            "samples, their attributes and comparison table.")
 
     @staticmethod
     def _overwride_sample_representation():
@@ -276,7 +276,7 @@ class Analysis(object):
             # For empty levels (all values nan), return nan colour
             if len(level) == 0:
                 colors.append([nan_color] * len(index))
-                _LOGGER.warn("Level {} has only NaN values.".format(level.name))
+                _LOGGER.warning("Level {} has only NaN values.".format(level.name))
                 continue
             # determine the type of data in each level
             # TODO: check this works in all cases
@@ -369,7 +369,7 @@ class Analysis(object):
             if quant_matrix is None:
                 quant_matrix = "expression_annotated"
         else:
-            _LOGGER.warn("Data type of object not known, will not set as attribute.")
+            _LOGGER.warning("Data type of object not known, will not set as attribute.")
             assign = False
             output_matrix = ""
             if quant_matrix is None:
@@ -720,7 +720,7 @@ def unsupervised_analysis(
     for algo in manifold_algorithms:
         _LOGGER.info("Learning manifold with '{}' algorithm.".format(algo))
         if (algo in ["Isomap", "LocallyLinearEmbedding"]) and (len(samples) <= 5):
-            _LOGGER.warn("Number of samples is too small to perform '{}'".format(algo))
+            _LOGGER.warning("Number of samples is too small to perform '{}'".format(algo))
             continue
 
         manif = getattr(manifold, algo)(**params[algo])
@@ -905,7 +905,7 @@ def unsupervised_analysis(
             elif all([type(i) in [int, float, np.int64, np.float64] for i in groups]):
                 variable_type = "numerical"
             else:
-                _LOGGER.warn("attr %s cannot be tested." % attr)
+                _LOGGER.warning("attr %s cannot be tested." % attr)
                 associations.append([pc + 1, attr, variable_type, np.nan, np.nan, np.nan])
                 continue
 
@@ -1081,16 +1081,16 @@ def deseq_analysis(
                 _results(dds, contrast=contrast, alpha=alpha,
                          independentFiltering=independent_filtering, parallel=True))
         except RRuntimeError as e:
-            _LOGGER.warn("DESeq2 group contrast '{}' didn't work!".format(contrast))
+            _LOGGER.warning("DESeq2 group contrast '{}' didn't work!".format(contrast))
             _LOGGER.error(e)
             contrast = ["sample_group" + a, "sample_group" + b]
             try:
                 res = _as_data_frame(
                     _results(dds, contrast=contrast, alpha=alpha,
                              independentFiltering=independent_filtering, parallel=True))
-                _LOGGER.warn("DESeq2 group contrast '{}' did work now!".format(", ".join(contrast)))
+                _LOGGER.warning("DESeq2 group contrast '{}' did work now!".format(", ".join(contrast)))
             except RRuntimeError as e2:
-                _LOGGER.warn("DESeq2 group contrast '{}' didn't work either!".format(", ".join(contrast)))
+                _LOGGER.warning("DESeq2 group contrast '{}' didn't work either!".format(", ".join(contrast)))
                 _LOGGER.error(e2)
                 raise e2
 
@@ -1642,7 +1642,7 @@ def collect_differential_analysis(
 
     results_file = os.path.join(output_dir, output_prefix + ".deseq_result.all_comparisons.csv")
     if not overwrite and os.path.exists(results_file):
-        _LOGGER.warn("Differential analysis results '{}' already exist and argument `overwrite` is True.".format(results_file))
+        _LOGGER.warning("Differential analysis results '{}' already exist and argument `overwrite` is True.".format(results_file))
         return None
 
     comps = comparison_table["comparison_name"].drop_duplicates().sort_values()
@@ -1655,7 +1655,7 @@ def collect_differential_analysis(
             res2 = pd.read_csv(out_file, index_col=0)
         except IOError as e:
             if permissive:
-                _LOGGER.warn("Results file for comparison '{}' do not exist. Skipping.".format(comp))
+                _LOGGER.warning("Results file for comparison '{}' do not exist. Skipping.".format(comp))
                 continue
             else:
                 raise e
@@ -1675,7 +1675,7 @@ def collect_differential_analysis(
         if analysis is not None:
             analysis.differential_results = results
         else:
-            _LOGGER.warn("Cannot assign results to analysis object as this was not provided.")
+            _LOGGER.warning("Cannot assign results to analysis object as this was not provided.")
     return results
 
 
@@ -1709,7 +1709,7 @@ def differential_overlap(
     elif data_type == "RNA-seq":
         unit = "gene"
     else:
-        _LOGGER.warn("Unknown data type. Will not use data-specific units.")
+        _LOGGER.warning("Unknown data type. Will not use data-specific units.")
         unit = "feature"
 
     if "direction" not in differential.columns:
@@ -2084,7 +2084,7 @@ def plot_differential(
         try:
             comparison_table = analysis.comparison_table
         except AttributeError:
-            _LOGGER.warn(msg)
+            _LOGGER.warning(msg)
             _LOGGER.info(hint)
 
     if only_comparison_samples and comparison_table is not None:
@@ -2387,7 +2387,7 @@ def plot_differential(
     if results.loc[:, "diff"].sum() < 1:
         msg = "No significantly different regions found in any comparison."
         msg += " Skipping heatmap plots on differential {}s.".format(var_name)
-        _LOGGER.warn(msg)
+        _LOGGER.warning(msg)
         return
 
     # Observe values of variables across all comparisons
@@ -2420,18 +2420,18 @@ def plot_differential(
 
             n = groups.isnull().sum().sum()
             if n > 0:
-                _LOGGER.warn(
+                _LOGGER.warning(
                     "{} {}s (across all comparisons) were not found in quantification matrix!".format(n, var_name))
                 m = groups.columns[groups.isnull().sum() == groups.shape[0]]
                 if len(m) > 0:
-                    _LOGGER.warn(
+                    _LOGGER.warning(
                         "{} comparison groups were not found in quantification matrix: '{}'!"
                         .format(len(m), ", ".join(m)) +
                         " Proceeding without those.")
                     groups = groups.loc[:, ~groups.columns.isin(m)]
                 f = groups.index[groups.isnull().sum(1) == groups.shape[1]]
                 if len(f) > 0:
-                    _LOGGER.warn(
+                    _LOGGER.warning(
                         "{} {}s were not found in quantification matrix!"
                         .format(len(m), var_name) +
                         " Proceeding without those.")
@@ -2553,7 +2553,7 @@ def plot_differential(
 
     n = matrix2.isnull().sum().sum()
     if n > 0:
-        _LOGGER.warn(
+        _LOGGER.warning(
             "WARNING! {} {} (across all comparisons) were not found in quantification matrix!".format(n, var_name) +
             " Proceeding without those.")
         matrix2 = matrix2.dropna()
@@ -2685,7 +2685,7 @@ def lola(bed_files, universe_file, output_folder, output_prefixes=None, genome="
             msg = "Running more than one BED file at once while only specifying `output_folder` argument"
             msg += " will cause output files to be named in the form '{output_folder}/{region_database}.{input_file}.tsv'."
             msg += " To prevent this behaviour, pass a list of arguments to `output_prefixes`."
-            _LOGGER.warn(msg)
+            _LOGGER.warning(msg)
             output_prefixes = [r.replace(os.path.sep, "__").replace(".bed", ".") for r in bed_files]
         else:
             output_prefixes = ["."]
@@ -2932,8 +2932,8 @@ def homer_combine_motifs(
     import glob
 
     if known_vertebrates_TFs_only:
-        _LOGGER.warn("WARNING! `known_vertebrates_TFs_only` option is deprecated!" +
-                     "Pass a given motif_database to `motif_database` directly.")
+        _LOGGER.warning("WARNING! `known_vertebrates_TFs_only` option is deprecated!" +
+                        "Pass a given motif_database to `motif_database` directly.")
 
     # concatenate files
     out_file = os.path.join(output_dir, "homerMotifs.combined.motifs")
@@ -2972,7 +2972,7 @@ def homer_combine_motifs(
             # delete previous results if existing
             results = os.path.join(dir_, "knownResults.txt")
             if os.path.exists(results):
-                _LOGGER.warn("Deleting previously existing results file: '{}'".format(results))
+                _LOGGER.warning("Deleting previously existing results file: '{}'".format(results))
                 os.remove(results)
             # prepare enrichment command with consensus set
             cmd = (
@@ -3216,7 +3216,7 @@ def differential_enrichment(
 
     known = ['lola', 'meme', 'homer', 'enrichr']
     if not all([x in known for x in steps]):
-        _LOGGER.warn("Not all provided steps for enrichment are known! Proceeding anyway.")
+        _LOGGER.warning("Not all provided steps for enrichment are known! Proceeding anyway.")
 
     if "{data_type}" in output_dir:
         output_dir = output_dir.format(data_type=data_type)
@@ -3264,7 +3264,7 @@ def differential_enrichment(
             # Add data_type specific info
             comparison_df = matrix.loc[diff, :]
             if comparison_df.shape != comparison_df.dropna().shape:
-                _LOGGER.warn(
+                _LOGGER.warning(
                     "There are differential regions which are not in the set of annotated regions for comparison '{}'!".format(comp) +
                     " Continuing enrichment without those.")
                 comparison_df = comparison_df.dropna()
@@ -3350,7 +3350,7 @@ def differential_enrichment(
             _LOGGER.info("Using background region set '{}'.".format(background))
         except AttributeError:
             background = ""
-            _LOGGER.warn("Using no background region set because 'analysis.sites' is not set!")
+            _LOGGER.warning("Using no background region set because 'analysis.sites' is not set!")
         _LOGGER.info("Submitting enrichment jobs.")
         run_enrichment_jobs(
             analysis_name=analysis.name, results_dir=output_dir,
@@ -3461,7 +3461,7 @@ def collect_differential_enrichment(
                             annot.loc[:, "TF"] = annot['TF'].str.replace(r"_.*", "")
                             meme_enr = pd.merge(meme_enr, annot).drop("TF", axis=1).rename(columns={"TF_name": "TF"})
                     else:
-                        _LOGGER.warn("Comparison '{}' has no MEME enriched motifs.".format(comp))
+                        _LOGGER.warning("Comparison '{}' has no MEME enriched motifs.".format(comp))
 
                 # HOMER DE NOVO - de novo motif enrichment independent for each sample
                 try:
@@ -4709,7 +4709,7 @@ def project_to_geo(
                 cmd += "chmod 644 {}; ".format(md5_file)
                 annot.loc[sample.name, "bigwig_file_md5sum"] = md5_file
             else:
-                _LOGGER.warn("'{}' sample '{}' does not have a 'bigwig' attribute set. Skipping bigWig file.".format(sample.library, sample.name))
+                _LOGGER.warning("'{}' sample '{}' does not have a 'bigwig' attribute set. Skipping bigWig file.".format(sample.library, sample.name))
 
         # Copy peaks
         if sample.library == "ATAC-seq":
@@ -4729,7 +4729,7 @@ def project_to_geo(
                 cmd += "chmod 644 {}; ".format(md5_file)
                 annot.loc[sample.name, "peaks_file_md5sum"] = md5_file
             else:
-                _LOGGER.warn("'{}' sample '{}' does not have a 'peaks' attribute set. Skipping peaks file.".format(sample.library, sample.name))
+                _LOGGER.warning("'{}' sample '{}' does not have a 'peaks' attribute set. Skipping peaks file.".format(sample.library, sample.name))
 
         if distributed and not dry_run:
             from pypiper.ngstk import NGSTk
@@ -4874,7 +4874,7 @@ def query_biomart(
         msg = "Ensembl version might not be supported."
         msg += " Tested versions are 'grch37' 'and 'grch38'."
         msg += " Will try anyway."
-        _LOGGER.warn(msg)
+        _LOGGER.warning(msg)
 
     # Build request XML
     ens_ver = "" if ensembl_version == "grch38" else ensembl_version + "."
@@ -4903,7 +4903,7 @@ def query_biomart(
         msg += " It is likely this is because one of the requested attributes has commas as is quoted."
         msg += " Or because querying an organism not present in vertebrate database."
         msg += " Will try to replace these fields and parse."
-        _LOGGER.warn(msg)
+        _LOGGER.warning(msg)
         # input probably contains commas inside fields
         c = pd.Series([x.strip() for x in content])
         # well's assume that fields with commas have been quoted

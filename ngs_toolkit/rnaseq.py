@@ -64,7 +64,7 @@ class RNASeqAnalysis(Analysis):
                         names=["ensembl_gene_id", "ensembl_transcript_id", "v1", "v2"])
                 except IOError(msg) as e:
                     if permissive:
-                        _LOGGER.warn(e)
+                        _LOGGER.warning(e)
                     else:
                         raise e
                 # add id index
@@ -89,7 +89,7 @@ class RNASeqAnalysis(Analysis):
                 else:
                     raise ValueError("Argument 'expression_type' must be one of {counts, rpkm}")
             except IOError:
-                _LOGGER.warn("Sample {} is missing.".format(sample.name))
+                _LOGGER.warning("Sample {} is missing.".format(sample.name))
                 continue
             e.index = expr.index
 
@@ -118,7 +118,7 @@ class RNASeqAnalysis(Analysis):
                         sample.name + ".gene.txt"), sep="\t")
             except IOError(msg) as e:
                 if permissive:
-                    _LOGGER.warn(e)
+                    _LOGGER.warning(e)
                     continue
                 else:
                     raise e
@@ -370,7 +370,7 @@ class RNASeqAnalysis(Analysis):
         """
         from ngs_toolkit.general import unsupervised_analysis
 
-        _LOGGER.warn(PendingDeprecationWarning(
+        _LOGGER.warning(PendingDeprecationWarning(
             "RNASeqAnalysis.unsupervised is provided for backward compatibility "
             "only and will be removed. Please use "
             "ngs_toolkit.general.unsupervised_analysis(RNASeqAnalysis) "
@@ -421,13 +421,13 @@ def knockout_plot(
     msg = ("The following `knockout_genes` were not found in the expression matrix: '{}'"
            .format(", ".join(missing)))
     if len(missing) > 0:
-        _LOGGER.warn(msg)
+        _LOGGER.warning(msg)
     knockout_genes = [k for k in knockout_genes if k in expression_matrix.index]
 
     ko = expression_matrix.loc[knockout_genes, :]
     msg = "None of the `knockout_genes` were found in the expression matrix.\nCannot proceed."
     if ko.empty:
-        _LOGGER.warn(msg)
+        _LOGGER.warning(msg)
         return
     v = np.absolute(scipy.stats.zscore(ko, axis=1)).flatten().max()
     v += (v / 10.)

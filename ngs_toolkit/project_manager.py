@@ -116,7 +116,7 @@ def create_project(
         pipeline_interfaces: /home/{username}/workspace/open_pipelines/pipeline_interface.yaml
         sample_annotation: /scratch/lab_bock/shared/projects/{project_name}/metadata/annotation.csv
         sample_subannotation: /scratch/lab_bock/shared/projects/{project_name}/metadata/merge_table.csv
-        comparison_table: /scratch/lab_bock/shared/projects/{project_name}/metadata/comcomparison_table.csv
+        comparison_table: /scratch/lab_bock/shared/projects/{project_name}/metadata/comparison_table.csv
     sample_attributes:
         - sample_name
     group_attributes:
@@ -169,9 +169,8 @@ def create_project(
     with open(comparison_table, "w") as handle:
         handle.write(comparison_table_template)
 
-    # Initialize git repository
-    os.chdir(project_dir)
-    return os.system("git init")
+    # Initialize git repository)
+    return os.system("git init {}".format(project_dir))
 
 
 def create_requirements_file(
@@ -202,7 +201,7 @@ def create_requirements_file(
 
     if os.path.exists(requirements_file):
         if not overwrite:
-            _LOGGER.warn("'requirements.txt' file already existing, skipping.")
+            _LOGGER.warning("'requirements.txt' file already existing, skipping.")
             return
 
     requirements_filecontent = "\n".join(libraries)
@@ -218,7 +217,7 @@ def create_makefile(
     Create a Makefile to manage the project execution.
     """
     makefile = os.path.join(project_dir, "Makefile")
-    src_dir = "src"
+    # src_dir = "src"
     log_dir = "log"
     metadata_dir = "metadata"
     project_config = os.path.join(metadata_dir, "project_config.yaml")

@@ -81,7 +81,7 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
             ]["comparison_side"].tolist())) != 2:
                 error = "Comparison '{}' does not contain two sides.".format(comparison)
                 if permissive:
-                    _LOGGER.warn(error)
+                    _LOGGER.warning(error)
                     continue
                 else:
                     raise ValueError(error)
@@ -103,7 +103,7 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
             if len(signal_samples) == 0 or len(control_samples) == 0:
                 error = "Comparison side for '{}' comparison does not contain samples.".format(comparison)
                 if permissive:
-                    _LOGGER.warn(error)
+                    _LOGGER.warning(error)
                     continue
                 else:
                     raise ValueError(error)
@@ -126,7 +126,7 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
                     cmds += [homer_call_chipseq_peak_job(
                         signal_samples, control_samples, output_dir=output_dir, name=comparison, as_job=as_jobs)]
                 else:
-                    _LOGGER.warn("Peak files for comparison '{}' already exist. Skipping.".format(comparison))
+                    _LOGGER.warning("Peak files for comparison '{}' already exist. Skipping.".format(comparison))
 
             if not as_jobs:
                 for cmd in cmds:
@@ -145,7 +145,7 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
         from ngs_toolkit.chipseq import homer_peaks_to_bed
 
         if filter_bed == "blacklist.mm10_liftOver.bed":
-            _LOGGER.warn("Using blacklist features of mm10 genome!")
+            _LOGGER.warning("Using blacklist features of mm10 genome!")
 
         # Complement default `peaks_dir`
         if "{results_dir}" in peaks_dir:
@@ -215,7 +215,7 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
                         homer_peaks_to_bed(file, file.replace("narrowPeak", "bed"))
                     except IOError:
                         if permissive:
-                            _LOGGER.warn(error)
+                            _LOGGER.warning(error)
                             peak_counts = peak_counts.append(
                                 pd.Series([comparison, peak_type, np.nan]), ignore_index=True)
                             continue
@@ -230,7 +230,7 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
                     df = pd.read_csv(file, sep="\t")
                 except IOError:
                     if permissive:
-                        _LOGGER.warn(error)
+                        _LOGGER.warning(error)
                         peak_counts = peak_counts.append(
                             pd.Series([comparison, peak_type, np.nan]), ignore_index=True)
                         continue
@@ -284,13 +284,13 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
                         f = re.sub("_peaks.narrowPeak", "_summits.bed", peak_file)
                         peaks = pybedtools.BedTool(f).slop(b=extension, genome=genome)
                     except ValueError:
-                        _LOGGER.warn("Summits for comparison {} ({}) not found!".format(comparison, f))
+                        _LOGGER.warning("Summits for comparison {} ({}) not found!".format(comparison, f))
                         continue
                 else:
                     try:
                         peaks = pybedtools.BedTool(peak_file)
                     except ValueError:
-                        _LOGGER.warn("Peaks for comparison {} ({}) not found!".format(comparison, peak_file))
+                        _LOGGER.warning("Peaks for comparison {} ({}) not found!".format(comparison, peak_file))
                         continue
                 # Merge overlaping peaks within a comparison
                 peaks = peaks.merge()
@@ -348,7 +348,7 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
                 try:
                     sample_support = self.sites.intersect(peak_file, wa=True, c=True).to_dataframe()
                 except (ValueError, pybedtools.MalformedBedLineError, pybedtools.helpers.BEDToolsError):
-                    _LOGGER.warn("Peaks for comparison {} ({}) not found!".format(comparison, peak_file))
+                    _LOGGER.warning("Peaks for comparison {} ({}) not found!".format(comparison, peak_file))
                     continue
                 sample_support.index = index
                 support[(comparison, peak_type)] = sample_support.iloc[:, 3]

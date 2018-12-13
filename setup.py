@@ -9,7 +9,7 @@ import glob
 extra = {}
 
 try:
-    from setuptools import setup
+    from setuptools import setup, find_packages
     if sys.version_info < (2, 7):
         extra['install_requires'] = ['argparse']
     if sys.version_info >= (3,):
@@ -58,7 +58,7 @@ except(IOError, ImportError):
 # setup
 setup(
     name="ngs_toolkit",
-    packages=["ngs_toolkit", "ngs_toolkit.recipes"],
+    packages=find_packages(),  # should eval to ["ngs_toolkit", "ngs_toolkit.recipes"],
     version=version,
     entry_points={
         "console_scripts": [

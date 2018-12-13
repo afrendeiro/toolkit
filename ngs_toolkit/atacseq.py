@@ -171,7 +171,7 @@ class ATACSeqAnalysis(Analysis):
                     if not permissive:
                         raise e
                     else:
-                        _LOGGER.warn(e)
+                        _LOGGER.warning(e)
 
         # Special cases
         if "sites" in only_these_keys:
@@ -182,7 +182,7 @@ class ATACSeqAnalysis(Analysis):
                 if not permissive:
                     raise e
                 else:
-                    _LOGGER.warn(e)
+                    _LOGGER.warning(e)
 
         if "accessibility" in only_these_keys:
             file = os.path.join(self.results_dir, self.name + ".accessibility.annotated_metadata.csv")
@@ -194,7 +194,7 @@ class ATACSeqAnalysis(Analysis):
                 if not permissive:
                     raise e
                 else:
-                    _LOGGER.warn(e)
+                    _LOGGER.warning(e)
 
     def get_consensus_sites(
             self, samples=None, region_type="summits", extension=250,
@@ -234,7 +234,7 @@ class ATACSeqAnalysis(Analysis):
                     peaks = pybedtools.BedTool(f).slop(b=extension, genome=sample.genome)
                 except ValueError as e:
                     if permissive:
-                        _LOGGER.warn("Summits for sample {} ({}) not found!".format(sample, f))
+                        _LOGGER.warning("Summits for sample {} ({}) not found!".format(sample, f))
                         continue
                     else:
                         raise e
@@ -243,7 +243,7 @@ class ATACSeqAnalysis(Analysis):
                     peaks = pybedtools.BedTool(sample.peaks)
                 except ValueError as e:
                     if permissive:
-                        _LOGGER.warn("Peaks for sample {} ({}) not found!".format(sample, sample.peaks))
+                        _LOGGER.warning("Peaks for sample {} ({}) not found!".format(sample, sample.peaks))
                         continue
                     else:
                         raise e
@@ -386,7 +386,7 @@ class ATACSeqAnalysis(Analysis):
 
         missing = [s for s in samples if not os.path.exists(s.filtered)]
         if len(missing) > 0:
-            _LOGGER.warn("Samples have missing BAM file: {}".format("\n".join([s.name for s in missing])))
+            _LOGGER.warning("Samples have missing BAM file: {}".format("\n".join([s.name for s in missing])))
             samples = [s for s in samples if s not in missing]
 
         if sites is None:
@@ -1385,7 +1385,7 @@ class ATACSeqAnalysis(Analysis):
         """
         from ngs_toolkit.general import unsupervised_analysis
 
-        _LOGGER.warn(PendingDeprecationWarning(
+        _LOGGER.warning(PendingDeprecationWarning(
             "ATACSeqAnalysis.unsupervised is provided for backward compatibility "
             "only and will be removed. Please use "
             "ngs_toolkit.general.unsupervised_analysis(ATACSeqAnalysis) "
@@ -2379,7 +2379,7 @@ def footprint(
 
     for motif_number in motif_numbers:
         if not os.path.exists(os.path.join(motifs_dir, "{}.pwmout.RData".format(motif_number))):
-            _LOGGER.warn("PIQ file for motif {} does not exist".format(motif_number))
+            _LOGGER.warning("PIQ file for motif {} does not exist".format(motif_number))
             continue
 
         t_dir = os.path.join(tmp_dir, group_name)
@@ -2525,7 +2525,7 @@ def piq_to_network(
     files = os.listdir(group_foot_dir)
 
     if len(files) == 0:
-        _LOGGER.warn("There are not footprint calls for group '{}' in '{}'".format(group_name, group_foot_dir))
+        _LOGGER.warning("There are not footprint calls for group '{}' in '{}'".format(group_name, group_foot_dir))
 
     # use universe set of ATAC-seq peaks to filter data
     all_peaks = pybedtools.BedTool(peak_universe_file)
@@ -2655,7 +2655,7 @@ def differential_interactions(
         axis.set_ylim(lims)
 
     if group_name1 == group_name2:
-        _LOGGER.warn("The two groups are the same! Skipping...")
+        _LOGGER.warning("The two groups are the same! Skipping...")
         return
 
     comparison_name = "{}-{}".format(group_name1, group_name2)

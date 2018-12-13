@@ -39,8 +39,8 @@ def setup_logger(level="INFO", logfile=None):
     _LOGGER.addHandler(fh)
     _LOGGER.addHandler(ch)
 
-    _LOGGER.info("This is ngs_toolkit (http://ngs-toolkit.rtfd.io), version: {}"
-                 .format(__version__))
+    _LOGGER.debug("This is ngs_toolkit (http://ngs-toolkit.rtfd.io), version: {}"
+                  .format(__version__))
     return _LOGGER
 
 

@@ -1,6 +1,8 @@
+
 [![Documentation status](https://readthedocs.org/projects/ngs-toolkit/badge/?version=latest)](http://ngs-toolkit.readthedocs.io/en/latest/?badge=latest)
 [![PyPI version](https://badge.fury.io/py/ngs-toolkit.svg)](https://badge.fury.io/py/ngs-toolkit)
 [![Codacy Badge](https://api.codacy.com/project/badge/Grade/30fcafc027e64b21bf9ddfe8d7f0ff3a)](https://app.codacy.com/app/afrendeiro/toolkit?utm_source=github.com&utm_medium=referral&utm_content=afrendeiro/toolkit&utm_campaign=Badge_Grade_Dashboard)
+[![Build Status](https://travis-ci.org/afrendeiro/toolkit.svg?branch=master)](https://travis-ci.org/afrendeiro/toolkit)
 
 [![PEP compatible](http://pepkit.github.io/img/PEP-compatible-green.svg)](http://pepkit.github.io)
 

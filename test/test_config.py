@@ -26,7 +26,7 @@ class RandomDataGenerator(object):
         s = list((string.ascii_lowercase[15:] * n_variables)[:n_variables])
         s = [i + str(j) for i, j in zip(s, range(n_variables))]
         d = patsy.demo_data(
-            *string.ascii_lowercase[:n_factors], *s, nlevels=2, min_rows=n_samples)
+            * (list(string.ascii_lowercase[:n_factors]) + s), nlevels=2, min_rows=n_samples)
         d = pd.DataFrame(d)
         dcat = d.loc[:, d.dtypes != np.float]
         dnum = d.loc[:, d.dtypes == np.float]
@@ -118,16 +118,20 @@ class GenerateProject(object):
 
         if not only_metadata:
             if data_type == "ATAC-seq":
-                n.to_csv(os.path.join(output_dir, project_name, "results", project_name + "_peaks.raw_coverage.csv"))
+                n.to_csv(os.path.join(
+                    output_dir, project_name, "results", project_name + "_peaks.raw_coverage.csv"))
             elif data_type == "RNA-seq":
-                n.to_csv(os.path.join(output_dir, project_name, "results", project_name + ".expression_counts.gene_level.csv"))
+                n.to_csv(os.path.join(
+                    output_dir, project_name, "results", project_name + ".expression_counts.gene_level.csv"))
 
 
 def test_version_matches():
     from ngs_toolkit import __version__ as installed_version
     import pkgutil
 
-    file_version = pkgutil.get_data('ngs_toolkit', "_version.py").decode().strip().split(" = ")[1].replace("\"", "")
+    file_version = (
+        pkgutil.get_data('ngs_toolkit', "_version.py")
+        .decode().strip().split(" = ")[1].replace("\"", ""))
     assert installed_version == file_version
 
 
@@ -141,7 +145,8 @@ def test_all_requirements_are_importable():
 
     replace = {"scikit-learn": "sklearn", "piper": "pypiper"}
 
-    requirements = [x.split(" ")[0] for x in data['info']['requires_dist']]
+    # not extra requirements
+    requirements = [x.split(" ")[0] for x in data['info']['requires_dist'] if "extra" not in x]
     # versions = [x.split(" ")[1] if len(x.split(" ")) > 1 else "" for x in data['info']['requires_dist']]
 
     for req in requirements:
@@ -238,19 +243,25 @@ def test_analysis_creation():
 
     n_samples = (n_factors * n_replicates) + n_factors
 
-    GenerateProject(project_name=project_name, genome=genome_assembly, n_factors=n_factors, n_replicates=n_replicates)
+    GenerateProject(
+        project_name=project_name, genome=genome_assembly, data_type=data_type,
+        n_factors=n_factors, n_replicates=n_replicates, n_variables=n_variables)
 
     # first edit the defaul path to the annotation sheet
     config = os.path.join("tests", project_name, "metadata", "project_config.yaml")
     c = yaml.safe_load(open(config, 'r'))
-    c['metadata']['sample_annotation'] = os.path.abspath(os.path.join("tests", project_name, "metadata", "annotation.csv"))
-    c['metadata']['comparison_table'] = os.path.abspath(os.path.join("tests", project_name, "metadata", "comparison_table.csv"))
+    c['metadata']['sample_annotation'] = os.path.abspath(
+        os.path.join("tests", project_name, "metadata", "annotation.csv"))
+    c['metadata']['comparison_table'] = os.path.abspath(
+        os.path.join("tests", project_name, "metadata", "comparison_table.csv"))
     yaml.safe_dump(c, open(config, "w"))
 
     # project and associated analysis
     prj = Project(config)
     a = Analysis(name=project_name, prj=prj)
-    assert a.__repr__() == "Analysis object named '{}' with {} samples of genome '{}'.".format(project_name, n_samples, genome_assembly)
+    assert a.__repr__() == (
+        "Analysis object named '{}' with {} samples of genome '{}'."
+        .format(project_name, n_samples, genome_assembly))
     assert len(prj.samples) == len(a.samples)
     assert all([x == y for x, y in zip(prj.samples, a.samples)])
 

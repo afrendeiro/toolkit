@@ -142,7 +142,7 @@ class Analysis(object):
         hint += " object to use those attributes during the analysis."
         if self.prj is not None:
             for attr in ["samples", "sample_attributes", "group_attributes"]:
-                if not hasattr(self.prj, "samples"):
+                if not hasattr(self.prj, attr):
                     _LOGGER.warning("Associated project does not have any '{}'.".format(attr) +
                                     hint.format(attr) if attr != "samples" else "")
                 else:
@@ -158,7 +158,7 @@ class Analysis(object):
                             _LOGGER.debug("Samples already exist for analysis, not overwriting.")
             # comparison table is under "prj.metadata"
             for attr in ["comparison_table"]:
-                if not hasattr(self.prj, "samples"):
+                if not hasattr(self.prj, attr):
                     _LOGGER.warning("Associated project does not have any '{}'.".format(attr))
                 else:
                     msg = "Setting project's '{0}' as the analysis '{0}'.".format(attr)
@@ -1699,6 +1699,17 @@ def differential_overlap(
     from scipy.stats import fisher_exact
     from statsmodels.sandbox.stats.multicomp import multipletests
 
+    # if data_type is None:
+    #     msg = "Data type not defined and Analysis object does not have a `data_type` attribute."
+    #     try:
+    #         data_type = analysis.data_type
+    #     except AttributeError as e:
+    #         _LOGGER.error(msg)
+    #         raise e
+    #     if data_type is None:
+    #         _LOGGER.error(msg)
+    #         raise ValueError
+
     if "{data_type}" in output_dir:
         output_dir = output_dir.format(data_type=data_type)
 
@@ -1811,11 +1822,15 @@ def differential_overlap(
         sns.heatmap(piv_combined, square=True, cmap="RdBu_r", center=0, cbar_kws={"label": "Concordant {}s ({})".format(unit, description)}, ax=axis, **extra)
         axis.set_xticklabels(axis.get_xticklabels(), rotation=90, ha="center")
         axis.set_yticklabels(axis.get_yticklabels(), rotation=0, ha="right")
-        fig.savefig(os.path.join(output_dir, output_prefix + ".differential_overlap.{}.up_down_together.svg".format(label)), bbox_inches="tight")
+        fig.savefig(os.path.join(
+                output_dir, output_prefix + ".differential_overlap.{}.up_down_together.svg".format(label)),
+            bbox_inches="tight")
 
         # Rank plots
         if metric == "log_pvalue":
-            r = pd.melt(piv_combined.reset_index(), id_vars=['group1'], var_name="group2", value_name="agreement")
+            r = pd.melt(
+                piv_combined.reset_index(),
+                id_vars=['group1'], var_name="group2", value_name="agreement")
             r = r.dropna().sort_values('agreement')
             r = r.iloc[range(0, r.shape[0], 2)]
             r['rank'] = r['agreement'].rank(ascending=False)
@@ -1839,7 +1854,9 @@ def differential_overlap(
                 ax.set_ylabel("Agreement (-log(p-value))")
                 ax.set_xlabel("Rank")
             sns.despine(fig)
-            fig.savefig(os.path.join(output_dir, output_prefix + ".differential_overlap.{}.agreement.rank.svg".format(label)), bbox_inches="tight")
+            fig.savefig(os.path.join(
+                    output_dir, output_prefix + ".differential_overlap.{}.agreement.rank.svg".format(label)),
+                bbox_inches="tight")
 
         # Observe disagreement
         # (overlap of down-regulated with up-regulated and vice-versa)
@@ -1856,7 +1873,9 @@ def differential_overlap(
         np.fill_diagonal(piv_disagree.values, np.nan)
 
         fig, axis = plt.subplots(1, 2, figsize=(16, 8), subplot_kw={"aspect": 'equal'})
-        sns.heatmap(piv_disagree, square=True, cmap="Greens", cbar_kws={"label": "Discordant {}s ({})".format(unit, description)}, ax=axis[0])
+        sns.heatmap(
+            piv_disagree, square=True, cmap="Greens",
+            cbar_kws={"label": "Discordant {}s ({})".format(unit, description)}, ax=axis[0])
         # sns.heatmap(np.log2(1 + piv_disagree), square=True, cmap="Greens", cbar_kws={"label": "Discordant {}s (log2)".format(unit)}, ax=axis[1][0])
 
         norm = matplotlib.colors.Normalize(vmin=0, vmax=piv_disagree.max().max())
@@ -1867,7 +1886,9 @@ def differential_overlap(
                 # print(len(piv_disagree.index) - (j + 0.5), len(piv_disagree.index) - (i + 0.5))
                 axis[1].scatter(
                     len(piv_disagree.index) - (j + 0.5), len(piv_disagree.index) - (i + 0.5),
-                    s=(100 ** (norm(piv_disagree.loc[g1, g2]))) - 1, color=cmap(norm(piv_disagree.loc[g1, g2])), marker="o")
+                    s=(100 ** (norm(piv_disagree.loc[g1, g2]))) - 1,
+                    color=cmap(norm(piv_disagree.loc[g1, g2])), marker="o")
+                axis[1].set_title("Rotate plot -90 degrees")
                 # axis[1][1].scatter(
                 #     len(piv_disagree.index) - (j + 0.5), len(piv_disagree.index) - (i + 0.5),
                 #     s=(100 ** (log_norm(np.log2(1 + piv_disagree).loc[g1, g2]))) - 1, color=cmap(log_norm(np.log2(1 + piv_disagree).loc[g1, g2])), marker="o")
@@ -1876,11 +1897,15 @@ def differential_overlap(
         axis[0].set_yticklabels(axis[0].get_yticklabels(), rotation=0, ha="right")
         axis[1].set_xlim((0, len(piv_disagree.index)))
         axis[1].set_ylim((0, len(piv_disagree.columns)))
-        fig.savefig(os.path.join(output_dir, output_prefix + ".differential_overlap.{}.disagreement.svg".format(label)), bbox_inches="tight")
+        fig.savefig(os.path.join(
+                output_dir, output_prefix + ".differential_overlap.{}.disagreement.svg".format(label)),
+            bbox_inches="tight")
 
         # Rank plots
         if metric == "log_pvalue":
-            r = pd.melt(piv_disagree.reset_index(), id_vars=['group1'], var_name="group2", value_name="disagreement")
+            r = pd.melt(
+                piv_disagree.reset_index(),
+                id_vars=['group1'], var_name="group2", value_name="disagreement")
             r = r.dropna().sort_values('disagreement')
             r = r.iloc[range(0, r.shape[0], 2)]
             r['rank'] = r['disagreement'].rank(ascending=False)
@@ -1897,7 +1922,11 @@ def differential_overlap(
                 ax.set_ylabel("Disagreement (-log(p-value))")
                 ax.set_xlabel("Rank")
             sns.despine(fig)
-            fig.savefig(os.path.join(output_dir, output_prefix + ".differential_overlap.{}.disagreement.rank.svg".format(label)), bbox_inches="tight")
+            fig.savefig(
+                os.path.join(
+                    output_dir,
+                    output_prefix + ".differential_overlap.{}.disagreement.rank.svg".format(label)),
+                bbox_inches="tight")
 
 
 def plot_differential(
@@ -1907,7 +1936,7 @@ def plot_differential(
         samples=None,
         matrix=None,
         only_comparison_samples=False,
-        data_type="ATAC-seq",
+        data_type=None,
         alpha=0.05,
         corrected_p_value=True,
         fold_change=None,
@@ -2046,6 +2075,17 @@ def plot_differential(
     req_attrs = [mean_column, log_fold_change_column, p_value_column, adjusted_p_value_column, comparison_column]
     if not all([x in results.columns for x in req_attrs]):
         raise AssertionError("Results dataframe must have '{}' columns.".format(", ".join(req_attrs)))
+
+    if data_type is None:
+        msg = "Data type not defined and Analysis object does not have a `data_type` attribute."
+        try:
+            data_type = analysis.data_type
+        except AttributeError as e:
+            _LOGGER.error(msg)
+            raise e
+        if data_type is None:
+            _LOGGER.error(msg)
+            raise ValueError
 
     # Make output dir
     if "{data_type}" in output_dir:
@@ -2268,8 +2308,8 @@ def plot_differential(
                     add_colorbar_to_axis(collection, label="-log10(p-value)")
                 ax.set_title(comparison)
                 # Name groups
-                xl = c.loc[c['comparison_side'] == 0, 'comparison_name'].drop_duplicates().squeeze()
-                yl = c.loc[c['comparison_side'] == 1, 'comparison_name'].drop_duplicates().squeeze()
+                xl = c.loc[c['comparison_side'] <= 0, 'sample_group'].drop_duplicates().squeeze()
+                yl = c.loc[c['comparison_side'] >= 1, 'sample_group'].drop_duplicates().squeeze()
                 if not (type(xl) is str) and (type(yl) is str):
                     xl = "Down-regulated"
                     yl = "Up-regulated"
@@ -2891,9 +2931,10 @@ def parse_great_enrichment(input_tsv):
 
 def homer_combine_motifs(
         comparison_dirs, output_dir,
+        region_prefix="differential_analysis",
         reduce_threshold=0.6, match_threshold=10, info_value=0.6,
         p_value_threshold=1e-25, fold_enrichment=None,
-        cpus=8, run=False, as_jobs=True, genome="hg19",
+        cpus=8, run=True, as_jobs=True, genome="hg19",
         motif_database=None, known_vertebrates_TFs_only=False):
     """
     Create consensus of de novo discovered motifs from HOMER
@@ -2909,7 +2950,7 @@ def homer_combine_motifs(
     :param cpus: Number of available CPUS/threads for multithread processing.
                  Defaults to 8
     :type cpus: number, optional
-    :param run: Whether to run enrichment of each comparison in the consensus motifs. Default is False
+    :param run: Whether to run enrichment of each comparison in the consensus motifs. Default is True
     :type run: bool, optional
     :param as_jobs: Whether to run enrichment as a cluster job. Default is True
     :type as_jobs: bool, optional
@@ -2934,6 +2975,9 @@ def homer_combine_motifs(
     if known_vertebrates_TFs_only:
         _LOGGER.warning("WARNING! `known_vertebrates_TFs_only` option is deprecated!" +
                         "Pass a given motif_database to `motif_database` directly.")
+
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
 
     # concatenate files
     out_file = os.path.join(output_dir, "homerMotifs.combined.motifs")
@@ -2977,7 +3021,7 @@ def homer_combine_motifs(
             # prepare enrichment command with consensus set
             cmd = (
                 "findMotifsGenome.pl {bed} {genome}r {dir} -p {cpus} -nomotif -mknown {motif_file}"
-                .format(bed=os.path.join(dir_, "differential_analysis_regions.bed"),
+                .format(bed=os.path.join(dir_, region_prefix + "_regions.bed"),
                         genome=genome, cpus=cpus, dir=dir_,
                         motif_file=combined_motifs))
             # run
@@ -3154,8 +3198,8 @@ done""".format(results_dir=results_dir)]
 
 def differential_enrichment(
         analysis,
-        differential,
-        data_type="ATAC-seq",
+        differential=None,
+        data_type=None,
         output_dir="results/differential_analysis_{data_type}/enrichments",
         output_prefix="differential_analysis",
         genome="hg19",
@@ -3198,6 +3242,33 @@ def differential_enrichment(
     from ngs_toolkit.general import run_enrichment_jobs
 
     serial = not as_jobs
+
+    if differential is None:
+        msg = "Data frame with differential comparison results `differential` "
+        msg += "was not passed and is not defined in the Analysis object as a "
+        msg += "`differential_results` attribute."
+        hint = " Run analysis.differential_analysis to get differential results."
+        try:
+            differential = analysis.differential_results
+        except AttributeError as e:
+            _LOGGER.error(msg)
+            _LOGGER.info(hint)
+            raise e
+        if data_type is None:
+            _LOGGER.error(msg)
+            _LOGGER.info(hint)
+            raise ValueError
+
+    if data_type is None:
+        msg = "Data type not defined and Analysis object does not have a `data_type` attribute."
+        try:
+            data_type = analysis.data_type
+        except AttributeError as e:
+            _LOGGER.error(msg)
+            raise e
+        if data_type is None:
+            _LOGGER.error(msg)
+            raise ValueError
 
     if data_type == "ATAC-seq":
         from ngs_toolkit.atacseq import characterize_regions_function
@@ -3285,7 +3356,7 @@ def differential_enrichment(
                     if serial:
                         if not os.path.exists(os.path.join(comparison_dir, output_prefix + ".enrichr.csv")):
                             enr = enrichr(comparison_df.reset_index())
-                            enr.to_csv(os.path.join(comparison_dir, output_prefix + ".enrichr.csv"), index=False)
+                            enr.to_csv(os.path.join(comparison_dir, output_prefix + ".enrichr.csv"), index=False, encoding="utf-8")
                         else:
                             enr = pd.read_csv(os.path.join(comparison_dir, output_prefix + ".enrichr.csv"), encoding="utf-8")
                             enr["comparison_name"] = comp
@@ -3387,6 +3458,17 @@ def collect_differential_enrichment(
     import pandas as pd
     from ngs_toolkit.general import parse_ame, parse_homer
     from tqdm import tqdm
+
+    # if data_type is None:
+    #     msg = "Data type not defined and Analysis object does not have a `data_type` attribute."
+    #     try:
+    #         data_type = analysis.data_type
+    #     except AttributeError as e:
+    #         _LOGGER.error(msg)
+    #         raise e
+    #     if data_type is None:
+    #         _LOGGER.error(msg)
+    #         raise ValueError
 
     if data_type not in ["ATAC-seq", "RNA-seq"]:
         raise ValueError("`data_type` must match one of 'ATAC-seq' or 'RNA-seq'.")
@@ -4209,6 +4291,16 @@ def count_dataframe_values(x):
     :rtype: int
     """
     return np.multiply(*x.shape) - x.isnull().sum().sum()
+
+
+def location_index_to_bed(index):
+    bed = pd.DataFrame(index=index)
+    index = index.to_series()
+    bed['chrom'] = index.str.split(":").str[0]
+    index2 = index.str.split(":").str[1]
+    bed['start'] = index2.str.split("-").str[0]
+    bed['end'] = index2.str.split("-").str[1]
+    return bed
 
 
 def timedelta_to_years(x):

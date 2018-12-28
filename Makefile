@@ -1,6 +1,18 @@
 .DEFAULT_GOAL := pypitest
 
-build:
+test:
+	pytest
+
+coverage: test
+	coverage run test/test_*.py
+	coverage report
+	coverage html
+
+covupload: coverage
+	coverage xml
+	python-codacy-coverage -r coverage.xml
+
+build: test
 	python setup.py sdist bdist_wheel
 
 pypitest: build
@@ -9,14 +21,17 @@ pypitest: build
 pypi: build
 	twine upload dist/*
 
+clean_cov:
+	rm -r coverage.xml htmlcov
+
 clean_dist:
 	rm -r dist/
 
 clean_build:
 	rm -r build/
 
-clean: clean_dist clean_build
+clean: clean_cov clean_dist clean_build
 
-all: build pypitest pypi clean_dist clean_build clean
+all: test coverage build pypitest pypi clean_dist clean_build clean
 
-.PHONY: build pypitest pypi clean_dist clean_build clean
+.PHONY: test coverage build pypitest pypi clean_dist clean_build clean

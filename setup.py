@@ -5,9 +5,14 @@ import os
 import glob
 
 
+def parse_requirements(req_file):
+    requirements = open(req_file).read().strip().split("\n")
+    requirements = [r for r in requirements if not r.startswith("#")]
+    return [r for r in requirements if "#egg=" not in r]
+
+
 # take care of extra required modules depending on Python version
 extra = {}
-
 try:
     from setuptools import setup, find_packages
     if sys.version_info < (2, 7):
@@ -18,22 +23,14 @@ except ImportError:
     from distutils.core import setup
     if sys.version_info < (2, 7):
         extra['dependencies'] = ['argparse']
-
 with open(os.path.join("ngs_toolkit", "_version.py"), 'r') as handle:
     version = handle.readline().split()[-1].strip("\"'\n")
 
-requirements = open("requirements/requirements.txt").read().strip().split("\n")
-requirements = [r for r in requirements if not r.startswith("#")]
-requirements = [r for r in requirements if "#egg=" not in r]
-
-requirements_rpy2 = open("requirements/requirements.rpy2.txt").read().strip().split("\n")
-requirements_rpy2 = [r for r in requirements_rpy2 if not r.startswith("#")]
-requirements_rpy2 = [r for r in requirements_rpy2 if "#egg=" not in r]
-
-requirements_sc = open("requirements/requirements.single_cell.txt").read().strip().split("\n")
-requirements_sc = [r for r in requirements_sc if not r.startswith("#")]
-requirements_sc = [r for r in requirements_sc if "#egg=" not in r]
-
+# Requirements
+requirements = parse_requirements("requirements/requirements.txt")
+test_requirements = parse_requirements("requirements/requirements.test.txt")
+requirements_rpy2 = parse_requirements("requirements/requirements.rpy2.txt")
+requirements_sc = parse_requirements("requirements/requirements.single_cell.txt")
 
 # Recipes
 recipes = glob.glob(os.path.join(os.path.curdir, "ngs_toolkit", "recipes", "*.py"))
@@ -81,6 +78,7 @@ setup(
     author_email='afrendeiro@gmail.com',
     license="GPL3",
     install_requires=requirements,
+    tests_requires=test_requirements,
     extras_require={
         'deseq2':  requirements_rpy2,
         'single_cell': requirements_sc},

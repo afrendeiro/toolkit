@@ -1,7 +1,11 @@
 username: 
 email: 
+website_root: 
 metadata:
   root_projects_dir: 
+default_genome_assemblies:
+  - "human": "hg19"
+  - "mouse": "mm10"
 resources:
   genomes:
     2bit:
@@ -77,6 +81,8 @@ graphics:
     figure_saving:
       - dpi: 300
       - bbox_inches: "tight"
+      - transparent: True
+      - frameon: False
     matplotlib:
       backend: TkAgg # Agg
     close_saved_figures: True

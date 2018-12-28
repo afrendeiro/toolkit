@@ -1,7 +1,11 @@
 username: arendeiro
 email: arendeiro@cemm.oeaw.ac.at
+website_root: http://biomedical-sequencing.at/bocklab/arendeiro/
 metadata:
   root_projects_dir: /scratch/lab_bock/shared/projects/
+default_genome_assemblies:
+  - human: hg19
+  - mouse: mm10
 resources:
   genomes:
     2bit:

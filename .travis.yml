@@ -12,7 +12,7 @@ before_install:
   - sudo su - -c "R -e \"if (!requireNamespace('BiocManager', quietly = TRUE)){install.packages('BiocManager', repos='https://CRAN.R-project.org')}; BiocManager::install('DESeq2', version = '3.8')\""
 
 install:
-  - pip install -r requirements/requirements.txt
-  - pip install .
+  - pip install -r requirements/requirements.test.txt
+  - pip install .[deseq2]
 script:
   - pytest

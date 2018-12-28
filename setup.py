@@ -78,7 +78,7 @@ setup(
     author_email='afrendeiro@gmail.com',
     license="GPL3",
     install_requires=requirements,
-    tests_requires=test_requirements,
+    tests_require=test_requirements,
     extras_require={
         'deseq2':  requirements_rpy2,
         'single_cell': requirements_sc},

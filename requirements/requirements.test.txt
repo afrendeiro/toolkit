@@ -1,2 +1,2 @@
-pytest
+pytest>=4.0.1
 codacy-coverage

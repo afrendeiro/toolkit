@@ -115,7 +115,7 @@ def main():
     )
     parser = add_args(parser)
     args = parser.parse_args()
-    # args = parser.parse_args('-t ATAC-seq metadata/project_config.yaml'.split(" "))
+    # args = parser.parse_args('-q -t RNA-seq metadata/project_config.yaml'.split(" "))
 
     # Start project
     print("Starting peppy project with project configuration file: '{}'".format(args.config_file))
@@ -126,7 +126,7 @@ def main():
         print("Filtering samples out which didn't pass QC as specified in sample annotation in column 'pass_qc'")
         prj._samples = [s for s in prj._samples if s.pass_qc not in ['0', 0, 'False', False]]
     print("Setting location of sample files dependent on sample types.")
-    for sample in prj.samples:
+    for sample in prj._samples:
         if hasattr(sample, "protocol"):
             sample.library = sample.protocol
 
@@ -148,7 +148,7 @@ def main():
     # ANALYSIS
     if args.data_type is None:
         print("Type of analysis not specified. Will run independent analysis for all types of data in the sample annotation sheet.")
-        data_types = sorted(list(set([s.library for s in prj.samples])))
+        data_types = sorted(list(set([s.library for s in prj._samples])))
         print("Sample data types: '{}'.".format(",".join(data_types)))
     else:
         print("Type of analysis specified. Will run only analysis for samples of type '{}'.".format(args.data_type))
@@ -160,7 +160,7 @@ def main():
 
     for data_type in data_types:
         print("Starting analysis for samples of type: '{}'.".format(data_type))
-        samples = [s for s in prj.samples if (s.library == data_type)]
+        samples = [s for s in prj._samples if (s.library == data_type)]
         if len(samples) > 0:
             print(
                 "Samples under consideration: '{}'. ".format(",".join([s.name for s in samples])) +
@@ -234,6 +234,7 @@ def main_analysis_pipeline(
     gets and plots enrichments for supervised analysis.
     """
 
+    # TODO: handle the genome vs transcriptome ambiguity
     genomes = list(set(s.genome for s in analysis.samples))
 
     if len(genomes) != 1:
@@ -307,6 +308,7 @@ def main_analysis_pipeline(
         analysis,
         quant_matrix=quant_matrix,
         attributes_to_plot=plotting_attributes,
+        data_type=data_type,
         plot_max_attr=20,
         plot_max_pcs=6,
         plot_group_centroids=True,
@@ -334,7 +336,7 @@ def main_analysis_pipeline(
             covariates=None,
             alpha=0.05,
             overwrite=True)
-        analysis.differential_results = analysis.differential_results.set_index("index")
+        # analysis.differential_results = analysis.differential_results.set_index("index")
     else:
         print("Complex design for differential analysis. There are sample(s) belonging to more than one group.")
         print("Performing analysis independently for each comparison.")
@@ -348,7 +350,7 @@ def main_analysis_pipeline(
                 samples=[s for s in analysis.samples if s.name in comp['sample_name'].tolist()],
                 covariates=None, alpha=alpha, overwrite=True)
             analysis.differential_results = analysis.differential_results.append(res, ignore_index=True)
-        analysis.differential_results = analysis.differential_results.set_index("index")
+        # analysis.differential_results = analysis.differential_results.set_index("index")
         analysis.differential_results.to_csv(
             os.path.join(analysis.results_dir, "differential_analysis_{}".format(data_type),
                          "differential_analysis.deseq_result.all_comparisons.csv"), index=True)

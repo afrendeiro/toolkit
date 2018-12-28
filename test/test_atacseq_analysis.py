@@ -13,10 +13,8 @@ import numpy as np
 
 
 @pytest.fixture
-def get_test_analysis():
+def get_test_analysis(tmp_path):
     # Let's make several "reallish" test projects
-    tmp_path = "tests"
-
     to_test = list()
     project_prefix_name = "test-project"
     data_type = "ATAC-seq"
@@ -45,7 +43,8 @@ def get_test_analysis():
             os.path.join(tmp_path, project_name, "metadata", "comparison_table.csv"))
         yaml.safe_dump(c, open(config, "w"))
 
-        prj_path = os.path.join("tests", project_name)
+        prj_path = os.path.join(tmp_path, project_name)
+        os.chdir(prj_path)
 
         # project and associated analysis
         analysis = ATACSeqAnalysis(
@@ -116,6 +115,37 @@ def test_quantile_normalization(get_test_analysis):
         assert all(np.array(cors) > 0.99)
 
 
-def test_cleanup(get_test_analysis):
+# TODO: test cqn normalization
+
+
+def test_normalize(get_test_analysis):
     for analysis in get_test_analysis:
-        shutil.rmtree(analysis.results_dir)
+        qnorm = analysis.normalize_coverage_rpm(save=False)
+        qnorm_d = analysis.normalize(method="total", save=False)
+        assert np.array_equal(qnorm_d, qnorm)
+        qnorm = analysis.normalize_coverage_quantiles(save=False)
+        qnorm_d = analysis.normalize(method="quantile", save=False)
+        assert np.array_equal(qnorm_d, qnorm)
+        # TODO: add cqn normalization
+
+
+# TODO: test region set annotation
+
+
+def test_plot_raw_coverage(get_test_analysis):
+    for analysis in get_test_analysis:
+        analysis.plot_raw_coverage()
+        output = os.path.join(analysis.results_dir, analysis.name + ".raw_counts.violinplot.svg")
+        assert os.path.exists(output)
+        assert os.stat(output).st_size > 0
+
+        attr = "a"
+        analysis.plot_raw_coverage(by_attribute=attr)
+        output = os.path.join(analysis.results_dir, analysis.name + ".raw_counts.violinplot.by_{}.svg".format(attr))
+        assert os.path.exists(output)
+        assert os.stat(output).st_size > 0
+
+
+# def test_cleanup(get_test_analysis):
+#     for analysis in get_test_analysis:
+#         shutil.rmtree(analysis.results_dir)

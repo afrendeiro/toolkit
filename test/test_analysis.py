@@ -58,6 +58,8 @@ class RandomDataGenerator(object):
         # add random location indexes
         if data_type in ["ATAC-seq", "ChIP-seq"]:
             dnum.columns = self.get_random_genomic_locations(n_variables, genome_assembly=genome_assembly)
+        if data_type in ["RNA-seq"]:
+            dnum.columns = self.get_random_genomic_locations(n_variables, genome_assembly=genome_assembly)
 
         return dnum.T, dcat
 
@@ -77,6 +79,21 @@ class RandomDataGenerator(object):
         df.loc[(df[2] - df[1]) < min_width, 2] += min_width
         bed = pybedtools.BedTool.from_dataframe(df).shuffle(genome=genome_assembly).to_dataframe()
         return bed['chrom'] + ":" + bed['start'].astype(str) + "-" + bed['end'].astype(str)
+
+    @staticmethod
+    def get_random_genes(
+            size,
+            genome_assembly="hg19"):
+        from ngs_toolkit.general import query_biomart
+        import numpy as np
+        import pandas as pd
+
+        m = {"hg19": "grch37", "hg38": "grch38", "mm10": "grcm38"}
+
+        g = query_biomart(
+            attributes=['external_gene_name'],
+            ensembl_version=m[genome_assembly]).squeeze()
+        return pd.Series(np.random.choice(g, size))
 
 
 def generate_project(

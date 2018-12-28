@@ -701,10 +701,10 @@ class ATACSeqAnalysis(Analysis):
         :returns pd.DataFrame: Normalized pandas DataFrame.
 
         """
-        if method == "quantile":
-            return self.normalize_coverage_quantiles(matrix=matrix, samples=samples, save=save, assign=assign)
-        elif method == "total":
+        if method == "total":
             return self.normalize_coverage_rpm(matrix=matrix, samples=samples, save=save, assign=assign)
+        elif method == "quantile":
+            return self.normalize_coverage_quantiles(matrix=matrix, samples=samples, save=save, assign=assign)
         elif method == "gc_content":
             return self.normalize_gc_content(matrix=matrix, samples=samples, save=save, assign=assign)
         else:

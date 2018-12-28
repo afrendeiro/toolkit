@@ -3,8 +3,8 @@
 test:
 	pytest
 
-coverage: test
-	coverage run test/test_*.py
+coverage:
+	coverage run -m pytest
 	coverage report
 	coverage html
 

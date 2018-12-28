@@ -1,8 +1,5 @@
 #!/usr/bin/env python
 
-import os
-import pandas as pd
-
 
 class RandomDataGenerator(object):
     def __init__(self):
@@ -15,6 +12,7 @@ class RandomDataGenerator(object):
             data_type="ATAC-seq", genome_assembly="hg19"):
         import string
         import patsy
+        import pandas as pd
         import numpy as np
 
         if not isinstance(group_fold_differences, list):
@@ -70,6 +68,7 @@ class RandomDataGenerator(object):
             genome_assembly="hg19"):
         import pybedtools
         import numpy as np
+        import pandas as pd
 
         chrom = ['chr1'] * size
         start = np.array([0] * size)
@@ -80,51 +79,55 @@ class RandomDataGenerator(object):
         return bed['chrom'] + ":" + bed['start'].astype(str) + "-" + bed['end'].astype(str)
 
 
-class GenerateProject(object):
-    def __init__(
-            self,
-            output_dir="tests", project_name="test_project",
-            organism="human", genome_assembly="hg19", data_type="ATAC-seq",
-            only_metadata=False, **kwargs):
-        from ngs_toolkit.project_manager import create_project
+def generate_project(
+        output_dir="tests", project_name="test_project",
+        organism="human", genome_assembly="hg19", data_type="ATAC-seq",
+        only_metadata=False, **kwargs):
+    from ngs_toolkit.project_manager import create_project
+    import os
 
-        # Create project with projectmanager
-        create_project(
-            project_name, output_dir,
-            genome_assemblies={organism: genome_assembly},
-            overwrite=True)
+    # Create project with projectmanager
+    create_project(
+        project_name, output_dir,
+        genome_assemblies={organism: genome_assembly},
+        overwrite=True)
 
-        # Generate random data
-        g = RandomDataGenerator()
-        n, c = g.generate_random_data(genome_assembly=genome_assembly, **kwargs)
+    # Generate random data
+    g = RandomDataGenerator()
+    n, c = g.generate_random_data(genome_assembly=genome_assembly, **kwargs)
 
-        # add additional sample info
-        c['protocol'] = data_type
-        c['organism'] = organism
-        # now save it
-        c.to_csv(os.path.join(output_dir, project_name, "metadata", "annotation.csv"))
+    # add additional sample info
+    c['protocol'] = data_type
+    c['organism'] = organism
+    # now save it
+    c.to_csv(os.path.join(output_dir, project_name, "metadata", "annotation.csv"))
 
-        dirs = [os.path.join(output_dir, project_name, "results")]
-        for d in dirs:
-            if not os.path.exists(d):
-                os.makedirs(d)
+    dirs = [os.path.join(output_dir, project_name, "results")]
+    for d in dirs:
+        if not os.path.exists(d):
+            os.makedirs(d)
 
-        if not only_metadata:
-            if data_type == "ATAC-seq":
-                n.to_csv(os.path.join(
-                    output_dir, project_name, "results", project_name + "_peaks.raw_coverage.csv"))
-            elif data_type == "RNA-seq":
-                n.to_csv(os.path.join(
-                    output_dir, project_name, "results", project_name + ".expression_counts.gene_level.csv"))
+    if not only_metadata:
+        if data_type == "ATAC-seq":
+            from ngs_toolkit.general import location_index_to_bed
+            bed = location_index_to_bed(n.index)
+            bed.to_csv(os.path.join(
+                output_dir, project_name, "results", project_name + "_peak_set.bed"), index=False, sep="\t", header=False)
+            n.to_csv(os.path.join(
+                output_dir, project_name, "results", project_name + "_peaks.raw_coverage.csv"))
+        elif data_type == "RNA-seq":
+            n.to_csv(os.path.join(
+                output_dir, project_name, "results", project_name + ".expression_counts.gene_level.csv"))
 
 
-def test_project_manager():
+def test_project_manager(tmp_path):
     from ngs_toolkit import _CONFIG
     from ngs_toolkit.project_manager import create_project
+    import os
+    import pandas as pd
     import shutil
 
     project_name = "test_project"
-    root_dir = "tests"
     annotation_vars = [
         "sample_name", "toggle", "pass_qc", "protocol", "library",
         "cell_line", "cell_type", "condition",
@@ -133,27 +136,27 @@ def test_project_manager():
 
     genome_assemblies = {k: v for x in _CONFIG["default_genome_assemblies"] for k, v in x.items()}
     create_project(
-        project_name, root_dir, genome_assemblies=genome_assemblies, overwrite=True)
+        project_name, tmp_path, genome_assemblies=genome_assemblies, overwrite=True)
 
     expected_files = [
-        os.path.join(root_dir, project_name, ".git"),
-        os.path.join(root_dir, project_name, "metadata"),
-        os.path.join(root_dir, project_name, "metadata", "project_config.yaml"),
-        os.path.join(root_dir, project_name, "metadata", "annotation.csv"),
-        os.path.join(root_dir, project_name, "metadata", "merge_table.csv"),
-        os.path.join(root_dir, project_name, "metadata", "comparison_table.csv"),
+        os.path.join(tmp_path, project_name, ".git"),
+        os.path.join(tmp_path, project_name, "metadata"),
+        os.path.join(tmp_path, project_name, "metadata", "project_config.yaml"),
+        os.path.join(tmp_path, project_name, "metadata", "annotation.csv"),
+        os.path.join(tmp_path, project_name, "metadata", "merge_table.csv"),
+        os.path.join(tmp_path, project_name, "metadata", "comparison_table.csv"),
     ]
     for f in expected_files:
         assert os.path.exists(f)
 
-    df = pd.read_csv(os.path.join(root_dir, project_name, "metadata", "annotation.csv"))
+    df = pd.read_csv(os.path.join(tmp_path, project_name, "metadata", "annotation.csv"))
     assert df.shape == (0, len(annotation_vars))
     assert all(c in df.columns for c in annotation_vars)
 
-    shutil.rmtree(os.path.join("tests", project_name))
+    shutil.rmtree(tmp_path)
 
 
-def test_analysis_creation():
+def test_analysis_creation(tmp_path):
     from ngs_toolkit.general import Analysis
     import os
     from peppy import Project
@@ -201,18 +204,19 @@ def test_analysis_creation():
             )
             n_samples = (n_factors * n_replicates) + n_factors
 
-            GenerateProject(
+            generate_project(
+                output_dir=tmp_path,
                 project_name=project_name, genome_assembly=genome_assembly, data_type=data_type,
                 n_factors=n_factors, n_replicates=n_replicates, n_variables=n_variables)
 
             # first edit the defaul path to the annotation sheet
             config = os.path.join(
-                "tests", project_name, "metadata", "project_config.yaml")
+                tmp_path, project_name, "metadata", "project_config.yaml")
             c = yaml.safe_load(open(config, 'r'))
             c['metadata']['sample_annotation'] = os.path.abspath(
-                os.path.join("tests", project_name, "metadata", "annotation.csv"))
+                os.path.join(tmp_path, project_name, "metadata", "annotation.csv"))
             c['metadata']['comparison_table'] = os.path.abspath(
-                os.path.join("tests", project_name, "metadata", "comparison_table.csv"))
+                os.path.join(tmp_path, project_name, "metadata", "comparison_table.csv"))
             yaml.safe_dump(c, open(config, "w"))
 
             # project and associated analysis
@@ -224,4 +228,49 @@ def test_analysis_creation():
             assert len(prj.samples) == len(a.samples)
             assert all([x == y for x, y in zip(prj.samples, a.samples)])
 
-            shutil.rmtree(os.path.join("tests", project_name))
+            shutil.rmtree(tmp_path)
+
+
+def test_analysis_serialization(tmp_path):
+    from ngs_toolkit.general import Analysis
+    import shutil
+    import os
+    import numpy as np
+
+    pickle_file = os.path.join(tmp_path, "pickle")
+    a = Analysis(pickle_file=pickle_file)
+    assert not os.path.exists(pickle_file)
+    a.to_pickle()
+    assert os.path.exists(pickle_file)
+    assert os.stat(pickle_file).st_size > 0
+
+    previous_size = os.stat(pickle_file).st_size
+    a.random = np.random.random((100, 100))
+    a.to_pickle()
+    new_size = os.stat(pickle_file).st_size
+    assert new_size > previous_size
+
+    shutil.rmtree(tmp_path)
+
+
+def test_analysis_loading(tmp_path):
+    from ngs_toolkit.general import Analysis
+    import shutil
+    import os
+
+    pickle_file = os.path.join(tmp_path, "pickle")
+    a = Analysis(pickle_file=pickle_file)
+    a.secret = "I've existed before"
+    a.to_pickle()
+
+    a2 = Analysis(pickle_file=pickle_file, from_pickle=True)
+    assert a2.secret == "I've existed before"
+
+    a3 = Analysis()
+    a3.update(pickle_file)
+    assert a3.secret == "I've existed before"
+
+    a4 = Analysis(pickle_file=pickle_file).from_pickle()
+    assert a4.secret == "I've existed before"
+
+    shutil.rmtree(tmp_path)

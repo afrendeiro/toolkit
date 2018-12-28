@@ -189,7 +189,7 @@ class ATACSeqAnalysis(Analysis):
             try:
                 # TODO: add configuration for custom number of header lines
                 # TODO: or think of smart way to infer
-                setattr(self, "accessibility", pd.read_csv(file, index_col=0, header=range(n_header_vars)))
+                setattr(self, "accessibility", pd.read_csv(file, index_col=0, header=list(range(n_header_vars))))
             except IOError as e:
                 if not permissive:
                     raise e
@@ -279,7 +279,13 @@ class ATACSeqAnalysis(Analysis):
         """
         self.sites = pybedtools.BedTool(bed_file)
         if overwrite:
-            self.sites.saveas(os.path.join(self.results_dir, self.name + "_peak_set.bed"))
+            default_sites = os.path.join(self.results_dir, self.name + "_peak_set.bed")
+            # pybedtools will pipe to the input file!
+            if bed_file == default_sites:
+                self.sites.saveas(default_sites + ".new")
+                os.rename(default_sites + ".new", default_sites)
+            else:
+                self.sites.saveas(default_sites)
 
     def calculate_peak_support(self, samples=None, region_type="summits"):
         """
@@ -416,18 +422,21 @@ class ATACSeqAnalysis(Analysis):
             index=[sample.name for sample in samples]
         ).T
 
-        # Add interval description to df
-        ints = map(
-            lambda x: (
-                x.split(":")[0],
-                x.split(":")[1].split("-")[0],
-                x.split(":")[1].split("-")[1]
-            ),
-            coverage.index
-        )
-        coverage["chrom"] = [x[0] for x in ints]
-        coverage["start"] = [int(x[1]) for x in ints]
-        coverage["end"] = [int(x[2]) for x in ints]
+        # # Add interval description to df
+        # ints = map(
+        #     lambda x: (
+        #         x.split(":")[0],
+        #         x.split(":")[1].split("-")[0],
+        #         x.split(":")[1].split("-")[1]
+        #     ),
+        #     coverage.index
+        # )
+        # coverage["chrom"] = [x[0] for x in ints]
+        # coverage["start"] = [int(x[1]) for x in ints]
+        # coverage["end"] = [int(x[2]) for x in ints]
+        # or:
+        # from ngs_toolkit.general import location_index_to_bed
+        # coverage = coverage.join(location_index_to_bed(coverage.index))
 
         if assign:
             self.coverage = coverage
@@ -452,36 +461,42 @@ class ATACSeqAnalysis(Analysis):
         """
         # default to matrix to be normalized
         if matrix is None:
-            to_norm = getattr(self, matrix_name)
+            r_matrix = getattr(self, matrix_name)
         else:
-            to_norm = matrix
+            r_matrix = matrix
         # default to all samples in self with matching names in matrix
         if samples is None:
-            to_norm = to_norm[[s.name for s in self.samples]]
+            r_matrix = r_matrix[[s.name for s in self.samples]]
         else:
-            to_norm = to_norm[[s.name for s in samples]]
+            r_matrix = r_matrix[[s.name for s in samples]]
 
-        return to_norm
+        return r_matrix
 
     def normalize_coverage_rpm(
-            self, matrix=None, samples=None, mult_factor=1e6,
+            self, matrix=None, samples=None,
+            mult_factor=1e6, log_transform=True, pseudocount=1,
             save=True, assign=True):
         """
         Normalization of matrix of (n_features, n_samples) by total in each sample.
 
         :param str matrix: Attribute name of matrix to normalize.
-        :param list samples: Iterable of peppy.Sample objects to restrict \
-                             matrix to. \
+        :param list samples: Iterable of peppy.Sample objects to restrict matrix to.
                              If not provided (`None` is passed) the matrix will not be subsetted.
         :param float mult_factor: A constant to multiply values for.
+        :param bool log_transform: Whether to log transform values or not.
+        :param [int, float] pseudocount: A constant to add to values.
         :param bool save: Whether to write normalized DataFrame to disk.
         :param bool assign: Whether to assign the normalized DataFrame to an attribute ``.
-
         """
         to_norm = self.get_matrix(matrix=matrix, samples=samples, matrix_name="coverage")
         # apply normalization over total
-        coverage_rpm = np.log2(((1 + to_norm) / (1 + to_norm).sum()) * mult_factor)
-        coverage_rpm = coverage_rpm.join(self.coverage[['chrom', 'start', 'end']])
+        coverage_rpm = ((pseudocount + to_norm) / (pseudocount + to_norm).sum()) * mult_factor
+
+        # Log2 transform
+        if log_transform:
+            coverage_rpm = np.log2(coverage_rpm)
+
+        # coverage_rpm = coverage_rpm.join(self.coverage[['chrom', 'start', 'end']])
         if save:
             coverage_rpm.to_csv(os.path.join(self.results_dir, self.name + "_peaks.coverage_rpm.csv"), index=True)
         if assign:
@@ -491,7 +506,7 @@ class ATACSeqAnalysis(Analysis):
 
     def normalize_coverage_quantiles(
             self, matrix=None, samples=None, implementation="Python",
-            log_transform=True, log_constant=0.001, save=True, assign=True):
+            log_transform=True, pseudocount=1, save=True, assign=True):
         """
         Quantile normalization of matrix of (n_features, n_samples).
 
@@ -504,10 +519,9 @@ class ATACSeqAnalysis(Analysis):
                                    `preprocessCore` package, and the Python one is from \
                                    here https://github.com/ShawnLYU/Quantile_Normalize.
         :param bool log_transform: Whether to log transform values or not.
-        :param float log_constant: A constant to add before log transformation.
+        :param float pseudocount: A constant to add before log transformation.
         :param bool save: Whether to write normalized DataFrame to disk.
         :param bool assign: Whether to assign the normalized DataFrame to an attribute ``.
-
         """
         if matrix is None:
             to_norm = self.get_matrix(matrix=matrix, samples=samples, matrix_name="coverage")
@@ -530,10 +544,13 @@ class ATACSeqAnalysis(Analysis):
 
         # Log2 transform
         if log_transform:
-            coverage_qnorm = np.log2(log_constant + coverage_qnorm)
+            coverage_qnorm = np.log2(pseudocount + coverage_qnorm)
 
-        # Add back postition columns
-        coverage_qnorm = coverage_qnorm.join(self.coverage[['chrom', 'start', 'end']])
+        if coverage_qnorm.min().min() <= 0:
+            coverage_qnorm += coverage_qnorm.abs().min().min()
+
+        # # Add back postition columns
+        # coverage_qnorm = coverage_qnorm.join(self.coverage[['chrom', 'start', 'end']])
         if save:
             coverage_qnorm.to_csv(os.path.join(self.results_dir, self.name + "_peaks.coverage_qnorm.csv"), index=True)
         if assign:
@@ -646,7 +663,7 @@ class ATACSeqAnalysis(Analysis):
         to_norm = self.get_matrix(matrix=matrix, samples=samples, matrix_name="coverage")
         coverage_gc_corrected = (
             cqn(cov=to_norm, gc_content=self.nuc["gc_content"], lengths=self.nuc["length"])
-            .join(self.coverage[['chrom', 'start', 'end']])
+            # .join(self.coverage[['chrom', 'start', 'end']])
         )
 
         if save:

@@ -107,8 +107,6 @@ def create_project(
         username = os.getenv("USER")
     if email is None:
         email = _CONFIG['email']
-    if "{username}" in email:
-        email = email.format(username=username)
     if url is None:
         url = _CONFIG['website_root']
     if url is not None:

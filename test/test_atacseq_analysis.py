@@ -3,7 +3,7 @@
 import pytest
 import os
 import yaml
-from .test_analysis import generate_project
+from .data_generator import generate_project
 from peppy import Project
 from ngs_toolkit.atacseq import ATACSeqAnalysis
 import shutil

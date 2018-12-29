@@ -15,7 +15,7 @@ _LOGGER = ngs_toolkit._LOGGER
 _CONFIG = ngs_toolkit._CONFIG
 
 
-def parse_arguments():
+def parse_arguments(cli_string=None):
     """
     Argument Parsing.
     """
@@ -81,8 +81,12 @@ def parse_arguments():
         p.add_argument("-V", "--version", action="version",
                        version=ngs_toolkit.__version__)
 
-    args = parser.parse_args()
-    args.root_dir = os.path.abspath(args.root_dir)
+    if cli_string is None:
+        args = parser.parse_args()
+    else:
+        args = parser.parse_args(cli_string.split(" "))
+    if args.command == "create":
+        args.root_dir = os.path.abspath(args.root_dir)
 
     return args
 

@@ -1,7 +1,17 @@
 language: python
+
 python:
   # - "2.7"
   - "3.6"
+
+env:
+  R_LIBS=$HOME/R_libs/ 
+
+cache:
+  directories:
+    - $HOME/R_libs
+    - $HOME/.cache/pip
+
 before_install:
   - sudo apt-get install -y bedtools
   - sudo sh -c 'echo "deb http://cran.rstudio.com/bin/linux/ubuntu trusty-cran35/" >> /etc/apt/sources.list'
@@ -9,13 +19,15 @@ before_install:
   - gpg -a --export E084DAB9 | sudo apt-key add -
   - sudo apt-get update
   - sudo apt-get -y install r-base
-  - sudo su - -c "R -e \"if (!requireNamespace('BiocManager', quietly = TRUE)){install.packages('BiocManager', repos='https://CRAN.R-project.org')}; BiocManager::install(c('DESeq2', 'preprocessCore', 'cqn'), version = '3.8')\""
+  - R -e "if (!requireNamespace('BiocManager', quietly = TRUE)){install.packages('BiocManager', repos='https://CRAN.R-project.org')}; BiocManager::install(c('DESeq2', 'preprocessCore', 'cqn'), version = '3.8')"
 
 install:
   - pip install -r requirements/requirements.test.txt
   - pip install .[r]
+
 script:
   - coverage run -m pytest
+
 after_success:
   - coverage report
   - coverage xml

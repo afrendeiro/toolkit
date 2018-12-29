@@ -140,10 +140,9 @@ class Test_unsupervised_analysis:
             assert os.stat(output).st_size > 0
         for output in not_outputs:
             assert not os.path.exists(output)
-        # sshutil.rmtree(os.path.join(analysis.results_dir, "unsupervised_analysis_ATAC-seq"))
 
     # def test_high_samples_varying_all_outputs(self, analysis, outputs):
-    #     for i in range(4, len(analysis.samples)):
+    #     for i in range(4, len(analysis.samples), 2):
     #         print(i)
     #         unsupervised_analysis(analysis, samples=analysis.samples[i:])
     #         for output in outputs:

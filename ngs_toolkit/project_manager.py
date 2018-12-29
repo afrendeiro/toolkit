@@ -97,6 +97,8 @@ def create_project(
     """
     Main function: Create project.
     """
+    import subprocess
+
     project_dir = os.path.join(root_dir, project_name)
 
     if os.path.exists(project_dir):
@@ -185,7 +187,7 @@ def create_project(
         handle.write(comparison_table_template)
 
     # Initialize git repository)
-    return os.system("git init {}".format(project_dir))
+    return subprocess.call("git init {}".format(project_dir).split(" "))
 
 
 def create_requirements_file(
@@ -275,7 +277,10 @@ def create_makefile(
 
 
 def run_recipe(recipe_name, project_config):
-    return os.popen("python -m ngs_toolkit.recipes.{} {}".format(recipe_name, project_config))
+    import subprocess
+    return subprocess.call("python -m ngs_toolkit.recipes.{} {}"
+                           .format(recipe_name, project_config)
+                           .split(" "))
 
 
 def main():

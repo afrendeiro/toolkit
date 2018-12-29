@@ -244,13 +244,13 @@ class Analysis(object):
         :returns pd.DataFrame: Annotated dataframe with requested sample attributes.
         """
         if (attributes is None) and hasattr(self, "sample_attributes"):
-            _LOGGER.info("Using 'sample_attributes' from analysis to annotate matrix:"
+            _LOGGER.info("Using 'sample_attributes' from analysis to annotate matrix: {}"
                          .format(",".join(self.sample_attributes)))
             attributes = self.sample_attributes
         if (attributes is None) and hasattr(self, "prj"):
             _LOGGER.warn(
                 "Analysis has no 'sample_attributes' set. " +
-                "Will use all columns from project annotation sheet:"
+                "Will use all columns from project annotation sheet: {}"
                 .format(",".join(self.prj.sheet.columns)))
             attributes = self.prj.sheet.columns
         if attributes is None:
@@ -2810,6 +2810,7 @@ def lola(bed_files, universe_file, output_folder, output_prefixes=None, genome="
 def bed_to_fasta(bed_file, fasta_file, genome="hg19", genome_2bit=None):
     import os
     import pandas as pd
+    import subprocess
 
     if genome_2bit is None:
         # Get region databases from config
@@ -2841,12 +2842,12 @@ def bed_to_fasta(bed_file, fasta_file, genome="hg19", genome_2bit=None):
     # do enrichment
     cmd = "twoBitToFa {0} -bed={1} {2}".format(genome_2bit, bed_file + ".tmp.bed", fasta_file)
 
-    os.popen(cmd)
-    # os.system("rm %s" % bed_file + ".tmp.bed")
+    subprocess.call(cmd.split(" "))
+    # subprocess.call("rm %s" % bed_file + ".tmp.bed")
 
 
 def meme_ame(input_fasta, output_dir, background_fasta=None, organism="human", motif_database_file=None):
-    import os
+    import subprocess
 
     if motif_database_file is None:
         # Get region databases from config
@@ -2871,7 +2872,7 @@ def meme_ame(input_fasta, output_dir, background_fasta=None, organism="human", m
         cmd = """
         fasta-dinucleotide-shuffle -c 1 -f {0} > {1}
         """.format(input_fasta, shuffled)
-        os.system(cmd)
+        subprocess.call(cmd.split(" "))
 
     cmd = """
     ame --bgformat 1 --scoring avg --method ranksum --pvalue-report-threshold 0.05 \\
@@ -2879,8 +2880,8 @@ def meme_ame(input_fasta, output_dir, background_fasta=None, organism="human", m
     """.format(
         background_fasta if background_fasta is not None else shuffled,
         output_dir, input_fasta, motif_database_file)
-    os.system(cmd)
-    # os.system("rm %s" % shuffled)
+    subprocess.call(cmd.split(" "))
+    # subprocess.call("rm {}".format(shuffled).split(" "))
 
 
 def parse_ame(ame_dir):
@@ -2916,11 +2917,12 @@ def parse_ame(ame_dir):
 
 
 def homer_motifs(bed_file, output_dir, genome="hg19"):
+    import subprocess
     cmd = "findMotifsGenome.pl {bed} {genome}r {out_dir} \
     -size 1000 -h -p 2 -len 8,10,12,14 -noknown".format(
         bed=bed_file, genome=genome, out_dir=output_dir
     )
-    os.system(cmd)
+    subprocess.call(cmd.split(" "))
 
 
 def parse_homer(homer_dir):
@@ -3019,15 +3021,9 @@ def homer_combine_motifs(
     :type motif_database: str
     :returns: If `run` is `False`, returns path to consensus motif file. Otherwise `None`.
     :rtype: str
-
-    :Test:
-
-    comparison_dirs = (os.popen(
-        "find analysis/differential_analysis_ATAC-seq.top_1000/ -type d ! -name homerResults")
-    .read().strip().split("\n")[1:])
-    output_dir = "analysis/differential_analysis_ATAC-seq.top_1000/"
     """
     import glob
+    import subprocess
 
     if known_vertebrates_TFs_only:
         _LOGGER.warning("WARNING! `known_vertebrates_TFs_only` option is deprecated!" +
@@ -3052,9 +3048,9 @@ def homer_combine_motifs(
         fold_enrichment = ""
     else:
         fold_enrichment = " -F " + str(fold_enrichment)
-    os.popen("compareMotifs.pl {} {} -reduceThresh {} -matchThresh {}{} -pvalue {} -info {}{} -nofacts -cpu {}"
-             .format(out_file, output_dir, reduce_threshold, match_threshold,
-                     extra, p_value_threshold, info_value, fold_enrichment, cpus))
+    subprocess.call("compareMotifs.pl {} {} -reduceThresh {} -matchThresh {}{} -pvalue {} -info {}{} -nofacts -cpu {}"
+                    .format(out_file, output_dir, reduce_threshold, match_threshold,
+                            extra, p_value_threshold, info_value, fold_enrichment, cpus).split(" "))
 
     # concatenate consensus motif files
     files = glob.glob(os.path.join(output_dir, "homerResults/*motif"))
@@ -3083,10 +3079,10 @@ def homer_combine_motifs(
                         motif_file=combined_motifs))
             # run
             if as_jobs:
-                os.system("sbatch -J homer.{d} -o {dir}.homer.log -p shortq -c 8 --mem 20000 --wrap '{cmd}'"
-                          .format(d=os.path.basename(dir_), dir=dir_, cmd=cmd))
+                subprocess.call("sbatch -J homer.{d} -o {dir}.homer.log -p shortq -c 8 --mem 20000 --wrap '{cmd}'"
+                                .format(d=os.path.basename(dir_), dir=dir_, cmd=cmd).split(" "))
             else:
-                os.system(cmd)
+                subprocess.call(cmd.split(" "))
 
 
 def enrichr(dataframe, gene_set_libraries=None, kind="genes"):
@@ -3190,6 +3186,7 @@ def run_enrichment_jobs(
     """
     Submit enrichment jobs for a specifc analysis.
     """
+    import subprocess
     cmds = list()
 
     # LOLA
@@ -3250,7 +3247,7 @@ fi
 done""".format(results_dir=results_dir)]
 
     for cmd in cmds:
-        os.system(cmd)
+        subprocess.call(cmd.split(" "))
 
 
 def differential_enrichment(
@@ -4572,14 +4569,14 @@ def count_jobs_running(cmd="squeue", sep="\n"):
 
 def submit_job_if_possible(cmd, total_job_lim=800, refresh_time=10, in_between_time=5):
     from ngs_toolkit.general import count_jobs_running
+    import subprocess
     import time
-    import os
 
     submit = count_jobs_running() < total_job_lim
     while not submit:
         time.sleep(refresh_time)
         submit = count_jobs_running() < total_job_lim
-    os.system(cmd)
+    subprocess.call(cmd.split(" "))
     time.sleep(in_between_time)
 
 
@@ -4594,7 +4591,7 @@ def sra_id2geo_id(sra_ids):
 
     geo_ids = list()
     for id in sra_ids:
-        p, err = subprocess.Popen(cmd.format(id))
+        p, err = subprocess.call(cmd.format(id).split(" "))
         geo_ids.append(p.communicate())
     return
 
@@ -4751,10 +4748,11 @@ def series_matrix2csv(matrix_url, prefix=None):
     """
     matrix_url: gziped URL with GEO series matrix.
     """
+    import subprocess
     import gzip
     import pandas as pd
 
-    os.system("wget {}".format(matrix_url))
+    subprocess.call("wget {}".format(matrix_url).split(" "))
     filename = matrix_url.split("/")[-1]
 
     with gzip.open(filename, 'rb') as f:
@@ -4811,6 +4809,7 @@ def project_to_geo(
     :type dry_run: bool, optional
     :returns: pandas.DataFrame with annotation of samples and their BAM, BigWig, narrowPeak files and respective md5sums.
     """
+    import subprocess
     output_dir = os.path.abspath(output_dir)
     if samples is None:
         samples = project.samples
@@ -4904,7 +4903,7 @@ def project_to_geo(
     if not distributed and not dry_run:
         for i, cmd in enumerate(cmds):
             _LOGGER.info(i, cmd)
-            os.system(cmd)
+            subprocess.call(cmd.split(" "))
 
     return annot
 
@@ -4945,7 +4944,7 @@ def rename_sample_files(
 
     :returns: None
     """
-    from subprocess import call
+    import subprocess
     cmds = list()
     # 1) move to tmp name
     for i, series in annotation_mapping.iterrows():
@@ -4989,7 +4988,7 @@ def rename_sample_files(
             if cmd.startswith("#"):
                 continue
             try:
-                r = call(cmd, shell=True)
+                r = subprocess.call(cmd.split(" "))
             except OSError as e:
                 raise e
             if r != 0:

@@ -199,6 +199,7 @@ def calculate_region_set_frip(
         as_job=False, cpus=8, permissive=True):
     """
     """
+    import subprocess
     if region_set is None:
         region_set = analysis.sites
 
@@ -236,9 +237,11 @@ def calculate_region_set_frip(
                 raise e
 
         if as_job:
-            os.system("sbatch -p shortq -J region_set_frip.{} -o {} -c {} --mem 8000 {}".format(sample.name, log_file, cpus, job_file))
+            subprocess.call("sbatch -p shortq -J region_set_frip.{} -o {} -c {} --mem 8000 {}"
+                            .format(sample.name, log_file, cpus, job_file)
+                            .split(" "))
         else:
-            os.system("sh {}".format(job_file))
+            subprocess.call("sh {}".format(job_file).split(" "))
 
     return 0
 

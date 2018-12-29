@@ -59,6 +59,7 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
         :raises ValueError: Will be raised if not `permissive` and incomplete/incoherent comparisons are detected.
         """
         from tqdm import tqdm
+        import subprocess
 
         req_columns = ["comparison_name", "sample_name", "comparison_side", "sample_group"]
         msg = "Comparison table is missing some of the following columns: '{}'.".format(",".join(req_columns))
@@ -131,7 +132,7 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
             if not as_jobs:
                 for cmd in cmds:
                     _LOGGER.info("Calling peaks for comparison '{}' with command: '{}'.\n".format(comparison, cmd))
-                    os.system(cmd)
+                    subprocess.call(cmd.split(" "))
 
     def filter_peaks(self, comparison_table, filter_bed="blacklist.mm10_liftOver.bed", peaks_dir="{results_dir}/chipseq_peaks"):
         """

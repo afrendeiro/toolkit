@@ -15,4 +15,8 @@ install:
   - pip install -r requirements/requirements.test.txt
   - pip install .[r]
 script:
-  - pytest
+  - coverage run -m pytest
+after_success:
+  - coverage report
+  - coverage xml
+  - python-codacy-coverage -r coverage.xml

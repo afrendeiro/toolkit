@@ -3,6 +3,9 @@
 test:
 	pytest --disable-warnings --show-capture=no
 
+test2:
+	python2 -m pytest --disable-warnings --show-capture=no
+
 coverage:
 	coverage run -m pytest
 	coverage report

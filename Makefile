@@ -1,7 +1,7 @@
 .DEFAULT_GOAL := pypitest
 
 test:
-	pytest
+	pytest --disable-warnings --show-capture=no
 
 coverage:
 	coverage run -m pytest

@@ -59,14 +59,12 @@ def get_test_analysis(tmp_path):
 
 def test_consensus_set_loading(get_test_analysis):
     for analysis in get_test_analysis:
-        # load up consesnsus set
         assert hasattr(analysis, "sites")
         assert isinstance(analysis.sites, pybedtools.BedTool)
 
 
 def test_coverage_matrix_loading(get_test_analysis):
     for analysis in get_test_analysis:
-        # load up coverage matrix
         assert hasattr(analysis, "coverage")
         assert isinstance(analysis.coverage, pd.DataFrame)
         assert analysis.coverage.dtypes.all() == int
@@ -74,7 +72,6 @@ def test_coverage_matrix_loading(get_test_analysis):
 
 def test_setting_consensus_set(get_test_analysis):
     for analysis in get_test_analysis:
-        # setting a new consensus set
         peaks = os.path.join(analysis.results_dir, analysis.name + "_peak_set.bed")
         analysis.set_consensus_sites(peaks)
         assert hasattr(analysis, "sites")

@@ -244,12 +244,14 @@ class Analysis(object):
         :returns pd.DataFrame: Annotated dataframe with requested sample attributes.
         """
         if (attributes is None) and hasattr(self, "sample_attributes"):
-            _LOGGER.info("Using 'sample_attributes' from analysis to annotate matrix.")
+            _LOGGER.info("Using 'sample_attributes' from analysis to annotate matrix:"
+                         .format(",".join(self.sample_attributes)))
             attributes = self.sample_attributes
         if (attributes is None) and hasattr(self, "prj"):
             _LOGGER.warn(
                 "Analysis has no 'sample_attributes' set. " +
-                "Will use all columns from project annotation sheet.")
+                "Will use all columns from project annotation sheet:"
+                .format(",".join(self.prj.sheet.columns)))
             attributes = self.prj.sheet.columns
         if attributes is None:
             msg = "Attributes not given and could not be set from Analysis or Project."
@@ -293,17 +295,17 @@ class Analysis(object):
 
         attrs = list()
         for attr in attributes:
-            _LOGGER.info(attr)
-            l = list()
+            _LOGGER.debug("Attribute: '{}'".format(attr))
+            ll = list()
             for sample in samples:  # keep order of samples in matrix
                 try:
-                    l.append(getattr(sample, attr))
+                    ll.append(getattr(sample, attr))
                 except AttributeError:
-                    l.append(np.nan)
+                    ll.append(np.nan)
             if numerical_attributes is not None:
                 if attr in numerical_attributes:
-                    l = [float(x) for x in l]
-            attrs.append(l)
+                    ll = [float(x) for x in ll]
+            attrs.append(ll)
 
         # Generate multiindex columns
         index = pd.MultiIndex.from_arrays(attrs, names=attributes)
@@ -664,6 +666,30 @@ def unsupervised_analysis(
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
+    matrix = getattr(analysis, quant_matrix)
+
+    if type(matrix.columns) is not pd.core.indexes.multi.MultiIndex:
+        msg = "Provided quantification matrix must have columns with MultiIndex."
+        hint = " Use ngs_toolkit.general.annotate_with_sample_metadata to do that."
+        _LOGGER.error(msg + hint)
+        raise TypeError(msg)
+
+    if samples is None:
+        samples = [s for s in analysis.samples
+                   if s.name in matrix.columns.get_level_values("sample_name")]
+    else:
+        samples = [s for s in samples
+                   if s.name in matrix.columns.get_level_values("sample_name")]
+    if len(samples) == 0:
+        msg = "None of the samples could be found in the quantification matrix."
+        _LOGGER.error(msg)
+        raise ValueError(msg)
+    if len(samples) == 1:
+        msg = "Only one sample could be found in the quantification matrix."
+        hint = " Function needs more than one."
+        _LOGGER.error(msg + hint)
+        raise ValueError(msg)
+
     msg = "`attributes_to_plot` were not specified and the analysis does not have a "
     msg += " 'group_attributes' variable."
     if attributes_to_plot is None:
@@ -672,19 +698,16 @@ def unsupervised_analysis(
         except AttributeError:
             _LOGGER.error(msg)
             raise
-
-    matrix = getattr(analysis, quant_matrix)
-
-    if type(matrix.columns) is not pd.core.indexes.multi.MultiIndex:
-        raise TypeError("Provided quantification matrix must have columns with MultiIndex.")
-
-    if samples is None:
-        samples = [s for s in analysis.samples
-                   if s.name in matrix.columns.get_level_values("sample_name")]
-
     # remove attributes with all NaNs
     attributes_to_plot = [attr for attr in attributes_to_plot
+                          if attr in matrix.columns.names]
+    attributes_to_plot = [attr for attr in attributes_to_plot
                           if not pd.isnull(matrix.columns.get_level_values(attr)).all()]
+    if len(attributes_to_plot) == 0:
+        msg = ("None of the factors in `attributes_to_plot` could be found in the " +
+               "quantification matrix index or they are all NaN.")
+        _LOGGER.error(msg)
+        raise ValueError(msg)
 
     # This will always be a matrix for all samples
     color_dataframe = pd.DataFrame(
@@ -739,13 +762,17 @@ def unsupervised_analysis(
         "TSNE": {'init': 'pca'},
     }
     for algo in manifold_algorithms:
-        _LOGGER.info("Learning manifold with '{}' algorithm.".format(algo))
-        if (algo in ["Isomap", "LocallyLinearEmbedding"]) and (len(samples) <= 5):
-            _LOGGER.warning("Number of samples is too small to perform '{}'".format(algo))
-            continue
+        msg = "Learning manifold with '{}' algorithm".format(algo)
+        _LOGGER.info(msg + ".")
 
         manif = getattr(manifold, algo)(**params[algo])
-        x_new = manif.fit_transform(X.T)
+        try:
+            x_new = manif.fit_transform(X.T)
+        except (TypeError, ValueError):
+            hint = " Number of samples might be too small to perform '{}'".format(algo)
+            _LOGGER.error(msg + " failed!" + hint)
+            continue
+
         xx = pd.DataFrame(x_new, index=X.columns, columns=list(range(x_new.shape[1])))
 
         _LOGGER.info("Plotting projection of manifold with '{}' algorithm.".format(algo))
@@ -847,6 +874,8 @@ def unsupervised_analysis(
         4 * len(attributes_to_plot), 4 * pcs))
     if len(attributes_to_plot) == 1:
         axis = axis.reshape((pcs, 1))
+    if pcs == 1:
+        axis = axis.reshape((1, len(attributes_to_plot)))
     for pc in range(pcs):
         for i, attr in enumerate(attributes_to_plot):
             for j, sample in enumerate(xx.index):
@@ -956,6 +985,12 @@ def unsupervised_analysis(
     associations = pd.DataFrame(
         associations, columns=["pc", "attribute", "variable_type", "group_1", "group_2", "p_value"])
 
+    if associations.empty:
+        msg = "Couldn't test any associations between PCs and factors."
+        hint = " Perhaps PCA produced only 1 PC?"
+        _LOGGER.warning(msg + hint)
+        return
+
     # write
     _LOGGER.info("Saving associations.")
     associations.to_csv(os.path.join(
@@ -965,6 +1000,7 @@ def unsupervised_analysis(
     if len(attributes_to_plot) < 2:
         _LOGGER.info("Only one attribute given, can't plot associations.")
         return
+
     # Plot
     # associations[associations['p_value'] < 0.05].drop(['group_1', 'group_2'], axis=1).drop_duplicates()
     # associations.drop(['group_1', 'group_2'], axis=1).drop_duplicates().pivot(index="pc", columns="attribute", values="p_value")

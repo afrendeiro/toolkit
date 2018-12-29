@@ -2,9 +2,6 @@
 
 
 class RandomDataGenerator(object):
-    def __init__(self):
-        pass
-
     def generate_random_data(
             self,
             n_factors=2, n_variables=100000, n_replicates=5,

@@ -141,36 +141,31 @@ class Analysis(object):
         hint = " Adding a '{}' section to your project configuration file allows the analysis"
         hint += " object to use those attributes during the analysis."
         if self.prj is not None:
-            for attr in ["samples", "sample_attributes", "group_attributes"]:
-                if not hasattr(self.prj, attr):
+            for attr, parent in [
+                    ("samples", self.prj), ("sample_attributes", self.prj),
+                    ("group_attributes", self.prj), ("comparison_table", self.prj.metadata)]:
+                if not hasattr(parent, attr):
                     _LOGGER.warning("Associated project does not have any '{}'.".format(attr) +
                                     hint.format(attr) if attr != "samples" else "")
                 else:
                     msg = "Setting project's '{0}' as the analysis '{0}'.".format(attr)
                     if overwrite:
                         _LOGGER.info(msg)
-                        setattr(self, attr, getattr(self.prj, attr))
+                        setattr(self, attr, getattr(parent, attr))
                     else:
-                        if self.samples is None:
+                        if not hasattr(self, attr):
                             _LOGGER.info(msg)
-                            setattr(self, attr, getattr(self.prj, attr))
+                            setattr(self, attr, getattr(parent, attr))
                         else:
-                            _LOGGER.debug("Samples already exist for analysis, not overwriting.")
-            # comparison table is under "prj.metadata"
-            for attr in ["comparison_table"]:
-                if not hasattr(self.prj, attr):
-                    _LOGGER.warning("Associated project does not have any '{}'.".format(attr))
-                else:
-                    msg = "Setting project's '{0}' as the analysis '{0}'.".format(attr)
-                    if overwrite:
-                        _LOGGER.info(msg)
-                        setattr(self, attr, pd.read_csv(getattr(self.prj.metadata, attr)))
-                    else:
-                        if self.samples is None:
-                            _LOGGER.info(msg)
-                            setattr(self, attr, pd.read_csv(getattr(self.prj.metadata, attr)))
-                        else:
-                            _LOGGER.debug("Samples already exist for analysis, not overwriting.")
+                            if getattr(self, attr) is None:
+                                setattr(self, attr, getattr(parent, attr))
+                            else:
+                                _LOGGER.debug("{} already exist for analysis, not overwriting."
+                                              .format(attr.replace("_", " ").capitalize()))
+            if hasattr(self, "comparison_table"):
+                if isinstance(self.comparison_table, str):
+                    _LOGGER.debug("Reading up comparison table.")
+                    self.comparison_table = pd.read_csv(self.comparison_table)
         else:
             _LOGGER.warning("Analysis object does not have an attached Project. " +
                             "Will not add special attributes to analysis such as " +
@@ -1026,7 +1021,7 @@ def unsupervised_analysis(
     g = sns.clustermap(
         (pivot < 0.05).astype(int),
         row_cluster=False, cbar_kws={"label": "significant association"},
-        square=True, rasterized=rasterized)
+        square=True, rasterized=rasterized, vmin=0, vmax=1)
     g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=45, ha="right")
     g.fig.savefig(os.path.join(
         output_dir, "{}.{}.pca.variable_principle_components_association.masked.svg"
@@ -1473,7 +1468,7 @@ def differential_from_bivariate_fit(
 def differential_analysis(
         analysis,
         comparison_table=None,
-        data_type="ATAC-seq",
+        data_type=None,
         samples=None,
         covariates=None,
         output_dir="results/differential_analysis_{data_type}",
@@ -1533,6 +1528,17 @@ def differential_analysis(
             _LOGGER.error(msg)
             _LOGGER.info(hint)
             raise e
+
+    if data_type is None:
+        msg = "Data type not defined and Analysis object does not have a `data_type` attribute."
+        try:
+            data_type = analysis.data_type
+        except AttributeError as e:
+            _LOGGER.error(msg)
+            raise e
+        if data_type is None:
+            _LOGGER.error(msg)
+            raise ValueError
 
     # Check comparisons
     # check comparison table has required columns
@@ -4591,8 +4597,7 @@ def sra_id2geo_id(sra_ids):
 
     geo_ids = list()
     for id in sra_ids:
-        p, err = subprocess.call(cmd.format(id).split(" "))
-        geo_ids.append(p.communicate())
+        geo_ids.append(subprocess.call(cmd.format(id).split(" ")).read())
     return
 
 

@@ -4,8 +4,9 @@
 class RandomDataGenerator(object):
     def generate_random_data(
             self,
-            n_factors=2, n_variables=100000, n_replicates=5,
-            distribution="negative_binomial", group_fold_differences=2, variation=1,
+            n_factors=2, n_variables=20000, n_replicates=5,
+            distribution="negative_binomial", group_fold_differences=5,
+            fraction_of_different=0.2,
             data_type="ATAC-seq", genome_assembly="hg19"):
         import string
         import patsy
@@ -32,18 +33,32 @@ class RandomDataGenerator(object):
 
         # add variation to groups
         for i, factor in enumerate(dcat.columns):
+            af = dnum.columns.to_series().sample(frac=fraction_of_different).tolist()
             levels = dcat.loc[:, factor].unique()
 
             if len(levels) == 2:
                 for level, f in zip(levels, [1, -1]):
-                    diff = dnum.mean(axis=0) * (group_fold_differences[i] / 2) * f
-                    dnum.loc[dcat.loc[:, factor] == level, :] += diff
+                    diff = (
+                        dnum.loc[:, af].mean(axis=0) *
+                        (group_fold_differences[i] / 2) *
+                        f)  # * np.absolute(np.random.normal(0, 0.1)))
+                    dnum.loc[
+                        dcat.loc[:, factor] == level,
+                        dnum.columns.isin(af)] += diff
             else:
                 raise NotImplementedError
 
         # add intersect from distribution
         dist = getattr(np.random, distribution)
         dnum = (dnum + dist(1, 0.1, n_variables))
+
+        # add overdispersion across all features
+        mean = dnum.mean(axis=0)
+        space = np.linspace(mean.max(), mean.min(), 100)
+        step = space[0] - space[1]
+        for i, lim in enumerate(space):
+            cur = mean[(mean <= lim + step) & (mean > lim)].index
+            dnum.loc[:, cur] *= np.random.normal(0, np.log2(i + 1), len(cur))
 
         # make non-negative
         if dnum.min().min() < 0:
@@ -100,6 +115,10 @@ def generate_project(
     from ngs_toolkit.project_manager import create_project
     import os
     import yaml
+    import pandas as pd
+    import string
+
+    output_dir = os.path.abspath(output_dir)
 
     # Create project with projectmanager
     create_project(
@@ -117,15 +136,31 @@ def generate_project(
     # now save it
     c.to_csv(os.path.join(output_dir, project_name, "metadata", "annotation.csv"))
 
+    # Make comparison table
+    if "n_factors" in kwargs:
+        table_file = os.path.join(output_dir, project_name, "metadata", "comparison_table.csv")
+        ct = pd.DataFrame()
+        for factor in list(string.ascii_lowercase[:kwargs['n_factors']]):
+            for side, f in [(1, "2"), (0, "1")]:
+                ct2 = c.loc[c[factor] == factor + f].index.to_frame()
+                ct2['comparison_side'] = side
+                ct2['comparison_name'] = "Factor_" + factor + "_" + "2vs1"
+                ct2['sample_group'] = "Factor_" + factor + f
+                ct = ct.append(ct2)
+        ct['comparison_type'] = "differential"
+        ct['data_type'] = data_type
+        ct['comparison_genome'] = genome_assembly
+        ct.to_csv(table_file, index=False)
+
     # add the sample_attributes and group_attributes depending on the number of factors
     if "n_factors" in kwargs:
-        import string
         config_file = os.path.join(output_dir, project_name, "metadata", "project_config.yaml")
         config = yaml.safe_load(
             open(config_file, "r"))
         factors = list(string.ascii_lowercase[:kwargs['n_factors']])
         config['sample_attributes'] = ['sample_name'] + factors
         config['group_attributes'] = factors
+        config['metadata']['comparison_table'] = table_file
         yaml.safe_dump(config, open(config_file, "w"))
 
     # prepare dirs

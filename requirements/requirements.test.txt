@@ -1,2 +1,3 @@
 pytest>=4.0.1
+coverge>=4.5.2
 codacy-coverage

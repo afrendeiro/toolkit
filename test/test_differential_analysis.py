@@ -75,8 +75,23 @@ def outputs(analysis):
     return outputs
 
 
+# @pytest.fixture
+# def outputs_no_subdirectories(analysis):
+#     output_dir = os.path.join(analysis.results_dir, "differential_analysis_ATAC-seq")
+#     prefix = os.path.join(output_dir, "differential_analysis.")
+#     outputs = [
+#         prefix + "deseq_result.Factor_a_2vs1.csv",
+#         prefix + "comparison_table.tsv",
+#         prefix + "count_matrix.tsv",
+#         prefix + "deseq_result.all_comparisons.csv",
+#         prefix + "experiment_matrix.tsv"]
+#     return outputs
+
+
 class Test_differential_analysis:
     def test_no_arguments(self, analysis, outputs):
+        import pandas as pd
+
         differential_analysis(analysis)
         assert os.path.exists(
             os.path.join(analysis.results_dir, "differential_analysis_ATAC-seq"))
@@ -85,3 +100,20 @@ class Test_differential_analysis:
         for output in outputs[1:]:
             assert os.path.exists(output)
             assert os.stat(output).st_size > 0
+        assert hasattr(analysis, "differential_results")
+        assert isinstance(analysis.differential_results, pd.DataFrame)
+        assert analysis.differential_results.index.str.startswith("chr").all()
+        assert analysis.differential_results.index.name == 'index'
+        cols = ['baseMean', 'log2FoldChange',
+                'lfcSE', 'stat', 'pvalue', 'padj', 'comparison_name']
+        assert analysis.differential_results.columns.tolist() == cols
+
+    # def test_no_subdirectories(self, analysis, outputs):
+    #     differential_analysis(analysis)
+    #     assert os.path.exists(
+    #         os.path.join(analysis.results_dir, "differential_analysis_ATAC-seq"))
+    #     assert os.path.exists(outputs[0])
+    #     assert os.path.isdir(outputs[0])
+    #     for output in outputs[1:]:
+    #         assert os.path.exists(output)
+    #         assert os.stat(output).st_size > 0

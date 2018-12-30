@@ -1032,7 +1032,7 @@ def deseq_analysis(
         count_matrix, experiment_matrix, comparison_table, formula,
         output_dir, output_prefix,
         overwrite=True, alpha=0.05, independent_filtering=False,
-        create_subdirectories=False):
+        create_subdirectories=True):
     """
     Perform differential comparison analysis with DESeq2.
 
@@ -1109,11 +1109,11 @@ def deseq_analysis(
     comps = comparison_table["comparison_name"].drop_duplicates().sort_values()
     for comp in tqdm(comps, total=len(comps), desc="Comparison"):
         if create_subdirectories:
-            out_file = os.path.join(output_dir, output_prefix + ".deseq_result.{}.csv".format(comp))
-        else:
-            out_file = os.path.join(output_dir, comp, output_prefix + ".deseq_result.{}.csv".format(comp))
             if not os.path.exists(os.path.join(output_dir, comp)):
                 os.makedirs(os.path.join(output_dir, comp))
+            out_file = os.path.join(output_dir, comp, output_prefix + ".deseq_result.{}.csv".format(comp))
+        else:
+            out_file = os.path.join(output_dir, output_prefix + ".deseq_result.{}.csv".format(comp))
 
         if not overwrite and os.path.exists(out_file):
             continue
@@ -1154,7 +1154,7 @@ def deseq_analysis(
         res.index.name = "index"
 
         # save
-        res.to_csv(out_file)
+        res.sort_values('pvalue').to_csv(out_file)
         # append
         results = results.append(res.reset_index(), ignore_index=True)
 
@@ -1994,7 +1994,7 @@ def differential_overlap(
 
 def plot_differential(
         analysis,
-        results,
+        results=None,
         comparison_table=None,
         samples=None,
         matrix=None,
@@ -2134,6 +2134,20 @@ def plot_differential(
     import matplotlib.pyplot as plt
     import seaborn as sns
     from ngs_toolkit.graphics import add_colorbar_to_axis
+
+    if results is None:
+        msg = "Differential results dataframe not given and Analysis object does not"
+        msg += " have a `differential_results` attribute."
+        hint = " Run differential_analysis to produce differential results."
+        try:
+            results = analysis.differential_results
+        except AttributeError as e:
+            _LOGGER.error(msg + hint)
+            raise e
+        if (results is None) or (not isinstance(results, pd.DataFrame)):
+            hint = " Run differential_analysis to produce differential results."
+            _LOGGER.error(msg)
+            raise ValueError
 
     req_attrs = [mean_column, log_fold_change_column, p_value_column, adjusted_p_value_column, comparison_column]
     if not all([x in results.columns for x in req_attrs]):

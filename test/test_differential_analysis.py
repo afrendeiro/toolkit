@@ -11,6 +11,8 @@ from ngs_toolkit.general import differential_analysis
 
 @pytest.fixture
 def analysis(tmp_path):
+    tmp_path = str(tmp_path)  # for Python2
+
     # Let's make several "reallish" test projects
     to_test = list()
     project_prefix_name = "test-project"
@@ -51,10 +53,6 @@ def analysis(tmp_path):
             results_dir=os.path.join(prj_path, "results"))
         a.set_attributes()
         a.load_data()
-
-        a.normalize(method="total")
-        a.normalize(method="quantile")
-        a.annotate_with_sample_metadata(quant_matrix="coverage_qnorm")
 
         to_test.append(a)
     return to_test[0]

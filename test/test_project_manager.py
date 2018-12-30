@@ -22,6 +22,8 @@ def test_project_creation(tmp_path):
     import pandas as pd
     import shutil
 
+    tmp_path = str(tmp_path)  # for Python2
+
     project_name = "test_project"
     annotation_vars = [
         "sample_name", "toggle", "pass_qc", "protocol", "library",

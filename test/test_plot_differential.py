@@ -12,6 +12,7 @@ from ngs_toolkit.general import differential_analysis, plot_differential
 @pytest.fixture
 def analysis(tmp_path):
     import rpy2
+    tmp_path = str(tmp_path)  # for Python2
 
     # Let's make several "reallish" test projects
     to_test = list()

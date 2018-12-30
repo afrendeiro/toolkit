@@ -14,6 +14,8 @@ import numpy as np
 
 @pytest.fixture
 def get_test_analysis(tmp_path):
+    tmp_path = str(tmp_path)  # for Python2
+
     # Let's make several "reallish" test projects
     to_test = list()
     project_prefix_name = "test-project"

@@ -12,6 +12,8 @@ import shutil
 
 @pytest.fixture
 def analysis(tmp_path):
+    tmp_path = str(tmp_path)  # for Python2
+
     # Let's make several "reallish" test projects
     to_test = list()
     project_prefix_name = "test-project"

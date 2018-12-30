@@ -11,6 +11,8 @@ def test_analysis_creation(tmp_path):
     import yaml
     import shutil
 
+    tmp_path = str(tmp_path)  # for Python2
+
     name = "test_analysis"
 
     a = Analysis(name=name)
@@ -85,6 +87,8 @@ def test_analysis_serialization(tmp_path):
     import os
     import numpy as np
 
+    tmp_path = str(tmp_path)  # for Python2
+
     pickle_file = os.path.join(tmp_path, "pickle")
     a = Analysis(pickle_file=pickle_file)
     assert not os.path.exists(pickle_file)
@@ -105,6 +109,8 @@ def test_analysis_loading(tmp_path):
     from ngs_toolkit.general import Analysis
     import shutil
     import os
+
+    tmp_path = str(tmp_path)  # for Python2
 
     pickle_file = os.path.join(tmp_path, "pickle")
     a = Analysis(pickle_file=pickle_file)

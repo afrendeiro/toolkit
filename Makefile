@@ -1,10 +1,12 @@
 .DEFAULT_GOAL := pypitest
 
-test:
-	python3 -m pytest --disable-warnings --show-capture=no
+test3:
+	python2 -m pytest --disable-warnings --show-capture=no
 
 test2:
 	python2 -m pytest --disable-warnings --show-capture=no
+
+test: test3 test2
 
 coverage:
 	coverage run -m pytest

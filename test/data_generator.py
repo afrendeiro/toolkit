@@ -58,7 +58,7 @@ class RandomDataGenerator(object):
         step = space[0] - space[1]
         for i, lim in enumerate(space):
             cur = mean[(mean <= lim + step) & (mean > lim)].index
-            dnum.loc[:, cur] *= np.random.normal(0, np.log2(i + 1), len(cur))
+            dnum.loc[:, cur] *= np.random.normal(0, i + 1, len(cur))
 
         # make non-negative
         if dnum.min().min() < 0:

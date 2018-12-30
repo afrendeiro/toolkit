@@ -58,19 +58,19 @@ def analysis(tmp_path):
         a.normalize(method="total")
         a.normalize(method="quantile")
         a.annotate_with_sample_metadata(quant_matrix="coverage_qnorm")
-
-        # Sometimes the DESeq2 call fails, but it often works if repeated
-        i = 1
-        max_attempts = 10
-        while not hasattr(a, "differential_results"):
-            try:
-                print("Attempt to run differential_analysis number: {}".format(i))
-                differential_analysis(a)
-            except rpy2.rinterface.RRuntimeError:
-                i += 1
-                if i == max_attempts:
-                    raise RuntimeError("Tried to run differential_analysis a maximum of {} times."
-                                       .format(max_attempts))
+        differential_analysis(a)
+        # # Sometimes the DESeq2 call fails, but it often works if repeated
+        # i = 1
+        # max_attempts = 10
+        # while not hasattr(a, "differential_results"):
+        #     try:
+        #         print("Attempt to run differential_analysis number: {}".format(i))
+        #         differential_analysis(a)
+        #     except rpy2.rinterface.RRuntimeError:
+        #         if i == max_attempts:
+        #             raise RuntimeError("Tried to run differential_analysis a maximum of {} times."
+        #                                .format(max_attempts))
+        #         i += 1
 
         to_test.append(a)
     return to_test[0]

@@ -6,7 +6,6 @@ import yaml
 from .data_generator import generate_project
 from peppy import Project
 from ngs_toolkit.atacseq import ATACSeqAnalysis
-import shutil
 import pybedtools
 import pandas as pd
 import numpy as np

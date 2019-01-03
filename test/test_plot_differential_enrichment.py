@@ -6,7 +6,7 @@ import os
 import yaml
 from peppy import Project
 from ngs_toolkit.atacseq import ATACSeqAnalysis
-from ngs_toolkit.general import differential_analysis, plot_differential
+from ngs_toolkit.general import differential_analysis, differential_enrichment, plot_differential_enrichment
 
 
 @pytest.fixture
@@ -57,51 +57,43 @@ def analysis(tmp_path):
 
         a.normalize(method="total")
         a.normalize(method="quantile")
+        a.get_peak_gene_annotation()
+        a.annotate(quant_matrix="coverage_qnorm")
         a.annotate_with_sample_metadata(quant_matrix="coverage_qnorm")
         differential_analysis(a)
-        # # Sometimes the DESeq2 call fails, but it often works if repeated
-        # i = 1
-        # max_attempts = 10
-        # while not hasattr(a, "differential_results"):
-        #     try:
-        #         print("Attempt to run differential_analysis number: {}".format(i))
-        #         differential_analysis(a)
-        #     except rpy2.rinterface.RRuntimeError:
-        #         if i == max_attempts:
-        #             raise RuntimeError("Tried to run differential_analysis a maximum of {} times."
-        #                                .format(max_attempts))
-        #         i += 1
-
+        differential_enrichment(a, steps=['enrichr'])
         to_test.append(a)
     return to_test[0]
 
 
 @pytest.fixture
 def outputs(analysis):
+    from ngs_toolkit import _CONFIG
+    gene_set_libraries = _CONFIG['resources']['enrichr']['gene_set_libraries']
     prefix = os.path.join(analysis.results_dir,
-                          "differential_analysis_ATAC-seq", "differential_analysis.")
-    outputs = [
-        prefix + "diff_region.samples.clustermap.corr.svg",
-        prefix + "diff_region.samples.clustermap.svg",
-        prefix + "diff_region.samples.clustermap.z0.svg",
-        prefix + "diff_region.samples.sorted.clustermap.svg",
-        prefix + "diff_region.samples.sorted.clustermap.z0.svg",
-        prefix + "log2FoldChange.distribution.per_comparison.svg",
-        prefix + "log2FoldChange.distribution.svg",
-        prefix + "ma_plots.svg",
-        prefix + "number_differential.directional.svg",
-        prefix + "padj.distribution.per_comparison.svg",
-        prefix + "padj.distribution.svg",
-        prefix + "pvalue.distribution.per_comparison.svg",
-        prefix + "pvalue.distribution.svg",
-        prefix + "scatter_plots.svg",
-        prefix + "volcano_plots.svg"]
+                          "differential_analysis_ATAC-seq", "enrichments",
+                          "differential_analysis.enrichr.")
+    outputs = list()
+    for g in gene_set_libraries:
+        outputs += [
+            prefix + "{}.barplot.top_5.svg".format(g),
+            prefix + "{}.cluster_specific.Row_z_score.svg".format(g),
+            prefix + "{}.cluster_specific.svg".format(g),
+            prefix + "{}.correlation.svg".format(g),
+            prefix + "{}.zscore_vs_pvalue.scatterplot.svg".format(g)]
     return outputs
 
 
-class Test_plot_differential:
+# @pytest.mark.skip(reason="no way of currently testing this")
+class Test_plot_differential_enrichment:
     def test_no_arguments(self, analysis, outputs):
-        plot_differential(analysis)
+        import pandas as pd
+        enr = pd.read_csv(
+            os.path.join(analysis.results_dir,
+                         "differential_analysis_ATAC-seq",
+                         "enrichments",
+                         "differential_analysis.enrichr.csv"))
+        plot_differential_enrichment(enr, "enrichr")
         for output in outputs:
             assert os.path.exists(output)
             assert os.stat(output).st_size > 0

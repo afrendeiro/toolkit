@@ -144,6 +144,7 @@ class ATACSeqAnalysis(Analysis):
                 "coverage_qnorm": "_peaks.coverage_qnorm.csv",
                 "nuc": "_peaks.gccontent_length.csv",
                 "coverage_gc_corrected": "_peaks.coverage_gc_corrected.csv",
+                "closest_tss_distances": "_peaks.closest_tss_distances.csv",
                 "gene_annotation": "_peaks.gene_annotation.csv",
                 "region_annotation": "_peaks.region_annotation.csv",
                 "region_annotation_b": "_peaks.region_annotation_background.csv",
@@ -154,8 +155,8 @@ class ATACSeqAnalysis(Analysis):
         if only_these_keys is None:
             only_these_keys = [
                 "sites", "support", "coverage", "coverage_qnorm",
-                "nuc", "coverage_gc_corrected", "gene_annotation",
-                "region_annotation", "region_annotation_b",
+                "nuc", "coverage_gc_corrected", "closest_tss_distances",
+                "gene_annotation", "region_annotation", "region_annotation_b",
                 "chrom_state_annotation", "chrom_state_annotation_b",
                 "coverage_annotated", "accessibility"]
 
@@ -448,30 +449,6 @@ class ATACSeqAnalysis(Analysis):
 
         return coverage
 
-    def get_matrix(self, matrix=None, samples=None, matrix_name="coverage"):
-        """
-        Return a matrix that is an attribute of self for the requested samples.
-
-        :param pandas.DataFrame matrix: Pandas DataFrame.
-        :param list samples: Iterable of peppy.Sample objects to restrict \
-                             matrix to. \
-                             If not provided (`None` is passed) the matrix will not be subsetted.
-        :param str matrix_name: Name of the matrix that is an attribute of the object.
-        :returns pandas.DataFrame: Requested DataFrame.
-        """
-        # default to matrix to be normalized
-        if matrix is None:
-            r_matrix = getattr(self, matrix_name)
-        else:
-            r_matrix = matrix
-        # default to all samples in self with matching names in matrix
-        if samples is None:
-            r_matrix = r_matrix[[s.name for s in self.samples]]
-        else:
-            r_matrix = r_matrix[[s.name for s in samples]]
-
-        return r_matrix
-
     def normalize_coverage_rpm(
             self, matrix=None, samples=None,
             mult_factor=1e6, log_transform=True, pseudocount=1,
@@ -712,42 +689,81 @@ class ATACSeqAnalysis(Analysis):
             _LOGGER.error(msg)
             raise ValueError(msg)
 
-    def get_peak_gene_annotation(self, tss_file="refseq.refflat.tss.bed"):
+    def get_peak_gene_annotation(self, tss_file=None, max_dist=100000):
         """
         Annotates peaks with closest gene.
-        Needs `tss_file` file in `data_dir`/external.
-        A pickle file with each feature's distance to the nearest gene is also saved.
+        The annotation reference can either be given in the `tss_file` parameter
+        but if ommited, it will be fetched if analysis has `genome` and `organism`
+        attributes.
+        A dataframe with each feature's distance to the nearest gene is also saved.
 
-        :param str tss_file: A 5 column BED file with TSS positions (cols 1-3), \
-                             gene names (col 4) and TSS strand (col 5) exclusively! \
-                             For backward compatibility, it assumes this file is \
-                             in the `data_dir`/external directory.
-                             This will change in the future.
+        :param str tss_file: A 5 column BED file with TSS positions (cols 1-3),
+                             gene names (col 4) and TSS strand (col 5) exclusively!
+        :param int max_dist: Maximum absolute distance allowed to perform associations.
+                             Regions with no genes within the range will have NaN values.
         :var pd.DataFrame gene_annotation: A pandas DataFrame containing the genome
-                                             annotations of the region features.
-        :returns: None
-
-        # TODO: change file to absolute path.
-        # TODO: add options to limit association based on maximum distance.
-
+                                             annotations of the region features. If a feature
+                                             overlaps more than one gene, the two gene values will
+                                             be concatenated with a comma.
+        :var pd.DataFrame closest_tss_distances: A pandas DataFrame containing unique region->gene
+                                             associations. In contrast to gene_annotation dataframe,
+                                             this contains one row per region->gene assignment.
+        :returns: pd.DataFrame: Same as `gene_annotation`.
         """
-        # create bedtool with hg19 TSS positions
-        tss = pybedtools.BedTool(os.path.join(self.data_dir, "external", tss_file))
-        # get closest TSS of each cll peak
-        gene_annotation = self.sites.closest(tss, d=True).to_dataframe()
-        gene_annotation = gene_annotation[['chrom', 'start', 'end'] + gene_annotation.columns[-3:].tolist()]  # TODO: check this
-        gene_annotation.columns = ['chrom', 'start', 'end', 'gene_name', "strand", 'distance']
+        if tss_file is None:
+            from ngs_toolkit.general import get_genome_annotations
+            _LOGGER.info("Reference TSS file was not given, will try to get TSS annotations.")
+            if (not hasattr(self, "genome")) or (not hasattr(self, "organism")):
+                msg = "`genome` and `organism` attributes were not given or are not set in Analysis object."
+                hint = " Use Analysis.set_organism_genome for this."
+                _LOGGER.error(msg + hint)
+                raise ValueError(msg)
+            _LOGGER.info("Getting TSS annotations for organism '{}', genome '{}'. "
+                         .format(self.organism, self.genome))
+            tss = pybedtools.BedTool.from_dataframe(
+                get_genome_annotations(organism=self.organism, genome_assembly=self.genome))
+            cols = [-6, -4, -1]
+        else:
+            tss = pybedtools.BedTool(tss_file)
+            cols = list(range(-3, 0))
+
+        # get closest TSS of each region
+        self.closest_tss_distances = self.sites.closest(tss, D="b").to_dataframe()
+
+        # rename
+        self.closest_tss_distances = (self.closest_tss_distances[
+            ['chrom', 'start', 'end'] +
+            self.closest_tss_distances.columns[cols].tolist()])  # TODO: check this
+        self.closest_tss_distances.columns = [
+            'chrom', 'start', 'end', 'gene_name', "strand", 'distance']
+
+        # set NaN to assignments out of range
+        self.closest_tss_distances.loc[
+            self.closest_tss_distances['distance'].abs() > max_dist,
+            ['gene_name', 'strand', 'distance']] = np.nan
 
         # aggregate annotation per peak, concatenate various genes (comma-separated)
-        self.gene_annotation = gene_annotation.groupby(['chrom', 'start', 'end']).aggregate(lambda x: ",".join(set([str(i) for i in x]))).reset_index()
-        self.gene_annotation.index = self.gene_annotation['chrom'] + ":" + self.gene_annotation['start'].astype(str) + "-" + self.gene_annotation['end'].astype(str)
+        self.gene_annotation = (
+            self.closest_tss_distances
+            .groupby(['chrom', 'start', 'end'])
+            .aggregate(
+                lambda x: ",".join(set([str(i) for i in x])))
+            .reset_index())
+        self.gene_annotation.index = (
+            self.gene_annotation['chrom'] + ":" +
+            self.gene_annotation['start'].astype(str) + "-" +
+            self.gene_annotation['end'].astype(str))
 
         # save to disk
-        self.gene_annotation.to_csv(os.path.join(self.results_dir, self.name + "_peaks.gene_annotation.csv"), index=True)
-
-        # save distances to all TSSs (for plotting)
-        self.closest_tss_distances = gene_annotation['distance'].tolist()
-        pickle.dump(self.closest_tss_distances, open(os.path.join(self.results_dir, self.name + "_peaks.closest_tss_distances.pickle"), 'wb'))
+        self.closest_tss_distances.to_csv(
+            os.path.join(self.results_dir,
+                         self.name + "_peaks.closest_tss_distances.csv"),
+            index=True)
+        self.gene_annotation.to_csv(
+            os.path.join(self.results_dir,
+                         self.name + "_peaks.gene_annotation.csv"),
+            index=True)
+        return self.gene_annotation
 
     def get_peak_genomic_location(
             self, region_files=[
@@ -878,48 +894,64 @@ class ATACSeqAnalysis(Analysis):
 
         next_matrix = quant_matrix
         # add closest gene
+        msg = "`{}` attribute does not exist."
         if hasattr(self, "gene_annotation"):
             self.coverage_annotated = pd.merge(
                 next_matrix,
-                self.gene_annotation, on=['chrom', 'start', 'end'], how="left")
+                self.gene_annotation, left_index=True, right_index=True, how="left")
             next_matrix = self.coverage_annotated
         else:
             if not permissive:
-                raise AttributeError("`gene_annotation` attribute does not exist.")
+                _LOGGER.error(msg.format("gene_annotation"))
+                raise AttributeError(msg.format("gene_annotation"))
+            else:
+                _LOGGER.info(msg + " Proceeding anyway.")
         # add genomic location
         if hasattr(self, "region_annotation"):
             self.coverage_annotated = pd.merge(
                 next_matrix,
-                self.region_annotation[['chrom', 'start', 'end', 'genomic_region']], on=['chrom', 'start', 'end'], how="left")
+                self.region_annotation[['chrom', 'start', 'end', 'genomic_region']],
+                left_index=True, right_index=True, how="left")
             next_matrix = self.coverage_annotated
         else:
             if not permissive:
-                raise AttributeError("`region_annotation` attribute does not exist.")
+                _LOGGER.error(msg.format("region_annotation"))
+                raise AttributeError(msg.format("region_annotation"))
+            else:
+                _LOGGER.info(msg + " Proceeding anyway.")
         # add chromatin state
         if hasattr(self, "chrom_state_annotation"):
             self.coverage_annotated = pd.merge(
                 next_matrix,
-                self.chrom_state_annotation[['chrom', 'start', 'end', 'chromatin_state']], on=['chrom', 'start', 'end'], how="left")
+                self.chrom_state_annotation[['chrom', 'start', 'end', 'chromatin_state']],
+                left_index=True, right_index=True, how="left")
             next_matrix = self.coverage_annotated
         else:
             if not permissive:
-                raise AttributeError("`chrom_state_annotation` attribute does not exist.")
+                _LOGGER.error(msg.format("chrom_state_annotation"))
+                raise AttributeError(msg.format("chrom_state_annotation"))
+            else:
+                _LOGGER.info(msg + " Proceeding anyway.")
         # add support
         if hasattr(self, "support"):
             self.coverage_annotated = pd.merge(
                 next_matrix,
-                self.support[['chrom', 'start', 'end', 'support']], on=['chrom', 'start', 'end'], how="left")
+                self.support[['chrom', 'start', 'end', 'support']],
+                left_index=True, right_index=True, how="left")
             next_matrix = self.coverage_annotated
         else:
             if not permissive:
-                raise AttributeError("`support` attribute does not exist.")
+                _LOGGER.error(msg.format("support"))
+                raise AttributeError(msg.format("support"))
+            else:
+                _LOGGER.info(msg + " Proceeding anyway.")
 
         if not hasattr(self, "coverage_annotated"):
             self.coverage_annotated = next_matrix
         # calculate mean coverage
-        self.coverage_annotated['mean'] = self.coverage_annotated[[s.name for s in samples]].mean(axis=1)
+        self.coverage_annotated['mean'] = self.coverage_annotated.loc[:, [s.name for s in samples]].mean(axis=1)
         # calculate coverage variance
-        self.coverage_annotated['variance'] = self.coverage_annotated[[s.name for s in samples]].var(axis=1)
+        self.coverage_annotated['variance'] = self.coverage_annotated.loc[:, [s.name for s in samples]].var(axis=1)
         # calculate std deviation (sqrt(variance))
         self.coverage_annotated['std_deviation'] = np.sqrt(self.coverage_annotated['variance'])
         # calculate dispersion (variance / mean)
@@ -1496,6 +1528,7 @@ def characterize_regions_function(
 
     # export gene names
     clean = df['gene_name'].str.split(",").apply(pd.Series, 1).stack().drop_duplicates()
+    clean = clean[~clean.isin(['.', 'nan'])]
     clean.to_csv(
             os.path.join(output_dir, "{}_genes.symbols.txt".format(prefix)),
             index=False)

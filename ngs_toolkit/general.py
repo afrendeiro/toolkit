@@ -54,7 +54,6 @@ class Analysis(object):
             name="analysis",
             samples=None,
             prj=None,
-            genome=None,
             data_dir="data",
             results_dir="results",
             pickle_file=None,
@@ -66,7 +65,6 @@ class Analysis(object):
         self.results_dir = results_dir
         self.samples = samples
         self.prj = prj
-        self.genome = genome
         self.pickle_file = pickle_file
 
         # parse remaining kwargs
@@ -86,12 +84,13 @@ class Analysis(object):
                 os.makedirs(directory)
 
         # Store projects attributes in self
+        _LOGGER.debug("Trying to set analysis attributes.")
         self.set_attributes(overwrite=False)
 
         # Try to set genome if not set
-        if self.genome is None:
-            _LOGGER.debug("Trying to get analysis genome.")
-            self.set_genome_assembly()
+        self.organism, self.genome = (None, None)
+        _LOGGER.debug("Trying to get analysis genome.")
+        self.set_organism_genome()
         # TODO: if genome is set, get required static files for that genome assembly
 
         _LOGGER.debug("Setting data type-specific attributes to None.")
@@ -106,9 +105,10 @@ class Analysis(object):
     def __repr__(self):
         t = "'{}' analysis".format(self.data_type) if self.data_type is not None else "Analysis"
         samples = " with {} samples".format(len(self.samples)) if self.samples is not None else ""
-        genome = " of genome '{}'".format(self.genome) if self.genome is not None else ""
+        organism = " of organism '{}'".format(self.organism) if self.organism is not None else ""
+        genome = " ({})".format(self.genome) if self.genome is not None else ""
         suffix = "."
-        return t + " object named '{}'".format(self.name) + samples + genome + suffix
+        return t + " object '{}'".format(self.name) + samples + organism + genome + suffix
 
     def update(self, pickle_file=None):
         """
@@ -121,10 +121,17 @@ class Analysis(object):
         """
         self.__dict__.update(self.from_pickle(pickle_file=pickle_file).__dict__)
 
-    def set_genome_assembly(self):
+    def set_organism_genome(self):
         if self.samples is None:
             _LOGGER.warning("Genome assembly for analysis was not set and cannot be derived from samples.")
         else:
+            organisms = list(set([s.organism for s in self.samples]))
+            if len(organisms) == 1:
+                _LOGGER.info("Setting analysis organism as '{}'.".format(organisms[0]))
+                self.organism = organisms[0]
+            else:
+                _LOGGER.warning("Found several organism for the various analysis samples. " +
+                                "Will not set a organism for analysis.")
             genomes = list(set([s.genome for s in self.samples]))
             if len(genomes) == 1:
                 _LOGGER.info("Setting analysis genome as '{}'.".format(genomes[0]))
@@ -204,6 +211,34 @@ class Analysis(object):
         if pickle_file is None:
             pickle_file = self.pickle_file
         return pickle.load(open(pickle_file, 'rb'))
+
+    def get_matrix(self, matrix=None, matrix_name=None, samples=None):
+        """
+        Return a matrix that is an attribute of self subsetted for the requested samples.
+
+        :param pandas.DataFrame matrix: Pandas DataFrame.
+        :param list samples: Iterable of peppy.Sample objects to restrict matrix to.
+                             If not provided (`None` is passed) the matrix will not be subsetted.
+        :param str matrix_name: Name of the matrix that is an attribute of the object
+                                with values for samples in `samples`.
+        :returns pandas.DataFrame: Requested DataFrame.
+        """
+        if (matrix is None) & (matrix_name is None):
+            msg = "Either arguments `matrix` or `matrix_name` must be provided."
+            _LOGGER.error(msg)
+            raise ValueError(msg)
+        # default to matrix to be normalized
+        if matrix is None:
+            r_matrix = getattr(self, matrix_name)
+        else:
+            r_matrix = matrix
+        # default to all samples in self with matching names in matrix
+        if samples is None:
+            r_matrix = r_matrix.loc[:, [s.name for s in self.samples]]
+        else:
+            r_matrix = r_matrix.loc[:, [s.name for s in samples]]
+
+        return r_matrix
 
     def annotate_with_sample_metadata(
             self,
@@ -419,6 +454,106 @@ class Analysis(object):
                 colors.append(col)
 
         return colors
+
+
+def get_genome_annotations(
+        organism, genome_assembly=None, output_dir=None, chrom_subset=None, chr_prefix=True,
+        transcript_subset=['protein_coding', 'processed_transcript', 'lincRNA', 'antisense']):
+    """
+    Get genome annotations required for several ngs_toolkit analysis.
+    This is a simple approach using Biomart's API querying the Ensembl database..
+    Saves results to disk and returns a dataframe.
+
+    :param organism: Organism to get annotation for. Currently supported: "human" and "mouse".
+    :type organism: str
+    :param genome_assembly: Ensembl assembly/version to use.
+                       Default for "human" is "grch37" and for "mouse" is "grcm38".
+    :type genome_assembly: str, optional
+    :param output_dir: Directory to write output to. Defaults to "reference" in current directory.
+    :type output_dir: str, optional
+    :param chrom_subset: List of valid chromosomes to get annotations for. Defaults to all
+    :type chrom_subset: list, optional
+    :param chr_prefix: Whether chromosome names should have the "chr" prefix. Defaults to True
+    :type chr_prefix: bool, optional
+    :param transcript_subset: Subset of transcript biotypes to keep.
+                              See here the available biotypes https://www.ensembl.org/Help/Faq?id=468
+                              Defaults to 'protein_coding', 'processed_transcript', 'lincRNA', 'antisense'.
+    :type transcript_subset: list, optional
+    :returns: DataFrame with genome annotations
+    :rtype: pandas.DataFrame
+    """
+    from ngs_toolkit.general import query_biomart
+    organisms = {
+        "human": {"species": "hsapiens", "ensembl_version": "grch37"},
+        "mouse": {"species": "mmusculus", "ensembl_version": "grcm38"}
+    }
+
+    if genome_assembly is None:
+        genome_assembly = organisms[organism]['ensembl_version']
+    if genome_assembly == "hg19":
+        genome_assembly = "grch37"
+    if genome_assembly == "hg38":
+        genome_assembly = "grch38"
+    if genome_assembly == "mm10":
+        genome_assembly = "grcm38"
+
+    if output_dir is None:
+        output_dir = os.path.join(os.path.abspath(os.path.curdir), "reference")
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
+    attributes = [
+        "chromosome_name", "start_position",
+        "ensembl_gene_id", "external_gene_name",
+        "strand", "transcript_biotype"]
+    res = query_biomart(
+        attributes=attributes,
+        species=organisms[organism]['species'],
+        ensembl_version=genome_assembly)
+
+    if transcript_subset is None:
+        res = res.drop(['transcript_biotype'], axis=1).drop_duplicates()
+    else:
+        res = res.loc[res['transcript_biotype'].isin(transcript_subset), :]
+    if chrom_subset is not None:
+        res = res.loc[res['chromosome_name'].isin(chrom_subset), :]
+    if chr_prefix:
+        res.loc[:, 'chromosome_name'] = "chr" + res['chromosome_name']
+    res.loc[:, 'start_position'] = res['start_position'].astype(int)
+    res.loc[:, 'strand'] = res['strand'].replace("1", "+").replace("-1", "-")
+    res.loc[:, 'end'] = res.apply(
+        lambda x: x['start_position'] + 1 if x['strand'] == "+" else x['start_position'],
+        axis=1)
+    res.loc[:, 'start_position'] = res.apply(
+        lambda x: x['start_position'] - 1 if x['strand'] == "-" else x['start_position'],
+        axis=1)
+
+    # drop same gene duplicates if starting in same position but just annotated with
+    # different biotypes
+    res = (
+        res[attributes[:2] + ["end"] + attributes[2:]]
+        .sort_values(by=res.columns.tolist(), axis=0)
+        .drop_duplicates(subset=res.columns[:3], keep="last"))
+
+    # make real BED format
+    res.loc[:, 'fill'] = '.'
+    cols = [
+        'chromosome_name', 'start_position', 'end', 'external_gene_name', 'fill', 'strand',
+        'ensembl_gene_id', 'transcript_biotype']
+    res = res.loc[:, cols]
+
+    # save
+    res.to_csv(
+        os.path.join(output_dir, "{}.{}.gene_annotation.tss.bed"
+                     .format(organism, genome_assembly)),
+        index=False, header=False, sep="\t")
+
+    res[res['transcript_biotype'] == "protein_coding"].drop(attributes[-1], axis=1).to_csv(
+        os.path.join(output_dir, "{}.{}.gene_annotation.protein_coding.tss.bed"
+                     .format(organism, genome_assembly)),
+        index=False, header=False, sep="\t")
+
+    return res
 
 
 def count_reads_in_intervals(bam, intervals):
@@ -3281,7 +3416,7 @@ def differential_enrichment(
         directional=True,
         max_diff=1000,
         sort_var="pvalue",
-        as_jobs=True):
+        as_jobs=False):
     """
     Perform various types of enrichment analysis given a dataframe
     of the results from differential analysis.
@@ -3328,13 +3463,13 @@ def differential_enrichment(
             _LOGGER.error(msg)
             _LOGGER.info(hint)
             raise e
-        if data_type is None:
+        if differential is None:
             _LOGGER.error(msg)
             _LOGGER.info(hint)
             raise ValueError
 
     if data_type is None:
-        msg = "Data type not defined and Analysis object does not have a `data_type` attribute."
+        msg = "Data type not given and Analysis object does not have a `data_type` attribute."
         try:
             data_type = analysis.data_type
         except AttributeError as e:
@@ -4076,8 +4211,6 @@ def plot_differential_enrichment(
 
         for gene_set_library in enrichment_table["gene_set_library"].unique():
             _LOGGER.info(gene_set_library)
-            if gene_set_library == "Epigenomics_Roadmap_HM_ChIP-seq":
-                continue
 
             # Plot top_n terms of each comparison in barplots
             n = len(enrichment_table[comp_variable].drop_duplicates())
@@ -5037,14 +5170,15 @@ def query_biomart(
     import pandas as pd
     import numpy as np
 
-    if ensembl_version not in ['grch37', 'grch38']:
+    supported = ['grch37', 'grch38', 'grcm38']
+    if ensembl_version not in supported:
         msg = "Ensembl version might not be supported."
-        msg += " Tested versions are 'grch37' 'and 'grch38'."
+        msg += " Tested versions are '{}'.".format("','".join(supported))
         msg += " Will try anyway."
         _LOGGER.warning(msg)
 
     # Build request XML
-    ens_ver = "" if ensembl_version == "grch38" else ensembl_version + "."
+    ens_ver = "" if ensembl_version.endswith("38") else ensembl_version + "."
     url_query = "".join([
         """http://{}ensembl.org/biomart/martservice?query=""".format(ens_ver),
         """<?xml version="1.0" encoding="UTF-8"?>""",
@@ -5059,6 +5193,11 @@ def query_biomart(
         _LOGGER.error("Request to Biomart API was not successful.")
         return
     content = list(req.iter_lines())
+
+    if (len(content) == 1) and (content[0].startswith("Query ERROR")):
+        msg = "Request to Biomart API was not successful. Check your input.\n{}".format(content[0])
+        _LOGGER.error(msg)
+        raise ValueError(msg)
 
     if type(content[0]) == bytes:
         content = [x.decode("utf-8") for x in content]

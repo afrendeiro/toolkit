@@ -16,7 +16,7 @@ def test_analysis_creation(tmp_path):
     name = "test_analysis"
 
     a = Analysis(name=name)
-    assert a.__repr__() == "Analysis object named '{}'.".format(name)
+    assert a.__repr__() == "Analysis object '{}'.".format(name)
     assert "samples" not in a.__repr__()
 
     # Let's make several "reallish" test projects
@@ -56,7 +56,9 @@ def test_analysis_creation(tmp_path):
 
             generate_project(
                 output_dir=tmp_path,
-                project_name=project_name, genome_assembly=genome_assembly, data_type=data_type,
+                project_name=project_name,
+                organism=organism, genome_assembly=genome_assembly,
+                data_type=data_type,
                 n_factors=n_factors, n_replicates=n_replicates, n_variables=n_variables)
 
             # first edit the defaul path to the annotation sheet
@@ -73,8 +75,8 @@ def test_analysis_creation(tmp_path):
             prj = Project(config)
             a = Analysis(name=project_name, prj=prj)
             assert a.__repr__() == (
-                "Analysis object named '{}' with {} samples of genome '{}'."
-                .format(project_name, n_samples, genome_assembly))
+                "Analysis object '{}' with {} samples of organism '{}' ({})."
+                .format(project_name, n_samples, organism, genome_assembly))
             assert len(prj.samples) == len(a.samples)
             assert all([x == y for x, y in zip(prj.samples, a.samples)])
 

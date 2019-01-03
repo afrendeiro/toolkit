@@ -1,7 +1,7 @@
 .DEFAULT_GOAL := pypitest
 
 test3:
-	python2 -m pytest --disable-warnings --show-capture=no
+	python3 -m pytest --disable-warnings --show-capture=no
 
 test2:
 	python2 -m pytest --disable-warnings --show-capture=no

@@ -31,7 +31,9 @@ def get_test_analysis(tmp_path):
 
         generate_project(
             output_dir=tmp_path,
-            project_name=project_name, genome_assembly=genome_assembly, data_type=data_type,
+            project_name=project_name,
+            organism=organism, genome_assembly=genome_assembly,
+            data_type=data_type,
             n_factors=n_factors, n_replicates=n_replicates, n_variables=n_variables)
 
         # first edit the defaul path to the annotation sheet
@@ -58,90 +60,103 @@ def get_test_analysis(tmp_path):
     return to_test
 
 
-def test_consensus_set_loading(get_test_analysis):
+# def test_consensus_set_loading(get_test_analysis):
+#     for analysis in get_test_analysis:
+#         assert hasattr(analysis, "sites")
+#         assert isinstance(analysis.sites, pybedtools.BedTool)
+
+
+# def test_coverage_matrix_loading(get_test_analysis):
+#     for analysis in get_test_analysis:
+#         assert hasattr(analysis, "coverage")
+#         assert isinstance(analysis.coverage, pd.DataFrame)
+#         assert analysis.coverage.dtypes.all() == int
+
+
+# def test_setting_consensus_set(get_test_analysis):
+#     for analysis in get_test_analysis:
+#         peaks = os.path.join(analysis.results_dir, analysis.name + "_peak_set.bed")
+#         analysis.set_consensus_sites(peaks)
+#         assert hasattr(analysis, "sites")
+#         sites = pd.read_csv(peaks, header=None)
+#         assert len(analysis.sites) == sites.shape[0]
+
+
+# def test_rpm_normalization(get_test_analysis):
+#     for analysis in get_test_analysis:
+#         qnorm = analysis.normalize_coverage_rpm(save=False)
+#         assert qnorm.dtypes.all() == np.float
+#         rpm_file = os.path.join(analysis.results_dir, analysis.name + "_peaks.coverage_rpm.csv")
+#         assert not os.path.exists(rpm_file)
+#         qnorm = analysis.normalize_coverage_rpm(save=True)
+#         assert os.path.exists(rpm_file)
+#         assert os.stat(rpm_file).st_size > 0
+
+
+# def test_quantile_normalization(get_test_analysis):
+#     for analysis in get_test_analysis:
+#         qnorm_p = analysis.normalize_coverage_quantiles(implementation="Python", save=False)
+#         qnorm_r = analysis.normalize_coverage_quantiles(implementation="R", save=False)
+
+#         import scipy
+#         cors = list()
+#         for col in qnorm_p.columns:
+#             cors.append(scipy.stats.pearsonr(qnorm_p[col], qnorm_r[col])[0])
+#         assert all(np.array(cors) > 0.99)
+
+
+# # TODO: test cqn normalization
+
+
+# def test_normalize(get_test_analysis):
+#     for analysis in get_test_analysis:
+#         qnorm = analysis.normalize_coverage_rpm(save=False)
+#         qnorm_d = analysis.normalize(method="total", save=False)
+#         assert np.array_equal(qnorm_d, qnorm)
+#         qnorm = analysis.normalize_coverage_quantiles(save=False)
+#         qnorm_d = analysis.normalize(method="quantile", save=False)
+#         assert np.array_equal(qnorm_d, qnorm)
+#         # TODO: add cqn normalization
+
+
+# def test_get_peak_gene_annotation(get_test_analysis):
+#     for analysis in get_test_analysis:
+#         mapping = {"hg19": "grch37", "hg38": "grch38", "mm10": "grcm38"}
+#         os.chdir(os.path.join(analysis.results_dir, os.pardir))
+#         annot = analysis.get_peak_gene_annotation(max_dist=1e10)
+#         tss = os.path.join("reference",
+#                            "{}.{}.gene_annotation.protein_coding.tss.bed"
+#                            .format(analysis.organism, mapping[analysis.genome]))
+#         assert os.path.exists(tss)
+#         assert os.stat(tss).st_size > 0
+#         assert isinstance(annot, pd.DataFrame)
+#         assert annot.shape[0] >= len(analysis.sites)
+
+
+# TODO: test genomic location annotation
+
+def test_annotate(get_test_analysis):
     for analysis in get_test_analysis:
-        assert hasattr(analysis, "sites")
-        assert isinstance(analysis.sites, pybedtools.BedTool)
+        analysis.get_peak_gene_annotation(max_dist=1e10)
+        analysis.annotate(quant_matrix="coverage")
+        annot = os.path.join(
+            analysis.results_dir, analysis.name + "_peaks.coverage_qnorm.annotated.csv")
+        assert os.path.exists(annot)
+        assert os.stat(annot).st_size > 0
 
 
-def test_coverage_matrix_loading(get_test_analysis):
-    for analysis in get_test_analysis:
-        assert hasattr(analysis, "coverage")
-        assert isinstance(analysis.coverage, pd.DataFrame)
-        assert analysis.coverage.dtypes.all() == int
+# def test_plot_raw_coverage(get_test_analysis):
+#     for analysis in get_test_analysis:
+#         analysis.plot_raw_coverage()
+#         output = os.path.join(analysis.results_dir, analysis.name + ".raw_counts.violinplot.svg")
+#         assert os.path.exists(output)
+#         assert os.stat(output).st_size > 0
 
-
-def test_setting_consensus_set(get_test_analysis):
-    for analysis in get_test_analysis:
-        peaks = os.path.join(analysis.results_dir, analysis.name + "_peak_set.bed")
-        analysis.set_consensus_sites(peaks)
-        assert hasattr(analysis, "sites")
-        sites = pd.read_csv(peaks, header=None)
-        assert len(analysis.sites) == sites.shape[0]
-
-
-def test_get_matrix(get_test_analysis):
-    for analysis in get_test_analysis:
-        matrix = analysis.get_matrix()
-        assert np.array_equal(matrix.values, analysis.coverage.values)
-        assert (matrix == analysis.coverage).all().all()
-        analysis.dummy = analysis.coverage + 1
-        matrix = analysis.get_matrix(matrix_name="dummy")
-        assert (matrix == (analysis.coverage + 1)).all().all()
-
-
-def test_rpm_normalization(get_test_analysis):
-    for analysis in get_test_analysis:
-        qnorm = analysis.normalize_coverage_rpm(save=False)
-        assert qnorm.dtypes.all() == np.float
-        rpm_file = os.path.join(analysis.results_dir, analysis.name + "_peaks.coverage_rpm.csv")
-        assert not os.path.exists(rpm_file)
-        qnorm = analysis.normalize_coverage_rpm(save=True)
-        assert os.path.exists(rpm_file)
-        assert os.stat(rpm_file).st_size > 0
-
-
-def test_quantile_normalization(get_test_analysis):
-    for analysis in get_test_analysis:
-        qnorm_p = analysis.normalize_coverage_quantiles(implementation="Python", save=False)
-        qnorm_r = analysis.normalize_coverage_quantiles(implementation="R", save=False)
-
-        import scipy
-        cors = list()
-        for col in qnorm_p.columns:
-            cors.append(scipy.stats.pearsonr(qnorm_p[col], qnorm_r[col])[0])
-        assert all(np.array(cors) > 0.99)
-
-
-# TODO: test cqn normalization
-
-
-def test_normalize(get_test_analysis):
-    for analysis in get_test_analysis:
-        qnorm = analysis.normalize_coverage_rpm(save=False)
-        qnorm_d = analysis.normalize(method="total", save=False)
-        assert np.array_equal(qnorm_d, qnorm)
-        qnorm = analysis.normalize_coverage_quantiles(save=False)
-        qnorm_d = analysis.normalize(method="quantile", save=False)
-        assert np.array_equal(qnorm_d, qnorm)
-        # TODO: add cqn normalization
-
-
-# TODO: test region set annotation
-
-
-def test_plot_raw_coverage(get_test_analysis):
-    for analysis in get_test_analysis:
-        analysis.plot_raw_coverage()
-        output = os.path.join(analysis.results_dir, analysis.name + ".raw_counts.violinplot.svg")
-        assert os.path.exists(output)
-        assert os.stat(output).st_size > 0
-
-        attr = "a"
-        analysis.plot_raw_coverage(by_attribute=attr)
-        output = os.path.join(analysis.results_dir, analysis.name + ".raw_counts.violinplot.by_{}.svg".format(attr))
-        assert os.path.exists(output)
-        assert os.stat(output).st_size > 0
+#         attr = "a"
+#         analysis.plot_raw_coverage(by_attribute=attr)
+#         output = os.path.join(analysis.results_dir, analysis.name + ".raw_counts.violinplot.by_{}.svg".format(attr))
+#         assert os.path.exists(output)
+#         assert os.stat(output).st_size > 0
 
 
 # def test_cleanup(get_test_analysis):

@@ -141,6 +141,8 @@ def test_quantile_normalization(get_test_analysis):
         assert all(np.array(cors) > 0.99)
 
 
+@pytest.mark.skipif('TRAVIS' in os.environ,
+                    reason="Often causes memory error in Travis")
 def test_cqn_normalization(get_test_analysis):
     # Test just one for speed
     analysis = [a for a in get_test_analysis if a.genome == "hg38"][0]
@@ -155,12 +157,20 @@ def test_cqn_normalization(get_test_analysis):
 def test_normalize(get_test_analysis):
     for analysis in get_test_analysis:
         qnorm = analysis.normalize_coverage_rpm(save=False)
+        assert isinstance(qnorm, pd.DataFrame)
+        assert hasattr(analysis, "coverage_rpm")
         qnorm_d = analysis.normalize(method="total", save=False)
         assert np.array_equal(qnorm_d, qnorm)
         qnorm = analysis.normalize_coverage_quantiles(save=False)
+        assert hasattr(analysis, "coverage_rpm")
         qnorm_d = analysis.normalize(method="quantile", save=False)
+        assert isinstance(qnorm_d, pd.DataFrame)
+        assert hasattr(analysis, "coverage_qnorm")
         assert np.array_equal(qnorm_d, qnorm)
-        # TODO: add cqn normalization
+        if 'TRAVIS' not in os.environ:
+            qnorm = analysis.normalize_gc_content(save=False)
+            assert isinstance(qnorm, pd.DataFrame)
+            assert hasattr(analysis, "coverage_gc_corrected")
 
 
 def test_get_matrix_stats(get_test_analysis):
@@ -190,6 +200,8 @@ def test_get_peak_gene_annotation(get_test_analysis):
         assert annot.shape[0] >= len(analysis.sites)
 
 
+@pytest.mark.skipif('TRAVIS' in os.environ,
+                    reason="Often fails due to API call in Travis")
 def test_get_peak_genomic_location(get_test_analysis):
     # Test only one for speed
     analysis = [a for a in get_test_analysis if a.genome == "hg38"][0]
@@ -246,7 +258,9 @@ def test_annotate(get_test_analysis, get_chrom_file):
     analysis.get_peak_chromatin_state(chrom_state_file=get_chrom_file)
     analysis.get_matrix_stats(quant_matrix='coverage')
     analysis.get_peak_gene_annotation(max_dist=1e10)
-    analysis.get_peak_genomic_location()
+    if 'TRAVIS' not in os.environ:
+        # "Often fails due to API call in Travis"
+        analysis.get_peak_genomic_location()
     analysis.annotate(quant_matrix="coverage")
     f = os.path.join(
         analysis.results_dir, analysis.name + "_peaks.coverage_qnorm.annotated.csv")

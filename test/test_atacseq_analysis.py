@@ -60,6 +60,18 @@ def get_test_analysis(tmp_path):
     return to_test
 
 
+@pytest.fixture
+def get_chrom_file():
+    from ngs_toolkit.general import download_gzip_file
+    url = (
+        "https://egg2.wustl.edu/roadmap/data/byFileType/" +
+        "chromhmmSegmentations/ChmmModels/coreMarks/jointModel/" +
+        "final/E002_15_coreMarks_hg38lift_dense.bed.gz")
+    chrom_state_file = os.path.abspath("E002_15_coreMarks_hg38lift_dense.bed")
+    download_gzip_file(url, chrom_state_file)
+    return chrom_state_file
+
+
 def test_get_consensus_sites(get_test_analysis):
     import pytest
     for analysis in get_test_analysis:
@@ -129,7 +141,15 @@ def test_quantile_normalization(get_test_analysis):
         assert all(np.array(cors) > 0.99)
 
 
-# TODO: test cqn normalization
+def test_cqn_normalization(get_test_analysis):
+    # Test just one for speed
+    analysis = [a for a in get_test_analysis if a.genome == "hg38"][0]
+
+    qnorm = analysis.normalize_gc_content()
+    assert qnorm.dtypes.all() == np.float
+    file = os.path.join(analysis.results_dir, analysis.name + "_peaks.coverage_gc_corrected.csv")
+    assert os.path.exists(file)
+    assert os.stat(file).st_size > 0
 
 
 def test_normalize(get_test_analysis):
@@ -143,24 +163,35 @@ def test_normalize(get_test_analysis):
         # TODO: add cqn normalization
 
 
+def test_get_matrix_stats(get_test_analysis):
+    for analysis in get_test_analysis:
+        annot = analysis.get_matrix_stats(quant_matrix='coverage')
+        output = os.path.join(
+            analysis.results_dir, "{}_peaks.stats_per_region.csv".format(analysis.name))
+        assert os.path.exists(output)
+        assert os.stat(output).st_size > 0
+        assert isinstance(annot, pd.DataFrame)
+        cols = ['mean', 'variance', 'std_deviation', 'dispersion', 'qv2', 'amplitude']
+        assert all([x in annot.columns.tolist() for x in cols])
+
+
 def test_get_peak_gene_annotation(get_test_analysis):
     mapping = {"hg19": "grch37", "hg38": "grch38", "mm10": "grcm38"}
 
-    # Test only one for speed
-    analysis = [a for a in get_test_analysis if a.genome == "hg38"][0]
-
-    os.chdir(os.path.join(analysis.results_dir, os.pardir))
-    annot = analysis.get_peak_gene_annotation(max_dist=1e10)
-    tss = os.path.join("reference",
-                       "{}.{}.gene_annotation.protein_coding.tss.bed"
-                       .format(analysis.organism, mapping[analysis.genome]))
-    assert os.path.exists(tss)
-    assert os.stat(tss).st_size > 0
-    assert isinstance(annot, pd.DataFrame)
-    assert annot.shape[0] >= len(analysis.sites)
+    for analysis in get_test_analysis:
+        os.chdir(os.path.join(analysis.results_dir, os.pardir))
+        annot = analysis.get_peak_gene_annotation(max_dist=1e10)
+        tss = os.path.join("reference",
+                           "{}.{}.gene_annotation.protein_coding.tss.bed"
+                           .format(analysis.organism, mapping[analysis.genome]))
+        assert os.path.exists(tss)
+        assert os.stat(tss).st_size > 0
+        assert isinstance(annot, pd.DataFrame)
+        assert annot.shape[0] >= len(analysis.sites)
 
 
 def test_get_peak_genomic_location(get_test_analysis):
+    # Test only one for speed
     analysis = [a for a in get_test_analysis if a.genome == "hg38"][0]
     prefix = os.path.join(
         analysis.results_dir, "..", "reference", "{}.{}.genomic_context")
@@ -180,35 +211,6 @@ def test_get_peak_genomic_location(get_test_analysis):
 
     assert isinstance(annot, pd.DataFrame)
     assert annot.shape[0] >= len(analysis.sites)
-
-
-@pytest.fixture
-def get_chrom_file():
-    url = (
-        "https://egg2.wustl.edu/roadmap/data/byFileType/" +
-        "chromhmmSegmentations/ChmmModels/coreMarks/jointModel/" +
-        "final/E002_15_coreMarks_hg38lift_dense.bed.gz")
-    chrom_state_file = os.path.abspath("E002_15_coreMarks_hg38lift_dense.bed")
-
-    try:  # Python 3
-        import urllib.request
-        import gzip
-        response = urllib.request.urlopen(url)
-        with open(chrom_state_file, 'wb') as outfile:
-            outfile.write(gzip.decompress(response.read()))
-    except ImportError:  # Python 2
-        import urllib2
-        import StringIO
-        import gzip
-        response = urllib2.urlopen(url)
-        gz_file = StringIO.StringIO()
-        gz_file.write(response.read())
-        gz_file.seek(0)
-        file = gzip.GzipFile(fileobj=gz_file, mode='rb')
-        with open(chrom_state_file, 'w') as outfile:
-            outfile.write(file.read())
-
-    return chrom_state_file
 
 
 def test_peak_chromatin_state(get_test_analysis, get_chrom_file):
@@ -241,16 +243,24 @@ def test_peak_chromatin_state(get_test_analysis, get_chrom_file):
 def test_annotate(get_test_analysis, get_chrom_file):
     analysis = [a for a in get_test_analysis if a.genome == "hg38"][0]
 
+    analysis.get_peak_chromatin_state(chrom_state_file=get_chrom_file)
+    analysis.get_matrix_stats(quant_matrix='coverage')
     analysis.get_peak_gene_annotation(max_dist=1e10)
     analysis.get_peak_genomic_location()
-    analysis.get_peak_chromatin_state(chrom_state_file=get_chrom_file)
     analysis.annotate(quant_matrix="coverage")
     f = os.path.join(
         analysis.results_dir, analysis.name + "_peaks.coverage_qnorm.annotated.csv")
+    assert hasattr(analysis, "coverage_annotated")
     assert os.path.exists(f)
     assert os.stat(f).st_size > 0
 
-    # TODO: test all components are there
+    cols = [
+        'gene_name', 'strand', 'distance',  # from gene_annotation
+        'genomic_region',  # from genomic_location
+        'chromatin_state',  # from chromatin_state
+        'mean', 'variance', 'std_deviation', 'dispersion', 'qv2', 'amplitude', 'iqr']  # from stats
+
+    assert all([c in analysis.coverage_annotated.columns.tolist() for c in cols])
 
 
 def test_plot_raw_coverage(get_test_analysis):

@@ -587,6 +587,78 @@ class Analysis(object):
         return colors
 
 
+def get_genome_reference(
+        organism, genome_assembly=None, output_dir=None, genome_provider="UCSC"):
+    """
+    Get genome FASTA file.
+    Saves results to disk and returns path to file.
+
+    :param organism: Organism to get annotation for. Currently supported: "human" and "mouse".
+    :type organism: str
+    :param output_dir: Directory to write output to. Defaults to current directory
+    :type output_dir: str, optional
+    :param genome_provider: Which genome provider to use. One of UCSC or Ensembl.
+    :type genome_provider: str, optional
+
+    :returns: Path to genome FASTA file
+    :rtype: str
+    """
+    from ngs_toolkit.general import download_gzip_file
+    import pybedtools
+
+    if output_dir is None:
+        output_dir = os.path.join(os.path.abspath(os.path.curdir), "reference")
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
+    if genome_provider == "UCSC":
+        base_link = "http://hgdownload.cse.ucsc.edu/goldenPath/{assembly}/bigZips/{assembly}.fa.gz"
+        organisms = {
+            "human": "hg19", "hsapiens": "hg19", "homo_sapiens": "hg19",
+            "mouse": "mm10", "mmusculus": "mm10", "mus_musculus": "mm10"}
+        if genome_assembly is None:
+            genome_assembly = organisms[organism]
+        url = base_link.format(assembly=genome_assembly)
+
+    elif genome_provider == "Ensembl":
+        base_link = "ftp://ftp.ensembl.org/pub/release-94/fasta/{long_organism}/dna/"
+        base_link += "{Clong_organism}.{assembly}."
+        base_link += "{sequence_type}.{id_type}.{id}fa.gz".format(
+            sequence_type="dna", id_type="chromosome", id="")
+        organisms = {
+            "human": {"long_species": "homo_sapiens", "ensembl_version": "grch37"},
+            "hsapiens": {"long_species": "homo_sapiens", "ensembl_version": "grch37"},
+            "homo_sapiens": {"long_species": "homo_sapiens", "ensembl_version": "grch37"},
+            "mouse": {"long_species": "mus_musculus", "ensembl_version": "grcm38"},
+            "mmusculus": {"long_species": "mus_musculus", "ensembl_version": "grcm38"},
+            "mus_musculus": {"long_species": "mus_musculus", "ensembl_version": "grcm38"}}
+        if genome_assembly is None:
+            genome_assembly = organisms[organism]['ensembl_version'].capitalize()
+        url = base_link.format(long_organism=organisms[organism]['long_species'],
+                               Clong_organism=organisms[organism]['long_species'].capitalize(),
+                               assembly=genome_assembly)
+
+    else:
+        msg = "`genome_provider` must be one of 'UCSC', 'Ensembl'"
+        _LOGGER.error(msg)
+        raise ValueError(msg)
+
+    genome_file = os.path.join(output_dir, "{}.{}.fa".format(organism, genome_assembly))
+    download_gzip_file(url, genome_file)
+
+    # create fasta index
+    bed = pd.DataFrame([['chr1', 1, 2]])
+    try:
+        bed = pybedtools.BedTool().from_dataframe(bed)
+        bed.nucleotide_content(fi=genome_file)
+    # this actually fails every time due to this 'bug':
+    # https://github.com/daler/pybedtools/issues/147
+    except pybedtools.helpers.BEDToolsError:
+        pass
+
+    return genome_file
+
+
 def get_blacklist_annotations(
         organism, genome_assembly=None, output_dir=None):
     """
@@ -603,6 +675,7 @@ def get_blacklist_annotations(
     :returns: Path to blacklist BED file
     :rtype: str
     """
+    from ngs_toolkit.general import download_gzip_file
     if output_dir is None:
         output_dir = os.path.join(os.path.abspath(os.path.curdir), "reference")
     if not os.path.exists(output_dir):
@@ -622,24 +695,7 @@ def get_blacklist_annotations(
     output = os.path.join(output_dir, "{}.{}.blacklist.bed"
                           .format(organism, genome_assembly))
 
-    try:  # Python 3
-        import urllib.request
-        import gzip
-        response = urllib.request.urlopen(url)
-        with open(output, 'wb') as outfile:
-            outfile.write(gzip.decompress(response.read()))
-    except ImportError:  # Python 2
-        import urllib2
-        import StringIO
-        import gzip
-        response = urllib2.urlopen(url)
-        gz_file = StringIO.StringIO()
-        gz_file.write(response.read())
-        gz_file.seek(0)
-        file = gzip.GzipFile(fileobj=gz_file, mode='rb')
-        with open(output, 'w') as outfile:
-            outfile.write(file.read())
-
+    download_gzip_file(url, output)
     return output
 
 
@@ -926,7 +982,13 @@ def get_annotations(
     """
     # TODO: test
     from ngs_toolkit.general import (
-        get_blacklist_annotations, get_tss_annotations, get_genomic_context)
+        get_genome_reference,
+        get_blacklist_annotations,
+        get_tss_annotations,
+        get_genomic_context)
+
+    if 'fasta' in steps:
+        get_genome_reference(organism=organism, genome_assembly=genome_assembly)
     if 'blacklist' in steps:
         get_blacklist_annotations(organism=organism, genome_assembly=genome_assembly)
     if 'tss' in steps:
@@ -4908,7 +4970,7 @@ def count_dataframe_values(x):
 
 def location_index_to_bed(index):
     bed = pd.DataFrame(index=index)
-    index = index.to_series()
+    index = index.to_series(name='region')
     bed['chrom'] = index.str.split(":").str[0]
     index2 = index.str.split(":").str[1]
     bed['start'] = index2.str.split("-").str[0]
@@ -5193,6 +5255,39 @@ def fastq2bam(input_fastq, output_bam, sample_name, input_fastq2=None):
     cmd += """ OUTPUT={0}""".format(output_bam)
 
     return cmd
+
+
+def download_file(url, output_file):
+    try:  # Python 3
+        import urllib.request
+        response = urllib.request.urlopen(url)
+        with open(output_file, 'wb') as outfile:
+            outfile.write(response.read())
+    except ImportError:  # Python 2
+        import urllib2
+        response = urllib2.urlopen(url)
+        with open(output_file, 'w') as outfile:
+            outfile.write(response.read())
+
+
+def download_gzip_file(url, output_file):
+    try:  # Python 3
+        import urllib.request
+        import gzip
+        response = urllib.request.urlopen(url)
+        with open(output_file, 'wb') as outfile:
+            outfile.write(gzip.decompress(response.read()))
+    except ImportError:  # Python 2
+        import urllib2
+        import StringIO
+        import gzip
+        response = urllib2.urlopen(url)
+        gz_file = StringIO.StringIO()
+        gz_file.write(response.read())
+        gz_file.seek(0)
+        file = gzip.GzipFile(fileobj=gz_file, mode='rb')
+        with open(output_file, 'w') as outfile:
+            outfile.write(file.read())
 
 
 def download_cram(link, output_dir):
@@ -5634,8 +5729,9 @@ def query_biomart(
          """</Query>"""])
     req = requests.get(url_query, stream=True)
     if not req.ok:
-        _LOGGER.error("Request to Biomart API was not successful.")
-        return
+        msg = "Request to Biomart API was not successful."
+        _LOGGER.error(msg)
+        raise ValueError(msg)
     content = list(req.iter_lines())
 
     if (len(content) == 1) and (content[0].startswith("Query ERROR")):

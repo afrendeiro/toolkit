@@ -134,7 +134,6 @@ class ATACSeqAnalysis(Analysis):
         :var pandas.DataFrame coverage_annotated: Sets a `coverage_annotated` variable.
         :var pandas.DataFrame accessibility: Sets a `accessibility` variable.
         :returns: `None`
-
         """
         if output_mapping is None:
             # TODO: get default mapping by having functions declare what they output
@@ -155,6 +154,7 @@ class ATACSeqAnalysis(Analysis):
                 "chrom_state_annotation_b": "_peaks.chromatin_state_background.csv",
                 "chrom_state_annotation_mapping": "_peaks.chrom_state_annotation_mapping.csv",
                 "chrom_state_annotation_b_mapping": "_peaks.chrom_state_annotation_background_mapping.csv",
+                "stats": "_peaks.stats_per_region.csv",
                 "coverage_annotated": "_peaks.coverage_qnorm.annotated.csv",
             }
         if only_these_keys is None:
@@ -163,6 +163,8 @@ class ATACSeqAnalysis(Analysis):
                 "nuc", "coverage_gc_corrected", "closest_tss_distances",
                 "gene_annotation", "region_annotation", "region_annotation_b",
                 "chrom_state_annotation", "chrom_state_annotation_b",
+                "chrom_state_annotation_mapping", "chrom_state_annotation_b_mapping",
+                "stats",
                 "coverage_annotated", "accessibility"]
 
         output_mapping = {k: v for k, v in output_mapping.items() if k in only_these_keys}
@@ -551,7 +553,7 @@ class ATACSeqAnalysis(Analysis):
         """
         Normalization of matrix of (n_features, n_samples) by total in each sample.
 
-        :param str matrix: Attribute name of matrix to normalize.
+        :param str matrix: Attribute name of matrix to normalize. Defaults to 'coverage'.
         :param list samples: Iterable of peppy.Sample objects to restrict matrix to.
                              If not provided (`None` is passed) the matrix will not be subsetted.
         :param float mult_factor: A constant to multiply values for.
@@ -582,7 +584,7 @@ class ATACSeqAnalysis(Analysis):
         """
         Quantile normalization of matrix of (n_features, n_samples).
 
-        :param str matrix: Attribute name of matrix to normalize.
+        :param str matrix: Attribute name of matrix to normalize. Defaults to 'coverage'.
         :param list samples: Iterable of peppy.Sample objects to restrict matrix to.
                              If not provided (`None` is passed) the matrix will not be subsetted.
         :param str implementation: One of `"R"` or `"Python"`. Dictates which implementation
@@ -630,9 +632,9 @@ class ATACSeqAnalysis(Analysis):
 
         return coverage_qnorm
 
+    @check_organism_genome
     def get_peak_gccontent_length(
-            self, bed_file=None, genome="hg19",
-            fasta_file="/home/arendeiro/resources/genomes/{g}/{g}.fa"):
+            self, bed_file=None, fasta_file=None):
         """
         Get length and GC content of features in region set.
 
@@ -641,24 +643,33 @@ class ATACSeqAnalysis(Analysis):
                              If not provided the calculation will be for the analysis
                              `sites` attribute.
         :param str genome: Genome assembly.
-        :param str fasta_file: Fasta file of `genome`.
+        :param str fasta_file: Fasta file of `genome`. Should be indexed.
+                               If not given, will try to download.
         :var nuc: DataFrame with nucleotide content and length of each region.
         :returns pandas.DataFrame: DataFrame with nucleotide content and length of each region.
-
         """
         if bed_file is None:
             sites = self.sites
         else:
             sites = pybedtools.BedTool(bed_file)
 
-        nuc = sites.nucleotide_content(fi=fasta_file.format(g=genome)).to_dataframe(comment="#")[["score", "blockStarts"]]
+        if fasta_file is None:
+            from ngs_toolkit.general import get_genome_reference
+            _LOGGER.info("Reference genome FASTA file was not given, will try to get it.")
+            self._check_organism_genome(self)
+            _LOGGER.info("Getting genome FASTA file for organism '{}', genome '{}'. "
+                         .format(self.organism, self.genome))
+            fasta_file = get_genome_reference(organism=self.organism, genome_assembly=self.genome)
+
+        nuc = sites.nucleotide_content(fi=fasta_file).to_dataframe(comment="#")[["score", "blockStarts"]]
         nuc.columns = ["gc_content", "length"]
         nuc.index = [str(i.chrom) + ":" + str(i.start) + "-" + str(i.stop) for i in sites]
 
         # get only the sites matching the coverage (not overlapping blacklist)
         self.nuc = nuc.ix[self.coverage.index]
 
-        self.nuc.to_csv(os.path.join(self.results_dir, self.name + "_peaks.gccontent_length.csv"), index=True)
+        self.nuc.to_csv(os.path.join(
+            self.results_dir, self.name + "_peaks.gccontent_length.csv"), index=True)
 
         return self.nuc
 
@@ -671,7 +682,7 @@ class ATACSeqAnalysis(Analysis):
             >>> source('http://bioconductor.org/biocLite.R')
             >>> biocLite('cqn')
 
-        :param str matrix: Attribute name of matrix to normalize.
+        :param str matrix: Attribute name of matrix to normalize. Defaults to 'coverage'.
         :param list samples: Iterable of peppy.Sample objects to restrict
                              matrix to.
                              If not provided (`None` is passed) the matrix will not be subsetted.
@@ -696,8 +707,6 @@ class ATACSeqAnalysis(Analysis):
         # Fix R's stupid colnames replacement
         sed -i 's/ATAC.seq_/ATAC-seq_/g' coverage_gc_corrected.csv
         """
-
-        @staticmethod
         def cqn(cov, gc_content, lengths):
             # install R package
             # source('http://bioconductor.org/biocLite.R')
@@ -801,8 +810,8 @@ class ATACSeqAnalysis(Analysis):
         attributes.
         A dataframe with each feature's distance to the nearest gene is also saved.
 
-        :param str tss_file: A 5 column BED file with TSS positions (cols 1-3),
-                             gene names (col 4) and TSS strand (col 5) exclusively!
+        :param str tss_file: A valid BED file where the name field (4th column) identifies the gene
+                             and the strand column (6th column). Other fields will not be used.
         :param int max_dist: Maximum absolute distance allowed to perform associations.
                              Regions with no genes within the range will have NaN values.
 
@@ -816,6 +825,8 @@ class ATACSeqAnalysis(Analysis):
         :returns: A dataframe with genes annotated for the peak set.
         """
         from ngs_toolkit.general import bed_to_index
+        cols = [6, 8, 9]
+
         if tss_file is None:
             from ngs_toolkit.general import get_tss_annotations
             _LOGGER.info("Reference TSS file was not given, will try to get TSS annotations.")
@@ -823,11 +834,13 @@ class ATACSeqAnalysis(Analysis):
             _LOGGER.info("Getting TSS annotations for organism '{}', genome '{}'. "
                          .format(self.organism, self.genome))
             tss = pybedtools.BedTool.from_dataframe(
-                get_tss_annotations(organism=self.organism, genome_assembly=self.genome))
-            cols = [-6, -4, -1]
+                get_tss_annotations(organism=self.organism, genome_assembly=self.genome)
+                .iloc[:, list(range(6))])
         else:
-            tss = pybedtools.BedTool(tss_file)
-            cols = list(range(-3, 0))
+            # extract only relevant columns
+            tss = pd.read_csv(tss_file, header=None, sep="\t")
+            tss = tss.iloc[:, list(range(6))]
+            tss = pybedtools.BedTool.from_dataframe(tss)
 
         if isinstance(self.sites, str):
             self.sites = pybedtools.BedTool(self.sites)
@@ -838,9 +851,13 @@ class ATACSeqAnalysis(Analysis):
         # rename
         self.closest_tss_distances = (self.closest_tss_distances[
             ['chrom', 'start', 'end'] +
-            self.closest_tss_distances.columns[cols].tolist()])  # TODO: check this
+            self.closest_tss_distances.columns[cols].tolist()])
         self.closest_tss_distances.columns = [
             'chrom', 'start', 'end', 'gene_name', "strand", 'distance']
+
+        # set NaN to distance without assignment (rather than the default '-1' from bedtools)
+        self.closest_tss_distances.loc[
+            self.closest_tss_distances['gene_name'] == '.', 'distance'] = np.nan
 
         # set NaN to assignments out of range
         self.closest_tss_distances.loc[
@@ -852,7 +869,7 @@ class ATACSeqAnalysis(Analysis):
             self.closest_tss_distances
             .groupby(['chrom', 'start', 'end'])
             .aggregate(
-                lambda x: ",".join(set([str(i) for i in x])))
+                lambda x: ",".join(set([str(i) for i in x if i != '.'])))
             .reset_index())
         self.closest_tss_distances.index = bed_to_index(self.closest_tss_distances)
         self.gene_annotation.index = bed_to_index(self.gene_annotation)
@@ -1016,17 +1033,56 @@ class ATACSeqAnalysis(Analysis):
             setattr(self, attr + "_mapping", annot)
         return self.chrom_state_annotation
 
-    def annotate(self, samples=None, quant_matrix="coverage_gc_corrected", permissive=True):
+    def get_matrix_stats(self, quant_matrix=None, samples=None):
+        """
+        Gets a matrix of feature-wise (i.e. for every reg. element) statistics such
+        across samples such as mean, variance, deviation, dispersion and amplitude.
+
+        :param str matrix: Attribute name of matrix to normalize. Defaults to 'coverage'.
+
+        :var pd.DataFrame stats: A DataFrame with statistics for each feature.
+        :returns: A DataFrame with statistics for each feature.
+        """
+        if samples is None:
+            samples = self.samples
+        if quant_matrix is None:
+            quant_matrix = "coverage_gc_corrected"
+        quant_matrix = getattr(self, quant_matrix)
+
+        quant_matrix = quant_matrix.loc[:, [s.name for s in samples]]
+
+        matrix = pd.DataFrame(index=pd.Index(quant_matrix.index, name="region"))
+        # calculate mean coverage
+        matrix.loc[:, 'mean'] = quant_matrix.mean(axis=1)
+        # calculate coverage variance
+        matrix.loc[:, 'variance'] = quant_matrix.var(axis=1)
+        # calculate std deviation (sqrt(variance))
+        matrix.loc[:, 'std_deviation'] = np.sqrt(matrix.loc[:, 'variance'])
+        # calculate dispersion (variance / mean)
+        matrix.loc[:, 'dispersion'] = matrix.loc[:, 'variance'] / matrix.loc[:, 'mean']
+        # calculate qv2 (std / mean) ** 2
+        matrix.loc[:, 'qv2'] = (matrix.loc[:, 'std_deviation'] / matrix.loc[:, 'mean']) ** 2
+        # calculate "amplitude" (max - min)
+        matrix.loc[:, 'amplitude'] = (quant_matrix.max(axis=1) - quant_matrix.min(axis=1))
+        # calculate interquantile range
+        matrix.loc[:, 'iqr'] = (quant_matrix.quantile(0.75, axis=1) - quant_matrix.quantile(0.25, axis=1))
+        matrix.to_csv(os.path.join(
+            self.results_dir, self.name + "_peaks.stats_per_region.csv"),
+            index=True)
+
+        self.stats = matrix
+        return self.stats
+
+    def annotate(self, samples=None, quant_matrix=None, permissive=True):
         """
         Annotates analysis regions by aggregating region-wise annotations
-        (region, chromatin state and gene annotations - if present) and
-        calculates numeric metrics across samples (support, mean, variance,
-        deviation, dispersion, amplitude).
+        (region, chromatin state, gene annotations and statistics - if present).
 
         The numeric matrix to be used is specified in `quant_matrix`.
+        If two annotation dataframes have equally named columns (e.g. chrom, start, end),
+        the value of the first is kept.
 
-        :param list samples: Iterable of peppy.Sample objects to restrict
-                             matrix to.
+        :param list samples: Iterable of peppy.Sample objects to restrict matrix to.
                              If not provided (`None` is passed) the matrix will not be subsetted.
                              Calculated metrics will be restricted to these samples.
         :param str quant_matrix: Attribute name of matrix to annotate.
@@ -1037,87 +1093,37 @@ class ATACSeqAnalysis(Analysis):
         :var pd.DataFrame coverage_annotated: A pandas DataFrame containing annotations of
                                               the region features.
         :returns: None
-
         """
         if samples is None:
             samples = self.samples
+        # TODO: come up with a resonable iterative way to figure out which matrix to use by default
         if quant_matrix is None:
-            quant_matrix = self.coverage_gc_corrected
-        else:
-            quant_matrix = getattr(self, quant_matrix)
+            quant_matrix = "coverage_gc_corrected"
+        quant_matrix = getattr(self, quant_matrix)
 
         next_matrix = quant_matrix
         # add closest gene
         msg = "`{}` attribute does not exist."
-        if hasattr(self, "gene_annotation"):
-            self.coverage_annotated = pd.merge(
-                next_matrix,
-                self.gene_annotation, left_index=True, right_index=True, how="left")
-            next_matrix = self.coverage_annotated
-        else:
-            if not permissive:
-                _LOGGER.error(msg.format("gene_annotation"))
-                raise AttributeError(msg.format("gene_annotation"))
+
+        # TODO: decide if this function should call the others to produce the annotations first
+
+        for matrix_name in ['gene_annotation', 'region_annotation', 'chrom_state_annotation', 'support', 'stats']:
+            if hasattr(self, matrix_name):
+                matrix = getattr(self, matrix_name)
+                self.coverage_annotated = pd.merge(
+                    next_matrix,
+                    matrix[matrix.columns.difference(next_matrix.columns)],
+                    left_index=True, right_index=True, how="left")
+                next_matrix = self.coverage_annotated
             else:
-                _LOGGER.info(msg + " Proceeding anyway.")
-        # add genomic location
-        if hasattr(self, "region_annotation"):
-            self.coverage_annotated = pd.merge(
-                next_matrix,
-                self.region_annotation[['chrom', 'start', 'end', 'genomic_region']],
-                left_index=True, right_index=True, how="left")
-            next_matrix = self.coverage_annotated
-        else:
-            if not permissive:
-                _LOGGER.error(msg.format("region_annotation"))
-                raise AttributeError(msg.format("region_annotation"))
-            else:
-                _LOGGER.info(msg + " Proceeding anyway.")
-        # add chromatin state
-        if hasattr(self, "chrom_state_annotation"):
-            self.coverage_annotated = pd.merge(
-                next_matrix,
-                self.chrom_state_annotation[['chrom', 'start', 'end', 'chromatin_state']],
-                left_index=True, right_index=True, how="left")
-            next_matrix = self.coverage_annotated
-        else:
-            if not permissive:
-                _LOGGER.error(msg.format("chrom_state_annotation"))
-                raise AttributeError(msg.format("chrom_state_annotation"))
-            else:
-                _LOGGER.info(msg + " Proceeding anyway.")
-        # add support
-        if hasattr(self, "support"):
-            self.coverage_annotated = pd.merge(
-                next_matrix,
-                self.support[['chrom', 'start', 'end', 'support']],
-                left_index=True, right_index=True, how="left")
-            next_matrix = self.coverage_annotated
-        else:
-            if not permissive:
-                _LOGGER.error(msg.format("support"))
-                raise AttributeError(msg.format("support"))
-            else:
-                _LOGGER.info(msg + " Proceeding anyway.")
+                if not permissive:
+                    _LOGGER.error(msg.format(matrix_name))
+                    raise AttributeError(msg.format(matrix_name))
+                else:
+                    _LOGGER.info(msg + " Proceeding anyway.")
 
         if not hasattr(self, "coverage_annotated"):
             self.coverage_annotated = next_matrix
-        # calculate mean coverage
-        self.coverage_annotated['mean'] = self.coverage_annotated.loc[:, [s.name for s in samples]].mean(axis=1)
-        # calculate coverage variance
-        self.coverage_annotated['variance'] = self.coverage_annotated.loc[:, [s.name for s in samples]].var(axis=1)
-        # calculate std deviation (sqrt(variance))
-        self.coverage_annotated['std_deviation'] = np.sqrt(self.coverage_annotated['variance'])
-        # calculate dispersion (variance / mean)
-        self.coverage_annotated['dispersion'] = self.coverage_annotated['variance'] / self.coverage_annotated['mean']
-        # calculate qv2 (std / mean) ** 2
-        self.coverage_annotated['qv2'] = (self.coverage_annotated['std_deviation'] / self.coverage_annotated['mean']) ** 2
-
-        # calculate "amplitude" (max - min)
-        self.coverage_annotated['amplitude'] = (
-            self.coverage_annotated[[s.name for s in samples]].max(axis=1) -
-            self.coverage_annotated[[s.name for s in samples]].min(axis=1)
-        )
 
         # Pair indexes
         msg = "Annotated matrix does not have same feature length as coverage matrix."
@@ -1125,6 +1131,8 @@ class ATACSeqAnalysis(Analysis):
             _LOGGER.error(msg)
             raise AssertionError(msg)
         self.coverage_annotated.index = self.coverage.index
+
+        # TODO: call annotate with samples_metadata maybe?
 
         # Save
         self.coverage_annotated.to_csv(os.path.join(self.results_dir, self.name + "_peaks.coverage_qnorm.annotated.csv"), index=True)

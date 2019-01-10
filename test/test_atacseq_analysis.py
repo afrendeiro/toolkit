@@ -133,7 +133,7 @@ def test_quantile_normalization(get_test_analysis):
     for analysis in get_test_analysis:
         f = os.path.join(
                 analysis.results_dir, analysis.name + "_peaks.coverage_qnorm.csv")
-        qnorm_p = analysis.normalize_coverage_quantiles(implementation="Python", save=False)
+        qnorm_p = analysis.normalize_coverage_quantiles(implementation="Python", save=True)
         assert isinstance(qnorm_p, pd.DataFrame)
         assert hasattr(analysis, "coverage_qnorm")
         assert os.path.exists(f)
@@ -141,7 +141,7 @@ def test_quantile_normalization(get_test_analysis):
         del analysis.coverage_qnorm
         os.remove(f)
 
-        qnorm_r = analysis.normalize_coverage_quantiles(implementation="R", save=False)
+        qnorm_r = analysis.normalize_coverage_quantiles(implementation="R", save=True)
         assert isinstance(qnorm_r, pd.DataFrame)
         assert hasattr(analysis, "coverage_qnorm")
         assert os.path.exists(f)

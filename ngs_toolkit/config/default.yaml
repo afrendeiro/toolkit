@@ -67,16 +67,22 @@ executables:
   findMotifsGenome.pl: findMotifsGenome.pl
   compareMotifs.pl: compareMotifs.pl
 sample_input_files:
+  # values in this section can use string formatting
+  # of the form {variable} to be completed with variables from the sample objects
+  # Example:
+  # ATAC-seq:
+  #   aligned_filtered_bam:
+  #     "{data_dir}/{sample_name}/mapped/{sample_name}.bowtie2.filtered.bam"
   ATAC-seq:
-    aligned_filtered_bam: "{data_dir}/{sample_name}/mapped/{sample_name}.bowtie2.filtered.bam"
-    peaks: "{data_dir}/{sample_name}/peaks/{sample_name}_peaks.narrowPeak"
-    summits: "{data_dir}/{sample_name}/peaks/{sample_name}_summits.bed"
+    aligned_filtered_bam:
+    peaks:
+    summits:
   ChIP-seq:
-    aligned_filtered_bam: "{data_dir}/{sample_name}/mapped/{sample_name}.bowtie2.filtered.bam"
+    aligned_filtered_bam:
   CNV:
-    aligned_filtered_bam: "{data_dir}/{sample_name}/mapped/{sample_name}.bowtie2.filtered.bam"
+    aligned_filtered_bam:
   RNA-seq:
-    aligned_filtered_bam: "{data_dir}/{sample_name}/mapped/{sample_name}.bowtie2.filtered.bam"
+    aligned_filtered_bam:
 graphics:
   settings:
     figure_saving:

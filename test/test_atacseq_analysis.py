@@ -63,7 +63,7 @@ def get_test_analysis(tmp_path):
 def test_get_consensus_sites(get_test_analysis):
     import pytest
     for analysis in get_test_analysis:
-        with pytest.raises(ValueError):
+        with pytest.raises(IOError):
             analysis.get_consensus_sites()
 
 
@@ -80,7 +80,7 @@ def test_get_supported_peaks(get_test_analysis):
 def test_measure_coverage(get_test_analysis):
     import pytest
     for analysis in get_test_analysis:
-        with pytest.raises(ValueError):
+        with pytest.raises(IOError):
             analysis.measure_coverage()
 
 

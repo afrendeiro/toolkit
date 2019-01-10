@@ -248,12 +248,35 @@ class ATACSeqAnalysis(Analysis):
         :param str blacklist_bed: A (3 column) BED file with genomic positions to
                                   exclude from consensus peak set.
         :param bool filter_chrM: Whether to exclude 'chrM' from peak set.
-        :raises ValueError: If not `permissive` and either the peak or summit file
-                            of a sample is not readable.
+        :param bool permissive: Whether Samples that which `region_type` attribute file does
+                               not exist should be simply skipped or an error thrown.
+        :raises IOError: If not `permissive` and either the `peaks` or `summits` file
+                         of a sample is not readable. Or if `permissive` but none of the samples
+                         has an existing file.
         :var pybedtools.BedTool sites: Sets a `sites` variable with consensus peak set.
         :returns: `None`
         """
         from tqdm import tqdm
+
+        if region_type not in ['summits', 'peaks']:
+            msg = "`region_type` attribute must be one of 'summits' or 'peaks'!"
+            _LOGGER.error(msg)
+            raise ValueError(msg)
+
+        if samples is None:
+            samples = self.samples
+
+        # Check whether all or any samples have input files (dependent on permissive)
+        check = self._check_samples_have_file(attr=region_type, f=all if permissive else any)
+        if (not permissive) and (not check):
+            miss = self._get_samples_missing_file(attr=region_type)
+            msg = "Not all samples have '{}' files.".format(region_type)
+            hint = " Samples missing files: {}".format(", ".join([s.name for s in miss]))
+            _LOGGER.error(msg + hint)
+            raise IOError(msg)
+        if permissive:
+            # if permissive, work only with samples with file
+            samples = self._return_samples_have_file(attr=region_type)
 
         if blacklist_bed is None:
             from ngs_toolkit.general import get_blacklist_annotations
@@ -265,9 +288,6 @@ class ATACSeqAnalysis(Analysis):
                 msg += " get one without analysis having `organism` and `genome` set."
                 _LOGGER.error(msg)
                 raise AttributeError(msg)
-
-        if samples is None:
-            samples = self.samples
 
         for i, sample in tqdm(enumerate(samples), total=len(samples), desc="Sample"):
             # print(sample.name)
@@ -342,7 +362,7 @@ class ATACSeqAnalysis(Analysis):
                 self.sites.saveas(default_sites)
 
     @check_has_sites
-    def calculate_peak_support(self, samples=None, region_type="summits"):
+    def calculate_peak_support(self, samples=None, region_type="summits", permissive=False):
         """
         Count number of called peaks per sample in the consensus region set.
         In addition calculate a measure of peak support (or ubiquitouness) by
@@ -357,12 +377,29 @@ class ATACSeqAnalysis(Analysis):
                                 If `summits`, peak summits will be extended by `extension`
                                 before union. Otherwise sample peaks will be used with
                                 no modification.
+        :param bool permissive: Whether Samples that which `region_type` attribute file does
+                               not exist should be simply skipped or an error thrown.
+        :raises IOError: If not `permissive` and either the `peaks` or `summits` file
+                         of a sample is not readable. Or if `permissive` but none of the samples
+                         has an existing file.
         :var pandas.DataFrame support: Sets a `support` variable with peak set overlap.
         """
         from tqdm import tqdm
 
         if samples is None:
             samples = self.samples
+
+        # Check whether all or any samples have input files (dependent on permissive)
+        check = self._check_samples_have_file(attr=region_type, f=all if permissive else any)
+        if (not permissive) and (not check):
+            miss = self._get_samples_missing_file(attr=region_type)
+            msg = "Not all samples have '{}' files.".format(region_type)
+            hint = " Samples missing files: {}".format(", ".join([s.name for s in miss]))
+            _LOGGER.error(msg + hint)
+            raise IOError(msg)
+        if permissive:
+            # if permissive, work only with samples with file
+            samples = self._return_samples_have_file(attr=region_type)
 
         # calculate support (number of samples overlaping each merged peak)
         for i, sample in tqdm(enumerate(samples), total=len(samples), desc="Sample"):
@@ -412,7 +449,9 @@ class ATACSeqAnalysis(Analysis):
             samples = self.samples
         return self.support.loc[:, [s.name for s in samples]].sum(1) != 0
 
-    def measure_coverage(self, samples=None, sites=None, assign=True, save=True, output_file=None):
+    def measure_coverage(
+            self, samples=None, sites=None, assign=True,
+            save=True, output_file=None, permissive=False):
         """
         Measure read coverage (counts) of each sample in each region in consensus sites.
         Will try to use parallel computing using the `parmap` library.
@@ -429,8 +468,11 @@ class ATACSeqAnalysis(Analysis):
                                         `output_file`.
         :param str output_file: A path to a CSV file with coverage output.
                                 Default is `self.results_dir/self.name + "_peaks.raw_coverage.csv"`.
-        :raises ValueError: If not `permissive` and either the peak or summit file
-                            of a sample is not readable.
+        :param bool permissive: Whether Samples that which `region_type` attribute file does
+                               not exist should be simply skipped or an error thrown.
+        :raises IOError: If not `permissive` and the 'aligned_filtered_bam' file attribute
+                         of a sample is not readable. Or if `permissive` but none of the samples
+                         has an existing file.
         :var pd.DataFrame coverage: Sets a `coverage` variable with DataFrame with read counts
                                     of shape (n_sites, m_samples).
         :returns pd.DataFrame: Pandas DataFrame with read counts of shape (n_sites, m_samples).
@@ -442,15 +484,18 @@ class ATACSeqAnalysis(Analysis):
         if samples is None:
             samples = self.samples
 
-        missing = [s for s in samples if not os.path.exists(s.aligned_filtered_bam)]
-        if len(missing) > 0:
-            _LOGGER.warning("Samples have missing BAM file: {}"
-                            .format("\n".join([s.name for s in missing])))
-            samples = [s for s in samples if s not in missing]
-        if len(samples) == 0:
-            msg = "None of the samples have BAM file!"
-            _LOGGER.error(msg)
-            raise ValueError(msg)
+        # Check whether all or any samples have input files (dependent on permissive)
+        attr = "aligned_filtered_bam"
+        check = self._check_samples_have_file(attr=attr, f=all)
+        if not check:
+            miss = self._get_samples_missing_file(attr=attr)
+            msg = "Not all samples have '{}' files.".format(attr)
+            hint = " Samples missing files: {}".format(", ".join([s.name for s in miss]))
+            _LOGGER.error(msg + hint)
+            raise IOError(msg)
+        if permissive:
+            # if permissive, work only with samples with file
+            samples = self._return_samples_have_file(attr=attr)
 
         if sites is None:
             sites = self.sites
@@ -985,7 +1030,7 @@ class ATACSeqAnalysis(Analysis):
                              If not provided (`None` is passed) the matrix will not be subsetted.
                              Calculated metrics will be restricted to these samples.
         :param str quant_matrix: Attribute name of matrix to annotate.
-        :param str permissive: Whether DataFrames that do not exist should be simply skipped
+        :param bool permissive: Whether DataFrames that do not exist should be simply skipped
                                or an error will be thrown.
         :raises AttributeError: If not `permissive` a required DataFrame does not exist as
                                 an object attribute.

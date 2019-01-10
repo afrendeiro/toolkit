@@ -189,6 +189,15 @@ class Analysis(object):
                 raise ValueError(msg + hint)
         return data_type
 
+    def _check_samples_have_file(self, attr, f=all):
+        return f([os.path.exists(str(getattr(sample, attr))) for sample in self.samples])
+
+    def _get_samples_have_file(self, attr):
+        return [sample for sample in self.samples if os.path.exists(str(getattr(sample, attr)))]
+
+    def _get_samples_missing_file(self, attr):
+        return [sample for sample in self.samples if not os.path.exists(str(getattr(sample, attr)))]
+
     def update(self, pickle_file=None):
         """
         Update all of the object's attributes with the attributes from a serialized
@@ -279,7 +288,9 @@ class Analysis(object):
         for data_type in _CONFIG['sample_input_files']:
             for attr, value in _CONFIG['sample_input_files'][data_type].items():
                 for s in [s for s in self.samples if s.protocol == data_type]:
-                    if ("{data_dir}" in value) and ("{sample_name}" in value):
+                    if value is None:
+                        pass
+                    elif ("{data_dir}" in value) and ("{sample_name}" in value):
                         value = value.format(data_dir=self.data_dir, sample_name=s.name)
                     elif "{data_dir}" in value:
                         value = value.format(data_dir=self.data_dir)

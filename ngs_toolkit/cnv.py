@@ -571,6 +571,9 @@ class CNVAnalysis(Analysis):
 
         from rpy2.robjects import numpy2ri, pandas2ri
         import rpy2.robjects as robjects
+        import warnings
+        from rpy2.rinterface import RRuntimeWarning
+        warnings.filterwarnings("ignore", category=RRuntimeWarning)
         numpy2ri.activate()
         pandas2ri.activate()
 

@@ -49,7 +49,7 @@ def analysis(tmp_path):
             name=project_name,
             prj=Project(config),
             results_dir=os.path.join(prj_path, "results"))
-        a.set_attributes()
+        a.set_project_attributes()
         a.load_data()
 
         a.normalize(method="total")

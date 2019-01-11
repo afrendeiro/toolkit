@@ -588,22 +588,28 @@ class Analysis(object):
 
 
 def get_genome_reference(
-        organism, genome_assembly=None, output_dir=None, genome_provider="UCSC"):
+        organism, genome_assembly=None, output_dir=None,
+        genome_provider="UCSC", file_format="fasta", dry_run=False):
     """
-    Get genome FASTA file.
+    Get genome FASTA/2bit file.
     Saves results to disk and returns path to file.
 
     :param organism: Organism to get annotation for. Currently supported: "human" and "mouse".
     :type organism: str
     :param output_dir: Directory to write output to. Defaults to current directory
     :type output_dir: str, optional
-    :param genome_provider: Which genome provider to use. One of UCSC or Ensembl.
+    :param genome_provider: Which genome provider to use. One of 'UCSC' or 'Ensembl'.
     :type genome_provider: str, optional
+    :param file_format: File format to get. One of 'fasta' or '2bit'.
+    :type file_format: str, optional
+    :param dry_run: Whether to not download and just return path to file.
+    :type dry_run: bool, optional
 
-    :returns: Path to genome FASTA file
-    :rtype: str
+    :returns: If not ``dry_run``, path to genome FASTA/2bit file,
+              otherwise tuple of URL of reference genome and path to file.
+    :rtype: str | tuple
     """
-    from ngs_toolkit.general import download_gzip_file
+    from ngs_toolkit.general import download_gzip_file, download_file
     import pybedtools
 
     if output_dir is None:
@@ -611,52 +617,84 @@ def get_genome_reference(
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
+    opts = ['UCSC', 'Ensembl']
+    if genome_provider not in opts:
+        msg = "`genome_provider` attribute must be one of '{}'.".format(", ".join(opts))
+        _LOGGER.error(msg)
+        raise ValueError(msg)
+
+    opts = ['fasta', '2bit']
+    if file_format not in opts:
+        msg = "`file_format` attribute must be one of '{}'.".format(", ".join(opts))
+        _LOGGER.error(msg)
+        raise ValueError(msg)
+
+    if (genome_provider == "Ensembl") and (file_format == '2bit'):
+        msg = "Ensembl does not provide 2bit files."
+        hint = " Use for example 'faToTwoBit' to convert the FASTA file."
+        _LOGGER.error(msg + hint)
+        raise ValueError(msg)
+    if (genome_provider == "UCSC") and (file_format == 'fasta') and (genome_assembly == 'hg19'):
+        msg = "UCSC does not provide FASTA files for the hg19 assembly."
+        hint = " Download a 2bit file and use for example 'TwoBitToFa' to convert."
+        _LOGGER.error(msg + hint)
+        raise ValueError(msg)
+
     if genome_provider == "UCSC":
-        base_link = "http://hgdownload.cse.ucsc.edu/goldenPath/{assembly}/bigZips/{assembly}.fa.gz"
         organisms = {
             "human": "hg19", "hsapiens": "hg19", "homo_sapiens": "hg19",
             "mouse": "mm10", "mmusculus": "mm10", "mus_musculus": "mm10"}
+        base_link = "http://hgdownload.cse.ucsc.edu/goldenPath/{assembly}/bigZips/{assembly}"
+        base_link += '.fa.gz' if file_format == 'fasta' else '.2bit'
         if genome_assembly is None:
             genome_assembly = organisms[organism]
         url = base_link.format(assembly=genome_assembly)
 
     elif genome_provider == "Ensembl":
-        base_link = "ftp://ftp.ensembl.org/pub/release-94/fasta/{long_organism}/dna/"
-        base_link += "{Clong_organism}.{assembly}."
-        base_link += "{sequence_type}.{id_type}.{id}fa.gz".format(
-            sequence_type="dna", id_type="chromosome", id="")
         organisms = {
-            "human": {"long_species": "homo_sapiens", "ensembl_version": "grch37"},
-            "hsapiens": {"long_species": "homo_sapiens", "ensembl_version": "grch37"},
-            "homo_sapiens": {"long_species": "homo_sapiens", "ensembl_version": "grch37"},
-            "mouse": {"long_species": "mus_musculus", "ensembl_version": "grcm38"},
-            "mmusculus": {"long_species": "mus_musculus", "ensembl_version": "grcm38"},
-            "mus_musculus": {"long_species": "mus_musculus", "ensembl_version": "grcm38"}}
+            "human": {"long_species": "homo_sapiens", "version": "grch37", "release": "75"},
+            "hsapiens": {"long_species": "homo_sapiens", "version": "grch37", "release": "75"},
+            "homo_sapiens": {"long_species": "homo_sapiens", "version": "grch37", "release": "75"},
+            "mouse": {"long_species": "mus_musculus", "version": "grcm38", "release": "94"},
+            "mmusculus": {"long_species": "mus_musculus", "version": "grcm38", "release": "94"},
+            "mus_musculus": {"long_species": "mus_musculus", "version": "grcm38", "release": "94"}}
         if genome_assembly is None:
-            genome_assembly = organisms[organism]['ensembl_version'].capitalize()
-        url = base_link.format(long_organism=organisms[organism]['long_species'],
+            genome_assembly = organisms[organism]['version'].replace("grc", "GRC")
+        base_link = "ftp://ftp.ensembl.org/pub/release-{release}/fasta/{long_organism}/dna/"
+        base_link += "{Clong_organism}.{assembly}."
+        base_link += "{}.".format(organisms[organism]['release']) if genome_assembly.endswith("37") else ""
+        base_link += "{sequence_type}.{id_type}.{id}fa.gz".format(
+            sequence_type="dna", id_type="primary_assembly", id="")
+        url = base_link.format(release=organisms[organism]['release'],
+                               long_organism=organisms[organism]['long_species'],
                                Clong_organism=organisms[organism]['long_species'].capitalize(),
                                assembly=genome_assembly)
 
-    else:
-        msg = "`genome_provider` must be one of 'UCSC', 'Ensembl'"
-        _LOGGER.error(msg)
-        raise ValueError(msg)
-
     genome_file = os.path.join(output_dir, "{}.{}.fa".format(organism, genome_assembly))
-    download_gzip_file(url, genome_file)
 
-    # create fasta index
-    bed = pd.DataFrame([['chr1', 1, 2]])
-    try:
-        bed = pybedtools.BedTool().from_dataframe(bed)
-        bed.nucleotide_content(fi=genome_file)
-    # this actually fails every time due to this 'bug':
-    # https://github.com/daler/pybedtools/issues/147
-    except pybedtools.helpers.BEDToolsError:
-        pass
+    # create .fai index for fasta file
+    if file_format == 'fasta':
+        if not dry_run:
+            download_gzip_file(url, genome_file)
+            bed = pd.DataFrame([['chr1', 1, 2]])
+            try:
+                bed = pybedtools.BedTool().from_dataframe(bed)
+                bed.nucleotide_content(fi=genome_file)
+            # The idea is to use a hidden method of bedtools
+            # to create an index (to skip having e.g. samtools as dependency)
+            # and use the bedtool nuc command to to do it.
+            # This actually fails to get nucleotide content every time due to this 'bug':
+            # https://github.com/daler/pybedtools/issues/147
+            # but nonetheless creates an index ¯\_(ツ)_/¯
+            except pybedtools.helpers.BEDToolsError:
+                pass
+            return genome_file
+    else:
+        if not dry_run:
+            download_file(url, genome_file)
+            return genome_file
 
-    return genome_file
+    return (url, genome_file)
 
 
 def get_blacklist_annotations(

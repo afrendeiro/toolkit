@@ -30,9 +30,8 @@ install:
   - pip install .[r]
 
 script:
-  - coverage run -m pytest
+  - pytest --cov ./ test/test_*.py
 
 after_success:
-  - coverage report
-  - coverage xml
+  - codecov
   - python-codacy-coverage -r coverage.xml

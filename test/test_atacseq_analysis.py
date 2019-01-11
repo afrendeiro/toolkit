@@ -15,7 +15,7 @@ travis = 'TRAVIS' in os.environ
 
 
 @pytest.fixture
-def get_test_analysis(tmp_path):
+def various_analysis(tmp_path):
     tmp_path = str(tmp_path)  # for Python2
 
     # Let's make several "reallish" test projects
@@ -64,7 +64,53 @@ def get_test_analysis(tmp_path):
 
 
 @pytest.fixture
-def get_chrom_file():
+def analysis(tmp_path):
+    tmp_path = str(tmp_path)  # for Python2
+
+    # Let's make several "reallish" test projects
+    project_prefix_name = "test-project"
+    data_type = "ATAC-seq"
+    organism, genome_assembly = ("human", "hg38")
+
+    n_factors = [1, 2, 3][0]
+    n_variables = [100, 1000, 10000][0]
+    n_replicates = [1, 2, 5][0]
+    project_name = "{}_{}_{}_{}_{}_{}".format(
+        project_prefix_name, data_type, genome_assembly,
+        n_factors, n_variables, n_replicates)
+
+    generate_project(
+        output_dir=tmp_path,
+        project_name=project_name,
+        organism=organism, genome_assembly=genome_assembly,
+        data_type=data_type,
+        n_factors=n_factors, n_replicates=n_replicates, n_variables=n_variables)
+
+    # first edit the defaul path to the annotation sheet
+    config = os.path.join(
+        tmp_path, project_name, "metadata", "project_config.yaml")
+    c = yaml.safe_load(open(config, 'r'))
+    c['metadata']['sample_annotation'] = os.path.abspath(
+        os.path.join(tmp_path, project_name, "metadata", "annotation.csv"))
+    c['metadata']['comparison_table'] = os.path.abspath(
+        os.path.join(tmp_path, project_name, "metadata", "comparison_table.csv"))
+    yaml.safe_dump(c, open(config, "w"))
+
+    prj_path = os.path.join(tmp_path, project_name)
+    os.chdir(prj_path)
+
+    # project and associated analysis
+    analysis = ATACSeqAnalysis(
+        name=project_name,
+        prj=Project(config),
+        results_dir=os.path.join(prj_path, "results"))
+    analysis.load_data()
+
+    return analysis
+
+
+@pytest.fixture
+def chrom_file():
     from ngs_toolkit.general import download_gzip_file
     url = (
         "https://egg2.wustl.edu/roadmap/data/byFileType/" +
@@ -75,15 +121,15 @@ def get_chrom_file():
     return chrom_state_file
 
 
-def test_get_consensus_sites(get_test_analysis):
+def test_get_consensus_sites(various_analysis):
     import pytest
-    for analysis in get_test_analysis:
+    for analysis in various_analysis:
         with pytest.raises(IOError):
             analysis.get_consensus_sites()
 
 
-def test_get_supported_peaks(get_test_analysis):
-    for analysis in get_test_analysis:
+def test_get_supported_peaks(various_analysis):
+    for analysis in various_analysis:
         analysis.support = pd.DataFrame(
             np.random.binomial(1, 0.4, size=analysis.coverage.shape),
             index=analysis.coverage.index,
@@ -92,28 +138,28 @@ def test_get_supported_peaks(get_test_analysis):
         assert fs.sum() < analysis.coverage.shape[0]
 
 
-def test_measure_coverage(get_test_analysis):
+def test_measure_coverage(various_analysis):
     import pytest
-    for analysis in get_test_analysis:
+    for analysis in various_analysis:
         with pytest.raises(IOError):
             analysis.measure_coverage()
 
 
-def test_consensus_set_loading(get_test_analysis):
-    for analysis in get_test_analysis:
+def test_consensus_set_loading(various_analysis):
+    for analysis in various_analysis:
         assert hasattr(analysis, "sites")
         assert isinstance(analysis.sites, pybedtools.BedTool)
 
 
-def test_coverage_matrix_loading(get_test_analysis):
-    for analysis in get_test_analysis:
+def test_coverage_matrix_loading(various_analysis):
+    for analysis in various_analysis:
         assert hasattr(analysis, "coverage")
         assert isinstance(analysis.coverage, pd.DataFrame)
         assert analysis.coverage.dtypes.all() == int
 
 
-def test_set_consensus_set(get_test_analysis):
-    for analysis in get_test_analysis:
+def test_set_consensus_set(various_analysis):
+    for analysis in various_analysis:
         peaks = os.path.join(analysis.results_dir, analysis.name + "_peak_set.bed")
         analysis.set_consensus_sites(peaks)
         assert hasattr(analysis, "sites")
@@ -121,8 +167,8 @@ def test_set_consensus_set(get_test_analysis):
         assert len(analysis.sites) == sites.shape[0]
 
 
-def test_rpm_normalization(get_test_analysis):
-    for analysis in get_test_analysis:
+def test_rpm_normalization(various_analysis):
+    for analysis in various_analysis:
         qnorm = analysis.normalize_coverage_rpm(save=False)
         assert qnorm.dtypes.all() == np.float
         rpm_file = os.path.join(analysis.results_dir, analysis.name + "_peaks.coverage_rpm.csv")
@@ -132,8 +178,8 @@ def test_rpm_normalization(get_test_analysis):
         assert os.stat(rpm_file).st_size > 0
 
 
-def test_quantile_normalization(get_test_analysis):
-    for analysis in get_test_analysis:
+def test_quantile_normalization(various_analysis):
+    for analysis in various_analysis:
         f = os.path.join(
                 analysis.results_dir, analysis.name + "_peaks.coverage_qnorm.csv")
         qnorm_p = analysis.normalize_coverage_quantiles(implementation="Python", save=True)
@@ -157,10 +203,7 @@ def test_quantile_normalization(get_test_analysis):
         # assert all(np.array(cors) > 0.99)
 
 
-def test_cqn_normalization(get_test_analysis):
-    # Test just one for speed
-    analysis = [a for a in get_test_analysis if a.genome == "hg38"][0]
-
+def test_cqn_normalization(analysis):
     # At some point, downloading a genome reference in Travis
     # caused memory error.
     # This should now be fixed by implementing download/decompressing
@@ -178,27 +221,37 @@ def test_cqn_normalization(get_test_analysis):
     assert os.stat(file).st_size > 0
 
 
-def test_normalize(get_test_analysis):
-    for analysis in get_test_analysis:
-        qnorm = analysis.normalize_coverage_rpm(save=False)
-        assert isinstance(qnorm, pd.DataFrame)
-        assert hasattr(analysis, "coverage_rpm")
-        qnorm_d = analysis.normalize(method="total", save=False)
-        assert np.array_equal(qnorm_d, qnorm)
-        qnorm = analysis.normalize_coverage_quantiles(save=False)
-        assert hasattr(analysis, "coverage_rpm")
-        qnorm_d = analysis.normalize(method="quantile", save=False)
-        assert isinstance(qnorm_d, pd.DataFrame)
-        assert hasattr(analysis, "coverage_qnorm")
-        assert np.array_equal(qnorm_d, qnorm)
+def test_normalize(analysis):
+    qnorm = analysis.normalize_coverage_rpm(save=False)
+    assert isinstance(qnorm, pd.DataFrame)
+    assert hasattr(analysis, "coverage_rpm")
+    qnorm_d = analysis.normalize(method="total", save=False)
+    assert np.array_equal(qnorm_d, qnorm)
+    qnorm = analysis.normalize_coverage_quantiles(save=False)
+    assert hasattr(analysis, "coverage_rpm")
+    qnorm_d = analysis.normalize(method="quantile", save=False)
+    assert isinstance(qnorm_d, pd.DataFrame)
+    assert hasattr(analysis, "coverage_qnorm")
+    assert np.array_equal(qnorm_d, qnorm)
+
+    # At some point, downloading a genome reference in Travis
+    # caused memory error.
+    # This should now be fixed by implementing download/decompressing
+    # functions working in chunks
+    try:
+        qnorm = analysis.normalize_gc_content(save=False)
+    except OSError:
         if travis:
-            qnorm = analysis.normalize_gc_content(save=False)
-            assert isinstance(qnorm, pd.DataFrame)
-            assert hasattr(analysis, "coverage_gc_corrected")
+            return
+        else:
+            raise
+
+    assert isinstance(qnorm, pd.DataFrame)
+    assert hasattr(analysis, "coverage_gc_corrected")
 
 
-def test_get_matrix_stats(get_test_analysis):
-    for analysis in get_test_analysis:
+def test_get_matrix_stats(various_analysis):
+    for analysis in various_analysis:
         annot = analysis.get_matrix_stats(quant_matrix='coverage')
         output = os.path.join(
             analysis.results_dir, "{}_peaks.stats_per_region.csv".format(analysis.name))
@@ -209,10 +262,8 @@ def test_get_matrix_stats(get_test_analysis):
         assert all([x in annot.columns.tolist() for x in cols])
 
 
-def test_get_peak_gene_annotation(get_test_analysis):
+def test_get_peak_gene_annotation(analysis):
     mapping = {"hg19": "grch37", "hg38": "grch38", "mm10": "grcm38"}
-
-    analysis = [a for a in get_test_analysis if a.genome == "hg38"][0]
 
     os.chdir(os.path.join(analysis.results_dir, os.pardir))
     annot = analysis.get_peak_gene_annotation(max_dist=1e10)
@@ -225,9 +276,7 @@ def test_get_peak_gene_annotation(get_test_analysis):
     assert annot.shape[0] >= len(analysis.sites)
 
 
-def test_get_peak_genomic_location(get_test_analysis):
-    # Test only one for speed
-    analysis = [a for a in get_test_analysis if a.genome == "hg38"][0]
+def test_get_peak_genomic_location(analysis):
     prefix = os.path.join(
         analysis.results_dir, "..", "reference", "{}.{}.genomic_context")
     fs = [prefix + a for a in [
@@ -259,11 +308,7 @@ def test_get_peak_genomic_location(get_test_analysis):
     assert annot.shape[0] >= len(analysis.sites)
 
 
-def test_peak_chromatin_state(get_test_analysis, get_chrom_file):
-
-    # Can only test hg38
-    analysis = [a for a in get_test_analysis if a.genome == "hg38"][0]
-
+def test_peak_chromatin_state(analysis, chrom_file):
     prefix = os.path.join(analysis.results_dir, analysis.name)
     fs = [
         prefix + "_peaks.chrom_state_annotation.csv",
@@ -275,7 +320,7 @@ def test_peak_chromatin_state(get_test_analysis, get_chrom_file):
         "chrom_state_annotation", "chrom_state_annotation_b",
         "chrom_state_annotation_mapping", "chrom_state_annotation_b_mapping"]
 
-    annot = analysis.get_peak_chromatin_state(chrom_state_file=get_chrom_file)
+    annot = analysis.get_peak_chromatin_state(chrom_state_file=chrom_file)
     assert isinstance(annot, pd.DataFrame)
     assert annot.shape[0] >= len(analysis.sites)
 
@@ -286,15 +331,22 @@ def test_peak_chromatin_state(get_test_analysis, get_chrom_file):
         assert hasattr(analysis, attr)
 
 
-def test_annotate(get_test_analysis, get_chrom_file):
-    analysis = [a for a in get_test_analysis if a.genome == "hg38"][0]
-
-    analysis.get_peak_chromatin_state(chrom_state_file=get_chrom_file)
+def test_annotate(analysis, chrom_file):
+    analysis.get_peak_chromatin_state(chrom_state_file=chrom_file)
     analysis.get_matrix_stats(quant_matrix='coverage')
     analysis.get_peak_gene_annotation(max_dist=1e10)
-    if travis:
-        # "Often fails due to API call in Travis"
+    # At some point, downloading a genome reference in Travis
+    # caused memory error.
+    # This should now be fixed by implementing download/decompressing
+    # functions working in chunks
+    failed = False
+    try:
         analysis.get_peak_genomic_location()
+    except OSError:
+        if travis:
+            failed = True
+        else:
+            raise
     analysis.annotate(quant_matrix="coverage")
     f = os.path.join(
         analysis.results_dir, analysis.name + "_peaks.coverage_qnorm.annotated.csv")
@@ -307,14 +359,14 @@ def test_annotate(get_test_analysis, get_chrom_file):
         'chromatin_state',  # from chromatin_state
         'mean', 'variance', 'std_deviation', 'dispersion', 'qv2', 'amplitude', 'iqr']  # from stats
 
-    if 'TRAVIS' not in os.environ:
+    if not failed:
         cols += ['genomic_region']  # from genomic_location
 
     assert all([c in analysis.coverage_annotated.columns.tolist() for c in cols])
 
 
-def test_plot_raw_coverage(get_test_analysis):
-    for analysis in get_test_analysis:
+def test_plot_raw_coverage(various_analysis):
+    for analysis in various_analysis:
         analysis.plot_raw_coverage()
         output = os.path.join(analysis.results_dir, analysis.name + ".raw_counts.violinplot.svg")
         assert os.path.exists(output)

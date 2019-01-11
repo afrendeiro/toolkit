@@ -5257,37 +5257,55 @@ def fastq2bam(input_fastq, output_bam, sample_name, input_fastq2=None):
     return cmd
 
 
-def download_file(url, output_file):
-    try:  # Python 3
-        import urllib.request
-        response = urllib.request.urlopen(url)
-        with open(output_file, 'wb') as outfile:
-            outfile.write(response.read())
-    except ImportError:  # Python 2
-        import urllib2
-        response = urllib2.urlopen(url)
-        with open(output_file, 'w') as outfile:
-            outfile.write(response.read())
+def decompress_file(file, output_file=None):
+    """
+    Decompress a gzip-compressed file in chunks (not in memory).
+    """
+    """
+    # test:
+    file = "file.bed.gz"
+    """
+    import gzip
+
+    if output_file is None:
+        if not file.endswith(".gz"):
+            msg = "`output_file` not given and input_file does not end in '.gz'."
+            _LOGGER.error(msg)
+            raise ValueError(msg)
+        output_file = file.replace(".gz", "")
+    with gzip.open(file, 'rb') as _in:
+        with open(output_file, 'w') as _out:
+            for line in _in.readlines():
+                _out.write(line.decode('utf-8'))
+
+
+def download_file(url, output_file, chunk_size=1024):
+    """
+    Download a file and write to disk in chunks (not in memory).
+    """
+    """
+    # test:
+    url = 'https://egg2.wustl.edu/roadmap/data/byFileType/chromhmmSegmentations'
+    url += '/ChmmModels/coreMarks/jointModel/final/E001_15_coreMarks_dense.bed.gz'
+    output_file = "file.bed.gz"
+    chunk_size = 1024
+    """
+    import requests
+    response = requests.get(url, stream=True)
+    with open(output_file, 'wb') as outfile:
+        outfile.writelines(
+            response.iter_content(chunk_size=chunk_size))
 
 
 def download_gzip_file(url, output_file):
-    try:  # Python 3
-        import urllib.request
-        import gzip
-        response = urllib.request.urlopen(url)
-        with open(output_file, 'wb') as outfile:
-            outfile.write(gzip.decompress(response.read()))
-    except ImportError:  # Python 2
-        import urllib2
-        import StringIO
-        import gzip
-        response = urllib2.urlopen(url)
-        gz_file = StringIO.StringIO()
-        gz_file.write(response.read())
-        gz_file.seek(0)
-        file = gzip.GzipFile(fileobj=gz_file, mode='rb')
-        with open(output_file, 'w') as outfile:
-            outfile.write(file.read())
+    if not output_file.endswith(".gz"):
+        output_file += '.gz'
+    download_file(url, output_file)
+    decompress_file(output_file)
+    if (
+            os.path.exists(output_file) and
+            os.path.exists(output_file.replace(".gz", ""))):
+        os.remove(output_file)
 
 
 def download_cram(link, output_dir):

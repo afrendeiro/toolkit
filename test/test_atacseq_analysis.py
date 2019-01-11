@@ -11,6 +11,9 @@ import pandas as pd
 import numpy as np
 
 
+travis = 'TRAVIS' in os.environ
+
+
 @pytest.fixture
 def get_test_analysis(tmp_path):
     tmp_path = str(tmp_path)  # for Python2
@@ -154,13 +157,21 @@ def test_quantile_normalization(get_test_analysis):
         # assert all(np.array(cors) > 0.99)
 
 
-@pytest.mark.skipif('TRAVIS' in os.environ,
-                    reason="Often causes memory error in Travis")
 def test_cqn_normalization(get_test_analysis):
     # Test just one for speed
     analysis = [a for a in get_test_analysis if a.genome == "hg38"][0]
 
-    qnorm = analysis.normalize_gc_content()
+    # At some point, downloading a genome reference in Travis
+    # caused memory error.
+    # This should now be fixed by implementing download/decompressing
+    # functions working in chunks
+    try:
+        qnorm = analysis.normalize_gc_content()
+    except OSError:
+        if travis:
+            pytest.skip()
+        else:
+            raise
     assert qnorm.dtypes.all() == np.float
     file = os.path.join(analysis.results_dir, analysis.name + "_peaks.coverage_gc_corrected.csv")
     assert os.path.exists(file)
@@ -180,7 +191,7 @@ def test_normalize(get_test_analysis):
         assert isinstance(qnorm_d, pd.DataFrame)
         assert hasattr(analysis, "coverage_qnorm")
         assert np.array_equal(qnorm_d, qnorm)
-        if 'TRAVIS' not in os.environ:
+        if travis:
             qnorm = analysis.normalize_gc_content(save=False)
             assert isinstance(qnorm, pd.DataFrame)
             assert hasattr(analysis, "coverage_gc_corrected")
@@ -201,20 +212,19 @@ def test_get_matrix_stats(get_test_analysis):
 def test_get_peak_gene_annotation(get_test_analysis):
     mapping = {"hg19": "grch37", "hg38": "grch38", "mm10": "grcm38"}
 
-    for analysis in get_test_analysis:
-        os.chdir(os.path.join(analysis.results_dir, os.pardir))
-        annot = analysis.get_peak_gene_annotation(max_dist=1e10)
-        tss = os.path.join("reference",
-                           "{}.{}.gene_annotation.protein_coding.tss.bed"
-                           .format(analysis.organism, mapping[analysis.genome]))
-        assert os.path.exists(tss)
-        assert os.stat(tss).st_size > 0
-        assert isinstance(annot, pd.DataFrame)
-        assert annot.shape[0] >= len(analysis.sites)
+    analysis = [a for a in get_test_analysis if a.genome == "hg38"][0]
+
+    os.chdir(os.path.join(analysis.results_dir, os.pardir))
+    annot = analysis.get_peak_gene_annotation(max_dist=1e10)
+    tss = os.path.join("reference",
+                       "{}.{}.gene_annotation.protein_coding.tss.bed"
+                       .format(analysis.organism, mapping[analysis.genome]))
+    assert os.path.exists(tss)
+    assert os.stat(tss).st_size > 0
+    assert isinstance(annot, pd.DataFrame)
+    assert annot.shape[0] >= len(analysis.sites)
 
 
-@pytest.mark.skipif('TRAVIS' in os.environ,
-                    reason="Often fails due to API call in Travis")
 def test_get_peak_genomic_location(get_test_analysis):
     # Test only one for speed
     analysis = [a for a in get_test_analysis if a.genome == "hg38"][0]
@@ -225,7 +235,18 @@ def test_get_peak_genomic_location(get_test_analysis):
         ".intron.bed", ".promoter.bed", ".utr3.bed", ".utr5.bed"]]
 
     os.chdir(os.path.join(analysis.results_dir, os.pardir))
-    annot = analysis.get_peak_genomic_location()
+
+    # At some point, downloading a genome reference in Travis
+    # caused memory error.
+    # This should now be fixed by implementing download/decompressing
+    # functions working in chunks
+    try:
+        annot = analysis.get_peak_genomic_location()
+    except OSError:
+        if travis:
+            pytest.skip()
+        else:
+            raise
 
     # check annotation files are produced
     mapping = {"hg19": "grch37", "hg38": "grch38", "mm10": "grcm38"}
@@ -271,7 +292,7 @@ def test_annotate(get_test_analysis, get_chrom_file):
     analysis.get_peak_chromatin_state(chrom_state_file=get_chrom_file)
     analysis.get_matrix_stats(quant_matrix='coverage')
     analysis.get_peak_gene_annotation(max_dist=1e10)
-    if 'TRAVIS' not in os.environ:
+    if travis:
         # "Often fails due to API call in Travis"
         analysis.get_peak_genomic_location()
     analysis.annotate(quant_matrix="coverage")
@@ -301,6 +322,7 @@ def test_plot_raw_coverage(get_test_analysis):
 
         attr = "a"
         analysis.plot_raw_coverage(by_attribute=attr)
-        output = os.path.join(analysis.results_dir, analysis.name + ".raw_counts.violinplot.by_{}.svg".format(attr))
+        output = os.path.join(
+            analysis.results_dir, analysis.name + ".raw_counts.violinplot.by_{}.svg".format(attr))
         assert os.path.exists(output)
         assert os.stat(output).st_size > 0

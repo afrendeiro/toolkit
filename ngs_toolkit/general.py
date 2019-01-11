@@ -685,7 +685,7 @@ def get_genome_reference(
             # and use the bedtool nuc command to to do it.
             # This actually fails to get nucleotide content every time due to this 'bug':
             # https://github.com/daler/pybedtools/issues/147
-            # but nonetheless creates an index ¯\_(ツ)_/¯
+            # but nonetheless creates an index :whatever:
             except pybedtools.helpers.BEDToolsError:
                 pass
             return genome_file

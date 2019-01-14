@@ -189,6 +189,7 @@ def merge_signal(
     """
     """
     import re
+    import subprocess
 
     def add_cmd(cmd, target, overwrite):
         if not overwrite:
@@ -274,10 +275,12 @@ def merge_signal(
         if dry_run:
             continue
         if as_job:
-            os.system("sbatch -p longq --time 4-00:00:00 " +
-                      "-J merge_signal.{} -o {} -c {} --mem 80000 {}".format(name, log_file, cpus, job_file))
+            subprocess.call("sbatch -p longq --time 4-00:00:00 " +
+                            "-J merge_signal.{} -o {} -c {} --mem 80000 {}"
+                            .format(name, log_file, cpus, job_file)
+                            .split(" "))
         else:
-            os.system("sh {}".format(job_file))
+            subprocess.call("sh {}".format(job_file).split(" "))
 
 
 if __name__ == '__main__':

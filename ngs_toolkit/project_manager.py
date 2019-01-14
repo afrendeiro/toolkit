@@ -12,9 +12,10 @@ import ngs_toolkit
 
 
 _LOGGER = ngs_toolkit._LOGGER
+_CONFIG = ngs_toolkit._CONFIG
 
 
-def parse_arguments():
+def parse_arguments(cli_string=None):
     """
     Argument Parsing.
     """
@@ -37,6 +38,18 @@ def parse_arguments():
     create_subparser.add_argument(
         dest="project_name",
         help="Project name.")
+    # # parse default assemblies from config
+    default = ",".join([":".join([k, v])
+                        for x in _CONFIG["default_genome_assemblies"]
+                        for k, v in x.items()])
+    # default = "human:hg19,mouse:mm10"
+    create_subparser.add_argument(
+        '-g', '--genome-assembly',
+        default=default,
+        dest="genome_assemblies",
+        help="List of 'organism:assembly' pairs for project. "
+             "Comma-separated list of pairs of supported organism/genome assembly. "
+             "Defaults to '{}'.".format(default))
     create_subparser.add_argument(
         '-r', '--root-dir',
         default=os.path.curdir,
@@ -68,25 +81,43 @@ def parse_arguments():
         p.add_argument("-V", "--version", action="version",
                        version=ngs_toolkit.__version__)
 
-    args = parser.parse_args()
-    args.root_dir = os.path.abspath(args.root_dir)
+    if cli_string is None:
+        args = parser.parse_args()
+    else:
+        args = parser.parse_args(cli_string.split(" "))
+    if args.command == "create":
+        args.root_dir = os.path.abspath(args.root_dir)
 
     return args
 
 
 def create_project(
-        project_name, root_dir, overwrite=False,
-        username="arendeiro", email="{username}@cemm.oeaw.ac.at",
-        url="http://biomedical-sequencing.at/bocklab/{username}/{project_name}"):
+        project_name, root_dir, genome_assemblies, overwrite=False,
+        username=None, email=None, url=None):
     """
     Main function: Create project.
     """
+    import subprocess
+
     project_dir = os.path.join(root_dir, project_name)
 
     if os.path.exists(project_dir):
         if not overwrite:
             _LOGGER.error("Detected existing project directory, skipping.")
             return 1
+
+    # Get defaults from config
+    if username is None:
+        username = _CONFIG['username']
+    if username is None:
+        username = os.getenv("USER")
+    if email is None:
+        email = _CONFIG['email']
+    if url is None:
+        url = _CONFIG['website_root']
+    if url is not None:
+        if "{project_name}" in url:
+            url = url.format(project_name=project_name)
 
     metadata_dir = os.path.join(project_dir, "metadata")
     project_config = os.path.join(metadata_dir, "project_config.yaml")
@@ -99,12 +130,6 @@ def create_project(
     for d in [project_dir, metadata_dir, src_dir]:
         if not os.path.exists(d):
             os.makedirs(d)
-
-    if "{project_name}" in url:
-        url = url.format(username=username, project_name=project_name)
-
-    if "{username}" in email:
-        email = email.format(username=username)
 
     project_config_template = """    project_name: {project_name}
     project_description: {project_name}
@@ -127,18 +152,7 @@ def create_project(
         bsf: /scratch/lab_bsf/samples/{{flowcell}}/{{flowcell}}_{{lane}}_samples/{{flowcell}}_{{lane}}#{{BSF_name}}.bam
     implied_columns:
         organism:
-            "Homo sapiens":
-                genome: hg19
-                transcriptome: hg19_cdna
-            "human":
-                genome: hg19
-                transcriptome: hg19_cdna
-            "Mus musculus":
-                genome: mm10
-                transcriptome: mm10_cdna
-            "mouse":
-                genome: mm10
-                transcriptome: mm10_cdna
+            {genome_assemblies}
     pipeline_config:
         atacseq: null
     compute:
@@ -147,7 +161,9 @@ def create_project(
     trackhubs:
         trackhub_dir: /data/groups/lab_bock/public_html/{username}/{project_name}/
         url: {url}""".format(
-        project_name=project_name, username=username, email=email, url=url)
+        project_name=project_name, username=username, email=email, url=url,
+        genome_assemblies="\n".join([
+            "'{}':\n                genome: '{}'".format(s, g) for s, g in genome_assemblies.items()]))
 
     merge_table_template = ",".join([
         "sample_name", "flowcell", "lane", "BSF_name", "data_source"])
@@ -171,32 +187,29 @@ def create_project(
         handle.write(comparison_table_template)
 
     # Initialize git repository)
-    return os.system("git init {}".format(project_dir))
+    return subprocess.call("git init {}".format(project_dir).split(" "))
 
 
 def create_requirements_file(
         project_name,
         project_dir,
-        libraries=["numpy>=1.14.5",
-                   "scipy>=1.0.1",
-                   "pandas>=0.23.3",
-                   "matplotlib>=2.1.2",
-                   "seaborn>=0.9.0",
-                   "pysam>=0.14.1",
-                   "pybedtools>=0.7.10",
-                   "scikit-learn>=0.20.0",
-                   "statsmodels>=0.9.0",
-                   "patsy>=0.5.0",
-                   "rpy2==2.8.6",
-                   "peppy==v0.9.2",
-                   "piper==0.6.0",
-                   "ngs-toolkit>={__version__}"],
+        requirements=None,
         overwrite=False):
     """
     Create a requirements.txt file with pip requirements.
     """
-    libraries = [l.format(__version__=ngs_toolkit.__version__)
-                 if "__version__" in l else l for l in libraries]
+    def get_current_requirements():
+        import requests
+        package_name = 'ngs-toolkit'
+        url = 'https://pypi.python.org/pypi/' + str(package_name) + '/json'
+        data = requests.get(url).json()
+        requirements = [x.replace(r" ", "").replace("(", "").replace(")", "")
+                        for x in data['info']['requires_dist'] if "extra" not in x]
+        requirements.append("ngs_toolkit=={}".format(ngs_toolkit.__version__))
+        return requirements
+
+    if requirements is None:
+        requirements = get_current_requirements()
 
     requirements_file = os.path.join(project_dir, "requirements.txt")
 
@@ -205,7 +218,7 @@ def create_requirements_file(
             _LOGGER.warning("'requirements.txt' file already existing, skipping.")
             return
 
-    requirements_filecontent = "\n".join(libraries)
+    requirements_filecontent = "\n".join(requirements)
 
     # write requirements file
     with open(requirements_file, "w") as handle:
@@ -264,7 +277,10 @@ def create_makefile(
 
 
 def run_recipe(recipe_name, project_config):
-    return os.popen("python -m ngs_toolkit.recipes.{} {}".format(recipe_name, project_config))
+    import subprocess
+    return subprocess.call("python -m ngs_toolkit.recipes.{} {}"
+                           .format(recipe_name, project_config)
+                           .split(" "))
 
 
 def main():
@@ -278,10 +294,15 @@ def main():
     if args.command == "create":
         _LOGGER.info("Creating project '{}' in '{}'.".format(
             args.project_name, args.root_dir))
+
+        genome_assemblies = {
+            x.split(":")[0]: x.split(":")[1]
+            for x in args.genome_assemblies.split(",")}
         # Create project.
         git_ok = create_project(
             project_name=args.project_name,
             root_dir=args.root_dir,
+            genome_assemblies=genome_assemblies,
             overwrite=args.overwrite)
         if git_ok != 0:
             _LOGGER.error("Initialization of project failed.")

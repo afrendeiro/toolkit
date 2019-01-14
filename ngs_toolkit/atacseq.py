@@ -13,6 +13,7 @@ import seaborn as sns
 
 from ngs_toolkit import _LOGGER
 from ngs_toolkit.general import Analysis
+from ngs_toolkit.decorators import (check_organism_genome, check_has_sites)
 
 
 class ATACSeqAnalysis(Analysis):
@@ -133,7 +134,6 @@ class ATACSeqAnalysis(Analysis):
         :var pandas.DataFrame coverage_annotated: Sets a `coverage_annotated` variable.
         :var pandas.DataFrame accessibility: Sets a `accessibility` variable.
         :returns: `None`
-
         """
         if output_mapping is None:
             # TODO: get default mapping by having functions declare what they output
@@ -145,18 +145,26 @@ class ATACSeqAnalysis(Analysis):
                 "nuc": "_peaks.gccontent_length.csv",
                 "coverage_gc_corrected": "_peaks.coverage_gc_corrected.csv",
                 "gene_annotation": "_peaks.gene_annotation.csv",
+                "closest_tss_distances": "_peaks.closest_tss_distances.csv",
                 "region_annotation": "_peaks.region_annotation.csv",
                 "region_annotation_b": "_peaks.region_annotation_background.csv",
+                "region_annotation_mapping": "_peaks.region_annotation_mapping.csv",
+                "region_annotation_b_mapping": "_peaks.region_annotation_background_mapping.csv",
                 "chrom_state_annotation": "_peaks.chromatin_state.csv",
                 "chrom_state_annotation_b": "_peaks.chromatin_state_background.csv",
+                "chrom_state_annotation_mapping": "_peaks.chrom_state_annotation_mapping.csv",
+                "chrom_state_annotation_b_mapping": "_peaks.chrom_state_annotation_background_mapping.csv",
+                "stats": "_peaks.stats_per_region.csv",
                 "coverage_annotated": "_peaks.coverage_qnorm.annotated.csv",
             }
         if only_these_keys is None:
             only_these_keys = [
                 "sites", "support", "coverage", "coverage_qnorm",
-                "nuc", "coverage_gc_corrected", "gene_annotation",
-                "region_annotation", "region_annotation_b",
+                "nuc", "coverage_gc_corrected", "closest_tss_distances",
+                "gene_annotation", "region_annotation", "region_annotation_b",
                 "chrom_state_annotation", "chrom_state_annotation_b",
+                "chrom_state_annotation_mapping", "chrom_state_annotation_b_mapping",
+                "stats",
                 "coverage_annotated", "accessibility"]
 
         output_mapping = {k: v for k, v in output_mapping.items() if k in only_these_keys}
@@ -189,52 +197,109 @@ class ATACSeqAnalysis(Analysis):
             try:
                 # TODO: add configuration for custom number of header lines
                 # TODO: or think of smart way to infer
-                setattr(self, "accessibility", pd.read_csv(file, index_col=0, header=range(n_header_vars)))
+                setattr(self, "accessibility", pd.read_csv(file, index_col=0, header=list(range(n_header_vars))))
             except IOError as e:
                 if not permissive:
                     raise e
                 else:
                     _LOGGER.warning(e)
 
+    @staticmethod
+    def check_region_index(matrix):
+        return matrix.index.str.contains(":").all() and matrix.index.str.contains("-").all()
+
+    @staticmethod
+    def set_region_index(matrix):
+        from ngs_toolkit.atacseq import ATACSeqAnalysis
+        if ATACSeqAnalysis.check_region_index(matrix):
+            _LOGGER.warning("Matrix already has well-formatted index.")
+            return matrix
+        else:
+            req = ['chrom', 'start', 'end']
+            if all([x in matrix.columns for x in req]):
+                matrix.index = (
+                    matrix['chrom'].astype(str) +
+                    ":" +
+                    matrix['start'].astype(str) +
+                    "-" +
+                    matrix['end'].astype(str))
+            else:
+                raise ValueError()
+
     def get_consensus_sites(
             self, samples=None, region_type="summits", extension=250,
-            blacklist_bed="wgEncodeDacMapabilityConsensusExcludable.bed",
+            blacklist_bed=None,
+            filter_chrM=True,
             permissive=False):
         """
         Get consensus (union) of enriched sites (peaks) across samples.
+        There are two modes possible, defined by the value of ``region_type``:
+         - peaks: simple union of all sites
+         - summits: peak summits are extended by ``extension`` and a union is made,
 
-        :param list samples: Iterable of peppy.Sample objects to restrict \
-                             to. Must have a `peaks` attribute set. \
-                             If not provided (`None` is passed) if will default to all samples \
+        :param list samples: Iterable of peppy.Sample objects to restrict
+                             to. Must have a `peaks` attribute set.
+                             If not provided (`None` is passed) if will default to all samples
                              in the analysis (`samples` attribute).
-        :param str region_type: One of `summits` or `peaks`. The type of region \
-                                to use to create the consensus region set. \
-                                If `summits`, peak summits will be extended by `extension` \
-                                before union. Otherwise sample peaks will be used with \
+        :param str region_type: One of `summits` or `peaks`. The type of region
+                                to use to create the consensus region set.
+                                If `summits`, peak summits will be extended by `extension`
+                                before union. Otherwise sample peaks will be used with
                                 no modification.
         :param int extension: Amount to extend peaks summits by in both directions.
-        :param str blacklist_bed: A (3 column) BED file with genomic positions to \
+        :param str blacklist_bed: A (3 column) BED file with genomic positions to
                                   exclude from consensus peak set.
-        :raises ValueError: If not `permissive` and either the peak or summit file \
-                            of a sample is not readable.
+        :param bool filter_chrM: Whether to exclude 'chrM' from peak set.
+        :param bool permissive: Whether Samples that which `region_type` attribute file does
+                               not exist should be simply skipped or an error thrown.
+        :raises IOError: If not `permissive` and either the `peaks` or `summits` file
+                         of a sample is not readable. Or if `permissive` but none of the samples
+                         has an existing file.
         :var pybedtools.BedTool sites: Sets a `sites` variable with consensus peak set.
         :returns: `None`
         """
-        import re
         from tqdm import tqdm
+
+        if region_type not in ['summits', 'peaks']:
+            msg = "`region_type` attribute must be one of 'summits' or 'peaks'!"
+            _LOGGER.error(msg)
+            raise ValueError(msg)
 
         if samples is None:
             samples = self.samples
+
+        # Check whether all or any samples have input files (dependent on permissive)
+        check = self._check_samples_have_file(attr=region_type, f=all if permissive else any)
+        if (not permissive) and (not check):
+            miss = self._get_samples_missing_file(attr=region_type)
+            msg = "Not all samples have '{}' files.".format(region_type)
+            hint = " Samples missing files: {}".format(", ".join([s.name for s in miss]))
+            _LOGGER.error(msg + hint)
+            raise IOError(msg)
+        if permissive:
+            # if permissive, work only with samples with file
+            samples = self._return_samples_have_file(attr=region_type)
+
+        if blacklist_bed is None:
+            from ngs_toolkit.general import get_blacklist_annotations
+            _LOGGER.info("Blacklist file not provided. Downloading...")
+            try:
+                get_blacklist_annotations(self.organism, self.genome)
+            except AttributeError:
+                msg = "Blacklist file was not provided and cannot"
+                msg += " get one without analysis having `organism` and `genome` set."
+                _LOGGER.error(msg)
+                raise AttributeError(msg)
 
         for i, sample in tqdm(enumerate(samples), total=len(samples), desc="Sample"):
             # print(sample.name)
             if region_type == "summits":
                 try:
-                    f = re.sub("_peaks.narrowPeak", "_summits.bed", sample.peaks)
-                    peaks = pybedtools.BedTool(f).slop(b=extension, genome=sample.genome)
+                    peaks = pybedtools.BedTool(sample.summits).slop(b=extension, genome=sample.genome)
                 except ValueError as e:
                     if permissive:
-                        _LOGGER.warning("Summits for sample {} ({}) not found!".format(sample, f))
+                        _LOGGER.warning(
+                            "Summits for sample {} ({}) not found!".format(sample, sample.summits))
                         continue
                     else:
                         raise e
@@ -243,7 +308,8 @@ class ATACSeqAnalysis(Analysis):
                     peaks = pybedtools.BedTool(sample.peaks)
                 except ValueError as e:
                     if permissive:
-                        _LOGGER.warning("Peaks for sample {} ({}) not found!".format(sample, sample.peaks))
+                        _LOGGER.warning(
+                            "Peaks for sample {} ({}) not found!".format(sample, sample.peaks))
                         continue
                     else:
                         raise e
@@ -255,14 +321,25 @@ class ATACSeqAnalysis(Analysis):
                 # Concatenate all peaks
                 sites = sites.cat(peaks)
 
+        if "sites" not in locals():
+            msg = "Couldn't read peak file for any sample."
+            _LOGGER.error(msg)
+            raise ValueError(msg)
         # Merge overlaping peaks across samples
         sites = sites.merge()
 
         # Filter
-        # remove blacklist regions
-        blacklist = pybedtools.BedTool(os.path.join(self.data_dir, "external", blacklist_bed))
-        # remove chrM peaks and save
-        sites.intersect(v=True, b=blacklist).filter(lambda x: x.chrom != 'chrM').saveas(os.path.join(self.results_dir, self.name + "_peak_set.bed"))
+        # # remove blacklist regions
+        if blacklist_bed is not False:
+            if not isinstance(blacklist_bed, pybedtools.BedTool):
+                blacklist = pybedtools.BedTool(blacklist_bed)
+                sites = sites.intersect(v=True, b=blacklist)
+        # # remove chrM peaks
+        if filter_chrM:
+            sites = sites.filter(lambda x: x.chrom != 'chrM')
+
+        # Save
+        sites.saveas(os.path.join(self.results_dir, self.name + "_peak_set.bed"))
 
         # Read up again
         self.sites = pybedtools.BedTool(os.path.join(self.results_dir, self.name + "_peak_set.bed"))
@@ -275,39 +352,62 @@ class ATACSeqAnalysis(Analysis):
         :param book overwrite: Whether a possibly existing file with a consensus peak set \
                                for this analysis should be overwritten in disk.
         :var pybedtools.BedTool sites: Sets a `sites` variable with consensus peak set.
-
         """
         self.sites = pybedtools.BedTool(bed_file)
         if overwrite:
-            self.sites.saveas(os.path.join(self.results_dir, self.name + "_peak_set.bed"))
+            default_sites = os.path.join(self.results_dir, self.name + "_peak_set.bed")
+            # pybedtools will pipe to the input file!
+            if bed_file == default_sites:
+                self.sites.saveas(default_sites + ".new")
+                os.rename(default_sites + ".new", default_sites)
+            else:
+                self.sites.saveas(default_sites)
 
-    def calculate_peak_support(self, samples=None, region_type="summits"):
+    @check_has_sites
+    def calculate_peak_support(self, samples=None, region_type="summits", permissive=False):
         """
         Count number of called peaks per sample in the consensus region set.
-        In addition calculate a measure of peak support (or ubiquitouness) by \
+        In addition calculate a measure of peak support (or ubiquitouness) by
         observing the ratio of samples containing a peak overlapping each region.
 
-        :param list samples: Iterable of peppy.Sample objects to restrict \
-                             to. Must have a `peaks` attribute set. \
-                             If not provided (`None` is passed) if will default to all samples \
+        :param list samples: Iterable of peppy.Sample objects to restrict
+                             to. Must have a `peaks` attribute set.
+                             If not provided (`None` is passed) if will default to all samples
                              in the analysis (`samples` attribute).
-        :param str region_type: One of `summits` or `peaks`. The type of region \
-                                to use to create the consensus region set. \
-                                If `summits`, peak summits will be extended by `extension` \
-                                before union. Otherwise sample peaks will be used with \
+        :param str region_type: One of `summits` or `peaks`. The type of region
+                                to use to create the consensus region set.
+                                If `summits`, peak summits will be extended by `extension`
+                                before union. Otherwise sample peaks will be used with
                                 no modification.
+        :param bool permissive: Whether Samples that which `region_type` attribute file does
+                               not exist should be simply skipped or an error thrown.
+        :raises IOError: If not `permissive` and either the `peaks` or `summits` file
+                         of a sample is not readable. Or if `permissive` but none of the samples
+                         has an existing file.
+        :var pandas.DataFrame support: Sets a `support` variable with peak set overlap.
         """
-        import re
         from tqdm import tqdm
 
         if samples is None:
             samples = self.samples
 
+        # Check whether all or any samples have input files (dependent on permissive)
+        check = self._check_samples_have_file(attr=region_type, f=all if permissive else any)
+        if (not permissive) and (not check):
+            miss = self._get_samples_missing_file(attr=region_type)
+            msg = "Not all samples have '{}' files.".format(region_type)
+            hint = " Samples missing files: {}".format(", ".join([s.name for s in miss]))
+            _LOGGER.error(msg + hint)
+            raise IOError(msg)
+        if permissive:
+            # if permissive, work only with samples with file
+            samples = self._return_samples_have_file(attr=region_type)
+
         # calculate support (number of samples overlaping each merged peak)
         for i, sample in tqdm(enumerate(samples), total=len(samples), desc="Sample"):
             # print(sample.name)
             if region_type == "summits":
-                peaks = re.sub("_peaks.narrowPeak", "_summits.bed", sample.peaks)
+                peaks = sample.summits
             else:
                 peaks = sample.peaks
 
@@ -328,20 +428,17 @@ class ATACSeqAnalysis(Analysis):
         support.index = support['chrom'] + ":" + support['start'].astype(str) + "-" + support['end'].astype(str)
         support.to_csv(os.path.join(self.results_dir, self.name + "_peaks.binary_overlap_support.csv"), index=True)
 
-        # get % of total consensus regions found per sample
-        # m = (
-        #     pd.melt(support, ["chrom", "start", "end"], var_name="sample_name")
-        #     .groupby("sample_name")
-        #     .apply(lambda x: len(x[x["value"] == 1])))
-
         # divide sum (of unique overlaps) by total to get support value between 0 and 1
-        support["support"] = support[[sample.name for sample in samples]].apply(lambda x: sum([i if i <= 1 else 1 for i in x]) / float(len(self.samples)), axis=1)
+        support["support"] = (
+            support[[sample.name for sample in samples]]
+            .apply(lambda x: sum([i if i <= 1 else 1 for i in x]) / float(len(self.samples)), axis=1))
         # save
         support.to_csv(os.path.join(self.results_dir, self.name + "_peaks.support.csv"), index=True)
 
-        self.support = support
+        setattr(self, 'support', support)
+        return self.support
 
-    def get_supported_peaks(self, samples):
+    def get_supported_peaks(self, samples=None):
         """
         Get mask of sites with 0 support in the given samples.
         Requires support matrix produced by `ngs_toolkit.atacseq.ATACSeqAnalysis.calculate_peak_support`.
@@ -352,9 +449,11 @@ class ATACSeqAnalysis(Analysis):
         """
         if samples is None:
             samples = self.samples
-        return self.support[[s.name for s in samples]].sum(1) != 0
+        return self.support.loc[:, [s.name for s in samples]].sum(1) != 0
 
-    def measure_coverage(self, samples=None, sites=None, assign=True, save=True, output_file=None):
+    def measure_coverage(
+            self, samples=None, sites=None, assign=True,
+            save=True, output_file=None, permissive=False):
         """
         Measure read coverage (counts) of each sample in each region in consensus sites.
         Will try to use parallel computing using the `parmap` library.
@@ -371,8 +470,11 @@ class ATACSeqAnalysis(Analysis):
                                         `output_file`.
         :param str output_file: A path to a CSV file with coverage output.
                                 Default is `self.results_dir/self.name + "_peaks.raw_coverage.csv"`.
-        :raises ValueError: If not `permissive` and either the peak or summit file
-                            of a sample is not readable.
+        :param bool permissive: Whether Samples that which `region_type` attribute file does
+                               not exist should be simply skipped or an error thrown.
+        :raises IOError: If not `permissive` and the 'aligned_filtered_bam' file attribute
+                         of a sample is not readable. Or if `permissive` but none of the samples
+                         has an existing file.
         :var pd.DataFrame coverage: Sets a `coverage` variable with DataFrame with read counts
                                     of shape (n_sites, m_samples).
         :returns pd.DataFrame: Pandas DataFrame with read counts of shape (n_sites, m_samples).
@@ -384,10 +486,18 @@ class ATACSeqAnalysis(Analysis):
         if samples is None:
             samples = self.samples
 
-        missing = [s for s in samples if not os.path.exists(s.filtered)]
-        if len(missing) > 0:
-            _LOGGER.warning("Samples have missing BAM file: {}".format("\n".join([s.name for s in missing])))
-            samples = [s for s in samples if s not in missing]
+        # Check whether all or any samples have input files (dependent on permissive)
+        attr = "aligned_filtered_bam"
+        check = self._check_samples_have_file(attr=attr, f=all)
+        if not check:
+            miss = self._get_samples_missing_file(attr=attr)
+            msg = "Not all samples have '{}' files.".format(attr)
+            hint = " Samples missing files: {}".format(", ".join([s.name for s in miss]))
+            _LOGGER.error(msg + hint)
+            raise IOError(msg)
+        if permissive:
+            # if permissive, work only with samples with file
+            samples = self._return_samples_have_file(attr=attr)
 
         if sites is None:
             sites = self.sites
@@ -395,11 +505,20 @@ class ATACSeqAnalysis(Analysis):
         # Count reads with pysam
         # make strings with intervals
         if isinstance(sites, pybedtools.bedtool.BedTool):
-            sites_str = [str(i.chrom) + ":" + str(i.start) + "-" + str(i.stop) for i in self.sites]
+            sites_str = [
+                str(i.chrom) + ":" +
+                str(i.start) + "-" +
+                str(i.stop) for i in self.sites]
         elif isinstance(sites, pd.core.frame.DataFrame):
-            sites_str = (sites.iloc[:, 0] + ":" + sites.iloc[:, 1].astype(str) + "-" + sites.iloc[:, 2].astype(str)).astype(str).tolist()
+            sites_str = (
+                sites.iloc[:, 0] + ":" +
+                sites.iloc[:, 1].astype(str) + "-" +
+                sites.iloc[:, 2].astype(str)).astype(str).tolist()
         elif isinstance(sites, str):
-            sites_str = [str(i.chrom) + ":" + str(i.start) + "-" + str(i.stop) for i in pybedtools.bedtool.BedTool(sites)]
+            sites_str = [
+                str(i.chrom) + ":" +
+                str(i.start) + "-" +
+                str(i.stop) for i in pybedtools.bedtool.BedTool(sites)]
 
         # count, create dataframe
         coverage = pd.DataFrame(
@@ -408,7 +527,7 @@ class ATACSeqAnalysis(Analysis):
                     pd.Series(x),
                     parmap.map(
                         count_reads_in_intervals,
-                        [sample.filtered for sample in samples],
+                        [sample.aligned_filtered_bam for sample in samples],
                         sites_str,
                         parallel=True
                     )
@@ -416,72 +535,42 @@ class ATACSeqAnalysis(Analysis):
             index=[sample.name for sample in samples]
         ).T
 
-        # Add interval description to df
-        ints = map(
-            lambda x: (
-                x.split(":")[0],
-                x.split(":")[1].split("-")[0],
-                x.split(":")[1].split("-")[1]
-            ),
-            coverage.index
-        )
-        coverage["chrom"] = [x[0] for x in ints]
-        coverage["start"] = [int(x[1]) for x in ints]
-        coverage["end"] = [int(x[2]) for x in ints]
-
         if assign:
             self.coverage = coverage
         if save:
             if output_file is not None:
                 coverage.to_csv(output_file, index=True)
             else:
-                self.coverage.to_csv(os.path.join(self.results_dir, self.name + "_peaks.raw_coverage.csv"), index=True)
+                self.coverage.to_csv(os.path.join(
+                    self.results_dir, self.name + "_peaks.raw_coverage.csv"), index=True)
 
         return coverage
 
-    def get_matrix(self, matrix=None, samples=None, matrix_name="coverage"):
-        """
-        Return a matrix that is an attribute of self for the requested samples.
-
-        :param pandas.DataFrame matrix: Pandas DataFrame.
-        :param list samples: Iterable of peppy.Sample objects to restrict \
-                             matrix to. \
-                             If not provided (`None` is passed) the matrix will not be subsetted.
-        :param str matrix_name: Name of the matrix that is an attribute of the object.
-        :returns pandas.DataFrame: Requested DataFrame.
-        """
-        # default to matrix to be normalized
-        if matrix is None:
-            to_norm = getattr(self, matrix_name)
-        else:
-            to_norm = matrix
-        # default to all samples in self with matching names in matrix
-        if samples is None:
-            to_norm = to_norm[[s.name for s in self.samples]]
-        else:
-            to_norm = to_norm[[s.name for s in samples]]
-
-        return to_norm
-
     def normalize_coverage_rpm(
-            self, matrix=None, samples=None, mult_factor=1e6,
+            self, matrix=None, samples=None,
+            mult_factor=1e6, log_transform=True, pseudocount=1,
             save=True, assign=True):
         """
         Normalization of matrix of (n_features, n_samples) by total in each sample.
 
-        :param str matrix: Attribute name of matrix to normalize.
-        :param list samples: Iterable of peppy.Sample objects to restrict \
-                             matrix to. \
+        :param str matrix: Attribute name of matrix to normalize. Defaults to 'coverage'.
+        :param list samples: Iterable of peppy.Sample objects to restrict matrix to.
                              If not provided (`None` is passed) the matrix will not be subsetted.
         :param float mult_factor: A constant to multiply values for.
+        :param bool log_transform: Whether to log transform values or not.
+        :param [int, float] pseudocount: A constant to add to values.
         :param bool save: Whether to write normalized DataFrame to disk.
         :param bool assign: Whether to assign the normalized DataFrame to an attribute ``.
-
         """
         to_norm = self.get_matrix(matrix=matrix, samples=samples, matrix_name="coverage")
         # apply normalization over total
-        coverage_rpm = np.log2(((1 + to_norm) / (1 + to_norm).sum()) * mult_factor)
-        coverage_rpm = coverage_rpm.join(self.coverage[['chrom', 'start', 'end']])
+        coverage_rpm = ((pseudocount + to_norm) / (pseudocount + to_norm).sum()) * mult_factor
+
+        # Log2 transform
+        if log_transform:
+            coverage_rpm = np.log2(coverage_rpm)
+
+        # coverage_rpm = coverage_rpm.join(self.coverage[['chrom', 'start', 'end']])
         if save:
             coverage_rpm.to_csv(os.path.join(self.results_dir, self.name + "_peaks.coverage_rpm.csv"), index=True)
         if assign:
@@ -491,23 +580,21 @@ class ATACSeqAnalysis(Analysis):
 
     def normalize_coverage_quantiles(
             self, matrix=None, samples=None, implementation="Python",
-            log_transform=True, log_constant=0.001, save=True, assign=True):
+            log_transform=True, pseudocount=1, save=True, assign=True):
         """
         Quantile normalization of matrix of (n_features, n_samples).
 
-        :param str matrix: Attribute name of matrix to normalize.
-        :param list samples: Iterable of peppy.Sample objects to restrict \
-                             matrix to. \
+        :param str matrix: Attribute name of matrix to normalize. Defaults to 'coverage'.
+        :param list samples: Iterable of peppy.Sample objects to restrict matrix to.
                              If not provided (`None` is passed) the matrix will not be subsetted.
-        :param str implementation: One of `"R"` or `"Python"`. Dictates which implementation \
-                                   is to be used. The R implementation comes from the \
-                                   `preprocessCore` package, and the Python one is from \
+        :param str implementation: One of `"R"` or `"Python"`. Dictates which implementation
+                                   is to be used. The R implementation comes from the
+                                   `preprocessCore` package, and the Python one is from
                                    here https://github.com/ShawnLYU/Quantile_Normalize.
         :param bool log_transform: Whether to log transform values or not.
-        :param float log_constant: A constant to add before log transformation.
+        :param float pseudocount: A constant to add before log transformation.
         :param bool save: Whether to write normalized DataFrame to disk.
         :param bool assign: Whether to assign the normalized DataFrame to an attribute ``.
-
         """
         if matrix is None:
             to_norm = self.get_matrix(matrix=matrix, samples=samples, matrix_name="coverage")
@@ -530,60 +617,74 @@ class ATACSeqAnalysis(Analysis):
 
         # Log2 transform
         if log_transform:
-            coverage_qnorm = np.log2(log_constant + coverage_qnorm)
+            coverage_qnorm = np.log2(pseudocount + coverage_qnorm)
 
-        # Add back postition columns
-        coverage_qnorm = coverage_qnorm.join(self.coverage[['chrom', 'start', 'end']])
+        if coverage_qnorm.min().min() <= 0:
+            coverage_qnorm += coverage_qnorm.abs().min().min()
+
+        # # Add back postition columns
+        # coverage_qnorm = coverage_qnorm.join(self.coverage[['chrom', 'start', 'end']])
         if save:
-            coverage_qnorm.to_csv(os.path.join(self.results_dir, self.name + "_peaks.coverage_qnorm.csv"), index=True)
+            coverage_qnorm.to_csv(os.path.join(
+                self.results_dir, self.name + "_peaks.coverage_qnorm.csv"), index=True)
         if assign:
             self.coverage_qnorm = coverage_qnorm
 
         return coverage_qnorm
 
+    @check_organism_genome
     def get_peak_gccontent_length(
-            self, bed_file=None, genome="hg19",
-            fasta_file="/home/arendeiro/resources/genomes/{g}/{g}.fa"):
+            self, bed_file=None, fasta_file=None):
         """
         Get length and GC content of features in region set.
 
-        :param str bed_file: A BED file with regions to calculate GC content on. \
-                             Must be a 3-column BED! \
-                             If not provided the calculation will be for the analysis \
+        :param str bed_file: A BED file with regions to calculate GC content on.
+                             Must be a 3-column BED!
+                             If not provided the calculation will be for the analysis
                              `sites` attribute.
         :param str genome: Genome assembly.
-        :param str fasta_file: Fasta file of `genome`.
+        :param str fasta_file: Fasta file of `genome`. Should be indexed.
+                               If not given, will try to download.
         :var nuc: DataFrame with nucleotide content and length of each region.
         :returns pandas.DataFrame: DataFrame with nucleotide content and length of each region.
-
         """
         if bed_file is None:
             sites = self.sites
         else:
             sites = pybedtools.BedTool(bed_file)
 
-        nuc = sites.nucleotide_content(fi=fasta_file.format(g=genome)).to_dataframe(comment="#")[["score", "blockStarts"]]
+        if fasta_file is None:
+            from ngs_toolkit.general import get_genome_reference
+            _LOGGER.info("Reference genome FASTA file was not given, will try to get it.")
+            self._check_organism_genome(self)
+            _LOGGER.info("Getting genome FASTA file for organism '{}', genome '{}'. "
+                         .format(self.organism, self.genome))
+            fasta_file = get_genome_reference(organism=self.organism, genome_assembly=self.genome)
+
+        nuc = sites.nucleotide_content(fi=fasta_file).to_dataframe(comment="#")[["score", "blockStarts"]]
         nuc.columns = ["gc_content", "length"]
         nuc.index = [str(i.chrom) + ":" + str(i.start) + "-" + str(i.stop) for i in sites]
 
         # get only the sites matching the coverage (not overlapping blacklist)
         self.nuc = nuc.ix[self.coverage.index]
 
-        self.nuc.to_csv(os.path.join(self.results_dir, self.name + "_peaks.gccontent_length.csv"), index=True)
+        self.nuc.to_csv(os.path.join(
+            self.results_dir, self.name + "_peaks.gccontent_length.csv"), index=True)
 
         return self.nuc
 
     def normalize_gc_content(self, matrix=None, samples=None, save=True, assign=True):
         """
-        Quantile normalization of matrix of (n_features, n_samples) followed by GC content correction by regression.
+        Quantile normalization of matrix of (n_features, n_samples) followed by GC content
+        correction by regression.
 
         Requires the R package "cqn" to be installed:
             >>> source('http://bioconductor.org/biocLite.R')
             >>> biocLite('cqn')
 
-        :param str matrix: Attribute name of matrix to normalize.
-        :param list samples: Iterable of peppy.Sample objects to restrict \
-                             matrix to. \
+        :param str matrix: Attribute name of matrix to normalize. Defaults to 'coverage'.
+        :param list samples: Iterable of peppy.Sample objects to restrict
+                             matrix to.
                              If not provided (`None` is passed) the matrix will not be subsetted.
         :param bool save: Whether to write normalized DataFrame to disk.
         :param bool assign: Whether to assign the normalized DataFrame to an attribute ``.
@@ -606,14 +707,15 @@ class ATACSeqAnalysis(Analysis):
         # Fix R's stupid colnames replacement
         sed -i 's/ATAC.seq_/ATAC-seq_/g' coverage_gc_corrected.csv
         """
-
-        @staticmethod
         def cqn(cov, gc_content, lengths):
             # install R package
             # source('http://bioconductor.org/biocLite.R')
             # biocLite('cqn')
             from rpy2 import robjects
             import rpy2.robjects.pandas2ri
+            import warnings
+            from rpy2.rinterface import RRuntimeWarning
+            warnings.filterwarnings("ignore", category=RRuntimeWarning)
             robjects.numpy2ri.deactivate()
             rpy2.robjects.pandas2ri.activate()
 
@@ -646,11 +748,12 @@ class ATACSeqAnalysis(Analysis):
         to_norm = self.get_matrix(matrix=matrix, samples=samples, matrix_name="coverage")
         coverage_gc_corrected = (
             cqn(cov=to_norm, gc_content=self.nuc["gc_content"], lengths=self.nuc["length"])
-            .join(self.coverage[['chrom', 'start', 'end']])
+            # .join(self.coverage[['chrom', 'start', 'end']])
         )
 
         if save:
-            coverage_gc_corrected.to_csv(os.path.join(self.results_dir, self.name + "_peaks.coverage_gc_corrected.csv"), index=True)
+            coverage_gc_corrected.to_csv(os.path.join(
+                self.results_dir, self.name + "_peaks.coverage_gc_corrected.csv"), index=True)
         if assign:
             self.coverage_gc_corrected = coverage_gc_corrected
 
@@ -663,258 +766,364 @@ class ATACSeqAnalysis(Analysis):
         :param str method: Normalization method to apply. One of:
                            `total`: Reads per total normalization (RPM).
                            `quantile`: Quantile normalization and log2 transformation.
-                           `gc_content`: Quantile normalization followed by GC content \
-                                         correction by regression (cqn R package) \
+                           `gc_content`: Quantile normalization followed by GC content
+                                         correction by regression (cqn R package)
                                          and log2 transformation.
         :param str matrix: Attribute name of matrix to normalize.
-        :param list samples: Iterable of peppy.Sample objects to restrict \
-                             matrix to. \
+        :param list samples: Iterable of peppy.Sample objects to restrict
+                             matrix to.
                              If not provided (`None` is passed) the matrix will not be subsetted.
         :param bool save: Whether to write normalized DataFrame to disk.
-        :param bool assign: Whether to assign the normalized DataFrame to an attribute \
+        :param bool assign: Whether to assign the normalized DataFrame to an attribute
                             (see variables below for each respective normalization type).
-        :var pd.DataFrame coverage_rpm: If `assign` is True, `coverage_rpm` is a pandas \
+        :var pd.DataFrame coverage_rpm: If `assign` is True, `coverage_rpm` is a pandas
                                         DataFrame normalized with RPM.
-        :var pd.DataFrame coverage_qnorm: If `assign` is True, `coverage_qnorm` \
-                                          is a pandas DataFrame normalized with \
+        :var pd.DataFrame coverage_qnorm: If `assign` is True, `coverage_qnorm`
+                                          is a pandas DataFrame normalized with
                                           quantile normalization.
-        :var pd.DataFrame coverage_gc_corrected: If `assign` is True, `coverage_gc_corrected` \
-                                                 is a pandas DataFrame normalized with GC correction \
+        :var pd.DataFrame coverage_gc_corrected: If `assign` is True, `coverage_gc_corrected`
+                                                 is a pandas DataFrame normalized with GC correction
                                                  and quantile normalization.
         :returns pd.DataFrame: Normalized pandas DataFrame.
 
         """
-        if method == "quantile":
-            return self.normalize_coverage_quantiles(matrix=matrix, samples=samples, save=save, assign=assign)
-        elif method == "total":
-            return self.normalize_coverage_rpm(matrix=matrix, samples=samples, save=save, assign=assign)
+        if method == "total":
+            return self.normalize_coverage_rpm(
+                matrix=matrix, samples=samples, save=save, assign=assign)
+        elif method == "quantile":
+            return self.normalize_coverage_quantiles(
+                matrix=matrix, samples=samples, save=save, assign=assign)
         elif method == "gc_content":
-            return self.normalize_gc_content(matrix=matrix, samples=samples, save=save, assign=assign)
+            return self.normalize_gc_content(
+                matrix=matrix, samples=samples, save=save, assign=assign)
         else:
             msg = "Requested normalization method is not available!"
             _LOGGER.error(msg)
             raise ValueError(msg)
 
-    def get_peak_gene_annotation(self, tss_file="refseq.refflat.tss.bed"):
+    @check_has_sites
+    def get_peak_gene_annotation(self, tss_file=None, max_dist=100000):
         """
         Annotates peaks with closest gene.
-        Needs `tss_file` file in `data_dir`/external.
-        A pickle file with each feature's distance to the nearest gene is also saved.
+        The annotation reference can either be given in the `tss_file` parameter
+        but if ommited, it will be fetched if analysis has `genome` and `organism`
+        attributes.
+        A dataframe with each feature's distance to the nearest gene is also saved.
 
-        :param str tss_file: A 5 column BED file with TSS positions (cols 1-3), \
-                             gene names (col 4) and TSS strand (col 5) exclusively! \
-                             For backward compatibility, it assumes this file is \
-                             in the `data_dir`/external directory.
-                             This will change in the future.
+        :param str tss_file: A valid BED file where the name field (4th column) identifies the gene
+                             and the strand column (6th column). Other fields will not be used.
+        :param int max_dist: Maximum absolute distance allowed to perform associations.
+                             Regions with no genes within the range will have NaN values.
+
         :var pd.DataFrame gene_annotation: A pandas DataFrame containing the genome
-                                             annotations of the region features.
-        :returns: None
-
-        # TODO: change file to absolute path.
-        # TODO: add options to limit association based on maximum distance.
-
+                                             annotations of the region features. If a feature
+                                             overlaps more than one gene, the two gene values will
+                                             be concatenated with a comma.
+        :var pd.DataFrame closest_tss_distances: A pandas DataFrame containing unique region->gene
+                                             associations. In contrast to gene_annotation dataframe,
+                                             this contains one row per region->gene assignment.
+        :returns: A dataframe with genes annotated for the peak set.
         """
-        # create bedtool with hg19 TSS positions
-        tss = pybedtools.BedTool(os.path.join(self.data_dir, "external", tss_file))
-        # get closest TSS of each cll peak
-        gene_annotation = self.sites.closest(tss, d=True).to_dataframe()
-        gene_annotation = gene_annotation[['chrom', 'start', 'end'] + gene_annotation.columns[-3:].tolist()]  # TODO: check this
-        gene_annotation.columns = ['chrom', 'start', 'end', 'gene_name', "strand", 'distance']
+        from ngs_toolkit.general import bed_to_index
+        cols = [6, 8, 9]
+
+        if tss_file is None:
+            from ngs_toolkit.general import get_tss_annotations
+            _LOGGER.info("Reference TSS file was not given, will try to get TSS annotations.")
+            self._check_organism_genome(self)
+            _LOGGER.info("Getting TSS annotations for organism '{}', genome '{}'. "
+                         .format(self.organism, self.genome))
+            tss = pybedtools.BedTool.from_dataframe(
+                get_tss_annotations(organism=self.organism, genome_assembly=self.genome)
+                .iloc[:, list(range(6))])
+        else:
+            # extract only relevant columns
+            tss = pd.read_csv(tss_file, header=None, sep="\t")
+            tss = tss.iloc[:, list(range(6))]
+            tss = pybedtools.BedTool.from_dataframe(tss)
+
+        if isinstance(self.sites, str):
+            self.sites = pybedtools.BedTool(self.sites)
+
+        # get closest TSS of each region
+        self.closest_tss_distances = self.sites.closest(tss, D="b").to_dataframe()
+
+        # rename
+        self.closest_tss_distances = (self.closest_tss_distances[
+            ['chrom', 'start', 'end'] +
+            self.closest_tss_distances.columns[cols].tolist()])
+        self.closest_tss_distances.columns = [
+            'chrom', 'start', 'end', 'gene_name', "strand", 'distance']
+
+        # set NaN to distance without assignment (rather than the default '-1' from bedtools)
+        self.closest_tss_distances.loc[
+            self.closest_tss_distances['gene_name'] == '.', 'distance'] = np.nan
+
+        # set NaN to assignments out of range
+        self.closest_tss_distances.loc[
+            self.closest_tss_distances['distance'].abs() > max_dist,
+            ['gene_name', 'strand', 'distance']] = np.nan
 
         # aggregate annotation per peak, concatenate various genes (comma-separated)
-        self.gene_annotation = gene_annotation.groupby(['chrom', 'start', 'end']).aggregate(lambda x: ",".join(set([str(i) for i in x]))).reset_index()
-        self.gene_annotation.index = self.gene_annotation['chrom'] + ":" + self.gene_annotation['start'].astype(str) + "-" + self.gene_annotation['end'].astype(str)
+        self.gene_annotation = (
+            self.closest_tss_distances
+            .groupby(['chrom', 'start', 'end'])
+            .aggregate(
+                lambda x: ",".join(set([str(i) for i in x if i != '.'])))
+            .reset_index())
+        self.closest_tss_distances.index = bed_to_index(self.closest_tss_distances)
+        self.gene_annotation.index = bed_to_index(self.gene_annotation)
 
         # save to disk
-        self.gene_annotation.to_csv(os.path.join(self.results_dir, self.name + "_peaks.gene_annotation.csv"), index=True)
+        self.closest_tss_distances.to_csv(
+            os.path.join(self.results_dir,
+                         self.name + "_peaks.closest_tss_distances.csv"),
+            index=True)
+        self.gene_annotation.to_csv(
+            os.path.join(self.results_dir,
+                         self.name + "_peaks.gene_annotation.csv"),
+            index=True)
+        return self.gene_annotation
 
-        # save distances to all TSSs (for plotting)
-        self.closest_tss_distances = gene_annotation['distance'].tolist()
-        pickle.dump(self.closest_tss_distances, open(os.path.join(self.results_dir, self.name + "_peaks.closest_tss_distances.pickle"), 'wb'))
-
+    @check_organism_genome
+    @check_has_sites
     def get_peak_genomic_location(
-            self, region_files=[
-                "ensembl_genes.bed", "ensembl_tss2kb.bed",
-                "ensembl_utr5.bed", "ensembl_exons.bed", "ensembl_introns.bed", "ensembl_utr3.bed"],
-            genome="hg19"):
+            self, genomic_context_file=None):
         """
-        Annotates peaks with its type of genomic location.
+        Annotates a consensus peak set (``sites`` attribute of analysis) with their genomic context.
+        The genomic context is mostly gene-centric, which includes overlap with
+        gene promoters, UTRs, exons, introns and remaining intergenic space.
 
-        :param list region_files: List of 3 column BED files with positions (cols 1-3)
-                                  of the features to be annotated. \
-                                  For backward compatibility, it assumes these files are \
-                                  in the `data_dir`/external directory.
-                                  This will change in the future
-        :param str genome: Genome assembly.
-        :var pd.DataFrame region_annotation: A pandas DataFrame containing the genome
-                                                  annotations of the region features.
-        :var pd.DataFrame region_annotation_b: A pandas DataFrame containing the genome
+        If no reference genomic annotation file is given (genomic_context_file kwarg),
+        it will use the ngs_toolkit.general.get_genomic_context function to get
+        such data. For more customization of the annotations, use that function directly and pass
+        the output file to this function.
+
+        :param str genomic_context_file: A 4 column BED file (chrom, start, end, feature),
+                                  where feature is a string with the type of region.
+                                  If not provided will be get with the get_genomic_context
+                                  function.
+
+        :var pd.DataFrame region_annotation: A DataFrame with the genome
+                                             annotations of the region features.
+        :var pd.DataFrame region_annotation_b: A DataFrame with the genome
                                                annotations of the genome background.
-        :returns: None
-
-        # TODO: change region files to absolute paths.
-
+        :var pd.DataFrame region_annotation_mapping: A DataFrame with one row for each
+                                                     chromatin state-region mapping.
+        :var pd.DataFrame region_annotation_b_mapping: A DataFrame with one row for each
+                                                       chromatin state-region mapping
+                                                       of the genome background.
+        :returns: A dataframe with genomic context annotation for the peak set.
         """
+        from ngs_toolkit.general import bed_to_index
+        if genomic_context_file is None:
+            from ngs_toolkit.general import get_genomic_context
+            _LOGGER.info("Reference genomic context file was not given, will try to get it.")
+            _LOGGER.info("Getting genomic context annotations for organism '{}', genome '{}'. "
+                         .format(self.organism, self.genome))
+            context = pybedtools.BedTool.from_dataframe(
+                get_genomic_context(organism=self.organism, genome_assembly=self.genome))
+        else:
+            context = pybedtools.BedTool(genomic_context_file)
+
+        if isinstance(self.sites, str):
+            self.sites = pybedtools.BedTool(self.sites)
 
         # create background
         # shuffle regions in genome to create background (keep them in the same chromossome)
-        background = self.sites.shuffle(genome=genome, chrom=True)
+        background = self.sites.shuffle(genome=self.genome, chrom=True)
 
-        for i, region in enumerate(region_files):
-            region_name = region.replace(".bed", "").replace("ensembl_", "")
-            r = pybedtools.BedTool(os.path.join(self.data_dir, "external", region))
-            if region_name == "genes":
-                region_name = "intergenic"
-                df = self.sites.intersect(r, wa=True, f=0.2, v=True).to_dataframe()
-                dfb = background.intersect(r, wa=True, f=0.2, v=True).to_dataframe()
-            else:
-                df = self.sites.intersect(r, wa=True, u=True, f=0.2).to_dataframe()
-                dfb = background.intersect(r, wa=True, u=True, f=0.2).to_dataframe()
-            df['genomic_region'] = region_name
-            dfb['genomic_region'] = region_name
-            if i == 0:
-                region_annotation = df
-                region_annotation_b = dfb
-            else:
-                region_annotation = pd.concat([region_annotation, df])
-                region_annotation_b = pd.concat([region_annotation_b, dfb])
+        cols = [0, 1, 2, 6]
+        for label, attr, bed in [
+                ("background", "region_annotation_b", background),
+                ("real", "region_annotation", self.sites)]:
+            annot = (
+                bed.intersect(context, wa=True, wb=True, f=0.2)
+                .sort().to_dataframe(usecols=cols))
+            annot.index = bed_to_index(annot)
+            annot.columns = ['chrom', 'start', 'end', 'genomic_region']
 
-        # sort
-        region_annotation.sort_values(['chrom', 'start', 'end'], inplace=True)
-        region_annotation_b.sort_values(['chrom', 'start', 'end'], inplace=True)
-        # remove duplicates (there shouldn't be anyway)
-        region_annotation = region_annotation.reset_index(drop=True).drop_duplicates()
-        region_annotation_b = region_annotation_b.reset_index(drop=True).drop_duplicates()
-        # join various regions per peak
-        self.region_annotation = region_annotation.groupby(['chrom', 'start', 'end']).aggregate(lambda x: ",".join(set([str(i) for i in x]))).reset_index()
-        self.region_annotation_b = region_annotation_b.groupby(['chrom', 'start', 'end']).aggregate(lambda x: ",".join(set([str(i) for i in x]))).reset_index()
+            # remove duplicates (there shouldn't be anyway)
+            annot = annot.drop_duplicates()
+            # join various annotations per peak
+            annot_comp = (
+                annot.groupby(['chrom', 'start', 'end'])
+                .aggregate(lambda x: ",".join(set([str(i) for i in x]))).reset_index())
+            annot_comp.index = bed_to_index(annot_comp)
+            annot_comp.columns = ['chrom', 'start', 'end', 'genomic_region']
+            # save to disk
+            a = "" if attr == "real" else "_" + attr
+            annot.to_csv(os.path.join(
+                self.results_dir, self.name + "_peaks.region_annotation{}_mapping.csv".format(a)),
+                index=True)
+            annot_comp.to_csv(os.path.join(
+                self.results_dir, self.name + "_peaks.region_annotation{}.csv".format(a)),
+                index=True)
 
-        # save to disk
-        self.region_annotation.to_csv(os.path.join(self.results_dir, self.name + "_peaks.region_annotation.csv"), index=False)
-        self.region_annotation_b.to_csv(os.path.join(self.results_dir, self.name + "_peaks.region_annotation_background.csv"), index=False)
+        setattr(self, attr, annot_comp)
+        setattr(self, attr + "_mapping", annot)
+        return self.region_annotation
 
-    def get_peak_chromatin_state(self, chrom_state_file="E032_15_coreMarks_mnemonics", genome="hg19"):
+    @check_organism_genome
+    @check_has_sites
+    def get_peak_chromatin_state(
+            self, chrom_state_file, frac=0.2):
         """
-        Annotates peaks with known chromatin states.
+        Annotates a consensus peak set (``sites`` attribute of analysis) with their chromatin
+        state context. This would be given, for example by a chromatin state segmentation
+        file from projects such as Roadmap Epigenomics.
 
-        :param str chrom_state_file: A 4 column BED file with positions (cols 1-3) \
-                                     and names (col 4) of the features to be annotated.
-        :param str genome: Genome assembly.
-        :var pd.DataFrame chrom_state_annotation: A pandas DataFrame containing the chromatin
+        See examples of such files for various cell types/assemblies here:
+        https://egg2.wustl.edu/roadmap/data/byFileType/chromhmmSegmentations/ChmmModels/coreMarks/jointModel/final/
+        (the *_dense.bed.gz files are optimal).
+
+        :param str chrom_state_file: A 4 column BED file (chrom, start, end, feature),
+                                  where feature is a string with the type of region.
+        :param float frac: Minimal fraction of region to overlap with a feature.
+
+        :var pd.DataFrame chrom_state_annotation: A DataFrame with the chromatin state
                                                   annotations of the region features.
-        :var pd.DataFrame chrom_state_annotation_b: A pandas DataFrame containing the chromatin
+        :var pd.DataFrame chrom_state_annotation_b: A DataFrame with the chromatin state
                                                     annotations of the genome background.
-        :returns: None
-
+        :var pd.DataFrame chrom_state_annotation_mapping: A DataFrame with one row for each
+                                                          chromatin state-region mapping.
+        :var pd.DataFrame chrom_state_annotation_b_mapping: A DataFrame with one row for each
+                                                            chromatin state-region mapping
+                                                            of the genome background.
+        :returns: A dataframe with chromatin state annotation for the peak set.
         """
-        # create bedtool with chromatin states
-        cell_states = pybedtools.BedTool(chrom_state_file)
+        from ngs_toolkit.general import bed_to_index
+
+        states = pybedtools.BedTool(chrom_state_file)
+
+        if isinstance(self.sites, str):
+            self.sites = pybedtools.BedTool(self.sites)
 
         # create background
         # shuffle regions in genome to create background (keep them in the same chromossome)
-        background = self.sites.shuffle(genome=genome, chrom=True)
+        background = self.sites.shuffle(genome=self.genome, chrom=True)
 
-        # intersect with cll peaks, to create annotation, get original peaks
-        chrom_state_annotation = self.sites.intersect(cell_states, wa=True, wb=True, f=0.2).to_dataframe()[['chrom', 'start', 'end', 'thickStart']]
-        chrom_state_annotation_b = background.intersect(cell_states, wa=True, wb=True, f=0.2).to_dataframe()[['chrom', 'start', 'end', 'thickStart']]
+        for label, attr, bed in [
+                ("real", "chrom_state_annotation", self.sites),
+                ("background", "chrom_state_annotation_b", background)]:
+            annot = (
+                bed.intersect(states, wa=True, wb=True, f=frac, loj=True)
+                .sort().to_dataframe(usecols=[0, 1, 2, 6]))
 
-        # aggregate annotation per peak, concatenate various annotations (comma-separated)
-        self.chrom_state_annotation = chrom_state_annotation.groupby(['chrom', 'start', 'end']).aggregate(lambda x: ",".join(x)).reset_index()
-        self.chrom_state_annotation.columns = ['chrom', 'start', 'end', 'chromatin_state']
+            # remove duplicates (there shouldn't be anyway)
+            annot = annot.drop_duplicates()
+            annot.index = bed_to_index(annot)
+            annot.columns = ['chrom', 'start', 'end', 'chromatin_state']
+            # join various annotations per peak
+            annot_comp = (
+                annot.groupby(['chrom', 'start', 'end'])
+                .aggregate(lambda x: ",".join(set([str(i) for i in x]))).reset_index())
+            annot_comp.index = bed_to_index(annot_comp)
+            annot_comp.columns = ['chrom', 'start', 'end', 'chromatin_state']
+            # save to disk
+            a = "" if (label == "real") else ("_" + label)
+            annot.to_csv(os.path.join(
+                self.results_dir, self.name + "_peaks.chrom_state_annotation{}_mapping.csv".format(a)),
+                index=True)
+            annot_comp.to_csv(os.path.join(
+                self.results_dir, self.name + "_peaks.chrom_state_annotation{}.csv".format(a)),
+                index=True)
 
-        self.chrom_state_annotation_b = chrom_state_annotation_b.groupby(['chrom', 'start', 'end']).aggregate(lambda x: ",".join(x)).reset_index()
-        self.chrom_state_annotation_b.columns = ['chrom', 'start', 'end', 'chromatin_state']
+            setattr(self, attr, annot_comp)
+            setattr(self, attr + "_mapping", annot)
+        return self.chrom_state_annotation
 
-        # save to disk
-        self.chrom_state_annotation.to_csv(os.path.join(self.results_dir, self.name + "_peaks.chromatin_state.csv"), index=False)
-        self.chrom_state_annotation_b.to_csv(os.path.join(self.results_dir, self.name + "_peaks.chromatin_state_background.csv"), index=False)
-
-    def annotate(self, samples=None, quant_matrix="coverage_gc_corrected", permissive=True):
+    def get_matrix_stats(self, quant_matrix=None, samples=None):
         """
-        Annotates analysis regions by aggregating region-wise annotations \
-        (region, chromatin state and gene annotations - if present) and \
-        calculates numeric metrics across samples (support, mean, variance, \
-        deviation, dispersion, amplitude).
+        Gets a matrix of feature-wise (i.e. for every reg. element) statistics such
+        across samples such as mean, variance, deviation, dispersion and amplitude.
 
-        The numeric matrix to be used is specified in `quant_matrix`.
+        :param str matrix: Attribute name of matrix to normalize. Defaults to 'coverage'.
 
-        :param list samples: Iterable of peppy.Sample objects to restrict \
-                             matrix to. \
-                             If not provided (`None` is passed) the matrix will not be subsetted. \
-                             Calculated metrics will be restricted to these samples.
-        :param str quant_matrix: Attribute name of matrix to annotate.
-        :param str permissive: Whether DataFrames that do not exist should be simply skipped \
-                               or an error will be thrown.
-        :raises AttributeError: If not `permissive` a required DataFrame does not exist as \
-                                an object attribute.
-        :var pd.DataFrame coverage_annotated: A pandas DataFrame containing annotations of
-                                              the region features.
-        :returns: None
-
+        :var pd.DataFrame stats: A DataFrame with statistics for each feature.
+        :returns: A DataFrame with statistics for each feature.
         """
         if samples is None:
             samples = self.samples
         if quant_matrix is None:
-            quant_matrix = self.coverage_gc_corrected
-        else:
-            quant_matrix = getattr(self, quant_matrix)
+            quant_matrix = "coverage_gc_corrected"
+        quant_matrix = getattr(self, quant_matrix)
+
+        quant_matrix = quant_matrix.loc[:, [s.name for s in samples]]
+
+        matrix = pd.DataFrame(index=pd.Index(quant_matrix.index, name="region"))
+        # calculate mean coverage
+        matrix.loc[:, 'mean'] = quant_matrix.mean(axis=1)
+        # calculate coverage variance
+        matrix.loc[:, 'variance'] = quant_matrix.var(axis=1)
+        # calculate std deviation (sqrt(variance))
+        matrix.loc[:, 'std_deviation'] = np.sqrt(matrix.loc[:, 'variance'])
+        # calculate dispersion (variance / mean)
+        matrix.loc[:, 'dispersion'] = matrix.loc[:, 'variance'] / matrix.loc[:, 'mean']
+        # calculate qv2 (std / mean) ** 2
+        matrix.loc[:, 'qv2'] = (matrix.loc[:, 'std_deviation'] / matrix.loc[:, 'mean']) ** 2
+        # calculate "amplitude" (max - min)
+        matrix.loc[:, 'amplitude'] = (quant_matrix.max(axis=1) - quant_matrix.min(axis=1))
+        # calculate interquantile range
+        matrix.loc[:, 'iqr'] = (quant_matrix.quantile(0.75, axis=1) - quant_matrix.quantile(0.25, axis=1))
+        matrix.to_csv(os.path.join(
+            self.results_dir, self.name + "_peaks.stats_per_region.csv"),
+            index=True)
+
+        self.stats = matrix
+        return self.stats
+
+    def annotate(self, samples=None, quant_matrix=None, permissive=True):
+        """
+        Annotates analysis regions by aggregating region-wise annotations
+        (region, chromatin state, gene annotations and statistics - if present).
+
+        The numeric matrix to be used is specified in `quant_matrix`.
+        If two annotation dataframes have equally named columns (e.g. chrom, start, end),
+        the value of the first is kept.
+
+        :param list samples: Iterable of peppy.Sample objects to restrict matrix to.
+                             If not provided (`None` is passed) the matrix will not be subsetted.
+                             Calculated metrics will be restricted to these samples.
+        :param str quant_matrix: Attribute name of matrix to annotate.
+        :param bool permissive: Whether DataFrames that do not exist should be simply skipped
+                               or an error will be thrown.
+        :raises AttributeError: If not `permissive` a required DataFrame does not exist as
+                                an object attribute.
+        :var pd.DataFrame coverage_annotated: A pandas DataFrame containing annotations of
+                                              the region features.
+        :returns: None
+        """
+        if samples is None:
+            samples = self.samples
+        # TODO: come up with a resonable iterative way to figure out which matrix to use by default
+        if quant_matrix is None:
+            quant_matrix = "coverage_gc_corrected"
+        quant_matrix = getattr(self, quant_matrix)
 
         next_matrix = quant_matrix
         # add closest gene
-        if hasattr(self, "gene_annotation"):
-            self.coverage_annotated = pd.merge(
-                next_matrix,
-                self.gene_annotation, on=['chrom', 'start', 'end'], how="left")
-            next_matrix = self.coverage_annotated
-        else:
-            if not permissive:
-                raise AttributeError("`gene_annotation` attribute does not exist.")
-        # add genomic location
-        if hasattr(self, "region_annotation"):
-            self.coverage_annotated = pd.merge(
-                next_matrix,
-                self.region_annotation[['chrom', 'start', 'end', 'genomic_region']], on=['chrom', 'start', 'end'], how="left")
-            next_matrix = self.coverage_annotated
-        else:
-            if not permissive:
-                raise AttributeError("`region_annotation` attribute does not exist.")
-        # add chromatin state
-        if hasattr(self, "chrom_state_annotation"):
-            self.coverage_annotated = pd.merge(
-                next_matrix,
-                self.chrom_state_annotation[['chrom', 'start', 'end', 'chromatin_state']], on=['chrom', 'start', 'end'], how="left")
-            next_matrix = self.coverage_annotated
-        else:
-            if not permissive:
-                raise AttributeError("`chrom_state_annotation` attribute does not exist.")
-        # add support
-        if hasattr(self, "support"):
-            self.coverage_annotated = pd.merge(
-                next_matrix,
-                self.support[['chrom', 'start', 'end', 'support']], on=['chrom', 'start', 'end'], how="left")
-            next_matrix = self.coverage_annotated
-        else:
-            if not permissive:
-                raise AttributeError("`support` attribute does not exist.")
+        msg = "`{}` attribute does not exist."
+
+        # TODO: decide if this function should call the others to produce the annotations first
+
+        for matrix_name in ['gene_annotation', 'region_annotation', 'chrom_state_annotation', 'support', 'stats']:
+            if hasattr(self, matrix_name):
+                matrix = getattr(self, matrix_name)
+                self.coverage_annotated = pd.merge(
+                    next_matrix,
+                    matrix[matrix.columns.difference(next_matrix.columns)],
+                    left_index=True, right_index=True, how="left")
+                next_matrix = self.coverage_annotated
+            else:
+                if not permissive:
+                    _LOGGER.error(msg.format(matrix_name))
+                    raise AttributeError(msg.format(matrix_name))
+                else:
+                    _LOGGER.info(msg + " Proceeding anyway.")
 
         if not hasattr(self, "coverage_annotated"):
             self.coverage_annotated = next_matrix
-        # calculate mean coverage
-        self.coverage_annotated['mean'] = self.coverage_annotated[[s.name for s in samples]].mean(axis=1)
-        # calculate coverage variance
-        self.coverage_annotated['variance'] = self.coverage_annotated[[s.name for s in samples]].var(axis=1)
-        # calculate std deviation (sqrt(variance))
-        self.coverage_annotated['std_deviation'] = np.sqrt(self.coverage_annotated['variance'])
-        # calculate dispersion (variance / mean)
-        self.coverage_annotated['dispersion'] = self.coverage_annotated['variance'] / self.coverage_annotated['mean']
-        # calculate qv2 (std / mean) ** 2
-        self.coverage_annotated['qv2'] = (self.coverage_annotated['std_deviation'] / self.coverage_annotated['mean']) ** 2
-
-        # calculate "amplitude" (max - min)
-        self.coverage_annotated['amplitude'] = (
-            self.coverage_annotated[[s.name for s in samples]].max(axis=1) -
-            self.coverage_annotated[[s.name for s in samples]].min(axis=1)
-        )
 
         # Pair indexes
         msg = "Annotated matrix does not have same feature length as coverage matrix."
@@ -922,6 +1131,8 @@ class ATACSeqAnalysis(Analysis):
             _LOGGER.error(msg)
             raise AssertionError(msg)
         self.coverage_annotated.index = self.coverage.index
+
+        # TODO: call annotate with samples_metadata maybe?
 
         # Save
         self.coverage_annotated.to_csv(os.path.join(self.results_dir, self.name + "_peaks.coverage_qnorm.annotated.csv"), index=True)
@@ -942,6 +1153,9 @@ class ATACSeqAnalysis(Analysis):
             raise AssertionError(msg)
 
         matrix = getattr(self, matrix).copy()
+
+        # if isinstance(matrix.columns, pd.MultiIndex):
+        #     matrix.columns = matrix.columns.get_level_values("sample_name")
 
         g = self.gene_annotation['gene_name'].str.split(",").apply(pd.Series).stack()
         g.index = g.index.droplevel(1)
@@ -1019,7 +1233,7 @@ class ATACSeqAnalysis(Analysis):
 
         # TODO: add parallelization with parmap
         stats = pd.DataFrame([
-            map(get_sample_reads, [s.filtered for s in samples]),
+            map(get_sample_reads, [s.aligned_filtered_bam for s in samples]),
             map(get_peak_number, [s.peaks for s in samples]),
             map(get_total_open_chromatin, [s.peaks for s in samples])],
             index=["reads_used", "peak_number", "open_chromatin"],
@@ -1479,6 +1693,7 @@ def characterize_regions_function(
 
     # export gene names
     clean = df['gene_name'].str.split(",").apply(pd.Series, 1).stack().drop_duplicates()
+    clean = clean[~clean.isin(['.', 'nan'])]
     clean.to_csv(
             os.path.join(output_dir, "{}_genes.symbols.txt".format(prefix)),
             index=False)

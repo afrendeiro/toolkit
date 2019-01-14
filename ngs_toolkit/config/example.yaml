@@ -1,7 +1,11 @@
 username: arendeiro
 email: arendeiro@cemm.oeaw.ac.at
+website_root: http://biomedical-sequencing.at/bocklab/arendeiro/
 metadata:
   root_projects_dir: /scratch/lab_bock/shared/projects/
+default_genome_assemblies:
+  - human: hg19
+  - mouse: mm10
 resources:
   genomes:
     2bit:
@@ -64,16 +68,23 @@ executables:
   ame: ame
   findMotifsGenome.pl: findMotifsGenome.pl
   compareMotifs.pl: compareMotifs.pl
-samples:
+sample_input_files:
+  # values in this section can use string formatting
+  # of the form {variable} to be completed with variables from the sample objects
+  # Example:
+  # ATAC-seq:
+  #   aligned_filtered_bam:
+  #     "{data_dir}/{sample_name}/mapped/{sample_name}.bowtie2.filtered.bam"
   ATAC-seq:
-    aligned_bam: "{data_dir}/{sample_name}/mapped/{sample_name}.bowtie2.filtered.bam"
+    aligned_filtered_bam: "{data_dir}/{sample_name}/mapped/{sample_name}.bowtie2.filtered.bam"
     peaks: "{data_dir}/{sample_name}/peaks/{sample_name}_peaks.narrowPeak"
+    summits: "{data_dir}/{sample_name}/peaks/{sample_name}_summits.bed"
   ChIP-seq:
-    aligned_bam: "{data_dir}/{sample_name}/mapped/{sample_name}.bowtie2.filtered.bam"
+    aligned_filtered_bam: "{data_dir}/{sample_name}/mapped/{sample_name}.bowtie2.filtered.bam"
   CNV:
-    aligned_bam: "{data_dir}/{sample_name}/mapped/{sample_name}.bowtie2.filtered.bam"
+    aligned_filtered_bam: "{data_dir}/{sample_name}/mapped/{sample_name}.bowtie2.filtered.bam"
   RNA-seq:
-    aligned_bam: "{data_dir}/{sample_name}/mapped/{sample_name}.bowtie2.filtered.bam"
+    aligned_filtered_bam: "{data_dir}/{sample_name}/mapped/{sample_name}.bowtie2.filtered.bam"
 graphics:
   settings:
     figure_saving:

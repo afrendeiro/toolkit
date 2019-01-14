@@ -136,10 +136,49 @@ class RNASeqAnalysis(Analysis):
 
         return expr.sort_index()
 
+    # def collect_htseqcount_output(self, samples=None, permissive=True):
+    #     """
+    #     Collect gene expression (read counts, gene-level) output from
+    #     HTSeq-count into expression matrix for `samples`.
+    #     """
+    #     if samples is None:
+    #         samples = self.samples
+
+    #     first = True
+    #     for i, sample in enumerate(samples):
+    #         msg = "Sample {} is missing.".format(sample.name)
+    #         try:
+    #             # read the "tr" file of one sample to get indexes
+    #             c = pd.read_csv(
+    #                 os.path.join(
+    #                     sample.paths.sample_root,
+    #                     "tophat_{}".format(sample.genome),
+    #                     sample.name + ".aln_sorted.htseq-count.tsv"), sep="\t")
+    #             c.columns = ['ensembl_gene_id', 'ensembl_transcript_id', 'counts']
+    #         except IOError(msg) as e:
+    #             if permissive:
+    #                 _LOGGER.warning(e)
+    #                 continue
+    #             else:
+    #                 raise e
+    #         # extract only gene ID and counts
+    #         c = c[["Symbol", "Exp1"]]
+    #         c = c.rename(
+    #             columns={"Symbol": "gene_symbol", "Exp1": sample.name}).set_index("gene_symbol")
+
+    #         # Append
+    #         if first:
+    #             expr = c
+    #         else:
+    #             expr = expr.join(c)
+    #         first = False
+
+    #     return expr.sort_index()
+
     def get_gene_expression(
             self, samples=None, sample_attributes=["sample_name"],
             expression_type="counts",
-            genome_assembly="grch37", species="hsapiens"):
+            genome_assembly="grch37", species="hsapiens", mul_factor=1e6):
         """
         Collect gene expression (read counts, transcript level) for all samples,
         annotates ensembl IDs with gene names, reduces gene expression to gene-level,
@@ -156,7 +195,7 @@ class RNASeqAnalysis(Analysis):
         # TODO: Save all matrices of both levels with clear, consistent naming
         # TODO: Declare saved files and outputs in docstring
         """
-        import requests
+        from ngs_toolkit.general import query_biomart
         from ngs_toolkit.general import normalize_quantiles_p
 
         if samples is None:
@@ -166,26 +205,8 @@ class RNASeqAnalysis(Analysis):
             samples=samples, expression_type=expression_type)
 
         # Map ensembl gene IDs to gene names
-        url_query = "".join([
-            """http://{}.ensembl.org/biomart/martservice?query=""".format(genome_assembly),
-            """<?xml version="1.0" encoding="UTF-8"?>""",
-            """<!DOCTYPE Query>""",
-            """<Query  virtualSchemaName = "default" formatter = "CSV" header = "0" uniqueRows = "0" count = "" datasetConfigVersion = "0.6" >""",
-            """<Dataset name = "{}_gene_ensembl" interface = "default" >""".format(species),
-            """<Attribute name = "ensembl_transcript_id" />""",
-            """<Attribute name = "external_gene_name" />""",
-            """</Dataset>""",
-            """</Query>"""])
-        req = requests.get(url_query, stream=True)
-        content = list(req.iter_lines())
-        if type(content[0]) == bytes:
-            mapping = pd.DataFrame(
-                (x.decode("utf-8").strip().split(",") for x in content),
-                columns=["ensembl_transcript_id", "gene_name"])
-        else:
-            mapping = pd.DataFrame(
-                (x.strip().split(",") for x in content),
-                columns=["ensembl_transcript_id", "gene_name"])
+        mapping = query_biomart(attributes=["ensembl_transcript_id", "external_gene_name"])
+
         # mapping['ensembl_transcript_id'] = mapping['ensembl_transcript_id'].str.replace("\..*", "")
         self.count_matrix = self.count_matrix.reset_index(drop=True, level="ensembl_gene_id")
         # self.count_matrix.index = self.count_matrix.index.str.replace("\..*", "")
@@ -209,7 +230,7 @@ class RNASeqAnalysis(Analysis):
 
         self.matrix_qnorm_log = np.log2(
             (pseudocount + self.matrix_qnorm) / self.matrix_qnorm.sum(axis=0)
-            * 1e6)
+            * mul_factor)
         self.matrix_qnorm_log.to_csv(
             os.path.join(self.results_dir, self.name +
                          ".expression_{}.transcript_level.quantile_normalized.log2_tpm.csv")
@@ -228,7 +249,7 @@ class RNASeqAnalysis(Analysis):
             pseudocount = 0
         self.expression = np.log2(
             ((pseudocount + self.expression_matrix_qnorm) /
-                self.expression_matrix_qnorm.sum(axis=0)) * 1e6)
+                self.expression_matrix_qnorm.sum(axis=0)) * mul_factor)
 
         # Annotate with sample metadata
         _samples = [s for s in samples if s.name in self.expression.columns]
@@ -557,3 +578,82 @@ def knockout_plot(
     g.savefig(
         os.path.join(output_dir, output_prefix + ".log_fc.thresholded.sorted.svg"),
         bbox_inches="tight")
+
+
+def assess_cell_cycle(analysis, quant_matrix=None, output_dir=None, output_prefix="cell_cycle_assessment"):
+    """
+    Predict cell cycle phase from expression data.
+
+    :param analysis: [description]
+    :type analysis: [type]
+    :param quant_matrix: [description], defaults to None
+    :type quant_matrix: [type], optional
+    :param output_dir: [description], defaults to None
+    :type output_dir: [type], optional
+    :param output_prefix: [description], defaults to "cell_cycle_assessment"
+    :type output_prefix: str, optional
+    :returns: [description]
+    :rtype: {[type]}
+    """
+    from scipy.stats import zscore
+    import anndata
+    import scanpy.api as sc
+    from ngs_toolkit.rnaseq import knockout_plot
+
+    if quant_matrix is None:
+        quant_matrix = analysis.expression
+
+    # quant_matrix = pd.read_csv(os.path.join(
+    #         "results",
+    #         "arid1a_rnaseq.expression_counts.gene_level.quantile_normalized.log2_tpm.csv"),
+    #     index_col=0)
+    exp_z = pd.DataFrame(
+        zscore(quant_matrix, axis=0),
+        index=quant_matrix.index, columns=quant_matrix.columns)
+
+    # Score samples for cell cycle
+    cl = "https://raw.githubusercontent.com/theislab/scanpy_usage/master/"
+    cl += "180209_cell_cycle/data/regev_lab_cell_cycle_genes.txt"
+    cc_prots = pd.read_csv(cl, header=None).squeeze()
+    s_genes = cc_prots[:43].tolist()
+    g2m_genes = cc_prots[43:].tolist()
+    cc_prots = [x for x in cc_prots if x in quant_matrix.index.tolist()]
+
+    knockout_plot(
+        knockout_genes=cc_prots,
+        output_prefix=output_prefix + ".gene_expression.zscore0",
+        expression_matrix=exp_z)
+
+    adata = anndata.AnnData(exp_z.T)
+    sc.pp.scale(adata)
+    sc.tl.score_genes_cell_cycle(adata, s_genes=s_genes, g2m_genes=g2m_genes)
+
+    preds = adata.obs
+
+    fig, axis = plt.subplots(
+        1, 2, figsize=(4 * 2, 4), sharex=True, sharey=True)
+    for ax in axis:
+        ax.axhline(0, alpha=0.5, linestyle="--", color="black")
+        ax.axvline(0, alpha=0.5, linestyle="--", color="black")
+        ax.set_xlabel("S-phase score")
+        ax.set_ylabel("G2/M-phase score")
+    for phase in preds['phase']:
+        axis[0].scatter(
+            preds.loc[preds['phase'] == phase, 'S_score'],
+            preds.loc[preds['phase'] == phase, 'G2M_score'],
+            label=phase, alpha=0.5, s=5)
+        axis[1].scatter(
+            preds.loc[(preds['phase'] == phase) & (preds.index.str.contains("HAP1")), 'S_score'],
+            preds.loc[(preds['phase'] == phase) & (preds.index.str.contains("HAP1")), 'G2M_score'],
+            label=phase, alpha=0.5, s=5)
+    for s in preds.index:
+        axis[0].text(preds.loc[s, "S_score"], preds.loc[s, "G2M_score"], s=s, fontsize=6)
+    for s in preds.index[preds.index.str.contains("HAP1")]:
+        axis[1].text(preds.loc[s, "S_score"], preds.loc[s, "G2M_score"], s=s, fontsize=6)
+    axis[0].set_title("All samples")
+    axis[1].set_title("HAP1 samples")
+    fig.savefig(os.path.join(
+            output_dir, output_prefix + ".cell_cycle_prediction.svg"),
+        dpi=300, bbox_inches="tight")
+
+    return preds

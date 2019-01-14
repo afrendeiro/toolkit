@@ -54,7 +54,6 @@ class Analysis(object):
             name="analysis",
             samples=None,
             prj=None,
-            genome=None,
             data_dir="data",
             results_dir="results",
             pickle_file=None,
@@ -66,7 +65,6 @@ class Analysis(object):
         self.results_dir = results_dir
         self.samples = samples
         self.prj = prj
-        self.genome = genome
         self.pickle_file = pickle_file
 
         # parse remaining kwargs
@@ -86,13 +84,18 @@ class Analysis(object):
                 os.makedirs(directory)
 
         # Store projects attributes in self
-        self.set_attributes(overwrite=False)
+        _LOGGER.debug("Trying to set analysis attributes.")
+        self.set_project_attributes(overwrite=False)
 
         # Try to set genome if not set
-        if self.genome is None:
-            _LOGGER.debug("Trying to get analysis genome.")
-            self.set_genome_assembly()
+        self.organism, self.genome = (None, None)
+        _LOGGER.debug("Trying to get analysis genome.")
+        self.set_organism_genome()
         # TODO: if genome is set, get required static files for that genome assembly
+
+        # Add sample input file locations
+        _LOGGER.debug("Trying to set sample input file attributes.")
+        self.set_samples_input_files()
 
         _LOGGER.debug("Setting data type-specific attributes to None.")
         attrs = [
@@ -106,9 +109,94 @@ class Analysis(object):
     def __repr__(self):
         t = "'{}' analysis".format(self.data_type) if self.data_type is not None else "Analysis"
         samples = " with {} samples".format(len(self.samples)) if self.samples is not None else ""
-        genome = " of genome '{}'".format(self.genome) if self.genome is not None else ""
+        organism = " of organism '{}'".format(self.organism) if self.organism is not None else ""
+        genome = " ({})".format(self.genome) if self.genome is not None else ""
         suffix = "."
-        return t + " object named '{}'".format(self.name) + samples + genome + suffix
+        return t + " object '{}'".format(self.name) + samples + organism + genome + suffix
+
+    @staticmethod
+    def _overwride_sample_representation():
+        from peppy import Sample
+
+        def r(self): return self.name
+        Sample.__repr__ = r
+
+    @staticmethod
+    def _format_string_with_attributes(obj, string):
+        """
+        Detect whether a string should be formatted with attributes from obj.
+
+        :param obj: [description]
+        :type obj: [type]
+        :param string: [description]
+        :type string: [type]
+        :returns: [description]
+        :rtype: {[type]}
+        :raises: NotImplementedError
+        """
+        # TODO: implement
+        # Detect if string contains formattable fields
+        # if all vaiables are present, format accordingly
+        raise NotImplementedError
+        return string.format()
+
+    @staticmethod
+    def _check_data_type_is_supported(data_type):
+        # TODO: test
+        supported = _CONFIG['supported_data_types']
+        return data_type in supported
+
+    @staticmethod
+    def _check_organism_genome(analysis):
+        # TODO: test
+        attrs = ['organism', 'genome']
+        msg = "Analysis does not have 'organism' or 'genome' attributes set."
+        hint = " You can set them with analysis.set_organism_genome, for example."
+        r1 = all([hasattr(analysis, attr) for attr in attrs])
+        r2 = all([getattr(analysis, attr) is not None for attr in attrs])
+        if not all([r1, r2]):
+            _LOGGER.error(msg + hint)
+            raise AttributeError(msg)
+        return True
+
+    @staticmethod
+    def _check_has_sites(analysis):
+        if not hasattr(analysis, "sites"):
+            msg = "Analysis object does not have a `sites` attribute."
+            hint = " Produce one with analysis.get_consensus_sites for example."
+            _LOGGER.error(msg + hint)
+            raise AttributeError(msg)
+        return True
+
+    def _get_data_type(self, data_type=None):
+        # TODO: test
+        if data_type is None:
+            msg = "Data type not defined and Analysis object does not have"
+            msg += " a `data_type` attribute."
+            try:
+                data_type = self.data_type
+            except AttributeError as e:
+                _LOGGER.error(msg)
+                raise e
+            if data_type is None:
+                _LOGGER.error(msg)
+                raise ValueError
+        else:
+            msg = "Data type is not supported."
+            hint = " Check which data types are supported in the 'supported_data_types'"
+            hint += " section of the configuration file."
+            if not self._check_data_type_is_supported(data_type):
+                raise ValueError(msg + hint)
+        return data_type
+
+    def _check_samples_have_file(self, attr, f=all):
+        return f([os.path.exists(str(getattr(sample, attr))) for sample in self.samples])
+
+    def _get_samples_have_file(self, attr):
+        return [sample for sample in self.samples if os.path.exists(str(getattr(sample, attr)))]
+
+    def _get_samples_missing_file(self, attr):
+        return [sample for sample in self.samples if not os.path.exists(str(getattr(sample, attr)))]
 
     def update(self, pickle_file=None):
         """
@@ -121,10 +209,17 @@ class Analysis(object):
         """
         self.__dict__.update(self.from_pickle(pickle_file=pickle_file).__dict__)
 
-    def set_genome_assembly(self):
+    def set_organism_genome(self):
         if self.samples is None:
             _LOGGER.warning("Genome assembly for analysis was not set and cannot be derived from samples.")
         else:
+            organisms = list(set([s.organism for s in self.samples]))
+            if len(organisms) == 1:
+                _LOGGER.info("Setting analysis organism as '{}'.".format(organisms[0]))
+                self.organism = organisms[0]
+            else:
+                _LOGGER.warning("Found several organism for the various analysis samples. " +
+                                "Will not set a organism for analysis.")
             genomes = list(set([s.genome for s in self.samples]))
             if len(genomes) == 1:
                 _LOGGER.info("Setting analysis genome as '{}'.".format(genomes[0]))
@@ -133,55 +228,88 @@ class Analysis(object):
                 _LOGGER.warning("Found several genome assemblies for the various analysis samples. " +
                                 "Will not set a genome for analysis.")
 
-    def set_attributes(self, overwrite=True):
+    def set_project_attributes(self, overwrite=True):
         """
         Set Analysis object attributes ``samples``, ``sample_attributes`` and ``group_atrributes``
         to the values in the associated Project object if existing.
+
+        :param overwrite: Whether to overwrite attribute values if existing. Defaults to True
+        :type overwrite: bool, optional
         """
         hint = " Adding a '{}' section to your project configuration file allows the analysis"
         hint += " object to use those attributes during the analysis."
         if self.prj is not None:
-            for attr in ["samples", "sample_attributes", "group_attributes"]:
-                if not hasattr(self.prj, "samples"):
+            for attr, parent in [
+                    ("samples", self.prj), ("sample_attributes", self.prj),
+                    ("group_attributes", self.prj), ("comparison_table", self.prj.metadata)]:
+                if not hasattr(parent, attr):
                     _LOGGER.warning("Associated project does not have any '{}'.".format(attr) +
                                     hint.format(attr) if attr != "samples" else "")
                 else:
                     msg = "Setting project's '{0}' as the analysis '{0}'.".format(attr)
                     if overwrite:
                         _LOGGER.info(msg)
-                        setattr(self, attr, getattr(self.prj, attr))
+                        setattr(self, attr, getattr(parent, attr))
                     else:
-                        if self.samples is None:
+                        if not hasattr(self, attr):
                             _LOGGER.info(msg)
-                            setattr(self, attr, getattr(self.prj, attr))
+                            setattr(self, attr, getattr(parent, attr))
                         else:
-                            _LOGGER.debug("Samples already exist for analysis, not overwriting.")
-            # comparison table is under "prj.metadata"
-            for attr in ["comparison_table"]:
-                if not hasattr(self.prj, "samples"):
-                    _LOGGER.warning("Associated project does not have any '{}'.".format(attr))
-                else:
-                    msg = "Setting project's '{0}' as the analysis '{0}'.".format(attr)
-                    if overwrite:
-                        _LOGGER.info(msg)
-                        setattr(self, attr, pd.read_csv(getattr(self.prj.metadata, attr)))
-                    else:
-                        if self.samples is None:
-                            _LOGGER.info(msg)
-                            setattr(self, attr, pd.read_csv(getattr(self.prj.metadata, attr)))
-                        else:
-                            _LOGGER.debug("Samples already exist for analysis, not overwriting.")
+                            if getattr(self, attr) is None:
+                                setattr(self, attr, getattr(parent, attr))
+                            else:
+                                _LOGGER.debug("{} already exist for analysis, not overwriting."
+                                              .format(attr.replace("_", " ").capitalize()))
+            if hasattr(self, "comparison_table"):
+                if isinstance(self.comparison_table, str):
+                    _LOGGER.debug("Reading up comparison table.")
+                    self.comparison_table = pd.read_csv(self.comparison_table)
         else:
             _LOGGER.warning("Analysis object does not have an attached Project. " +
                             "Will not add special attributes to analysis such as " +
                             "samples, their attributes and comparison table.")
 
-    @staticmethod
-    def _overwride_sample_representation():
-        from peppy import Sample
+    def set_samples_input_files(self, overwrite=True):
+        """
+        Add input file values to sample objects dependent on data type.
+        These are specified in the `ngs_toolkit` configuration file
+        under 'sample_input_files:<data type>:<attribute>'.
 
-        def r(self): return self.name
-        Sample.__repr__ = r
+        :param overwrite: Whether to overwrite attribute values if existing. Defaults to True
+        :type overwrite: bool, optional
+        """
+        if self.samples is None:
+            _LOGGER.error("Analysis object does not have attached Samples. " +
+                          "Will not add special attributes to samples such as " +
+                          "input file locations.")
+            return
+
+        msg = "Setting '{}' in sample {} as '{}'."
+        for data_type in _CONFIG['sample_input_files']:
+            for attr, value in _CONFIG['sample_input_files'][data_type].items():
+                for s in [s for s in self.samples if s.protocol == data_type]:
+                    if value is None:
+                        pass
+                    elif ("{data_dir}" in value) and ("{sample_name}" in value):
+                        value = value.format(data_dir=self.data_dir, sample_name=s.name)
+                    elif "{data_dir}" in value:
+                        value = value.format(data_dir=self.data_dir)
+                    elif "{sample_name}" in value:
+                        value = value.format(sample_name=s.name)
+                    if overwrite:
+                        _LOGGER.info(msg.format(attr, s.name, value))
+                        setattr(s, attr, value)
+                    else:
+                        if not hasattr(s, attr):
+                            _LOGGER.info(msg.format(attr, s.name, value))
+                            setattr(s, attr, value)
+                        else:
+                            if getattr(s, attr) is None:
+                                _LOGGER.info(msg.format(attr, s.name, value))
+                                setattr(s, attr, value)
+                            else:
+                                _LOGGER.debug("{} already exists in sample, not overwriting."
+                                              .format(attr.replace("_", " ").capitalize()))
 
     def to_pickle(self, timestamp=False):
         """
@@ -210,8 +338,150 @@ class Analysis(object):
             pickle_file = self.pickle_file
         return pickle.load(open(pickle_file, 'rb'))
 
+    def get_matrix(self, matrix=None, matrix_name=None, samples=None):
+        """
+        Return a matrix that is an attribute of self subsetted for the requested samples.
+
+        :param pandas.DataFrame matrix: Pandas DataFrame.
+        :param list samples: Iterable of peppy.Sample objects to restrict matrix to.
+                             If not provided (`None` is passed) the matrix will not be subsetted.
+        :param str matrix_name: Name of the matrix that is an attribute of the object
+                                with values for samples in `samples`.
+        :returns pandas.DataFrame: Requested DataFrame.
+        """
+        if (matrix is None) & (matrix_name is None):
+            msg = "Either arguments `matrix` or `matrix_name` must be provided."
+            _LOGGER.error(msg)
+            raise ValueError(msg)
+        # default to matrix to be normalized
+        if matrix is None:
+            r_matrix = getattr(self, matrix_name)
+        else:
+            r_matrix = matrix
+        # default to all samples in self with matching names in matrix
+        if samples is None:
+            r_matrix = r_matrix.loc[:, [s.name for s in self.samples]]
+        else:
+            r_matrix = r_matrix.loc[:, [s.name for s in samples]]
+
+        return r_matrix
+
+    def annotate_with_sample_metadata(
+            self,
+            quant_matrix=None,
+            attributes=None,
+            numerical_attributes=None,
+            save=True,
+            assign=True):
+        """
+        Annotate matrix ``(n_regions, n_samples)`` with sample metadata
+        (creates MultiIndex on columns). Numerical attributes can be pass as a iterable
+        to ``numerical_attributes`` to be converted.
+
+        :param str quant_matrix: Attribute name of matrix to annotate. By default this will
+                                 be infered from the analysis data_type in the following way:
+                                 ATAC-seq or ChIP-seq: ``coverage_annotated``;
+                                 RNA-seq: ``expression_annotated``.
+        :param list attributes: Desired attributes to be annotated. This defaults
+                                to all attributes in the original sample annotation sheet
+                                of the analysis Project.
+        :param list numerical_attributes: Attributes which are numeric even though they
+                                          might be so in the samples' attributes. Will attempt
+                                          to convert values to numeric.
+        :param bool save: Whether to write normalized DataFrame to disk.
+        :param bool assign: Whether to assign the normalized DataFrame to an attribute
+                            ``accessibility`` if ``data_type`` is "ATAC-seq,
+                            ``binding`` if ``data_type`` is "ChIP-seq, or
+                            ``expression`` if ``data_type`` is "RNA-seq.
+        :var pd.DataFrame {accessibility,binding,expression}: A pandas DataFrame with
+                                                              MultiIndex column index
+                                                              containing the sample's
+                                                              attributes specified.
+        :returns pd.DataFrame: Annotated dataframe with requested sample attributes.
+        """
+        if (attributes is None) and hasattr(self, "sample_attributes"):
+            _LOGGER.info("Using 'sample_attributes' from analysis to annotate matrix: {}"
+                         .format(",".join(self.sample_attributes)))
+            attributes = self.sample_attributes
+        if (attributes is None) and hasattr(self, "prj"):
+            _LOGGER.warn(
+                "Analysis has no 'sample_attributes' set. " +
+                "Will use all columns from project annotation sheet: {}"
+                .format(",".join(self.prj.sheet.columns)))
+            attributes = self.prj.sheet.columns
+        if attributes is None:
+            msg = "Attributes not given and could not be set from Analysis or Project."
+            raise ValueError(msg)
+
+        if self.data_type == "ATAC-seq":
+            output_matrix = "accessibility"
+            if quant_matrix is None:
+                quant_matrix = "coverage_annotated"
+        elif self.data_type == "ChIP-seq":
+            output_matrix = "binding"
+            if quant_matrix is None:
+                quant_matrix = "coverage_annotated"
+        elif self.data_type == "CNV":
+            output_matrix = "cnv"
+            if quant_matrix is None:
+                if type(getattr(self, quant_matrix)) is not pd.DataFrame:
+                    _LOGGER.error("For CNV data type, the matrix to be annotated must be" +
+                                  " directly passed to the function throught the `quant_matrix` argument!")
+                    raise ValueError
+            if quant_matrix is None:
+                quant_matrix = "coverage_norm"
+        elif self.data_type == "RNA-seq":
+            output_matrix = "expression"
+            if quant_matrix is None:
+                quant_matrix = "expression_annotated"
+        else:
+            _LOGGER.warning("Data type of object not known, will not set as attribute.")
+            assign = False
+            output_matrix = ""
+            if quant_matrix is None:
+                msg = "Data type of object not known, must specify `quant_matrix` to annotate!"
+                raise ValueError(msg)
+
+        matrix = getattr(self, quant_matrix)
+
+        if type(matrix.columns) is pd.core.indexes.multi.MultiIndex:
+            matrix.columns = matrix.columns.get_level_values("sample_name")
+
+        samples = [s for s in self.samples if s.name in matrix.columns.tolist()]
+
+        attrs = list()
+        for attr in attributes:
+            _LOGGER.debug("Attribute: '{}'".format(attr))
+            ll = list()
+            for sample in samples:  # keep order of samples in matrix
+                try:
+                    ll.append(getattr(sample, attr))
+                except AttributeError:
+                    ll.append(np.nan)
+            if numerical_attributes is not None:
+                if attr in numerical_attributes:
+                    ll = [float(x) for x in ll]
+            attrs.append(ll)
+
+        # Generate multiindex columns
+        index = pd.MultiIndex.from_arrays(attrs, names=attributes)
+        df = matrix[[s.name for s in samples]]
+        df.columns = index
+
+        # Save
+        if save:
+            df.to_csv(
+                os.path.join(
+                    self.results_dir,
+                    self.name + "{}.annotated_metadata.csv"
+                        .format("." + output_matrix if output_matrix != "" else output_matrix)),
+                index=True)
+        if assign:
+            setattr(self, output_matrix, df)
+        return df
+
     def get_level_colors(
-            self, index=None, matrix="accessibility", levels=None,
+            self, index=None, matrix=None, levels=None,
             pallete="tab20", cmap="RdBu_r", nan_color=(0.662745, 0.662745, 0.662745, 1.0),
             # TODO: implement dataframe return
             as_dataframe=False):
@@ -219,8 +489,9 @@ class Analysis(object):
         Get tuples of floats representing a colour for a sample in a given variable in a
         dataframe's index (particularly useful with MultiIndex dataframes).
 
-        By default, will act on the columns and its levels of an `matrix` dataframe of self.
-        Other ``index`` and ``levels`` can be passed for customization.
+        If given, will use the provieded ``index`` argument, otherwise, the the columns
+        and its levels of an attribute of self named ``matrix``.
+        ``levels`` can be passed to subset the levels of the index.
 
         Will try to guess if each variable is categorical or numerical and return either colours
         from a colour ``pallete`` or a ``cmap``, respectively with null values set to ``nan_color``
@@ -230,7 +501,7 @@ class Analysis(object):
         the column Index of the provided ``matrix``.
         :type index: pandas.Index, optional
         :param matrix: Name of analysis attribute containing a dataframe with pandas.MultiIndex
-                       columns to use. Defaults to ``accessibility``.
+                       columns to use.
         :type matrix: str, optional
         :param levels: Levels of multiindex to restrict to. Defaults to all in index.
         :type levels: list, optional
@@ -258,6 +529,10 @@ class Analysis(object):
         from collections import Counter
 
         if index is None:
+            if matrix is None:
+                msg = "One of `index` or `matrix` must be provided."
+                _LOGGER.error(msg)
+                raise ValueError(msg)
             index = getattr(self, matrix).columns
 
         if levels is not None:
@@ -311,108 +586,453 @@ class Analysis(object):
 
         return colors
 
-    def annotate_with_sample_metadata(
-            self,
-            quant_matrix=None,
-            attributes=None,
-            numerical_attributes=None,
-            save=True,
-            assign=True):
-        """
-        Annotate matrix ``(n_regions, n_samples)`` with sample metadata
-        (creates MultiIndex on columns). Numerical attributes can be pass as a iterable
-        to ``numerical_attributes`` to be converted.
 
-        :param str quant_matrix: Attribute name of matrix to annotate. By default this will
-                                 be infered from the analysis data_type in the following way:
-                                 ATAC-seq or ChIP-seq: ``coverage_annotated``;
-                                 RNA-seq: ``expression_annotated``.
-        :param list attributes: Desired attributes to be annotated. This defaults
-                                to all attributes in the original sample annotation sheet
-                                of the analysis Project.
-        :param list numerical_attributes: Attributes which are numeric even though they
-                                          might be so in the samples' attributes. Will attempt
-                                          to convert values to numeric.
-        :param bool save: Whether to write normalized DataFrame to disk.
-        :param bool assign: Whether to assign the normalized DataFrame to an attribute
-                            ``accessibility`` if ``data_type`` is "ATAC-seq,
-                            ``binding`` if ``data_type`` is "ChIP-seq, or
-                            ``expression`` if ``data_type`` is "RNA-seq.
-        :var pd.DataFrame {accessibility,binding,expression}: A pandas DataFrame with
-                                                              MultiIndex column index
-                                                              containing the sample's
-                                                              attributes specified.
-        :returns pd.DataFrame: Annotated dataframe with requested sample attributes.
-        """
-        if attributes is None:
-            attributes = self.prj.sheet.columns
+def get_genome_reference(
+        organism, genome_assembly=None, output_dir=None,
+        genome_provider="UCSC", file_format="fasta", dry_run=False):
+    """
+    Get genome FASTA/2bit file.
+    Saves results to disk and returns path to file.
 
-        if self.data_type == "ATAC-seq":
-            output_matrix = "accessibility"
-            if quant_matrix is None:
-                quant_matrix = "coverage_annotated"
-        elif self.data_type == "ChIP-seq":
-            output_matrix = "binding"
-            if quant_matrix is None:
-                quant_matrix = "coverage_annotated"
-        elif self.data_type == "CNV":
-            output_matrix = "cnv"
-            if quant_matrix is None:
-                if type(getattr(self, quant_matrix)) is not pd.DataFrame:
-                    _LOGGER.error("For CNV data type, the matrix to be annotated must be" +
-                                  " directly passed to the function throught the `quant_matrix` argument!")
-                    raise ValueError
-            if quant_matrix is None:
-                quant_matrix = "coverage_norm"
-        elif self.data_type == "RNA-seq":
-            output_matrix = "expression"
-            if quant_matrix is None:
-                quant_matrix = "expression_annotated"
-        else:
-            _LOGGER.warning("Data type of object not known, will not set as attribute.")
-            assign = False
-            output_matrix = ""
-            if quant_matrix is None:
-                msg = "Data type of object not known, must specify `quant_matrix` to annotate!"
-                raise ValueError(msg)
+    :param organism: Organism to get annotation for. Currently supported: "human" and "mouse".
+    :type organism: str
+    :param output_dir: Directory to write output to. Defaults to current directory
+    :type output_dir: str, optional
+    :param genome_provider: Which genome provider to use. One of 'UCSC' or 'Ensembl'.
+    :type genome_provider: str, optional
+    :param file_format: File format to get. One of 'fasta' or '2bit'.
+    :type file_format: str, optional
+    :param dry_run: Whether to not download and just return path to file.
+    :type dry_run: bool, optional
 
-        matrix = getattr(self, quant_matrix)
+    :returns: If not ``dry_run``, path to genome FASTA/2bit file,
+              otherwise tuple of URL of reference genome and path to file.
+    :rtype: str | tuple
+    """
+    from ngs_toolkit.general import download_gzip_file, download_file
+    import pybedtools
 
-        if type(matrix.columns) is pd.core.indexes.multi.MultiIndex:
-            matrix.columns = matrix.columns.get_level_values("sample_name")
+    if output_dir is None:
+        output_dir = os.path.join(os.path.abspath(os.path.curdir), "reference")
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
 
-        samples = [s for s in self.samples if s.name in matrix.columns.tolist()]
+    opts = ['UCSC', 'Ensembl']
+    if genome_provider not in opts:
+        msg = "`genome_provider` attribute must be one of '{}'.".format(", ".join(opts))
+        _LOGGER.error(msg)
+        raise ValueError(msg)
 
-        attrs = list()
-        for attr in attributes:
-            _LOGGER.info(attr)
-            l = list()
-            for sample in samples:  # keep order of samples in matrix
-                try:
-                    l.append(getattr(sample, attr))
-                except AttributeError:
-                    l.append(np.nan)
-            if numerical_attributes is not None:
-                if attr in numerical_attributes:
-                    l = [float(x) for x in l]
-            attrs.append(l)
+    opts = ['fasta', '2bit']
+    if file_format not in opts:
+        msg = "`file_format` attribute must be one of '{}'.".format(", ".join(opts))
+        _LOGGER.error(msg)
+        raise ValueError(msg)
 
-        # Generate multiindex columns
-        index = pd.MultiIndex.from_arrays(attrs, names=attributes)
-        df = matrix[[s.name for s in samples]]
-        df.columns = index
+    if (genome_provider == "Ensembl") and (file_format == '2bit'):
+        msg = "Ensembl does not provide 2bit files."
+        hint = " Use for example 'faToTwoBit' to convert the FASTA file."
+        _LOGGER.error(msg + hint)
+        raise ValueError(msg)
+    if (genome_provider == "UCSC") and (file_format == 'fasta') and (genome_assembly == 'hg19'):
+        msg = "UCSC does not provide FASTA files for the hg19 assembly."
+        hint = " Download a 2bit file and use for example 'TwoBitToFa' to convert."
+        _LOGGER.error(msg + hint)
+        raise ValueError(msg)
 
-        # Save
+    if genome_provider == "UCSC":
+        organisms = {
+            "human": "hg19", "hsapiens": "hg19", "homo_sapiens": "hg19",
+            "mouse": "mm10", "mmusculus": "mm10", "mus_musculus": "mm10"}
+        base_link = "http://hgdownload.cse.ucsc.edu/goldenPath/{assembly}/bigZips/{assembly}"
+        base_link += '.fa.gz' if file_format == 'fasta' else '.2bit'
+        if genome_assembly is None:
+            genome_assembly = organisms[organism]
+        url = base_link.format(assembly=genome_assembly)
+
+    elif genome_provider == "Ensembl":
+        organisms = {
+            "human": {"long_species": "homo_sapiens", "version": "grch37", "release": "75"},
+            "hsapiens": {"long_species": "homo_sapiens", "version": "grch37", "release": "75"},
+            "homo_sapiens": {"long_species": "homo_sapiens", "version": "grch37", "release": "75"},
+            "mouse": {"long_species": "mus_musculus", "version": "grcm38", "release": "94"},
+            "mmusculus": {"long_species": "mus_musculus", "version": "grcm38", "release": "94"},
+            "mus_musculus": {"long_species": "mus_musculus", "version": "grcm38", "release": "94"}}
+        if genome_assembly is None:
+            genome_assembly = organisms[organism]['version'].replace("grc", "GRC")
+        base_link = "ftp://ftp.ensembl.org/pub/release-{release}/fasta/{long_organism}/dna/"
+        base_link += "{Clong_organism}.{assembly}."
+        base_link += "{}.".format(organisms[organism]['release']) if genome_assembly.endswith("37") else ""
+        base_link += "{sequence_type}.{id_type}.{id}fa.gz".format(
+            sequence_type="dna", id_type="primary_assembly", id="")
+        url = base_link.format(release=organisms[organism]['release'],
+                               long_organism=organisms[organism]['long_species'],
+                               Clong_organism=organisms[organism]['long_species'].capitalize(),
+                               assembly=genome_assembly)
+
+    genome_file = os.path.join(output_dir, "{}.{}.fa".format(organism, genome_assembly))
+
+    # create .fai index for fasta file
+    if file_format == 'fasta':
+        if not dry_run:
+            download_gzip_file(url, genome_file)
+            bed = pd.DataFrame([['chr1', 1, 2]])
+            try:
+                bed = pybedtools.BedTool().from_dataframe(bed)
+                bed.nucleotide_content(fi=genome_file)
+            # The idea is to use a hidden method of bedtools
+            # to create an index (to skip having e.g. samtools as dependency)
+            # and use the bedtool nuc command to to do it.
+            # This actually fails to get nucleotide content every time due to this 'bug':
+            # https://github.com/daler/pybedtools/issues/147
+            # but nonetheless creates an index :whatever:
+            except pybedtools.helpers.BEDToolsError:
+                pass
+            return genome_file
+    else:
+        if not dry_run:
+            download_file(url, genome_file)
+            return genome_file
+
+    return (url, genome_file)
+
+
+def get_blacklist_annotations(
+        organism, genome_assembly=None, output_dir=None):
+    """
+    Get annotations of blacklisted genomic regions for a given organism/genome assembly.
+    Saves results to disk and returns a path to a BED file.
+
+    :param organism: Organism to get annotation for. Currently supported: "human" and "mouse".
+    :type organism: str
+    :param genome_assembly: Ensembl assembly/version to use.
+                       Default for "human" is "hg19/grch37" and for "mouse" is "mm10/grcm38".
+    :type genome_assembly: str, optional
+    :param output_dir: Directory to write output to. Defaults to "reference" in current directory.
+    :type output_dir: str, optional
+    :returns: Path to blacklist BED file
+    :rtype: str
+    """
+    from ngs_toolkit.general import download_gzip_file
+    if output_dir is None:
+        output_dir = os.path.join(os.path.abspath(os.path.curdir), "reference")
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+    organisms = {
+        "human": "hg19",
+        "mouse": "mm10"}
+    if genome_assembly is None:
+        genome_assembly = organisms[organism]
+        _LOGGER.warn("Genome assembly not selected. Using assembly '{}' for '{}'."
+                     .format(genome_assembly, organism))
+    url = "http://mitra.stanford.edu/kundaje/akundaje/release/blacklists/"
+    if genome_assembly not in ['hg19']:
+        url += "{0}-{1}/{0}.blacklist.bed.gz".format(genome_assembly, organism)
+    else:
+        url += "{0}-human/wgEncodeHg19ConsensusSignalArtifactRegions.bed.gz".format(genome_assembly)
+    output = os.path.join(output_dir, "{}.{}.blacklist.bed"
+                          .format(organism, genome_assembly))
+
+    download_gzip_file(url, output)
+    return output
+
+
+def get_tss_annotations(
+        organism, genome_assembly=None, save=True, output_dir=None, chr_prefix=True,
+        gene_types=['protein_coding', 'processed_transcript', 'lincRNA', 'antisense']):
+    """
+    Get annotations of TSS for a given organism/genome assembly.
+    This is a simple approach using Biomart's API querying the Ensembl database.
+    Saves results to disk and returns a dataframe.
+
+    :param organism: Organism to get annotation for. Currently supported: "human" and "mouse".
+    :type organism: str
+    :param genome_assembly: Ensembl assembly/version to use.
+                       Default for "human" is "grch37" and for "mouse" is "grcm38".
+    :type genome_assembly: str, optional
+    :param save: Whether to save to disk under ``output_dir``. Defaults to True.
+    :type save: bool, optional
+    :param output_dir: Directory to write output to. Defaults to "reference" in current directory.
+    :type output_dir: str, optional
+    :param chr_prefix: Whether chromosome names should have the "chr" prefix. Defaults to True
+    :type chr_prefix: bool, optional
+    :param gene_types: Subset of transcript biotypes to keep.
+                              See here the available biotypes https://www.ensembl.org/Help/Faq?id=468
+                              Defaults to 'protein_coding', 'processed_transcript', 'lincRNA', 'antisense'.
+    :type gene_types: list, optional
+    :returns: DataFrame with genome annotations
+    :rtype: pandas.DataFrame
+    """
+    from ngs_toolkit.general import query_biomart
+    organisms = {
+        "human": {"species": "hsapiens", "ensembl_version": "grch37"},
+        "mouse": {"species": "mmusculus", "ensembl_version": "grcm38"}
+    }
+
+    if genome_assembly is None:
+        genome_assembly = organisms[organism]['ensembl_version']
+    if genome_assembly == "hg19":
+        genome_assembly = "grch37"
+    if genome_assembly == "hg38":
+        genome_assembly = "grch38"
+    if genome_assembly == "mm10":
+        genome_assembly = "grcm38"
+
+    if save:
+        if output_dir is None:
+            output_dir = os.path.join(os.path.abspath(os.path.curdir), "reference")
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+
+    attributes = [
+        "chromosome_name", "start_position",
+        "ensembl_gene_id", "external_gene_name",
+        "strand", "transcript_biotype"]
+    res = query_biomart(
+        attributes=attributes,
+        species=organisms[organism]['species'],
+        ensembl_version=genome_assembly)
+
+    if gene_types is None:
+        res = res.drop(['transcript_biotype'], axis=1).drop_duplicates()
+    else:
+        res = res.loc[res['transcript_biotype'].isin(gene_types), :]
+    if chr_prefix:
+        res.loc[:, 'chromosome_name'] = "chr" + res['chromosome_name']
+    res.loc[:, 'start_position'] = res['start_position'].astype(int)
+    res.loc[:, 'strand'] = res['strand'].replace("1", "+").replace("-1", "-")
+    res.loc[:, 'end'] = res.apply(
+        lambda x: x['start_position'] + 1 if x['strand'] == "+" else x['start_position'],
+        axis=1)
+    res.loc[:, 'start_position'] = res.apply(
+        lambda x: x['start_position'] - 1 if x['strand'] == "-" else x['start_position'],
+        axis=1)
+
+    # drop same gene duplicates if starting in same position but just annotated with
+    # different biotypes
+    res = (
+        res[attributes[:2] + ["end"] + attributes[2:]]
+        .sort_values(by=res.columns.tolist(), axis=0)
+        .drop_duplicates(subset=res.columns[:3], keep="last"))
+
+    # make real BED format
+    res.loc[:, 'fill'] = '.'
+    cols = [
+        'chromosome_name', 'start_position', 'end', 'external_gene_name',
+        'fill', 'strand', 'ensembl_gene_id', 'transcript_biotype']
+    res = res.loc[:, cols]
+    res.columns = [
+        'chr', 'start', 'end', 'gene_name', 'score', 'strand',
+        'ensembl_gene_id', 'transcript_biotype']
+
+    # save
+    if save:
+        res.to_csv(
+            os.path.join(output_dir, "{}.{}.gene_annotation.tss.bed"
+                         .format(organism, genome_assembly)),
+            index=False, header=False, sep="\t")
+
+        res[res['transcript_biotype'] == "protein_coding"].drop(attributes[-1], axis=1).to_csv(
+            os.path.join(output_dir, "{}.{}.gene_annotation.protein_coding.tss.bed"
+                         .format(organism, genome_assembly)),
+            index=False, header=False, sep="\t")
+
+    return res
+
+
+def get_genomic_context(
+        organism, genome_assembly=None, save=True, output_dir=None, chr_prefix=True,
+        region_subset=['promoter', 'exon', '5utr', '3utr', 'intron', 'genebody', 'intergenic'],
+        gene_types=['protein_coding', 'processed_transcript', 'lincRNA', 'antisense'],
+        promoter_width=3000):
+    """
+    Get annotations of TSS for a given organism/genome assembly.
+    This is a simple approach using Biomart's API querying the Ensembl database.
+    Saves results to disk and returns a dataframe.
+
+    The API call to BioMart takes a bit long, so the function should take ~4 min.
+
+    :param organism: Organism to get annotation for. Currently supported: "human" and "mouse".
+    :type organism: str
+    :param genome_assembly: Ensembl assembly/version to use.
+                       Default for "human" is "grch37" and for "mouse" is "grcm38".
+    :type genome_assembly: str, optional
+    :param save: Whether to save to disk under ``output_dir``. Defaults to True.
+    :type save: bool, optional
+    :param output_dir: Directory to write output to. Defaults to "reference" in current directory.
+    :type output_dir: str, optional
+    :param chr_prefix: Whether chromosome names should have the "chr" prefix. Defaults to True
+    :type chr_prefix: bool, optional
+    :param gene_types: Subset of transcript biotypes to keep.
+                              See here the available biotypes https://www.ensembl.org/Help/Faq?id=468
+                              Defaults to 'protein_coding', 'processed_transcript', 'lincRNA', 'antisense'.
+    :type gene_types: list, optional
+    :returns: DataFrame with genome annotations
+    :rtype: pandas.DataFrame
+    """
+    from ngs_toolkit.general import query_biomart
+    import pybedtools
+    from pybedtools import BedTool
+
+    organisms = {
+        "human": {"species": "hsapiens", "ensembl_version": "grch37", "ucsc_version": "hg19"},
+        "mouse": {"species": "mmusculus", "ensembl_version": "grcm38", "ucsc_version": "mm10"}
+    }
+
+    if genome_assembly is None:
+        genome_assembly = organisms[organism]['ucsc_version']
+        ensembl_genome_assembly = organisms[organism]['ensembl_version']
+    elif genome_assembly == "hg19":
+        ensembl_genome_assembly = "grch37"
+    elif genome_assembly == "hg38":
+        ensembl_genome_assembly = "grch38"
+    elif genome_assembly == "mm10":
+        ensembl_genome_assembly = "grcm38"
+    else:
+        _LOGGER.warning()
+        ensembl_genome_assembly = genome_assembly
+
+    if save:
+        if output_dir is None:
+            output_dir = os.path.join(os.path.abspath(os.path.curdir), "reference")
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+
+    attrs = [
+        "ensembl_gene_id", "chromosome_name", "start_position", "end_position",
+        "exon_chrom_start", "exon_chrom_end",
+        "5_utr_start", "5_utr_end", "3_utr_start", "3_utr_end",
+        "strand", "external_gene_name", "gene_biotype"]
+    res = query_biomart(
+        attributes=attrs,
+        species=organisms[organism]['species'],
+        ensembl_version=ensembl_genome_assembly)
+
+    if chr_prefix:
+        res['chromosome_name'] = "chr" + res['chromosome_name']
+
+    # Keep only desired gene types
+    res = res.loc[res['gene_biotype'].isin(gene_types), :]
+    # Get strand
+    res.loc[:, 'strand'] = res['strand'].replace("1", "+").replace("-1", "-")
+    # remove exons which are also UTRs
+
+    bed_cols = ['chromosome_name', 'start_position', 'end_position', 'strand']
+    # # Promoters = genebody:start +/- N
+    promoter = res[bed_cols].drop_duplicates()
+    for col in promoter.columns:
+        if ("start" in col) or ("end" in col):
+            promoter.loc[:, col] = promoter.loc[:, col].astype(int)
+
+    promoter.loc[promoter['strand'] == "+", 'start_position'] = (
+        promoter.loc[promoter['strand'] == "+", 'start_position'] - (promoter_width / 2))
+    promoter.loc[promoter['strand'] == "-", 'start_position'] = (
+        promoter.loc[promoter['strand'] == "-", 'end_position'] - (promoter_width / 2))  # + 1
+    promoter.loc[promoter['strand'] == "+", 'end_position'] = (
+        promoter.loc[:, 'start_position'] + (promoter_width / 2))
+    for col in bed_cols[1:3]:
+        promoter.loc[:, col] = promoter.loc[:, col].astype(int)
+
+    # # genebody = start->end + promoter
+    gb = res[bed_cols].drop_duplicates()
+    for col in gb.columns:
+        if ("start" in col) or ("end" in col):
+            gb.loc[:, col] = gb.loc[:, col].astype(int)
+    gb = gb.append(promoter)
+    for col in bed_cols[1:3]:
+        gb.loc[:, col] = gb.loc[:, col].astype(int)
+    gb = gb.sort_values(gb.columns.tolist())
+    genebody_bed = BedTool.from_dataframe(gb)
+    genebody_bed = genebody_bed.sort().merge()
+    genebody = genebody_bed.to_dataframe()
+
+    # # Exon
+    exon = (
+        res[["chromosome_name", "exon_chrom_start", "exon_chrom_end"]]
+        .drop_duplicates().dropna())
+    # # 5utr
+    utr5 = (
+        res[["chromosome_name", "5_utr_start", "5_utr_end"]]
+        .drop_duplicates().dropna())
+    # # 3utr
+    utr3 = (
+        res[["chromosome_name", "3_utr_start", "3_utr_end"]]
+        .drop_duplicates().dropna())
+    for d in [exon, utr5, utr3]:
+        for col in d.columns:
+            if ("start" in col) or ("end" in col):
+                d.loc[:, col] = d.loc[:, col].astype(int)
+
+    # # Introns = genebody - (promoter + exon + 5utr + 3utr)
+    promoter = promoter.drop(['strand'], axis=1)
+    exon.columns = utr3.columns = utr5.columns = promoter.columns = bed_cols[:3]
+    others = promoter.append(exon).append(utr5).append(utr3)
+    for col in others.columns[1:]:
+        others.loc[:, col] = others.loc[:, col].astype(int)
+    intron = genebody_bed.subtract(BedTool.from_dataframe(others))
+    intron = intron.to_dataframe()
+
+    # # Intergenic = ChromSizes - genebody
+    cs = pybedtools.get_chromsizes_from_ucsc(genome_assembly)
+    cs = pd.DataFrame(cs).T.reset_index()
+    if not chr_prefix:
+        cs['index'] = cs['index'].str.subtract("chr", "")
+    cs = BedTool.from_dataframe(cs)
+    intergenic = cs.subtract(genebody_bed)
+    intergenic = intergenic.to_dataframe()
+
+    # join all
+    features = [
+        "promoter", "genebody", "exon", "intron",
+        "utr5", "utr3", "intergenic"]
+    annot = list()
+    for name in features:
+        cur = locals()[name]
+        cur = cur.iloc[:, list(range(3))]
+        cur.columns = bed_cols[:3]
+        cur.loc[:, "region_type"] = name
         if save:
-            df.to_csv(
-                os.path.join(
-                    self.results_dir,
-                    self.name + "{}.annotated_metadata.csv"
-                        .format("." + output_matrix if output_matrix != "" else output_matrix)),
-                index=True)
-        if assign:
-            setattr(self, output_matrix, df)
-        return df
+            cur.sort_values(cur.columns.tolist()).drop('region_type', axis=1).to_csv(
+                os.path.join(output_dir, "{}.{}.genomic_context.{}.bed"
+                             .format(organism, ensembl_genome_assembly, name)),
+                index=False, header=False, sep="\t")
+        annot.append(cur)
+
+    annot = pd.concat(annot)
+    annot = annot.sort_values(annot.columns.tolist())
+
+    # save
+    if save:
+        annot.to_csv(
+            os.path.join(output_dir, "{}.{}.genomic_context.bed"
+                         .format(organism, ensembl_genome_assembly)),
+            index=False, header=False, sep="\t")
+    return annot
+
+
+def get_annotations(
+        organism, genome_assembly=None, output_dir=None,
+        steps=['blacklist', 'tss', 'genomic']):
+    """
+    Get genome annotations required for several ngs_toolkit analysis.
+    This is a simple approach using Biomart's API querying the Ensembl database..
+    Saves results to disk and returns a dataframe.
+    """
+    # TODO: test
+    from ngs_toolkit.general import (
+        get_genome_reference,
+        get_blacklist_annotations,
+        get_tss_annotations,
+        get_genomic_context)
+
+    if 'fasta' in steps:
+        get_genome_reference(organism=organism, genome_assembly=genome_assembly)
+    if 'blacklist' in steps:
+        get_blacklist_annotations(organism=organism, genome_assembly=genome_assembly)
+    if 'tss' in steps:
+        get_tss_annotations(organism=organism, genome_assembly=genome_assembly)
+    if 'genomic' in steps:
+        get_genomic_context(organism=organism, genome_assembly=genome_assembly)
 
 
 def count_reads_in_intervals(bam, intervals):
@@ -461,6 +1081,9 @@ def normalize_quantiles_r(array):
     import numpy as np
     import rpy2.robjects as robjects
     import rpy2.robjects.numpy2ri
+    import warnings
+    from rpy2.rinterface import RRuntimeWarning
+    warnings.filterwarnings("ignore", category=RRuntimeWarning)
     rpy2.robjects.numpy2ri.activate()
 
     robjects.r('require("preprocessCore")')
@@ -494,7 +1117,7 @@ def normalize_quantiles_p(df_input):
 
 def unsupervised_analysis(
         analysis,
-        data_type="ATAC-seq",
+        data_type=None,
         quant_matrix=None,
         samples=None,
         attributes_to_plot=None,
@@ -616,6 +1239,17 @@ def unsupervised_analysis(
     import matplotlib.pyplot as plt
     import seaborn as sns
 
+    if data_type is None:
+        msg = "Data type not defined and Analysis object does not have a `data_type` attribute."
+        try:
+            data_type = analysis.data_type
+        except AttributeError as e:
+            _LOGGER.error(msg)
+            raise e
+        if data_type is None:
+            _LOGGER.error(msg)
+            raise ValueError
+
     if data_type == "ATAC-seq":
         if plot_prefix is None:
             plot_prefix = "all_sites"
@@ -644,6 +1278,30 @@ def unsupervised_analysis(
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
+    matrix = getattr(analysis, quant_matrix)
+
+    if type(matrix.columns) is not pd.core.indexes.multi.MultiIndex:
+        msg = "Provided quantification matrix must have columns with MultiIndex."
+        hint = " Use ngs_toolkit.general.annotate_with_sample_metadata to do that."
+        _LOGGER.error(msg + hint)
+        raise TypeError(msg)
+
+    if samples is None:
+        samples = [s for s in analysis.samples
+                   if s.name in matrix.columns.get_level_values("sample_name")]
+    else:
+        samples = [s for s in samples
+                   if s.name in matrix.columns.get_level_values("sample_name")]
+    if len(samples) == 0:
+        msg = "None of the samples could be found in the quantification matrix."
+        _LOGGER.error(msg)
+        raise ValueError(msg)
+    if len(samples) == 1:
+        msg = "Only one sample could be found in the quantification matrix."
+        hint = " Function needs more than one."
+        _LOGGER.error(msg + hint)
+        raise ValueError(msg)
+
     msg = "`attributes_to_plot` were not specified and the analysis does not have a "
     msg += " 'group_attributes' variable."
     if attributes_to_plot is None:
@@ -651,19 +1309,17 @@ def unsupervised_analysis(
             attributes_to_plot = analysis.group_attributes
         except AttributeError:
             _LOGGER.error(msg)
-
-    matrix = getattr(analysis, quant_matrix)
-
-    if type(matrix.columns) is not pd.core.indexes.multi.MultiIndex:
-        raise TypeError("Provided quantification matrix must have columns with MultiIndex.")
-
-    if samples is None:
-        samples = [s for s in analysis.samples
-                   if s.name in matrix.columns.get_level_values("sample_name")]
-
+            raise
     # remove attributes with all NaNs
     attributes_to_plot = [attr for attr in attributes_to_plot
+                          if attr in matrix.columns.names]
+    attributes_to_plot = [attr for attr in attributes_to_plot
                           if not pd.isnull(matrix.columns.get_level_values(attr)).all()]
+    if len(attributes_to_plot) == 0:
+        msg = ("None of the factors in `attributes_to_plot` could be found in the " +
+               "quantification matrix index or they are all NaN.")
+        _LOGGER.error(msg)
+        raise ValueError(msg)
 
     # This will always be a matrix for all samples
     color_dataframe = pd.DataFrame(
@@ -718,13 +1374,17 @@ def unsupervised_analysis(
         "TSNE": {'init': 'pca'},
     }
     for algo in manifold_algorithms:
-        _LOGGER.info("Learning manifold with '{}' algorithm.".format(algo))
-        if (algo in ["Isomap", "LocallyLinearEmbedding"]) and (len(samples) <= 5):
-            _LOGGER.warning("Number of samples is too small to perform '{}'".format(algo))
-            continue
+        msg = "Learning manifold with '{}' algorithm".format(algo)
+        _LOGGER.info(msg + ".")
 
         manif = getattr(manifold, algo)(**params[algo])
-        x_new = manif.fit_transform(X.T)
+        try:
+            x_new = manif.fit_transform(X.T)
+        except (TypeError, ValueError):
+            hint = " Number of samples might be too small to perform '{}'".format(algo)
+            _LOGGER.error(msg + " failed!" + hint)
+            continue
+
         xx = pd.DataFrame(x_new, index=X.columns, columns=list(range(x_new.shape[1])))
 
         _LOGGER.info("Plotting projection of manifold with '{}' algorithm.".format(algo))
@@ -826,6 +1486,8 @@ def unsupervised_analysis(
         4 * len(attributes_to_plot), 4 * pcs))
     if len(attributes_to_plot) == 1:
         axis = axis.reshape((pcs, 1))
+    if pcs == 1:
+        axis = axis.reshape((1, len(attributes_to_plot)))
     for pc in range(pcs):
         for i, attr in enumerate(attributes_to_plot):
             for j, sample in enumerate(xx.index):
@@ -935,6 +1597,12 @@ def unsupervised_analysis(
     associations = pd.DataFrame(
         associations, columns=["pc", "attribute", "variable_type", "group_1", "group_2", "p_value"])
 
+    if associations.empty:
+        msg = "Couldn't test any associations between PCs and factors."
+        hint = " Perhaps PCA produced only 1 PC?"
+        _LOGGER.warning(msg + hint)
+        return
+
     # write
     _LOGGER.info("Saving associations.")
     associations.to_csv(os.path.join(
@@ -944,6 +1612,7 @@ def unsupervised_analysis(
     if len(attributes_to_plot) < 2:
         _LOGGER.info("Only one attribute given, can't plot associations.")
         return
+
     # Plot
     # associations[associations['p_value'] < 0.05].drop(['group_1', 'group_2'], axis=1).drop_duplicates()
     # associations.drop(['group_1', 'group_2'], axis=1).drop_duplicates().pivot(index="pc", columns="attribute", values="p_value")
@@ -969,7 +1638,7 @@ def unsupervised_analysis(
     g = sns.clustermap(
         (pivot < 0.05).astype(int),
         row_cluster=False, cbar_kws={"label": "significant association"},
-        square=True, rasterized=rasterized)
+        square=True, rasterized=rasterized, vmin=0, vmax=1)
     g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=45, ha="right")
     g.fig.savefig(os.path.join(
         output_dir, "{}.{}.pca.variable_principle_components_association.masked.svg"
@@ -980,7 +1649,7 @@ def deseq_analysis(
         count_matrix, experiment_matrix, comparison_table, formula,
         output_dir, output_prefix,
         overwrite=True, alpha=0.05, independent_filtering=False,
-        create_subdirectories=False):
+        create_subdirectories=True):
     """
     Perform differential comparison analysis with DESeq2.
 
@@ -1018,10 +1687,12 @@ def deseq_analysis(
     import rpy2
     from rpy2.robjects import numpy2ri, pandas2ri
     import rpy2.robjects as robjects
-    from rpy2.rinterface import RRuntimeError
+    from rpy2.rinterface import RRuntimeError, RRuntimeWarning
     from ngs_toolkit.general import r2pandas_df
+    import warnings
     numpy2ri.activate()
     pandas2ri.activate()
+    warnings.filterwarnings("ignore", category=RRuntimeWarning)
 
     robjects.r('require("DESeq2")')
     _as_formula = robjects.r('as.formula')
@@ -1057,11 +1728,11 @@ def deseq_analysis(
     comps = comparison_table["comparison_name"].drop_duplicates().sort_values()
     for comp in tqdm(comps, total=len(comps), desc="Comparison"):
         if create_subdirectories:
-            out_file = os.path.join(output_dir, output_prefix + ".deseq_result.{}.csv".format(comp))
-        else:
-            out_file = os.path.join(output_dir, comp, output_prefix + ".deseq_result.{}.csv".format(comp))
             if not os.path.exists(os.path.join(output_dir, comp)):
                 os.makedirs(os.path.join(output_dir, comp))
+            out_file = os.path.join(output_dir, comp, output_prefix + ".deseq_result.{}.csv".format(comp))
+        else:
+            out_file = os.path.join(output_dir, output_prefix + ".deseq_result.{}.csv".format(comp))
 
         if not overwrite and os.path.exists(out_file):
             continue
@@ -1102,7 +1773,7 @@ def deseq_analysis(
         res.index.name = "index"
 
         # save
-        res.to_csv(out_file)
+        res.sort_values('pvalue').to_csv(out_file)
         # append
         results = results.append(res.reset_index(), ignore_index=True)
 
@@ -1416,7 +2087,7 @@ def differential_from_bivariate_fit(
 def differential_analysis(
         analysis,
         comparison_table=None,
-        data_type="ATAC-seq",
+        data_type=None,
         samples=None,
         covariates=None,
         output_dir="results/differential_analysis_{data_type}",
@@ -1476,6 +2147,17 @@ def differential_analysis(
             _LOGGER.error(msg)
             _LOGGER.info(hint)
             raise e
+
+    if data_type is None:
+        msg = "Data type not defined and Analysis object does not have a `data_type` attribute."
+        try:
+            data_type = analysis.data_type
+        except AttributeError as e:
+            _LOGGER.error(msg)
+            raise e
+        if data_type is None:
+            _LOGGER.error(msg)
+            raise ValueError
 
     # Check comparisons
     # check comparison table has required columns
@@ -1699,6 +2381,17 @@ def differential_overlap(
     from scipy.stats import fisher_exact
     from statsmodels.sandbox.stats.multicomp import multipletests
 
+    # if data_type is None:
+    #     msg = "Data type not defined and Analysis object does not have a `data_type` attribute."
+    #     try:
+    #         data_type = analysis.data_type
+    #     except AttributeError as e:
+    #         _LOGGER.error(msg)
+    #         raise e
+    #     if data_type is None:
+    #         _LOGGER.error(msg)
+    #         raise ValueError
+
     if "{data_type}" in output_dir:
         output_dir = output_dir.format(data_type=data_type)
 
@@ -1811,11 +2504,15 @@ def differential_overlap(
         sns.heatmap(piv_combined, square=True, cmap="RdBu_r", center=0, cbar_kws={"label": "Concordant {}s ({})".format(unit, description)}, ax=axis, **extra)
         axis.set_xticklabels(axis.get_xticklabels(), rotation=90, ha="center")
         axis.set_yticklabels(axis.get_yticklabels(), rotation=0, ha="right")
-        fig.savefig(os.path.join(output_dir, output_prefix + ".differential_overlap.{}.up_down_together.svg".format(label)), bbox_inches="tight")
+        fig.savefig(os.path.join(
+                output_dir, output_prefix + ".differential_overlap.{}.up_down_together.svg".format(label)),
+            bbox_inches="tight")
 
         # Rank plots
         if metric == "log_pvalue":
-            r = pd.melt(piv_combined.reset_index(), id_vars=['group1'], var_name="group2", value_name="agreement")
+            r = pd.melt(
+                piv_combined.reset_index(),
+                id_vars=['group1'], var_name="group2", value_name="agreement")
             r = r.dropna().sort_values('agreement')
             r = r.iloc[range(0, r.shape[0], 2)]
             r['rank'] = r['agreement'].rank(ascending=False)
@@ -1839,7 +2536,9 @@ def differential_overlap(
                 ax.set_ylabel("Agreement (-log(p-value))")
                 ax.set_xlabel("Rank")
             sns.despine(fig)
-            fig.savefig(os.path.join(output_dir, output_prefix + ".differential_overlap.{}.agreement.rank.svg".format(label)), bbox_inches="tight")
+            fig.savefig(os.path.join(
+                    output_dir, output_prefix + ".differential_overlap.{}.agreement.rank.svg".format(label)),
+                bbox_inches="tight")
 
         # Observe disagreement
         # (overlap of down-regulated with up-regulated and vice-versa)
@@ -1856,7 +2555,9 @@ def differential_overlap(
         np.fill_diagonal(piv_disagree.values, np.nan)
 
         fig, axis = plt.subplots(1, 2, figsize=(16, 8), subplot_kw={"aspect": 'equal'})
-        sns.heatmap(piv_disagree, square=True, cmap="Greens", cbar_kws={"label": "Discordant {}s ({})".format(unit, description)}, ax=axis[0])
+        sns.heatmap(
+            piv_disagree, square=True, cmap="Greens",
+            cbar_kws={"label": "Discordant {}s ({})".format(unit, description)}, ax=axis[0])
         # sns.heatmap(np.log2(1 + piv_disagree), square=True, cmap="Greens", cbar_kws={"label": "Discordant {}s (log2)".format(unit)}, ax=axis[1][0])
 
         norm = matplotlib.colors.Normalize(vmin=0, vmax=piv_disagree.max().max())
@@ -1867,7 +2568,9 @@ def differential_overlap(
                 # print(len(piv_disagree.index) - (j + 0.5), len(piv_disagree.index) - (i + 0.5))
                 axis[1].scatter(
                     len(piv_disagree.index) - (j + 0.5), len(piv_disagree.index) - (i + 0.5),
-                    s=(100 ** (norm(piv_disagree.loc[g1, g2]))) - 1, color=cmap(norm(piv_disagree.loc[g1, g2])), marker="o")
+                    s=(100 ** (norm(piv_disagree.loc[g1, g2]))) - 1,
+                    color=cmap(norm(piv_disagree.loc[g1, g2])), marker="o")
+                axis[1].set_title("Rotate plot -90 degrees")
                 # axis[1][1].scatter(
                 #     len(piv_disagree.index) - (j + 0.5), len(piv_disagree.index) - (i + 0.5),
                 #     s=(100 ** (log_norm(np.log2(1 + piv_disagree).loc[g1, g2]))) - 1, color=cmap(log_norm(np.log2(1 + piv_disagree).loc[g1, g2])), marker="o")
@@ -1876,11 +2579,15 @@ def differential_overlap(
         axis[0].set_yticklabels(axis[0].get_yticklabels(), rotation=0, ha="right")
         axis[1].set_xlim((0, len(piv_disagree.index)))
         axis[1].set_ylim((0, len(piv_disagree.columns)))
-        fig.savefig(os.path.join(output_dir, output_prefix + ".differential_overlap.{}.disagreement.svg".format(label)), bbox_inches="tight")
+        fig.savefig(os.path.join(
+                output_dir, output_prefix + ".differential_overlap.{}.disagreement.svg".format(label)),
+            bbox_inches="tight")
 
         # Rank plots
         if metric == "log_pvalue":
-            r = pd.melt(piv_disagree.reset_index(), id_vars=['group1'], var_name="group2", value_name="disagreement")
+            r = pd.melt(
+                piv_disagree.reset_index(),
+                id_vars=['group1'], var_name="group2", value_name="disagreement")
             r = r.dropna().sort_values('disagreement')
             r = r.iloc[range(0, r.shape[0], 2)]
             r['rank'] = r['disagreement'].rank(ascending=False)
@@ -1897,17 +2604,21 @@ def differential_overlap(
                 ax.set_ylabel("Disagreement (-log(p-value))")
                 ax.set_xlabel("Rank")
             sns.despine(fig)
-            fig.savefig(os.path.join(output_dir, output_prefix + ".differential_overlap.{}.disagreement.rank.svg".format(label)), bbox_inches="tight")
+            fig.savefig(
+                os.path.join(
+                    output_dir,
+                    output_prefix + ".differential_overlap.{}.disagreement.rank.svg".format(label)),
+                bbox_inches="tight")
 
 
 def plot_differential(
         analysis,
-        results,
+        results=None,
         comparison_table=None,
         samples=None,
         matrix=None,
         only_comparison_samples=False,
-        data_type="ATAC-seq",
+        data_type=None,
         alpha=0.05,
         corrected_p_value=True,
         fold_change=None,
@@ -2043,9 +2754,34 @@ def plot_differential(
     import seaborn as sns
     from ngs_toolkit.graphics import add_colorbar_to_axis
 
+    if results is None:
+        msg = "Differential results dataframe not given and Analysis object does not"
+        msg += " have a `differential_results` attribute."
+        hint = " Run differential_analysis to produce differential results."
+        try:
+            results = analysis.differential_results
+        except AttributeError as e:
+            _LOGGER.error(msg + hint)
+            raise e
+        if (results is None) or (not isinstance(results, pd.DataFrame)):
+            hint = " Run differential_analysis to produce differential results."
+            _LOGGER.error(msg)
+            raise ValueError
+
     req_attrs = [mean_column, log_fold_change_column, p_value_column, adjusted_p_value_column, comparison_column]
     if not all([x in results.columns for x in req_attrs]):
         raise AssertionError("Results dataframe must have '{}' columns.".format(", ".join(req_attrs)))
+
+    if data_type is None:
+        msg = "Data type not defined and Analysis object does not have a `data_type` attribute."
+        try:
+            data_type = analysis.data_type
+        except AttributeError as e:
+            _LOGGER.error(msg)
+            raise e
+        if data_type is None:
+            _LOGGER.error(msg)
+            raise ValueError
 
     # Make output dir
     if "{data_type}" in output_dir:
@@ -2268,8 +3004,8 @@ def plot_differential(
                     add_colorbar_to_axis(collection, label="-log10(p-value)")
                 ax.set_title(comparison)
                 # Name groups
-                xl = c.loc[c['comparison_side'] == 0, 'comparison_name'].drop_duplicates().squeeze()
-                yl = c.loc[c['comparison_side'] == 1, 'comparison_name'].drop_duplicates().squeeze()
+                xl = c.loc[c['comparison_side'] <= 0, 'sample_group'].drop_duplicates().squeeze()
+                yl = c.loc[c['comparison_side'] >= 1, 'sample_group'].drop_duplicates().squeeze()
                 if not (type(xl) is str) and (type(yl) is str):
                     xl = "Down-regulated"
                     yl = "Up-regulated"
@@ -2645,8 +3381,11 @@ def lola(bed_files, universe_file, output_folder, output_prefixes=None, genome="
     from rpy2.robjects import numpy2ri, pandas2ri
     import rpy2.robjects as robjects
     from ngs_toolkit.general import r2pandas_df
+    import warnings
+    from rpy2.rinterface import RRuntimeWarning
     numpy2ri.activate()
     pandas2ri.activate()
+    warnings.filterwarnings("ignore", category=RRuntimeWarning)
 
     _LOGGER.info("Loading LOLA R library thorugh rpy2.")
     robjects.r('require("LOLA")')
@@ -2713,6 +3452,7 @@ def lola(bed_files, universe_file, output_folder, output_prefixes=None, genome="
 def bed_to_fasta(bed_file, fasta_file, genome="hg19", genome_2bit=None):
     import os
     import pandas as pd
+    import subprocess
 
     if genome_2bit is None:
         # Get region databases from config
@@ -2744,12 +3484,12 @@ def bed_to_fasta(bed_file, fasta_file, genome="hg19", genome_2bit=None):
     # do enrichment
     cmd = "twoBitToFa {0} -bed={1} {2}".format(genome_2bit, bed_file + ".tmp.bed", fasta_file)
 
-    os.popen(cmd)
-    # os.system("rm %s" % bed_file + ".tmp.bed")
+    subprocess.call(cmd.split(" "))
+    # subprocess.call("rm %s" % bed_file + ".tmp.bed")
 
 
 def meme_ame(input_fasta, output_dir, background_fasta=None, organism="human", motif_database_file=None):
-    import os
+    import subprocess
 
     if motif_database_file is None:
         # Get region databases from config
@@ -2774,7 +3514,7 @@ def meme_ame(input_fasta, output_dir, background_fasta=None, organism="human", m
         cmd = """
         fasta-dinucleotide-shuffle -c 1 -f {0} > {1}
         """.format(input_fasta, shuffled)
-        os.system(cmd)
+        subprocess.call(cmd.split(" "))
 
     cmd = """
     ame --bgformat 1 --scoring avg --method ranksum --pvalue-report-threshold 0.05 \\
@@ -2782,8 +3522,8 @@ def meme_ame(input_fasta, output_dir, background_fasta=None, organism="human", m
     """.format(
         background_fasta if background_fasta is not None else shuffled,
         output_dir, input_fasta, motif_database_file)
-    os.system(cmd)
-    # os.system("rm %s" % shuffled)
+    subprocess.call(cmd.split(" "))
+    # subprocess.call("rm {}".format(shuffled).split(" "))
 
 
 def parse_ame(ame_dir):
@@ -2819,11 +3559,12 @@ def parse_ame(ame_dir):
 
 
 def homer_motifs(bed_file, output_dir, genome="hg19"):
+    import subprocess
     cmd = "findMotifsGenome.pl {bed} {genome}r {out_dir} \
     -size 1000 -h -p 2 -len 8,10,12,14 -noknown".format(
         bed=bed_file, genome=genome, out_dir=output_dir
     )
-    os.system(cmd)
+    subprocess.call(cmd.split(" "))
 
 
 def parse_homer(homer_dir):
@@ -2891,9 +3632,10 @@ def parse_great_enrichment(input_tsv):
 
 def homer_combine_motifs(
         comparison_dirs, output_dir,
+        region_prefix="differential_analysis",
         reduce_threshold=0.6, match_threshold=10, info_value=0.6,
         p_value_threshold=1e-25, fold_enrichment=None,
-        cpus=8, run=False, as_jobs=True, genome="hg19",
+        cpus=8, run=True, as_jobs=True, genome="hg19",
         motif_database=None, known_vertebrates_TFs_only=False):
     """
     Create consensus of de novo discovered motifs from HOMER
@@ -2909,7 +3651,7 @@ def homer_combine_motifs(
     :param cpus: Number of available CPUS/threads for multithread processing.
                  Defaults to 8
     :type cpus: number, optional
-    :param run: Whether to run enrichment of each comparison in the consensus motifs. Default is False
+    :param run: Whether to run enrichment of each comparison in the consensus motifs. Default is True
     :type run: bool, optional
     :param as_jobs: Whether to run enrichment as a cluster job. Default is True
     :type as_jobs: bool, optional
@@ -2921,19 +3663,16 @@ def homer_combine_motifs(
     :type motif_database: str
     :returns: If `run` is `False`, returns path to consensus motif file. Otherwise `None`.
     :rtype: str
-
-    :Test:
-
-    comparison_dirs = (os.popen(
-        "find analysis/differential_analysis_ATAC-seq.top_1000/ -type d ! -name homerResults")
-    .read().strip().split("\n")[1:])
-    output_dir = "analysis/differential_analysis_ATAC-seq.top_1000/"
     """
     import glob
+    import subprocess
 
     if known_vertebrates_TFs_only:
         _LOGGER.warning("WARNING! `known_vertebrates_TFs_only` option is deprecated!" +
                         "Pass a given motif_database to `motif_database` directly.")
+
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
 
     # concatenate files
     out_file = os.path.join(output_dir, "homerMotifs.combined.motifs")
@@ -2951,9 +3690,9 @@ def homer_combine_motifs(
         fold_enrichment = ""
     else:
         fold_enrichment = " -F " + str(fold_enrichment)
-    os.popen("compareMotifs.pl {} {} -reduceThresh {} -matchThresh {}{} -pvalue {} -info {}{} -nofacts -cpu {}"
-             .format(out_file, output_dir, reduce_threshold, match_threshold,
-                     extra, p_value_threshold, info_value, fold_enrichment, cpus))
+    subprocess.call("compareMotifs.pl {} {} -reduceThresh {} -matchThresh {}{} -pvalue {} -info {}{} -nofacts -cpu {}"
+                    .format(out_file, output_dir, reduce_threshold, match_threshold,
+                            extra, p_value_threshold, info_value, fold_enrichment, cpus).split(" "))
 
     # concatenate consensus motif files
     files = glob.glob(os.path.join(output_dir, "homerResults/*motif"))
@@ -2977,15 +3716,17 @@ def homer_combine_motifs(
             # prepare enrichment command with consensus set
             cmd = (
                 "findMotifsGenome.pl {bed} {genome}r {dir} -p {cpus} -nomotif -mknown {motif_file}"
-                .format(bed=os.path.join(dir_, "differential_analysis_regions.bed"),
+                .format(bed=os.path.join(dir_, region_prefix + "_regions.bed"),
                         genome=genome, cpus=cpus, dir=dir_,
                         motif_file=combined_motifs))
             # run
             if as_jobs:
-                os.system("sbatch -J homer.{d} -o {dir}.homer.log -p shortq -c 8 --mem 20000 --wrap '{cmd}'"
-                          .format(d=os.path.basename(dir_), dir=dir_, cmd=cmd))
+                subprocess.call("sbatch -J homer.{d} -o {dir}.homer.log -p shortq -c 8 --mem 20000"
+                                .format(d=os.path.basename(dir_), dir=dir_)
+                                .split(" ")
+                                + ['--wrap', cmd])
             else:
-                os.system(cmd)
+                subprocess.call(cmd.split(" "))
 
 
 def enrichr(dataframe, gene_set_libraries=None, kind="genes"):
@@ -3089,6 +3830,7 @@ def run_enrichment_jobs(
     """
     Submit enrichment jobs for a specifc analysis.
     """
+    import subprocess
     cmds = list()
 
     # LOLA
@@ -3149,21 +3891,21 @@ fi
 done""".format(results_dir=results_dir)]
 
     for cmd in cmds:
-        os.system(cmd)
+        subprocess.call(cmd.split(" "))
 
 
 def differential_enrichment(
         analysis,
-        differential,
-        data_type="ATAC-seq",
+        differential=None,
+        data_type=None,
         output_dir="results/differential_analysis_{data_type}/enrichments",
         output_prefix="differential_analysis",
-        genome="hg19",
+        genome=None,
         steps=['lola', 'meme', 'homer', 'enrichr'],
         directional=True,
         max_diff=1000,
         sort_var="pvalue",
-        as_jobs=True):
+        as_jobs=False):
     """
     Perform various types of enrichment analysis given a dataframe
     of the results from differential analysis.
@@ -3180,8 +3922,10 @@ def differential_enrichment(
     :type output_dir: str, optional
     :param output_prefix: Prefix to use when creating output files. Defaults to "differential_analysis".
     :type output_prefix: str, optional
-    :param genome: Genome assembly of the analysis. Defaults to "hg19".
+    :param genome: Genome assembly of the analysis. Defaults to Analysis's `genome` attribute.
     :type genome: str, optional
+    :param steps: Steps of the analysis to perform. Defaults to ['lola', 'meme', 'homer', 'enrichr'].
+    :type steps: list, optional
     :param directional: Whether enrichments should be performed in a direction-dependent way
                         (up-regulated and down-regulated features separately).
                         This requires a column named "log2FoldChange" to exist. Defaults to True.
@@ -3198,6 +3942,33 @@ def differential_enrichment(
     from ngs_toolkit.general import run_enrichment_jobs
 
     serial = not as_jobs
+
+    if differential is None:
+        msg = "Data frame with differential comparison results `differential` "
+        msg += "was not passed and is not defined in the Analysis object as a "
+        msg += "`differential_results` attribute."
+        hint = " Run analysis.differential_analysis to get differential results."
+        try:
+            differential = analysis.differential_results
+        except AttributeError as e:
+            _LOGGER.error(msg)
+            _LOGGER.info(hint)
+            raise e
+        if differential is None:
+            _LOGGER.error(msg)
+            _LOGGER.info(hint)
+            raise ValueError
+
+    if data_type is None:
+        msg = "Data type not given and Analysis object does not have a `data_type` attribute."
+        try:
+            data_type = analysis.data_type
+        except AttributeError as e:
+            _LOGGER.error(msg)
+            raise e
+        if data_type is None:
+            _LOGGER.error(msg)
+            raise ValueError
 
     if data_type == "ATAC-seq":
         from ngs_toolkit.atacseq import characterize_regions_function
@@ -3285,7 +4056,7 @@ def differential_enrichment(
                     if serial:
                         if not os.path.exists(os.path.join(comparison_dir, output_prefix + ".enrichr.csv")):
                             enr = enrichr(comparison_df.reset_index())
-                            enr.to_csv(os.path.join(comparison_dir, output_prefix + ".enrichr.csv"), index=False)
+                            enr.to_csv(os.path.join(comparison_dir, output_prefix + ".enrichr.csv"), index=False, encoding="utf-8")
                         else:
                             enr = pd.read_csv(os.path.join(comparison_dir, output_prefix + ".enrichr.csv"), encoding="utf-8")
                             enr["comparison_name"] = comp
@@ -3360,6 +4131,7 @@ def differential_enrichment(
 def collect_differential_enrichment(
         differential,
         directional=True,
+        steps=['lola', 'motif', 'homer', 'homer_consensus', 'enrichr'],
         data_type="ATAC-seq",
         output_dir="results/differential_analysis_{data_type}/enrichments",
         input_prefix="differential_analysis",
@@ -3375,6 +4147,8 @@ def collect_differential_enrichment(
                         (up-regulated and down-regulated features separately).
                         This implies a column named "direction" exists". Defaults to True.
     :type directional: bool, optional
+    :param steps: Steps of the analysis to perform. Defaults to ['lola', 'meme', 'homer', 'enrichr'].
+    :type steps: list, optional
     :param data_type: Data type. One of "ATAC-seq" and "RNA-seq". Defaults to "ATAC-seq".
     :type data_type: str, optional
     :param output_dir: Directory to create output files. Defaults to "results/differential_analysis_{data_type}".
@@ -3384,9 +4158,22 @@ def collect_differential_enrichment(
     :param permissive: Whether to skip non-existing files, giving a warning. Defaults to True.
     :type permissive: bool, optional
     """
+    # TODO: add self attribute and data_type independence
+    # This will break API compatibility
     import pandas as pd
     from ngs_toolkit.general import parse_ame, parse_homer
     from tqdm import tqdm
+
+    # if data_type is None:
+    #     msg = "Data type not defined and Analysis object does not have a `data_type` attribute."
+    #     try:
+    #         data_type = analysis.data_type
+    #     except AttributeError as e:
+    #         _LOGGER.error(msg)
+    #         raise e
+    #     if data_type is None:
+    #         _LOGGER.error(msg)
+    #         raise ValueError
 
     if data_type not in ["ATAC-seq", "RNA-seq"]:
         raise ValueError("`data_type` must match one of 'ATAC-seq' or 'RNA-seq'.")
@@ -3420,116 +4207,126 @@ def collect_differential_enrichment(
             comparison_dir = os.path.join(output_dir, "{}.{}".format(comp, direction))
 
             if data_type == "RNA-seq":
-                # print("Collecting enrichments of comparison '{}', direction '{}'.".format(comp, direction))
-                try:
-                    enr = pd.read_csv(os.path.join(comparison_dir, input_prefix + ".enrichr.csv"))
-                except IOError as e:
-                    if permissive:
-                        _LOGGER.error(error_msg.format("Enrichr", comp, direction))
+                _LOGGER.debug("Collecting enrichments of comparison '{}', direction '{}'.".format(comp, direction))
+                if 'enrichr' in steps:
+                    try:
+                        enr = pd.read_csv(os.path.join(comparison_dir, input_prefix + ".enrichr.csv"))
+                    except IOError as e:
+                        if permissive:
+                            _LOGGER.error(error_msg.format("Enrichr", comp, direction))
+                        else:
+                            raise e
+                    except pd.errors.EmptyDataError:
+                        continue
                     else:
-                        raise e
-                except pd.errors.EmptyDataError:
-                    continue
-                else:
-                    enr.loc[:, "comparison_name"] = comp
-                    enr.loc[:, "direction"] = direction
-                    pathway_enr = pathway_enr.append(enr, ignore_index=True)
+                        enr.loc[:, "comparison_name"] = comp
+                        enr.loc[:, "direction"] = direction
+                        pathway_enr = pathway_enr.append(enr, ignore_index=True)
             elif data_type == "ATAC-seq":
-                # print("Collecting enrichments of comparison '{}', direction '{}'.".format(comp, direction))
-                # read/parse
+                _LOGGER.debug("Collecting enrichments of comparison '{}', direction '{}'.".format(comp, direction))
 
                 # MEME/AME
-                try:
-                    ame_motifs = parse_ame(comparison_dir).reset_index()
-                    ame_motifs.columns = ["TF", "p_value"]
-                except IOError as e:
-                    if permissive:
-                        _LOGGER.error(error_msg.format("MEME/AME motif", comp, direction))
+                if 'motif' in steps:
+                    try:
+                        ame_motifs = parse_ame(comparison_dir).reset_index()
+                        ame_motifs.columns = ["TF", "p_value"]
+                    except IOError as e:
+                        if permissive:
+                            _LOGGER.error(error_msg.format("MEME/AME motif", comp, direction))
+                        else:
+                            raise e
                     else:
-                        raise e
-                else:
-                    if not ame_motifs.empty:  # work around no motifs enriched
-                        ame_motifs.loc[:, "comparison_name"] = comp
-                        ame_motifs.loc[:, "direction"] = direction
-                        meme_enr = meme_enr.append(ame_motifs, ignore_index=True)
+                        if not ame_motifs.empty:  # work around no motifs enriched
+                            ame_motifs.loc[:, "comparison_name"] = comp
+                            ame_motifs.loc[:, "direction"] = direction
+                            meme_enr = meme_enr.append(ame_motifs, ignore_index=True)
 
-                        # fix mouse TF names
-                        if (meme_enr['TF'].str.startswith("UP").sum() / float(meme_enr.shape[0])) >= 0.1:
-                            annot = pd.read_table(
-                                "~/resources/motifs/motif_databases/MOUSE/uniprobe_mouse.id_mapping.tsv",
-                                header=None, names=["TF", "TF_name"])
-                            annot.loc[:, "TF"] = annot['TF'].str.replace(r"_.*", "")
-                            meme_enr = pd.merge(meme_enr, annot).drop("TF", axis=1).rename(columns={"TF_name": "TF"})
-                    else:
-                        _LOGGER.warning("Comparison '{}' has no MEME enriched motifs.".format(comp))
+                            # fix mouse TF names
+                            if (meme_enr['TF'].str.startswith("UP").sum() / float(meme_enr.shape[0])) >= 0.1:
+                                annot = pd.read_table(
+                                    "~/resources/motifs/motif_databases/MOUSE/uniprobe_mouse.id_mapping.tsv",
+                                    header=None, names=["TF", "TF_name"])
+                                annot.loc[:, "TF"] = annot['TF'].str.replace(r"_.*", "")
+                                meme_enr = pd.merge(meme_enr, annot).drop("TF", axis=1).rename(columns={"TF_name": "TF"})
+                        else:
+                            _LOGGER.warning("Comparison '{}' has no MEME enriched motifs.".format(comp))
 
                 # HOMER DE NOVO - de novo motif enrichment independent for each sample
-                try:
-                    homer_motifs = parse_homer(os.path.join(comparison_dir, "homerResults"))
-                except IOError as e:
-                    if permissive:
-                        _LOGGER.error(error_msg.format("HOMER motif", comp, direction))
+                if 'homer' in steps:
+                    try:
+                        homer_motifs = parse_homer(os.path.join(comparison_dir, "homerResults"))
+                    except IOError as e:
+                        if permissive:
+                            _LOGGER.error(error_msg.format("HOMER motif", comp, direction))
+                        else:
+                            raise e
                     else:
-                        raise e
-                else:
-                    homer_motifs.loc[:, "comparison_name"] = comp
-                    homer_motifs.loc[:, "direction"] = direction
-                    homer_enr = homer_enr.append(homer_motifs, ignore_index=True)
+                        homer_motifs.loc[:, "comparison_name"] = comp
+                        homer_motifs.loc[:, "direction"] = direction
+                        homer_enr = homer_enr.append(homer_motifs, ignore_index=True)
 
                 # HOMER CONSENSUS - motif enrichment on a consensus set of motifs
-                try:
-                    homer_cons = pd.read_table(os.path.join(comparison_dir, "knownResults.txt"))
-                except IOError as e:
-                    # Homer consensus is always permissive
-                    _LOGGER.error(error_msg.format("HOMER consensus", comp, direction))
+                if 'homer_consensus' in steps:
+                    try:
+                        homer_cons = pd.read_table(os.path.join(comparison_dir, "knownResults.txt"))
+                    except IOError as e:
+                        # Homer consensus is always permissive
+                        _LOGGER.error(error_msg.format("HOMER consensus", comp, direction))
 
-                else:
-                    homer_cons.columns = homer_cons.columns.str.replace(r"\(of .*", "")
-                    homer_cons["# of Background Sequences with Motif"]
-                    for col in homer_cons.columns[homer_cons.columns.str.contains("%")]:
-                        homer_cons[col] = homer_cons[col].str.replace("%", "").astype(float)
-                    homer_cons.loc[:, "comparison_name"] = comp
-                    homer_cons.loc[:, "direction"] = direction
-                    homer_consensus = homer_consensus.append(homer_cons, ignore_index=True)
+                    else:
+                        homer_cons.columns = homer_cons.columns.str.replace(r"\(of .*", "")
+                        homer_cons["# of Background Sequences with Motif"]
+                        for col in homer_cons.columns[homer_cons.columns.str.contains("%")]:
+                            homer_cons[col] = homer_cons[col].str.replace("%", "").astype(float)
+                        homer_cons.loc[:, "comparison_name"] = comp
+                        homer_cons.loc[:, "direction"] = direction
+                        homer_consensus = homer_consensus.append(homer_cons, ignore_index=True)
 
                 # LOLA
-                try:
-                    lola = pd.read_csv(os.path.join(comparison_dir, "allEnrichments.tsv"), sep="\t")
-                except IOError as e:
-                    if permissive:
-                        _LOGGER.error(error_msg.format("LOLA", comp, direction))
+                if 'lola' in steps:
+                    try:
+                        lola = pd.read_csv(os.path.join(comparison_dir, "allEnrichments.tsv"), sep="\t")
+                    except IOError as e:
+                        if permissive:
+                            _LOGGER.error(error_msg.format("LOLA", comp, direction))
+                        else:
+                            raise e
                     else:
-                        raise e
-                else:
-                    lola.loc[:, "comparison_name"] = comp
-                    lola.loc[:, "direction"] = direction
-                    lola_enr = lola_enr.append(lola, ignore_index=True)
+                        lola.loc[:, "comparison_name"] = comp
+                        lola.loc[:, "direction"] = direction
+                        lola_enr = lola_enr.append(lola, ignore_index=True)
 
                 # ENRICHR
-                try:
-                    enr = pd.read_csv(os.path.join(comparison_dir, input_prefix + "_genes.enrichr.csv"))
-                except IOError as e:
-                    if permissive:
-                        _LOGGER.error(error_msg.format("Enrichr", comp, direction))
+                if 'enrichr' in steps:
+                    try:
+                        enr = pd.read_csv(os.path.join(comparison_dir, input_prefix + "_genes.enrichr.csv"))
+                    except IOError as e:
+                        if permissive:
+                            _LOGGER.error(error_msg.format("Enrichr", comp, direction))
+                        else:
+                            raise e
                     else:
-                        raise e
-                else:
-                    enr.loc[:, "comparison_name"] = comp
-                    enr.loc[:, "direction"] = direction
-                    pathway_enr = pathway_enr.append(enr, ignore_index=True)
+                        enr.loc[:, "comparison_name"] = comp
+                        enr.loc[:, "direction"] = direction
+                        pathway_enr = pathway_enr.append(enr, ignore_index=True)
 
     # write combined enrichments
-    pathway_enr.to_csv(
-        os.path.join(output_dir, output_prefix + ".enrichr.csv"), index=False, encoding="utf-8")
+    if 'enrichr' in steps:
+        pathway_enr.to_csv(
+            os.path.join(output_dir, output_prefix + ".enrichr.csv"), index=False, encoding="utf-8")
     if data_type == "ATAC-seq":
-        meme_enr.to_csv(
-            os.path.join(output_dir, output_prefix + ".meme_ame.csv"), index=False)
-        homer_enr.to_csv(
-            os.path.join(output_dir, output_prefix + ".homer_motifs.csv"), index=False)
-        homer_consensus.to_csv(
-            os.path.join(output_dir, output_prefix + ".homer_consensus.csv"), index=False)
-        lola_enr.to_csv(
-            os.path.join(output_dir, output_prefix + ".lola.csv"), index=False)
+        if 'motif' in steps:
+            meme_enr.to_csv(
+                os.path.join(output_dir, output_prefix + ".meme_ame.csv"), index=False)
+        if 'homer' in steps:
+            homer_enr.to_csv(
+                os.path.join(output_dir, output_prefix + ".homer_motifs.csv"), index=False)
+        if 'homer_consensus' in steps:
+            homer_consensus.to_csv(
+                os.path.join(output_dir, output_prefix + ".homer_consensus.csv"), index=False)
+        if 'lola' in steps:
+            lola_enr.to_csv(
+                os.path.join(output_dir, output_prefix + ".lola.csv"), index=False)
 
 
 def plot_differential_enrichment(
@@ -3615,7 +4412,7 @@ def plot_differential_enrichment(
 
     enrichment_table = enrichment_table.copy()
     if "direction" in enrichment_table.columns and direction_dependent:
-        enrichment_table[comp_variable] = enrichment_table[comp_variable].astype(
+        enrichment_table.loc[:, comp_variable] = enrichment_table[comp_variable].astype(
             str) + " " + enrichment_table["direction"].astype(str)
 
     if enrichment_type == "lola":
@@ -3920,8 +4717,6 @@ def plot_differential_enrichment(
 
         for gene_set_library in enrichment_table["gene_set_library"].unique():
             _LOGGER.info(gene_set_library)
-            if gene_set_library == "Epigenomics_Roadmap_HM_ChIP-seq":
-                continue
 
             # Plot top_n terms of each comparison in barplots
             n = len(enrichment_table[comp_variable].drop_duplicates())
@@ -4211,6 +5006,37 @@ def count_dataframe_values(x):
     return np.multiply(*x.shape) - x.isnull().sum().sum()
 
 
+def location_index_to_bed(index):
+    bed = pd.DataFrame(index=index)
+    index = index.to_series(name='region')
+    bed['chrom'] = index.str.split(":").str[0]
+    index2 = index.str.split(":").str[1]
+    bed['start'] = index2.str.split("-").str[0]
+    bed['end'] = index2.str.split("-").str[1]
+    return bed
+
+
+def bed_to_index(df):
+    """
+    Get an index of the form chrom:start-end
+    from a a dataframe with such columns.
+
+    :param pandas.DataFrame df: DataFrame with columns
+                                 'chr', 'start' and 'end'.
+    """
+    cols = ['chrom', 'start', 'end']
+    if not all([x in df.columns for x in cols]):
+        raise AttributeError("DataFrame does not have '{}' columns."
+                             .format("', '".join(cols)))
+    index = (
+        df['chrom'] +
+        ":" +
+        df['start'].astype(int).astype(str) +
+        "-" +
+        df['end'].astype(int).astype(str))
+    return pd.Index(index, name="region")
+
+
 def timedelta_to_years(x):
     """
     Convert a timedelta to years.
@@ -4423,14 +5249,14 @@ def count_jobs_running(cmd="squeue", sep="\n"):
 
 def submit_job_if_possible(cmd, total_job_lim=800, refresh_time=10, in_between_time=5):
     from ngs_toolkit.general import count_jobs_running
+    import subprocess
     import time
-    import os
 
     submit = count_jobs_running() < total_job_lim
     while not submit:
         time.sleep(refresh_time)
         submit = count_jobs_running() < total_job_lim
-    os.system(cmd)
+    subprocess.call(cmd.split(" "))
     time.sleep(in_between_time)
 
 
@@ -4445,8 +5271,7 @@ def sra_id2geo_id(sra_ids):
 
     geo_ids = list()
     for id in sra_ids:
-        p, err = subprocess.Popen(cmd.format(id))
-        geo_ids.append(p.communicate())
+        geo_ids.append(subprocess.call(cmd.format(id).split(" ")).read())
     return
 
 
@@ -4468,6 +5293,57 @@ def fastq2bam(input_fastq, output_bam, sample_name, input_fastq2=None):
     cmd += """ OUTPUT={0}""".format(output_bam)
 
     return cmd
+
+
+def decompress_file(file, output_file=None):
+    """
+    Decompress a gzip-compressed file in chunks (not in memory).
+    """
+    """
+    # test:
+    file = "file.bed.gz"
+    """
+    import gzip
+
+    if output_file is None:
+        if not file.endswith(".gz"):
+            msg = "`output_file` not given and input_file does not end in '.gz'."
+            _LOGGER.error(msg)
+            raise ValueError(msg)
+        output_file = file.replace(".gz", "")
+    with gzip.open(file, 'rb') as _in:
+        with open(output_file, 'w') as _out:
+            for line in _in.readlines():
+                _out.write(line.decode('utf-8'))
+
+
+def download_file(url, output_file, chunk_size=1024):
+    """
+    Download a file and write to disk in chunks (not in memory).
+    """
+    """
+    # test:
+    url = 'https://egg2.wustl.edu/roadmap/data/byFileType/chromhmmSegmentations'
+    url += '/ChmmModels/coreMarks/jointModel/final/E001_15_coreMarks_dense.bed.gz'
+    output_file = "file.bed.gz"
+    chunk_size = 1024
+    """
+    import requests
+    response = requests.get(url, stream=True)
+    with open(output_file, 'wb') as outfile:
+        outfile.writelines(
+            response.iter_content(chunk_size=chunk_size))
+
+
+def download_gzip_file(url, output_file):
+    if not output_file.endswith(".gz"):
+        output_file += '.gz'
+    download_file(url, output_file)
+    decompress_file(output_file)
+    if (
+            os.path.exists(output_file) and
+            os.path.exists(output_file.replace(".gz", ""))):
+        os.remove(output_file)
 
 
 def download_cram(link, output_dir):
@@ -4602,10 +5478,11 @@ def series_matrix2csv(matrix_url, prefix=None):
     """
     matrix_url: gziped URL with GEO series matrix.
     """
+    import subprocess
     import gzip
     import pandas as pd
 
-    os.system("wget {}".format(matrix_url))
+    subprocess.call("wget {}".format(matrix_url).split(" "))
     filename = matrix_url.split("/")[-1]
 
     with gzip.open(filename, 'rb') as f:
@@ -4642,26 +5519,36 @@ def project_to_geo(
     """
     Prepare raw sequencing files for submission to GEO.
     Files will be copied or generated in a new directory `output_dir`.
-    It will get the raw BAM file(s) of each sample, and in case of ATAC-seq/ChIP-seq samples,
-    the bigWig and peak files. If multiple BAM files exist for each sample, all will be copied and sequencially named with the "file\d" suffix,
-    where "\d" is the file number.
+    It will get the raw BAM file(s) of each sample, and in case of
+    ATAC-seq/ChIP-seq samples, the bigWig and peak files. If multiple BAM
+    files exist for each sample, all will be copied and sequencially named
+    with the "fileN" suffix, where "N" is the file number.
+
     For each copied file a md5sum will be calculated.
+
     A pandas DataFrame with info on the sample's files and md5sums will be returned.
 
     :param project: A peppy Project object to process.
     :type project: peppy.Project
-    :param output_dir: Directory to create output. Will be created/overwriten if existing.
+    :param output_dir: Directory to create output. Will be created/overwriten
+                       if existing.
                        Defaults to "geo_submission".
     :type output_dir: str, optional
-    :param samples: List of peppy.Sample objects in project to restrict to. Defaults to all samples in project.
+    :param samples: List of peppy.Sample objects in project to restrict to.
+                    Defaults to all samples in project.
     :type samples: list, optional
-    :param distributed: Whether processing should be distributed as jobs in a computing cluster for each sample.
-                        Currently available implementation supports a SLURM cluster only. Defaults to False.
+    :param distributed: Whether processing should be distributed as jobs in a
+                        computing cluster for each sample.
+                        Currently available implementation supports a SLURM
+                        cluster only. Defaults to False.
     :type distributed: bool, optional
     :param dry_run: Whether copy/execution/submisison commands should be not be run to test.
     :type dry_run: bool, optional
-    :returns: pandas.DataFrame with annotation of samples and their BAM, BigWig, narrowPeak files and respective md5sums.
+    :returns: pandas.DataFrame with annotation of samples and their BAM, BigWig, narrowPeak
+              files and respective md5sums.
+    :rtype: pandas.DataFrame
     """
+    import subprocess
     output_dir = os.path.abspath(output_dir)
     if samples is None:
         samples = project.samples
@@ -4709,7 +5596,9 @@ def project_to_geo(
                 cmd += "chmod 644 {}; ".format(md5_file)
                 annot.loc[sample.name, "bigwig_file_md5sum"] = md5_file
             else:
-                _LOGGER.warning("'{}' sample '{}' does not have a 'bigwig' attribute set. Skipping bigWig file.".format(sample.library, sample.name))
+                _LOGGER.warning("'{}' sample '{}' does not have a 'bigwig'"
+                                .format(sample.library, sample.name) +
+                                " attribute set. Skipping bigWig file.")
 
         # Copy peaks
         if sample.library == "ATAC-seq":
@@ -4729,7 +5618,9 @@ def project_to_geo(
                 cmd += "chmod 644 {}; ".format(md5_file)
                 annot.loc[sample.name, "peaks_file_md5sum"] = md5_file
             else:
-                _LOGGER.warning("'{}' sample '{}' does not have a 'peaks' attribute set. Skipping peaks file.".format(sample.library, sample.name))
+                _LOGGER.warning("'{}' sample '{}' does not have a 'peaks' attribute set."
+                                .format(sample.library, sample.name) +
+                                " Skipping peaks file.")
 
         if distributed and not dry_run:
             from pypiper.ngstk import NGSTk
@@ -4755,7 +5646,7 @@ def project_to_geo(
     if not distributed and not dry_run:
         for i, cmd in enumerate(cmds):
             _LOGGER.info(i, cmd)
-            os.system(cmd)
+            subprocess.call(cmd.split(" "))
 
     return annot
 
@@ -4796,7 +5687,7 @@ def rename_sample_files(
 
     :returns: None
     """
-    from subprocess import call
+    import subprocess
     cmds = list()
     # 1) move to tmp name
     for i, series in annotation_mapping.iterrows():
@@ -4840,7 +5731,7 @@ def rename_sample_files(
             if cmd.startswith("#"):
                 continue
             try:
-                r = call(cmd, shell=True)
+                r = subprocess.call(cmd.split(" "))
             except OSError as e:
                 raise e
             if r != 0:
@@ -4848,7 +5739,7 @@ def rename_sample_files(
 
 
 def query_biomart(
-        attributes=["ensembl_gene_id", "external_gene_name", "hgnc_id", "hgnc_symbol"],
+        attributes=None,
         species="hsapiens", ensembl_version="grch37"):
     """
     Query Biomart (https://www.ensembl.org/biomart/martview/).
@@ -4861,7 +5752,8 @@ def query_biomart(
     :type attributes: list, optional
     :param species: Ensembl string of species to query. Must be vertebrate. Defaults to "hsapiens".
     :type species: str, optional
-    :param ensembl_version: Ensembl version to query. Defaults to "grch37".
+    :param ensembl_version: Ensembl version to query. Currently "grch37", "grch38" and "grcm38" are tested.
+                            Defaults to "grch37".
     :type ensembl_version: str, optional
     :returns: Dataframe with required attributes for each entry.
     :rtype: pandas.DataFrame
@@ -4870,14 +5762,18 @@ def query_biomart(
     import pandas as pd
     import numpy as np
 
-    if ensembl_version not in ['grch37', 'grch38']:
+    supported = ['grch37', 'grch38', 'grcm38']
+    if ensembl_version not in supported:
         msg = "Ensembl version might not be supported."
-        msg += " Tested versions are 'grch37' 'and 'grch38'."
+        msg += " Tested versions are '{}'.".format("','".join(supported))
         msg += " Will try anyway."
         _LOGGER.warning(msg)
 
+    if attributes is None:
+        attributes = ["ensembl_gene_id", "external_gene_name", "hgnc_id", "hgnc_symbol"]
+
     # Build request XML
-    ens_ver = "" if ensembl_version == "grch38" else ensembl_version + "."
+    ens_ver = "" if ensembl_version.endswith("38") else ensembl_version + "."
     url_query = "".join([
         """http://{}ensembl.org/biomart/martservice?query=""".format(ens_ver),
         """<?xml version="1.0" encoding="UTF-8"?>""",
@@ -4889,9 +5785,15 @@ def query_biomart(
          """</Query>"""])
     req = requests.get(url_query, stream=True)
     if not req.ok:
-        _LOGGER.error("Request to Biomart API was not successful.")
-        return
+        msg = "Request to Biomart API was not successful."
+        _LOGGER.error(msg)
+        raise ValueError(msg)
     content = list(req.iter_lines())
+
+    if (len(content) == 1) and (content[0].startswith("Query ERROR")):
+        msg = "Request to Biomart API was not successful. Check your input.\n{}".format(content[0])
+        _LOGGER.error(msg)
+        raise ValueError(msg)
 
     if type(content[0]) == bytes:
         content = [x.decode("utf-8") for x in content]
@@ -5014,9 +5916,11 @@ def fix_batch_effect_limma(matrix, batch_variable="batch", covariates=None):
     """
     import patsy
     import pandas as pd
-    import rpy2
     from rpy2.robjects import numpy2ri, pandas2ri
     import rpy2.robjects as robjects
+    import warnings
+    from rpy2.rinterface import RRuntimeWarning
+    warnings.filterwarnings("ignore", category=RRuntimeWarning)
     numpy2ri.activate()
     pandas2ri.activate()
 

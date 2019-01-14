@@ -51,7 +51,13 @@ def setup_config(custom_yaml_config=None):
     It reads ngs_toolkit's package data to load a default configuration,
     tries to update it by reading a file in ``~/.ngs_toolkit.config.yaml`` if present,
     and lastly, updates it by reading a possible passed yaml file ``custom_yaml_config``.
+    Non-exisiting fields will maintain the previous values, so that the user needs only
+    to specify the section(s) (s)he needs.
 
+    :param custom_yaml_config: Path to YAML file with configuration.
+                               To see the structure of the YAML file, see
+                               https://github.com/afrendeiro/toolkit/blob/master/ngs_toolkit/config/default.yaml
+    :type custom_yaml_config: str, optional
     :returns: Dictionary with configurations
     :rtype: dict
     """
@@ -101,6 +107,12 @@ def setup_config(custom_yaml_config=None):
             raise e
 
     return _CONFIG
+
+
+def clear_log():
+    import os
+    logfile = os.path.join(os.path.expanduser("~"), ".ngs_toolkit.log.txt")
+    open(logfile, "w")
 
 
 setup_logger()

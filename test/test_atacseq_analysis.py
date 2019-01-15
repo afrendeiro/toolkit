@@ -205,7 +205,7 @@ def test_quantile_normalization(various_analysis):
         # assert all(np.array(cors) > 0.99)
 
 
-@pytest.skip("This is anyway tested after")
+@pytest.mark.skipif(travis, "This is anyway tested after")
 def test_cqn_normalization(analysis):
     # At some point, downloading a genome reference in Travis
     # caused memory error.

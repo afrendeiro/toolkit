@@ -55,6 +55,7 @@ class Analysis(object):
             name="analysis",
             samples=None,
             prj=None,
+            root_dir=None,
             data_dir="data",
             results_dir="results",
             pickle_file=None,
@@ -62,8 +63,17 @@ class Analysis(object):
             **kwargs):
         # parse kwargs with default
         self.name = name
-        self.data_dir = data_dir
-        self.results_dir = results_dir
+        if root_dir is None:
+            self.root_dir = os.curdir
+        self.root_dir = os.path.abspath(self.root_dir)
+
+        # # if given absolute paths, keep them, otherwise append to root directory
+        for dir_ in ['data_dir', 'results_dir']:
+            if not os.path.isabs(data_dir):
+                setattr(self, dir_, os.path.join(self.root_dir, eval(dir_)))
+            else:
+                setattr(self, dir_, eval(dir_))
+
         self.samples = samples
         self.prj = prj
         self.pickle_file = pickle_file
@@ -311,28 +321,69 @@ class Analysis(object):
 
     @check_organism_genome
     def get_annotations(
+            self,
             organism=None, genome_assembly=None, output_dir=None,
-            steps=['blacklist', 'tss', 'genomic']):
+            steps=['blacklist', 'tss', 'genomic_context']):
         """
-        Get genome annotations required for several ngs_toolkit analysis.
-        This is a simple approach using Biomart's API querying the Ensembl database..
-        Saves results to disk and returns a dataframe.
+        Get genome annotations and other resources for several ngs_toolkit analysis.
+
+        :param organism: Organism to get for. Currently supported are 'human' and 'mouse'.
+                         Defaults to analysis' own organism.
+        :type organism: str, optional
+        :param genome_assembly: Genome assembly to get for.
+                                Currently supported are 'hg19', 'hg38' and 'mm10'.
+                                Defaults to analysis' own genome assembly.
+        :type genome_assembly: str, optional
+        :param output_dir: Directory to save results to.
+                           Defaults to 'reference' in analysis root directory.
+        :type output_dir: str, optional
+        :param steps: Which steps to get.
+                      Options are:
+                        - 'fasta': Genome sequence in FASTA format
+                        - 'blacklist': Locations of blacklisted regions for genome
+                        - 'tss': Locations of gene's TSSs
+                        - 'genomic_context': Genomic context of genome
+                      Defaults to ['blacklist', 'tss', 'genomic_context']
+        :type steps: list, optional
+        :returns: Dictionary with keys same as the options as steps, containing
+                  paths to the requested files.
+        :rtype: dict
         """
-        # TODO: test
         from ngs_toolkit.general import (
             get_genome_reference,
             get_blacklist_annotations,
             get_tss_annotations,
             get_genomic_context)
 
+        if organism is None:
+            organism = self.organism
+        if genome_assembly is None:
+            genome_assembly = self.genome
+        if output_dir is None:
+            output_dir = os.path.join(self.root_dir, "reference")
+
+        args = {'organism': organism,
+                'genome_assembly': genome_assembly,
+                'output_dir': output_dir}
+        mapping = {"hg19": "grch37", "hg38": "grch38", "mm10": "grcm38"}
+        output = dict()
+
         if 'fasta' in steps:
-            get_genome_reference(organism=organism, genome_assembly=genome_assembly)
+            output['fasta_file'] = get_genome_reference(**args)
         if 'blacklist' in steps:
-            get_blacklist_annotations(organism=organism, genome_assembly=genome_assembly)
+            output['blacklist_file'] = get_blacklist_annotations(**args)
         if 'tss' in steps:
-            get_tss_annotations(organism=organism, genome_assembly=genome_assembly)
-        if 'genomic' in steps:
-            get_genomic_context(organism=organism, genome_assembly=genome_assembly)
+            get_tss_annotations(**args)
+            output['tss_file'] = os.path.join(
+                output_dir, "{}.{}.gene_annotation.protein_coding.tss.bed"
+                .format(self.organism, mapping[self.genome]))
+        if 'genomic_context' in steps:
+            get_genomic_context(**args)
+            output['genomic_context_file'] = os.path.join(
+                output_dir, "{}.{}.genomic_context.bed"
+                .format(self.organism, mapping[self.genome]))
+
+        return output
 
     def get_matrix(self, matrix=None, matrix_name=None, samples=None):
         """

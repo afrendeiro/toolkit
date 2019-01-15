@@ -10,9 +10,6 @@ from peppy import Project
 import ngs_toolkit
 
 
-_LOGGER = ngs_toolkit._LOGGER
-
-
 def parse_arguments():
     """
     Argument Parsing.

@@ -654,12 +654,10 @@ class ATACSeqAnalysis(Analysis):
             sites = pybedtools.BedTool(bed_file)
 
         if fasta_file is None:
-            from ngs_toolkit.general import get_genome_reference
             _LOGGER.info("Reference genome FASTA file was not given, will try to get it.")
-            self._check_organism_genome(self)
             _LOGGER.info("Getting genome FASTA file for organism '{}', genome '{}'. "
                          .format(self.organism, self.genome))
-            fasta_file = get_genome_reference(organism=self.organism, genome_assembly=self.genome)
+            fasta_file = self.get_annotations(steps=['fasta'])['fasta_file']
 
         nuc = sites.nucleotide_content(fi=fasta_file).to_dataframe(comment="#")[["score", "blockStarts"]]
         nuc.columns = ["gc_content", "length"]
@@ -828,19 +826,15 @@ class ATACSeqAnalysis(Analysis):
         cols = [6, 8, 9]
 
         if tss_file is None:
-            from ngs_toolkit.general import get_tss_annotations
             _LOGGER.info("Reference TSS file was not given, will try to get TSS annotations.")
-            self._check_organism_genome(self)
             _LOGGER.info("Getting TSS annotations for organism '{}', genome '{}'. "
                          .format(self.organism, self.genome))
-            tss = pybedtools.BedTool.from_dataframe(
-                get_tss_annotations(organism=self.organism, genome_assembly=self.genome)
-                .iloc[:, list(range(6))])
-        else:
-            # extract only relevant columns
-            tss = pd.read_csv(tss_file, header=None, sep="\t")
-            tss = tss.iloc[:, list(range(6))]
-            tss = pybedtools.BedTool.from_dataframe(tss)
+            tss_file = self.get_annotations(steps=['tss'])['tss_file']
+
+        # extract only relevant columns
+        tss = pd.read_csv(tss_file, header=None, sep="\t")
+        tss = tss.iloc[:, list(range(6))]
+        tss = pybedtools.BedTool.from_dataframe(tss)
 
         if isinstance(self.sites, str):
             self.sites = pybedtools.BedTool(self.sites)
@@ -916,15 +910,14 @@ class ATACSeqAnalysis(Analysis):
         :returns: A dataframe with genomic context annotation for the peak set.
         """
         from ngs_toolkit.general import bed_to_index
+
         if genomic_context_file is None:
-            from ngs_toolkit.general import get_genomic_context
             _LOGGER.info("Reference genomic context file was not given, will try to get it.")
             _LOGGER.info("Getting genomic context annotations for organism '{}', genome '{}'. "
                          .format(self.organism, self.genome))
-            context = pybedtools.BedTool.from_dataframe(
-                get_genomic_context(organism=self.organism, genome_assembly=self.genome))
-        else:
-            context = pybedtools.BedTool(genomic_context_file)
+            genomic_context_file = self.get_annotations(steps=['genomic_context'])['genomic_context_file']
+
+        context = pybedtools.BedTool(genomic_context_file)
 
         if isinstance(self.sites, str):
             self.sites = pybedtools.BedTool(self.sites)

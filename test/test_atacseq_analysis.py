@@ -205,7 +205,7 @@ def test_quantile_normalization(various_analysis):
         # assert all(np.array(cors) > 0.99)
 
 
-@pytest.mark.skipif(travis, "This is anyway tested after")
+@pytest.mark.skipif(travis, reason="This is anyway tested after")
 def test_cqn_normalization(analysis):
     # At some point, downloading a genome reference in Travis
     # caused memory error.
@@ -269,7 +269,7 @@ def test_get_peak_gene_annotation(analysis):
 
     os.chdir(os.path.join(analysis.results_dir, os.pardir))
     annot = analysis.get_peak_gene_annotation(max_dist=1e10)
-    tss = os.path.join("reference",
+    tss = os.path.join(analysis.root_dir, 'reference',
                        "{}.{}.gene_annotation.protein_coding.tss.bed"
                        .format(analysis.organism, mapping[analysis.genome]))
     assert os.path.exists(tss)
@@ -280,7 +280,7 @@ def test_get_peak_gene_annotation(analysis):
 
 def test_get_peak_genomic_location(analysis):
     prefix = os.path.join(
-        analysis.results_dir, "..", "reference", "{}.{}.genomic_context")
+        analysis.root_dir, "reference", "{}.{}.genomic_context")
     fs = [prefix + a for a in [
         ".bed", ".exon.bed", ".genebody.bed", ".intergenic.bed",
         ".intron.bed", ".promoter.bed", ".utr3.bed", ".utr5.bed"]]

@@ -1,15 +1,15 @@
 .DEFAULT_GOAL := pypitest
 
 test3:
-	python3 -m pytest -n 3 --disable-warnings --show-capture=no --cov ./ test/test_*.py
+	python3 -m pytest -n 3 --disable-warnings --show-capture=no --cov=ngs_toolkit --cov-report xml test/test_*.py --lf
 
 test2:
-	python2 -m pytest -n 3 --disable-warnings --show-capture=no --cov ./ test/test_*.py
+	python2 -m pytest -n 3 --disable-warnings --show-capture=no --cov=ngs_toolkit --cov-report xml test/test_*.py --lf
 
 test: test3
 
 coverage: test
-	codecov
+	codecov -f coverage.xml
 	python-codacy-coverage -r coverage.xml
 
 build: test

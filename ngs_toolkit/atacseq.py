@@ -1692,9 +1692,9 @@ def characterize_regions_function(
     df[['chrom', 'start', 'end']].reset_index().to_csv(tsv_file, sep="\t", header=False, index=False)
 
     # export gene names
-    clean = df['gene_name'].str.split(",").apply(pd.Series, 1).stack().drop_duplicates()
-    clean = clean[~clean.isin(['.', 'nan'])]
-    clean.to_csv(
+    clean_gene = df['gene_name'].str.split(",").apply(pd.Series, 1).stack().drop_duplicates()
+    clean_gene = clean_gene[~clean_gene.isin(['.', 'nan', ''])]
+    clean_gene.to_csv(
             os.path.join(output_dir, "{}_genes.symbols.txt".format(prefix)),
             index=False)
     if "ensembl_gene_id" in df.columns:
@@ -1749,7 +1749,7 @@ def characterize_regions_function(
     # Enrichr
     if 'enrichr' in steps:
         _LOGGER.info("Running Enrichr for '{}'".format(prefix))
-        results = enrichr(df[['chrom', 'start', 'end', "gene_name"]])
+        results = enrichr(clean_gene.to_frame(name="gene_name"))
         results.to_csv(
             os.path.join(output_dir, "{}_regions.enrichr.csv".format(prefix)),
             index=False, encoding='utf-8')

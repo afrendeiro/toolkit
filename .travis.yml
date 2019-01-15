@@ -30,8 +30,8 @@ install:
   - pip install .[r]
 
 script:
-  - pytest --cov ./ test/test_*.py
+  - pytest --disable-warnings --show-capture=no --cov=ngs_toolkit --cov-report xml test/test_*.py
 
 after_success:
-  - codecov
+  - codecov -f coverage.xml
   - python-codacy-coverage -r coverage.xml

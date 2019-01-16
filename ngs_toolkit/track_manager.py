@@ -10,9 +10,6 @@ from peppy import Project
 import ngs_toolkit
 
 
-_LOGGER = ngs_toolkit._LOGGER
-
-
 def parse_arguments():
     """
     Argument Parsing.
@@ -76,7 +73,7 @@ email {email}
 """.format(proj=proj_name, description=proj_desc, email=user_email)
     with open(track_hub, 'w') as handle:
         handle.write(text)
-    os.chmod(track_hub, 0755)
+    os.chmod(track_hub, 0o755)
 
     # Templates for various levels
     track_parent = """track {proj}
@@ -145,7 +142,7 @@ maxHeightPixels 32:32:8
     for genome in df['genome'].unique():
         if not os.path.exists(os.path.join(bigwig_dir, genome)):
             os.makedirs(os.path.join(bigwig_dir, genome))
-        os.chmod(os.path.join(bigwig_dir, genome), 0755)
+        os.chmod(os.path.join(bigwig_dir, genome), 0o755)
 
         df_g = df[(df['genome'] == genome)]
 
@@ -155,7 +152,7 @@ trackDb {g}/trackDb.txt
     """.format(g=genome)
         with open(genomes_hub, 'a') as handle:
             handle.write(text)
-        os.chmod(genomes_hub, 0755)
+        os.chmod(genomes_hub, 0o755)
 
         # TrackDB
         track_db = os.path.join(os.path.join(bigwig_dir, genome, "trackDb.txt"))
@@ -197,7 +194,7 @@ trackDb {g}/trackDb.txt
                 if not os.path.exists(dest) and args.link:
                     try:
                         os.symlink(sample_attrs['bigwig'], dest)
-                        os.chmod(dest, 0755)
+                        os.chmod(dest, 0o755)
                     except OSError:
                         print("Sample {} track file does not exist!".format(sample_attrs["sample_name"]))
                         continue
@@ -226,13 +223,13 @@ trackDb {g}/trackDb.txt
                 if not os.path.exists(dest) and args.link:
                     try:
                         os.symlink(sample_attrs['bigwig'], dest)
-                        os.chmod(dest, 0755)
+                        os.chmod(dest, 0o755)
                     except OSError:
                         print("Sample {} track file does not exist!".format(sample_attrs["sample_name"]))
                         continue
                 # Make directories readable and executable
-                os.chmod(os.path.join(bigwig_dir, genome), 0755)
-                os.chmod(bigwig_dir, 0755)
+                os.chmod(os.path.join(bigwig_dir, genome), 0o755)
+                os.chmod(bigwig_dir, 0o755)
 
         track = re.sub("_none", "", track)
 
@@ -295,8 +292,8 @@ def make_igv_tracklink(prj, track_file, track_url):
     # write to file
     with open(track_file, 'w') as handle:
         handle.write(text + "\n")
-    os.chmod(track_file, 0655)
-    os.chmod(os.path.dirname(track_file), 0755)
+    os.chmod(track_file, 0o655)
+    os.chmod(os.path.dirname(track_file), 0o755)
 
     msg = "\n".join([
         "Finished producing IGV track file!", "'{}'".format(track_file),

@@ -7,584 +7,10 @@ import pandas as pd
 
 from ngs_toolkit import _LOGGER
 from ngs_toolkit import _CONFIG
+from ngs_toolkit.analysis import Analysis
 
 
-class Analysis(object):
-    """
-    Generic class holding functions and data from a typical NGS analysis.
-
-    Other modules implement classes inheriting from this that in general contain
-    data type-specific functions (e.g. ``ngs_toolkit.atacseq.ATACSeqAnalysis``
-    has a ``get_consensus_sites`` function to generate a peak consensus map).
-
-    Objects of this type can be used to store data (e.g. dataframes), variables
-    (e.g. paths to files or configurations) and are easily serializable (saved
-    to a file as an object) for rapid loading and cross-environment portability.
-    See the ``ngs_toolkit.general.Analysis.to_pickle``,
-    ``ngs_toolkit.general.Analysis.from_pickle`` and
-    ``ngs_toolkit.general.Analysis.update`` functions for this.
-
-    :param name: Name of the analysis. Defaults to ``analysis``.
-    :type name: str, optional
-    :param samples: List of ``peppy.Sample`` objects that this analysis is tied to.
-                    Defaults to ``None``.
-    :type samples: list, optional
-    :param prj: A ``peppy.Project`` object that this analysis is tied to.
-                Defaults to ``None``.
-    :type prj: peppy.Project, optional
-    :param data_dir: Directory containing processed data (e.g. by looper) that will
-                     be input to the analysis. This is in principle not required.
-                     Defaults to ``data``.
-    :type data_dir: str, optional
-    :param results_dir: Directory to contain outputs produced by the analysis.
-                        Defaults to ``results``.
-    :type results_dir: str, optional
-    :param pickle_file: A pickle file to serialize the object.
-                        Defaults to "`name`.pickle".
-    :type pickle_file: str, optional
-    :param from_pickle: Whether the analysis should be loaded from an existing
-                        serialized analysis object in ``pickle_file``.
-                        Defaults to False.
-    :type from_pickle: bool, optional
-
-    Additional keyword arguments will simply be stored as object attributes.
-    """
-    def __init__(
-            self,
-            name="analysis",
-            samples=None,
-            prj=None,
-            data_dir="data",
-            results_dir="results",
-            pickle_file=None,
-            from_pickle=False,
-            **kwargs):
-        # parse kwargs with default
-        self.name = name
-        self.data_dir = data_dir
-        self.results_dir = results_dir
-        self.samples = samples
-        self.prj = prj
-        self.pickle_file = pickle_file
-
-        # parse remaining kwargs
-        _LOGGER.debug("Adding additional kwargs to analysis object.")
-        self.__dict__.update(kwargs)
-
-        # Set default location for the pickle
-        if self.pickle_file is None:
-            self.pickle_file = os.path.join(results_dir, "{}.pickle".format(self.name))
-        # reload itself if required
-        if from_pickle:
-            _LOGGER.info("Updating analysis object from pickle file: '{}'.".format(self.pickle_file))
-            self.update(pickle_file=self.pickle_file)
-
-        for directory in [self.data_dir, self.results_dir]:
-            if not os.path.exists(directory):
-                os.makedirs(directory)
-
-        # Store projects attributes in self
-        _LOGGER.debug("Trying to set analysis attributes.")
-        self.set_project_attributes(overwrite=False)
-
-        # Try to set genome if not set
-        self.organism, self.genome = (None, None)
-        _LOGGER.debug("Trying to get analysis genome.")
-        self.set_organism_genome()
-        # TODO: if genome is set, get required static files for that genome assembly
-
-        # Add sample input file locations
-        _LOGGER.debug("Trying to set sample input file attributes.")
-        self.set_samples_input_files()
-
-        _LOGGER.debug("Setting data type-specific attributes to None.")
-        attrs = [
-            "data_type", "var_names",
-            "quantity", "norm_units", "raw_matrix_name",
-            "norm_matrix_name", "annot_matrix_name"]
-        for attr in attrs:
-            if not hasattr(self, attr):
-                setattr(self, attr, None)
-
-    def __repr__(self):
-        t = "'{}' analysis".format(self.data_type) if self.data_type is not None else "Analysis"
-        samples = " with {} samples".format(len(self.samples)) if self.samples is not None else ""
-        organism = " of organism '{}'".format(self.organism) if self.organism is not None else ""
-        genome = " ({})".format(self.genome) if self.genome is not None else ""
-        suffix = "."
-        return t + " object '{}'".format(self.name) + samples + organism + genome + suffix
-
-    @staticmethod
-    def _overwride_sample_representation():
-        from peppy import Sample
-
-        def r(self): return self.name
-        Sample.__repr__ = r
-
-    @staticmethod
-    def _format_string_with_attributes(obj, string):
-        """
-        Detect whether a string should be formatted with attributes from obj.
-
-        :param obj: [description]
-        :type obj: [type]
-        :param string: [description]
-        :type string: [type]
-        :returns: [description]
-        :rtype: {[type]}
-        :raises: NotImplementedError
-        """
-        # TODO: implement
-        # Detect if string contains formattable fields
-        # if all vaiables are present, format accordingly
-        raise NotImplementedError
-        return string.format()
-
-    @staticmethod
-    def _check_data_type_is_supported(data_type):
-        # TODO: test
-        supported = _CONFIG['supported_data_types']
-        return data_type in supported
-
-    @staticmethod
-    def _check_organism_genome(analysis):
-        # TODO: test
-        attrs = ['organism', 'genome']
-        msg = "Analysis does not have 'organism' or 'genome' attributes set."
-        hint = " You can set them with analysis.set_organism_genome, for example."
-        r1 = all([hasattr(analysis, attr) for attr in attrs])
-        r2 = all([getattr(analysis, attr) is not None for attr in attrs])
-        if not all([r1, r2]):
-            _LOGGER.error(msg + hint)
-            raise AttributeError(msg)
-        return True
-
-    @staticmethod
-    def _check_has_sites(analysis):
-        if not hasattr(analysis, "sites"):
-            msg = "Analysis object does not have a `sites` attribute."
-            hint = " Produce one with analysis.get_consensus_sites for example."
-            _LOGGER.error(msg + hint)
-            raise AttributeError(msg)
-        return True
-
-    def _get_data_type(self, data_type=None):
-        # TODO: test
-        if data_type is None:
-            msg = "Data type not defined and Analysis object does not have"
-            msg += " a `data_type` attribute."
-            try:
-                data_type = self.data_type
-            except AttributeError as e:
-                _LOGGER.error(msg)
-                raise e
-            if data_type is None:
-                _LOGGER.error(msg)
-                raise ValueError
-        else:
-            msg = "Data type is not supported."
-            hint = " Check which data types are supported in the 'supported_data_types'"
-            hint += " section of the configuration file."
-            if not self._check_data_type_is_supported(data_type):
-                raise ValueError(msg + hint)
-        return data_type
-
-    def _check_samples_have_file(self, attr, f=all):
-        return f([os.path.exists(str(getattr(sample, attr))) for sample in self.samples])
-
-    def _get_samples_have_file(self, attr):
-        return [sample for sample in self.samples if os.path.exists(str(getattr(sample, attr)))]
-
-    def _get_samples_missing_file(self, attr):
-        return [sample for sample in self.samples if not os.path.exists(str(getattr(sample, attr)))]
-
-    def update(self, pickle_file=None):
-        """
-        Update all of the object's attributes with the attributes from a serialized
-        object (i.e. object stored in a file) object.
-
-        :param pickle_file: Pickle file to load. By default this is the object's attribute
-                            `pickle_file`.
-        :type pickle_file: str, optional
-        """
-        self.__dict__.update(self.from_pickle(pickle_file=pickle_file).__dict__)
-
-    def set_organism_genome(self):
-        if self.samples is None:
-            _LOGGER.warning("Genome assembly for analysis was not set and cannot be derived from samples.")
-        else:
-            organisms = list(set([s.organism for s in self.samples]))
-            if len(organisms) == 1:
-                _LOGGER.info("Setting analysis organism as '{}'.".format(organisms[0]))
-                self.organism = organisms[0]
-            else:
-                _LOGGER.warning("Found several organism for the various analysis samples. " +
-                                "Will not set a organism for analysis.")
-            genomes = list(set([s.genome for s in self.samples]))
-            if len(genomes) == 1:
-                _LOGGER.info("Setting analysis genome as '{}'.".format(genomes[0]))
-                self.genome = genomes[0]
-            else:
-                _LOGGER.warning("Found several genome assemblies for the various analysis samples. " +
-                                "Will not set a genome for analysis.")
-
-    def set_project_attributes(self, overwrite=True):
-        """
-        Set Analysis object attributes ``samples``, ``sample_attributes`` and ``group_atrributes``
-        to the values in the associated Project object if existing.
-
-        :param overwrite: Whether to overwrite attribute values if existing. Defaults to True
-        :type overwrite: bool, optional
-        """
-        hint = " Adding a '{}' section to your project configuration file allows the analysis"
-        hint += " object to use those attributes during the analysis."
-        if self.prj is not None:
-            for attr, parent in [
-                    ("samples", self.prj), ("sample_attributes", self.prj),
-                    ("group_attributes", self.prj), ("comparison_table", self.prj.metadata)]:
-                if not hasattr(parent, attr):
-                    _LOGGER.warning("Associated project does not have any '{}'.".format(attr) +
-                                    hint.format(attr) if attr != "samples" else "")
-                else:
-                    msg = "Setting project's '{0}' as the analysis '{0}'.".format(attr)
-                    if overwrite:
-                        _LOGGER.info(msg)
-                        setattr(self, attr, getattr(parent, attr))
-                    else:
-                        if not hasattr(self, attr):
-                            _LOGGER.info(msg)
-                            setattr(self, attr, getattr(parent, attr))
-                        else:
-                            if getattr(self, attr) is None:
-                                setattr(self, attr, getattr(parent, attr))
-                            else:
-                                _LOGGER.debug("{} already exist for analysis, not overwriting."
-                                              .format(attr.replace("_", " ").capitalize()))
-            if hasattr(self, "comparison_table"):
-                if isinstance(self.comparison_table, str):
-                    _LOGGER.debug("Reading up comparison table.")
-                    self.comparison_table = pd.read_csv(self.comparison_table)
-        else:
-            _LOGGER.warning("Analysis object does not have an attached Project. " +
-                            "Will not add special attributes to analysis such as " +
-                            "samples, their attributes and comparison table.")
-
-    def set_samples_input_files(self, overwrite=True):
-        """
-        Add input file values to sample objects dependent on data type.
-        These are specified in the `ngs_toolkit` configuration file
-        under 'sample_input_files:<data type>:<attribute>'.
-
-        :param overwrite: Whether to overwrite attribute values if existing. Defaults to True
-        :type overwrite: bool, optional
-        """
-        if self.samples is None:
-            _LOGGER.error("Analysis object does not have attached Samples. " +
-                          "Will not add special attributes to samples such as " +
-                          "input file locations.")
-            return
-
-        msg = "Setting '{}' in sample {} as '{}'."
-        for data_type in _CONFIG['sample_input_files']:
-            for attr, value in _CONFIG['sample_input_files'][data_type].items():
-                for s in [s for s in self.samples if s.protocol == data_type]:
-                    if value is None:
-                        pass
-                    elif ("{data_dir}" in value) and ("{sample_name}" in value):
-                        value = value.format(data_dir=self.data_dir, sample_name=s.name)
-                    elif "{data_dir}" in value:
-                        value = value.format(data_dir=self.data_dir)
-                    elif "{sample_name}" in value:
-                        value = value.format(sample_name=s.name)
-                    if overwrite:
-                        _LOGGER.info(msg.format(attr, s.name, value))
-                        setattr(s, attr, value)
-                    else:
-                        if not hasattr(s, attr):
-                            _LOGGER.info(msg.format(attr, s.name, value))
-                            setattr(s, attr, value)
-                        else:
-                            if getattr(s, attr) is None:
-                                _LOGGER.info(msg.format(attr, s.name, value))
-                                setattr(s, attr, value)
-                            else:
-                                _LOGGER.debug("{} already exists in sample, not overwriting."
-                                              .format(attr.replace("_", " ").capitalize()))
-
-    def to_pickle(self, timestamp=False):
-        """
-        Serialize object (i.e. save to disk) to hickle format.
-        """
-        import pickle
-        if timestamp:
-            import time
-            import datetime
-            ts = datetime.datetime.fromtimestamp(time.time()).strftime('%Y%m%d-%H%M%S')
-            p = self.pickle_file.replace(".pickle", ".{}.pickle".format(ts))
-        else:
-            p = self.pickle_file
-        pickle.dump(self, open(p, 'wb'), protocol=pickle.HIGHEST_PROTOCOL)
-
-    def from_pickle(self, pickle_file=None):
-        """
-        Load object from pickle file.
-
-        :param pickle_file: Pickle file to load. By default this is the object's
-                            attribute `pickle_file`.
-        :type pickle_file: str, optional
-        """
-        import pickle
-        if pickle_file is None:
-            pickle_file = self.pickle_file
-        return pickle.load(open(pickle_file, 'rb'))
-
-    def get_matrix(self, matrix=None, matrix_name=None, samples=None):
-        """
-        Return a matrix that is an attribute of self subsetted for the requested samples.
-
-        :param pandas.DataFrame matrix: Pandas DataFrame.
-        :param list samples: Iterable of peppy.Sample objects to restrict matrix to.
-                             If not provided (`None` is passed) the matrix will not be subsetted.
-        :param str matrix_name: Name of the matrix that is an attribute of the object
-                                with values for samples in `samples`.
-        :returns pandas.DataFrame: Requested DataFrame.
-        """
-        if (matrix is None) & (matrix_name is None):
-            msg = "Either arguments `matrix` or `matrix_name` must be provided."
-            _LOGGER.error(msg)
-            raise ValueError(msg)
-        # default to matrix to be normalized
-        if matrix is None:
-            r_matrix = getattr(self, matrix_name)
-        else:
-            r_matrix = matrix
-        # default to all samples in self with matching names in matrix
-        if samples is None:
-            r_matrix = r_matrix.loc[:, [s.name for s in self.samples]]
-        else:
-            r_matrix = r_matrix.loc[:, [s.name for s in samples]]
-
-        return r_matrix
-
-    def annotate_with_sample_metadata(
-            self,
-            quant_matrix=None,
-            attributes=None,
-            numerical_attributes=None,
-            save=True,
-            assign=True):
-        """
-        Annotate matrix ``(n_regions, n_samples)`` with sample metadata
-        (creates MultiIndex on columns). Numerical attributes can be pass as a iterable
-        to ``numerical_attributes`` to be converted.
-
-        :param str quant_matrix: Attribute name of matrix to annotate. By default this will
-                                 be infered from the analysis data_type in the following way:
-                                 ATAC-seq or ChIP-seq: ``coverage_annotated``;
-                                 RNA-seq: ``expression_annotated``.
-        :param list attributes: Desired attributes to be annotated. This defaults
-                                to all attributes in the original sample annotation sheet
-                                of the analysis Project.
-        :param list numerical_attributes: Attributes which are numeric even though they
-                                          might be so in the samples' attributes. Will attempt
-                                          to convert values to numeric.
-        :param bool save: Whether to write normalized DataFrame to disk.
-        :param bool assign: Whether to assign the normalized DataFrame to an attribute
-                            ``accessibility`` if ``data_type`` is "ATAC-seq,
-                            ``binding`` if ``data_type`` is "ChIP-seq, or
-                            ``expression`` if ``data_type`` is "RNA-seq.
-        :var pd.DataFrame {accessibility,binding,expression}: A pandas DataFrame with
-                                                              MultiIndex column index
-                                                              containing the sample's
-                                                              attributes specified.
-        :returns pd.DataFrame: Annotated dataframe with requested sample attributes.
-        """
-        if (attributes is None) and hasattr(self, "sample_attributes"):
-            _LOGGER.info("Using 'sample_attributes' from analysis to annotate matrix: {}"
-                         .format(",".join(self.sample_attributes)))
-            attributes = self.sample_attributes
-        if (attributes is None) and hasattr(self, "prj"):
-            _LOGGER.warn(
-                "Analysis has no 'sample_attributes' set. " +
-                "Will use all columns from project annotation sheet: {}"
-                .format(",".join(self.prj.sheet.columns)))
-            attributes = self.prj.sheet.columns
-        if attributes is None:
-            msg = "Attributes not given and could not be set from Analysis or Project."
-            raise ValueError(msg)
-
-        if self.data_type == "ATAC-seq":
-            output_matrix = "accessibility"
-            if quant_matrix is None:
-                quant_matrix = "coverage_annotated"
-        elif self.data_type == "ChIP-seq":
-            output_matrix = "binding"
-            if quant_matrix is None:
-                quant_matrix = "coverage_annotated"
-        elif self.data_type == "CNV":
-            output_matrix = "cnv"
-            if quant_matrix is None:
-                if type(getattr(self, quant_matrix)) is not pd.DataFrame:
-                    _LOGGER.error("For CNV data type, the matrix to be annotated must be" +
-                                  " directly passed to the function throught the `quant_matrix` argument!")
-                    raise ValueError
-            if quant_matrix is None:
-                quant_matrix = "coverage_norm"
-        elif self.data_type == "RNA-seq":
-            output_matrix = "expression"
-            if quant_matrix is None:
-                quant_matrix = "expression_annotated"
-        else:
-            _LOGGER.warning("Data type of object not known, will not set as attribute.")
-            assign = False
-            output_matrix = ""
-            if quant_matrix is None:
-                msg = "Data type of object not known, must specify `quant_matrix` to annotate!"
-                raise ValueError(msg)
-
-        matrix = getattr(self, quant_matrix)
-
-        if type(matrix.columns) is pd.core.indexes.multi.MultiIndex:
-            matrix.columns = matrix.columns.get_level_values("sample_name")
-
-        samples = [s for s in self.samples if s.name in matrix.columns.tolist()]
-
-        attrs = list()
-        for attr in attributes:
-            _LOGGER.debug("Attribute: '{}'".format(attr))
-            ll = list()
-            for sample in samples:  # keep order of samples in matrix
-                try:
-                    ll.append(getattr(sample, attr))
-                except AttributeError:
-                    ll.append(np.nan)
-            if numerical_attributes is not None:
-                if attr in numerical_attributes:
-                    ll = [float(x) for x in ll]
-            attrs.append(ll)
-
-        # Generate multiindex columns
-        index = pd.MultiIndex.from_arrays(attrs, names=attributes)
-        df = matrix[[s.name for s in samples]]
-        df.columns = index
-
-        # Save
-        if save:
-            df.to_csv(
-                os.path.join(
-                    self.results_dir,
-                    self.name + "{}.annotated_metadata.csv"
-                        .format("." + output_matrix if output_matrix != "" else output_matrix)),
-                index=True)
-        if assign:
-            setattr(self, output_matrix, df)
-        return df
-
-    def get_level_colors(
-            self, index=None, matrix=None, levels=None,
-            pallete="tab20", cmap="RdBu_r", nan_color=(0.662745, 0.662745, 0.662745, 1.0),
-            # TODO: implement dataframe return
-            as_dataframe=False):
-        """
-        Get tuples of floats representing a colour for a sample in a given variable in a
-        dataframe's index (particularly useful with MultiIndex dataframes).
-
-        If given, will use the provieded ``index`` argument, otherwise, the the columns
-        and its levels of an attribute of self named ``matrix``.
-        ``levels`` can be passed to subset the levels of the index.
-
-        Will try to guess if each variable is categorical or numerical and return either colours
-        from a colour ``pallete`` or a ``cmap``, respectively with null values set to ``nan_color``
-        (a 4-value tuple of floats).
-
-        :param index: Pandas Index to use. If not provided (default == None), this will be
-        the column Index of the provided ``matrix``.
-        :type index: pandas.Index, optional
-        :param matrix: Name of analysis attribute containing a dataframe with pandas.MultiIndex
-                       columns to use.
-        :type matrix: str, optional
-        :param levels: Levels of multiindex to restrict to. Defaults to all in index.
-        :type levels: list, optional
-        :param pallete: Name of matplotlib color palete to use with categorical levels.
-                        See matplotlib.org/examples/color/colormaps_reference.html.
-                        Defaults to ``Paired``.
-        :type pallete: str, optional
-        :param cmap: Name of matplotlib color palete to use with numerical levels.
-                     See matplotlib.org/examples/color/colormaps_reference.html.
-                     Defaults to ``RdBu_r``.
-        :type cmap: str, optional
-        :param nan_color: Color for missing (i.e. NA) values.
-                          Defaults to ``(0.662745, 0.662745, 0.662745, 0.5)`` == ``grey``.
-        :type nan_color: tuple, optional
-        :param as_dataframe: Whether a dataframe should be return. Defaults to False.
-                             Not implemented yet.
-        :type as_dataframe: bool, optional
-        :returns: List of list tuples (matrix) of shape (level, sample) with rgb values of
-                  each of the variable.
-        :rtype: {list}
-        """
-        import numpy as np
-        import matplotlib
-        import matplotlib.pyplot as plt
-        from collections import Counter
-
-        if index is None:
-            if matrix is None:
-                msg = "One of `index` or `matrix` must be provided."
-                _LOGGER.error(msg)
-                raise ValueError(msg)
-            index = getattr(self, matrix).columns
-
-        if levels is not None:
-            drop = [l.name for l in index.levels if l.name not in levels]
-            index = index.droplevel(drop)
-
-        # Handle special case of single level
-        if type(index) is pd.core.indexes.base.Index:
-            index = pd.MultiIndex.from_arrays([index.values], names=[index.name])
-
-        _cmap = plt.get_cmap(cmap)
-        _pallete = plt.get_cmap(pallete)
-
-        colors = list()
-        for level in index.levels:
-            # For empty levels (all values nan), return nan colour
-            if len(level) == 0:
-                colors.append([nan_color] * len(index))
-                _LOGGER.warning("Level {} has only NaN values.".format(level.name))
-                continue
-            # determine the type of data in each level
-            # TODO: check this works in all cases
-            most_common = Counter([type(x) for x in level]).most_common()[0][0]
-            _LOGGER.debug("Getting colours for level '{}', which has type '{}'."
-                          .format(level.name, most_common))
-
-            # Add either colors based on categories or numerical scale
-            if most_common in [int, float, np.float32, np.float64, np.int32, np.int64]:
-                values = index.get_level_values(level.name)
-                # Create a range of either 0-100 if only positive values are found
-                # or symmetrically from the maximum absolute value found
-                if not any(values.dropna() < 0):
-                    norm = matplotlib.colors.Normalize(vmin=values.min(), vmax=values.max())
-                else:
-                    r = max(abs(values.min()), abs(values.max()))
-                    norm = matplotlib.colors.Normalize(vmin=-r, vmax=r)
-
-                col = _cmap(norm(values))
-                # replace color for nan cases
-                col[np.where(index.get_level_values(level.name).to_series().isnull().tolist())] = nan_color
-                colors.append(col.tolist())
-            else:
-                n = len(set(index.get_level_values(level.name)))
-                # get n equidistant colors
-                p = [_pallete(1. * i / n) for i in range(n)]
-                color_dict = dict(zip(list(set(index.get_level_values(level.name))), p))
-                # color for nan cases
-                color_dict[np.nan] = nan_color
-                col = [color_dict[x] for x in index.get_level_values(level.name)]
-                colors.append(col)
-
-        return colors
+Analysis
 
 
 def get_genome_reference(
@@ -1010,31 +436,6 @@ def get_genomic_context(
     return annot
 
 
-def get_annotations(
-        organism, genome_assembly=None, output_dir=None,
-        steps=['blacklist', 'tss', 'genomic']):
-    """
-    Get genome annotations required for several ngs_toolkit analysis.
-    This is a simple approach using Biomart's API querying the Ensembl database..
-    Saves results to disk and returns a dataframe.
-    """
-    # TODO: test
-    from ngs_toolkit.general import (
-        get_genome_reference,
-        get_blacklist_annotations,
-        get_tss_annotations,
-        get_genomic_context)
-
-    if 'fasta' in steps:
-        get_genome_reference(organism=organism, genome_assembly=genome_assembly)
-    if 'blacklist' in steps:
-        get_blacklist_annotations(organism=organism, genome_assembly=genome_assembly)
-    if 'tss' in steps:
-        get_tss_annotations(organism=organism, genome_assembly=genome_assembly)
-    if 'genomic' in steps:
-        get_genomic_context(organism=organism, genome_assembly=genome_assembly)
-
-
 def count_reads_in_intervals(bam, intervals):
     """
     Count total number of reads in a iterable holding strings
@@ -1117,6 +518,7 @@ def normalize_quantiles_p(df_input):
 
 def unsupervised_analysis(
         analysis,
+        steps=['correlation', 'manifold', 'pca', 'pca_association'],
         data_type=None,
         quant_matrix=None,
         samples=None,
@@ -1238,6 +640,7 @@ def unsupervised_analysis(
     from scipy.stats import pearsonr
     import matplotlib.pyplot as plt
     import seaborn as sns
+    from statsmodels.sandbox.stats.multicomp import multipletests
 
     if data_type is None:
         msg = "Data type not defined and Analysis object does not have a `data_type` attribute."
@@ -1349,300 +752,322 @@ def unsupervised_analysis(
     #         .str.replace("RNA-seq_", "")
     #         .str.replace("ChIP-seq_", ""))
 
-    # Pairwise correlations
-    for method in ['pearson', 'spearman']:
-        _LOGGER.info("Plotting pairwise correlation with '{}' metric.".format(method))
-        g = sns.clustermap(
-            X.astype(float).corr(method),
-            xticklabels=False, yticklabels=sample_display_names, annot=display_corr_values,
-            cmap="Spectral_r", figsize=(0.2 * X.shape[1], 0.2 * X.shape[1]),
-            cbar_kws={"label": "{} correlation".format(method.capitalize())},
-            row_colors=color_dataframe.T, col_colors=color_dataframe.T)
-        g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize='xx-small')
-        g.ax_heatmap.set_xlabel(None, visible=False)
-        g.ax_heatmap.set_ylabel(None, visible=False)
-        g.fig.savefig(os.path.join(
-            output_dir, "{}.{}.{}_correlation.clustermap.svg"
-            .format(analysis.name, plot_prefix, method)), bbox_inches='tight', dpi=dpi)
+    if 'correlation' in steps:
+        # Pairwise correlations
+        for method in ['pearson', 'spearman']:
+            _LOGGER.info("Plotting pairwise correlation with '{}' metric.".format(method))
+            g = sns.clustermap(
+                X.astype(float).corr(method),
+                xticklabels=False, yticklabels=sample_display_names, annot=display_corr_values,
+                cmap="Spectral_r", figsize=(0.2 * X.shape[1], 0.2 * X.shape[1]),
+                cbar_kws={"label": "{} correlation".format(method.capitalize())},
+                row_colors=color_dataframe.T, col_colors=color_dataframe.T)
+            g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize='xx-small')
+            g.ax_heatmap.set_xlabel(None, visible=False)
+            g.ax_heatmap.set_ylabel(None, visible=False)
+            g.fig.savefig(os.path.join(
+                output_dir, "{}.{}.{}_correlation.clustermap.svg"
+                .format(analysis.name, plot_prefix, method)), bbox_inches='tight', dpi=dpi)
 
-    # Manifolds
-    params = {
-        "MDS": {'n_jobs': -1},
-        "Isomap": {'n_jobs': -1},
-        "LocallyLinearEmbedding": {},
-        "SpectralEmbedding": {'n_jobs': -1},
-        "TSNE": {'init': 'pca'},
-    }
-    for algo in manifold_algorithms:
-        msg = "Learning manifold with '{}' algorithm".format(algo)
-        _LOGGER.info(msg + ".")
+    if 'manifold' in steps:
+        # Manifolds
+        params = {
+            "MDS": {'n_jobs': -1},
+            "Isomap": {'n_jobs': -1},
+            "LocallyLinearEmbedding": {},
+            "SpectralEmbedding": {'n_jobs': -1},
+            "TSNE": {'init': 'pca'},
+        }
+        for algo in manifold_algorithms:
+            msg = "Learning manifold with '{}' algorithm".format(algo)
+            _LOGGER.info(msg + ".")
 
-        manif = getattr(manifold, algo)(**params[algo])
-        try:
-            x_new = manif.fit_transform(X.T)
-        except (TypeError, ValueError):
-            hint = " Number of samples might be too small to perform '{}'".format(algo)
-            _LOGGER.error(msg + " failed!" + hint)
-            continue
-
-        xx = pd.DataFrame(x_new, index=X.columns, columns=list(range(x_new.shape[1])))
-
-        _LOGGER.info("Plotting projection of manifold with '{}' algorithm.".format(algo))
-        fig, axis = plt.subplots(1, len(attributes_to_plot), figsize=(4 * len(attributes_to_plot), 4 * 1))
-        if len(attributes_to_plot) != 1:
-            axis = axis.flatten()
-        else:
-            axis = np.array([axis])
-        for i, attr in enumerate(attributes_to_plot):
-            for j, sample in enumerate(xx.index):
-                sample = pd.Series(sample, index=X.columns.names)
-                try:
-                    label = getattr(sample, attributes_to_plot[i])
-                except AttributeError:
-                    label = np.nan
-                axis[i].scatter(
-                    xx.loc[sample['sample_name'], 0],
-                    xx.loc[sample['sample_name'], 1],
-                    s=50, color=color_dataframe.loc[attr, sample['sample_name']],
-                    alpha=0.75, label=label, rasterized=rasterized)
-
-            # Plot groups
-            if plot_group_centroids:
-                xx2 = xx.groupby(attr).mean()
-                # get the color of each attribute group
-                cd = color_dataframe.loc[attr]
-                cd.name = None
-                cd.index = X.columns.get_level_values(attr)
-                cd = cd.reset_index().drop_duplicates().set_index(attr)
-                for j, group in enumerate(xx2.index):
-                    axis[i].scatter(
-                        xx2.loc[group, 0],
-                        xx2.loc[group, 1],
-                        marker="s", s=50, color=cd.loc[group].squeeze(),
-                        alpha=0.95, label=group, rasterized=rasterized)
-                    axis[i].text(
-                        xx2.loc[group, 0],
-                        xx2.loc[group, 1], group,
-                        color=cd.loc[group].squeeze(), alpha=0.95)
-
-            # Graphics
-            axis[i].set_title(attributes_to_plot[i])
-            axis[i].set_xlabel("{} 1".format(algo))
-            axis[i].set_ylabel("{} 2".format(algo))
-            if not axis_ticklabels:
-                axis[i].set_xticklabels(axis[i].get_xticklabels(), visible=False)
-                axis[i].set_yticklabels(axis[i].get_yticklabels(), visible=False)
-            if axis_lines:
-                axis[i].axhline(0, linestyle="--", color="black", alpha=0.3)
-                axis[i].axvline(0, linestyle="--", color="black", alpha=0.3)
-
-            if legends:
-                # Unique legend labels
-                handles, labels = axis[i].get_legend_handles_labels()
-                by_label = OrderedDict(zip(labels, handles))
-                if any([type(c) in [str, unicode] for c in by_label.keys()]) and len(by_label) <= 20:
-                    # if not any([re.match("^\d", c) for c in by_label.keys()]):
-                    axis[i].legend(by_label.values(), by_label.keys())
-        fig.savefig(os.path.join(
-            output_dir, "{}.{}.{}.svg"
-            .format(analysis.name, plot_prefix, algo.lower())), bbox_inches='tight', dpi=dpi)
-
-    # PCA
-    pcs = min(*X.shape) - 1
-    _LOGGER.info("Decomposing data with 'PCA' algorithm for {} dimensions.".format(pcs))
-    pca = PCA(n_components=pcs, svd_solver="arpack")
-    x_new = pca.fit_transform(X.T)
-    # transform again
-    xx = pd.DataFrame(x_new, index=X.columns, columns=list(range(x_new.shape[1])))
-
-    # plot % explained variance per PC
-    _LOGGER.info("Plotting variance explained with PCA.")
-    fig, axis = plt.subplots(1, 2, figsize=(4 * 2, 4))
-    axis[0].plot(
-        range(1, len(pca.explained_variance_) + 1),  # all PCs
-        (pca.explained_variance_ / pca.explained_variance_.sum()) * 100, 'o-')
-    axis[1].plot(
-        range(1, len(pca.explained_variance_) + 1),  # all PCs
-        np.log10(pca.explained_variance_), 'o-')
-    for ax in axis:
-        ax.axvline(len(attributes_to_plot), linestyle='--')
-        ax.set_xlabel("PC")
-    axis[0].set_ylabel("% variance")
-    axis[1].set_ylabel("log variance")
-    sns.despine(fig)
-    fig.savefig(os.path.join(
-        output_dir, "{}.{}.pca.explained_variance.svg"
-                    .format(analysis.name, plot_prefix)), bbox_inches='tight', dpi=dpi)
-
-    # Write % variance expained to disk
-    pd.Series((pca.explained_variance_ / pca.explained_variance_.sum()) * 100, name="PC").to_csv(
-        os.path.join(output_dir, "{}.{}.pca.explained_variance.csv".format(
-            analysis.name, plot_prefix)))
-
-    # plot pca
-    pcs = min(xx.shape[1] - 1, plot_max_pcs)
-    _LOGGER.info("Plotting PCA up to {} dimensions.".format(pcs))
-    fig, axis = plt.subplots(pcs, len(attributes_to_plot), figsize=(
-        4 * len(attributes_to_plot), 4 * pcs))
-    if len(attributes_to_plot) == 1:
-        axis = axis.reshape((pcs, 1))
-    if pcs == 1:
-        axis = axis.reshape((1, len(attributes_to_plot)))
-    for pc in range(pcs):
-        for i, attr in enumerate(attributes_to_plot):
-            for j, sample in enumerate(xx.index):
-                sample = pd.Series(sample, index=X.columns.names)
-                try:
-                    label = getattr(samples[j], attr)
-                except AttributeError:
-                    label = np.nan
-                axis[pc, i].scatter(
-                    xx.loc[sample['sample_name'], pc],
-                    xx.loc[sample['sample_name'], pc + 1],
-                    s=30, color=color_dataframe.loc[attr, sample['sample_name']],
-                    alpha=0.75, label=label, rasterized=rasterized)
-
-            # Plot groups
-            if plot_group_centroids:
-                xx2 = xx.groupby(attr).mean()
-                # get the color of each attribute group
-                cd = color_dataframe.loc[attr]
-                cd.name = None
-                cd.index = X.columns.get_level_values(attr)
-                cd = cd.reset_index().drop_duplicates().set_index(attr)
-                for j, group in enumerate(xx2.index):
-                    axis[pc, i].scatter(
-                        xx2.loc[group, pc],
-                        xx2.loc[group, pc + 1],
-                        marker="s", s=50, color=cd.loc[group].squeeze(),
-                        alpha=0.95, label=group, rasterized=rasterized)
-                    axis[pc, i].text(
-                        xx2.loc[group, pc],
-                        xx2.loc[group, pc + 1], group,
-                        color=cd.loc[group].squeeze(), alpha=0.95)
-
-            # Graphics
-            axis[pc, i].set_title(attr)
-            axis[pc, i].set_xlabel("PC {}".format(pc + 1))
-            axis[pc, i].set_ylabel("PC {}".format(pc + 2))
-            if not axis_ticklabels:
-                axis[pc, i].set_xticklabels(axis[pc, i].get_xticklabels(), visible=False)
-                axis[pc, i].set_yticklabels(axis[pc, i].get_yticklabels(), visible=False)
-            if axis_lines:
-                axis[pc, i].axhline(0, linestyle="--", color="black", alpha=0.3)
-                axis[pc, i].axvline(0, linestyle="--", color="black", alpha=0.3)
-
-            if legends:
-                # Unique legend labels
-                handles, labels = axis[pc, i].get_legend_handles_labels()
-                by_label = OrderedDict(zip(labels, handles))
-                if any([type(c) in [str, unicode] for c in by_label.keys()]) and len(by_label) <= plot_max_attr:
-                    # if not any([re.match("^\d", c) for c in by_label.keys()]):
-                    if always_legend:
-                        axis[pc, i].legend(by_label.values(), by_label.keys())
-                    else:
-                        if pc == (pcs - 1):
-                            axis[pc, i].legend(
-                                by_label.values(), by_label.keys())
-    fig.savefig(os.path.join(output_dir, "{}.{}.pca.svg".format(
-        analysis.name, plot_prefix)), bbox_inches="tight")
-
-    # Test association of PCs with attributes
-    if not test_pc_association:
-        _LOGGER.info("Not testing association of attributes with principal components.")
-        return
-
-    _LOGGER.info("Computing association of given attributes with principal components.")
-    associations = list()
-    for pc in range(pcs):
-        for attr in attributes_to_plot:
-            _LOGGER.info("PC {}; Attribute {}.".format(pc + 1, attr))
-
-            # Get all values of samples for this attr
-            groups = xx.index.get_level_values(attr)
-
-            # Determine if attr is categorical or continuous
-            if all([type(i) in [str, bool] for i in groups]) or len(groups) == 2:
-                variable_type = "categorical"
-            elif all([type(i) in [int, float, np.int64, np.float64] for i in groups]):
-                variable_type = "numerical"
-            else:
-                _LOGGER.warning("attr %s cannot be tested." % attr)
-                associations.append([pc + 1, attr, variable_type, np.nan, np.nan, np.nan])
+            manif = getattr(manifold, algo)(**params[algo])
+            try:
+                x_new = manif.fit_transform(X.T)
+            except (TypeError, ValueError):
+                hint = " Number of samples might be too small to perform '{}'".format(algo)
+                _LOGGER.error(msg + " failed!" + hint)
                 continue
 
-            if variable_type == "categorical":
-                # It categorical, test pairwise combinations of attributes
-                for group1, group2 in itertools.combinations(groups, 2):
-                    g1_mask = xx.index.get_level_values(attr) == group1
-                    g2_mask = xx.index.get_level_values(attr) == group2
+            xx = pd.DataFrame(x_new, index=X.columns, columns=list(range(x_new.shape[1])))
 
-                    g1_values = xx.loc[g1_mask, pc]
-                    g2_values = xx.loc[g2_mask, pc]
+            _LOGGER.info("Plotting projection of manifold with '{}' algorithm.".format(algo))
+            fig, axis = plt.subplots(1, len(attributes_to_plot), figsize=(4 * len(attributes_to_plot), 4 * 1))
+            if len(attributes_to_plot) != 1:
+                axis = axis.flatten()
+            else:
+                axis = np.array([axis])
+            for i, attr in enumerate(attributes_to_plot):
+                for j, sample in enumerate(xx.index):
+                    sample = pd.Series(sample, index=X.columns.names)
+                    try:
+                        label = getattr(sample, attributes_to_plot[i])
+                    except AttributeError:
+                        label = np.nan
+                    axis[i].scatter(
+                        xx.loc[sample['sample_name'], 0],
+                        xx.loc[sample['sample_name'], 1],
+                        s=50, color=color_dataframe.loc[attr, sample['sample_name']],
+                        alpha=0.75, label=label, rasterized=rasterized)
 
-                    # Test ANOVA (or Kruskal-Wallis H-test)
-                    p = kruskal(g1_values, g2_values)[1]
+                # Plot groups
+                if plot_group_centroids:
+                    xx2 = xx.groupby(attr).mean()
+                    # get the color of each attribute group
+                    cd = color_dataframe.loc[attr, :]
+                    cd.name = None
+                    cd.index = X.columns.get_level_values(attr)
+                    cd = cd.apply(lambda x: tuple(x) if isinstance(x, list) else x)  # fix for deduplicating lists
+                    cd = cd.reset_index().drop_duplicates().set_index(attr)
+                    for j, group in enumerate(xx2.index):
+                        axis[i].scatter(
+                            xx2.loc[group, 0],
+                            xx2.loc[group, 1],
+                            marker="s", s=50, color=cd.loc[group].squeeze(),
+                            alpha=0.95, label=group, rasterized=rasterized)
+                        axis[i].text(
+                            xx2.loc[group, 0],
+                            xx2.loc[group, 1], group,
+                            color=cd.loc[group].squeeze(), alpha=0.95)
 
-                    # Append
-                    associations.append([pc + 1, attr, variable_type, group1, group2, p])
+                # Graphics
+                axis[i].set_title(attributes_to_plot[i])
+                axis[i].set_xlabel("{} 1".format(algo))
+                axis[i].set_ylabel("{} 2".format(algo))
+                if not axis_ticklabels:
+                    axis[i].set_xticklabels(axis[i].get_xticklabels(), visible=False)
+                    axis[i].set_yticklabels(axis[i].get_yticklabels(), visible=False)
+                if axis_lines:
+                    axis[i].axhline(0, linestyle="--", color="black", alpha=0.3)
+                    axis[i].axvline(0, linestyle="--", color="black", alpha=0.3)
 
-            elif variable_type == "numerical":
-                # It numerical, calculate pearson correlation
-                pc_values = xx.loc[:, pc]
-                trait_values = xx.index.get_level_values(attr)
-                p = pearsonr(pc_values, trait_values)[1]
+                if legends:
+                    # Unique legend labels
+                    handles, labels = axis[i].get_legend_handles_labels()
+                    by_label = OrderedDict(zip(labels, handles))
+                    if any([type(c) in [str, unicode] for c in by_label.keys()]) and len(by_label) <= 20:
+                        # if not any([re.match("^\d", c) for c in by_label.keys()]):
+                        axis[i].legend(by_label.values(), by_label.keys())
+            fig.savefig(os.path.join(
+                output_dir, "{}.{}.{}.svg"
+                .format(analysis.name, plot_prefix, algo.lower())), bbox_inches='tight', dpi=dpi)
 
-                associations.append([pc + 1, attr, variable_type, np.nan, np.nan, p])
+    if 'pca' in steps:
+        # PCA
+        pcs = min(*X.shape) - 1
+        _LOGGER.info("Decomposing data with 'PCA' algorithm for {} dimensions.".format(pcs))
+        pca = PCA(n_components=pcs, svd_solver="arpack")
+        x_new = pca.fit_transform(X.T)
 
-    associations = pd.DataFrame(
-        associations, columns=["pc", "attribute", "variable_type", "group_1", "group_2", "p_value"])
+        pcs_order = range(pca.n_components_)
+        xx = pd.DataFrame(x_new, index=X.columns, columns=pcs_order)
+        xx.to_csv(
+            os.path.join(output_dir, "{}.{}.pca.fit.csv".format(
+                analysis.name, plot_prefix)))
+        comps = pd.DataFrame(pca.components_.T, index=X.index, columns=pcs_order)
+        comps.to_csv(
+            os.path.join(output_dir, "{}.{}.pca.loadings.csv".format(
+                analysis.name, plot_prefix)))
 
-    if associations.empty:
-        msg = "Couldn't test any associations between PCs and factors."
-        hint = " Perhaps PCA produced only 1 PC?"
-        _LOGGER.warning(msg + hint)
-        return
+        # Write % variance expained to disk
+        variance = pd.Series(
+            pca.explained_variance_ratio_ * 100,
+            name="percent_variance", index=pcs_order
+            ).to_frame()
+        variance['log_variance'] = np.log10(pca.explained_variance_)
+        variance.index.name = "PC"
+        variance.to_csv(
+            os.path.join(output_dir, "{}.{}.pca.explained_variance.csv".format(
+                analysis.name, plot_prefix)))
 
-    # write
-    _LOGGER.info("Saving associations.")
-    associations.to_csv(os.path.join(
-        output_dir, "{}.{}.pca.variable_principle_components_association.csv"
-                    .format(analysis.name, plot_prefix)), index=False)
+        # plot % explained variance per PC
+        _LOGGER.info("Plotting variance explained with PCA.")
+        fig, axis = plt.subplots(1, 3, figsize=(4 * 3, 4))
+        axis[0].plot(variance.index, variance['percent_variance'], 'o-')
+        axis[0].set_ylim((0, variance['percent_variance'].max() + variance['percent_variance'].max() * 0.1))
+        axis[1].plot(variance.index, variance['log_variance'], 'o-')
+        axis[2].plot(variance.index, variance['percent_variance'].cumsum(), 'o-')
+        axis[2].set_ylim((0, 100))
+        for ax in axis:
+            ax.axvline(len(attributes_to_plot), linestyle='--')
+            ax.set_xlabel("PC")
+        axis[0].set_ylabel("% variance")
+        axis[1].set_ylabel("log variance")
+        axis[2].set_ylabel("Cumulative % variance")
+        sns.despine(fig)
+        fig.savefig(os.path.join(
+            output_dir, "{}.{}.pca.explained_variance.svg"
+                        .format(analysis.name, plot_prefix)), bbox_inches='tight', dpi=dpi)
 
-    if len(attributes_to_plot) < 2:
-        _LOGGER.info("Only one attribute given, can't plot associations.")
-        return
+        # plot pca
+        pcs = min(xx.shape[1] - 1, plot_max_pcs)
+        _LOGGER.info("Plotting PCA up to {} dimensions.".format(pcs))
+        fig, axis = plt.subplots(pcs, len(attributes_to_plot), figsize=(
+            4 * len(attributes_to_plot), 4 * pcs))
+        if len(attributes_to_plot) == 1:
+            axis = axis.reshape((pcs, 1))
+        if pcs == 1:
+            axis = axis.reshape((1, len(attributes_to_plot)))
+        for pc in range(pcs):
+            for i, attr in enumerate(attributes_to_plot):
+                for j, sample in enumerate(xx.index):
+                    sample = pd.Series(sample, index=X.columns.names)
+                    try:
+                        label = getattr(samples[j], attr)
+                    except AttributeError:
+                        label = np.nan
+                    axis[pc, i].scatter(
+                        xx.loc[sample['sample_name'], pc],
+                        xx.loc[sample['sample_name'], pc + 1],
+                        s=30, color=color_dataframe.loc[attr, sample['sample_name']],
+                        alpha=0.75, label=label, rasterized=rasterized)
 
-    # Plot
-    # associations[associations['p_value'] < 0.05].drop(['group_1', 'group_2'], axis=1).drop_duplicates()
-    # associations.drop(['group_1', 'group_2'], axis=1).drop_duplicates().pivot(index="pc", columns="attribute", values="p_value")
-    pivot = (
-        associations
-        .groupby(["pc", "attribute"])
-        .min()['p_value']
-        .reset_index()
-        .pivot(index="pc", columns="attribute", values="p_value")
-        .dropna(axis=1))
+                # Plot groups
+                if plot_group_centroids:
+                    xx2 = xx.groupby(attr).mean()
+                    # get the color of each attribute group
+                    cd = color_dataframe.loc[attr, :]
+                    cd.name = None
+                    cd.index = X.columns.get_level_values(attr)
+                    cd = cd.apply(lambda x: tuple(x) if isinstance(x, list) else x)  # fix for deduplicating lists
+                    cd = cd.reset_index().drop_duplicates().set_index(attr)
+                    for j, group in enumerate(xx2.index):
+                        axis[pc, i].scatter(
+                            xx2.loc[group, pc],
+                            xx2.loc[group, pc + 1],
+                            marker="s", s=50, color=cd.loc[group].squeeze(),
+                            alpha=0.95, label=group, rasterized=rasterized)
+                        axis[pc, i].text(
+                            xx2.loc[group, pc],
+                            xx2.loc[group, pc + 1], group,
+                            color=cd.loc[group].squeeze(), alpha=0.95)
 
-    # heatmap of -log p-values
-    g = sns.clustermap(
-        -np.log10(pivot), row_cluster=False,
-        annot=True, cbar_kws={"label": "-log10(p_value) of association"},
-        square=True, rasterized=rasterized)
-    g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=45, ha="right")
-    g.fig.savefig(os.path.join(
-        output_dir, "{}.{}.pca.variable_principle_components_association.svg"
-                    .format(analysis.name, plot_prefix)), bbox_inches="tight", dpi=dpi)
+                # Graphics
+                axis[pc, i].set_title(attr)
+                axis[pc, i].set_xlabel("PC {}".format(pc + 1))
+                axis[pc, i].set_ylabel("PC {}".format(pc + 2))
+                if not axis_ticklabels:
+                    axis[pc, i].set_xticklabels(axis[pc, i].get_xticklabels(), visible=False)
+                    axis[pc, i].set_yticklabels(axis[pc, i].get_yticklabels(), visible=False)
+                if axis_lines:
+                    axis[pc, i].axhline(0, linestyle="--", color="black", alpha=0.3)
+                    axis[pc, i].axvline(0, linestyle="--", color="black", alpha=0.3)
 
-    # heatmap of masked significant
-    g = sns.clustermap(
-        (pivot < 0.05).astype(int),
-        row_cluster=False, cbar_kws={"label": "significant association"},
-        square=True, rasterized=rasterized, vmin=0, vmax=1)
-    g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=45, ha="right")
-    g.fig.savefig(os.path.join(
-        output_dir, "{}.{}.pca.variable_principle_components_association.masked.svg"
-                    .format(analysis.name, plot_prefix)), bbox_inches="tight", dpi=dpi)
+                if legends:
+                    # Unique legend labels
+                    handles, labels = axis[pc, i].get_legend_handles_labels()
+                    by_label = OrderedDict(zip(labels, handles))
+                    if any([type(c) in [str, unicode] for c in by_label.keys()]) and len(by_label) <= plot_max_attr:
+                        # if not any([re.match("^\d", c) for c in by_label.keys()]):
+                        if always_legend:
+                            axis[pc, i].legend(by_label.values(), by_label.keys())
+                        else:
+                            if pc == (pcs - 1):
+                                axis[pc, i].legend(
+                                    by_label.values(), by_label.keys())
+        fig.savefig(os.path.join(output_dir, "{}.{}.pca.svg".format(
+            analysis.name, plot_prefix)), bbox_inches="tight")
+
+    if ('pca' in steps) and ('pca_association' in steps):
+        # Test association of PCs with attributes
+        if not test_pc_association:
+            _LOGGER.info("Not testing association of attributes with principal components.")
+            return
+
+        _LOGGER.info("Computing association of given attributes with principal components.")
+        associations = list()
+        for pc in range(pcs):
+            for attr in attributes_to_plot:
+                _LOGGER.info("PC {}; Attribute {}.".format(pc + 1, attr))
+
+                # Get all values of samples for this attr
+                groups = xx.index.get_level_values(attr)
+
+                # Determine if attr is categorical or continuous
+                if all([type(i) in [str, bool] for i in groups]) or len(groups) == 2:
+                    variable_type = "categorical"
+                elif all([type(i) in [int, float, np.int64, np.float64] for i in groups]):
+                    variable_type = "numerical"
+                else:
+                    _LOGGER.warning("attr %s cannot be tested." % attr)
+                    associations.append([pc + 1, attr, variable_type, np.nan, np.nan, np.nan])
+                    continue
+
+                if variable_type == "categorical":
+                    # It categorical, test pairwise combinations of attributes
+                    for group1, group2 in itertools.combinations(groups, 2):
+                        g1_mask = xx.index.get_level_values(attr) == group1
+                        g2_mask = xx.index.get_level_values(attr) == group2
+
+                        g1_values = xx.loc[g1_mask, pc]
+                        g2_values = xx.loc[g2_mask, pc]
+
+                        # Test ANOVA (or Kruskal-Wallis H-test)
+                        p = kruskal(g1_values, g2_values)[1]
+
+                        # Append
+                        associations.append([pc + 1, attr, variable_type, group1, group2, p])
+
+                elif variable_type == "numerical":
+                    # It numerical, calculate pearson correlation
+                    pc_values = xx.loc[:, pc]
+                    trait_values = xx.index.get_level_values(attr)
+                    p = pearsonr(pc_values, trait_values)[1]
+
+                    associations.append([pc + 1, attr, variable_type, np.nan, np.nan, p])
+
+        associations = pd.DataFrame(
+            associations, columns=["pc", "attribute", "variable_type", "group_1", "group_2", "p_value"])
+
+        if associations.empty:
+            msg = "Couldn't test any associations between PCs and factors."
+            hint = " Perhaps PCA produced only 1 PC?"
+            _LOGGER.warning(msg + hint)
+            return
+
+        # correct p-values
+        associations.loc[:, 'adj_pvalue'] = multipletests(associations['p_value'], method="fdr_bh")[1]
+
+        # write
+        _LOGGER.info("Saving associations.")
+        associations.to_csv(os.path.join(
+            output_dir, "{}.{}.pca.variable_principle_components_association.csv"
+                        .format(analysis.name, plot_prefix)), index=False)
+
+        if len(attributes_to_plot) < 2:
+            _LOGGER.info("Only one attribute given, can't plot associations.")
+            return
+
+        # Plot
+        for var in ['p_value', 'adj_pvalue']:
+            pivot = (
+                associations
+                .groupby(["pc", "attribute"])
+                .min()[var]
+                .reset_index()
+                .pivot(index="pc", columns="attribute", values=var)
+                .dropna(axis=1))
+
+            # heatmap of -log p-values
+            g = sns.clustermap(
+                -np.log10(pivot), row_cluster=False,
+                annot=True, cbar_kws={"label": "-log10(p_value) of association"},
+                square=True, rasterized=rasterized, vmin=0)
+            g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=45, ha="right")
+            g.fig.savefig(os.path.join(
+                output_dir, "{}.{}.pca.variable_principle_components_association.{}.svg"
+                            .format(analysis.name, plot_prefix, var)), bbox_inches="tight", dpi=dpi)
+
+            # heatmap of masked significant
+            g = sns.clustermap(
+                (pivot < 0.05).astype(int),
+                row_cluster=False, cbar_kws={"label": "significant association"},
+                square=True, rasterized=rasterized, vmin=0, vmax=1, cmap="Paired")
+            g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=45, ha="right")
+            g.fig.savefig(os.path.join(
+                output_dir, "{}.{}.pca.variable_principle_components_association.{}.masked.svg"
+                            .format(analysis.name, plot_prefix, var)), bbox_inches="tight", dpi=dpi)
 
 
 def deseq_analysis(
@@ -2919,16 +2344,16 @@ def plot_differential(
     split_diff = results.groupby(
         [comparison_column, "direction"])['diff'].sum().sort_values(ascending=False).reset_index()
     split_diff.loc[split_diff['direction'] == 'down', "diff"] *= -1
-    split_diff['label'] = split_diff['comparison_name'] + ", " + split_diff['direction']
+    split_diff['label'] = split_diff[comparison_column].astype(str) + ", " + split_diff['direction']
     total_diff['diff_perc'] = (total_diff['diff'] / n_vars) * 100
     split_diff['diff_perc'] = (split_diff['diff'] / n_vars) * 100
 
     _LOGGER.info("Plotting number of differential {}s per comparison.".format(var_name))
     fig, axis = plt.subplots(2, 2, figsize=(4 * 2, 4 * 2))
-    sns.barplot(data=total_diff, x="diff", y="comparison_name", orient="h", ax=axis[0, 0])
-    sns.barplot(data=total_diff, x="diff_perc", y="comparison_name", orient="h", ax=axis[0, 1])
-    sns.barplot(data=split_diff, x="diff", y="comparison_name", hue="direction", dodge=False, orient="h", ax=axis[1, 0])
-    sns.barplot(data=split_diff, x="diff_perc", y="comparison_name", hue="direction", dodge=False, orient="h", ax=axis[1, 1])
+    sns.barplot(data=total_diff, x="diff", y=comparison_column, orient="h", ax=axis[0, 0])
+    sns.barplot(data=total_diff, x="diff_perc", y=comparison_column, orient="h", ax=axis[0, 1])
+    sns.barplot(data=split_diff, x="diff", y=comparison_column, hue="direction", dodge=False, orient="h", ax=axis[1, 0])
+    sns.barplot(data=split_diff, x="diff_perc", y=comparison_column, hue="direction", dodge=False, orient="h", ax=axis[1, 1])
     for ax in axis[0, :]:
         ax.set_xlabel("", visible=False)
     for ax in axis[:, 1]:
@@ -3060,8 +2485,8 @@ def plot_differential(
             ax.set_xlabel("log2(fold-change)")
             ax.set_ylabel("-log10(p-value)")
             ax.axvline(0, linestyle='--', alpha=0.5, zorder=0, color="black")
-            l = np.max([abs(i) for i in ax.get_xlim()])
-            ax.set_xlim(-l, l)
+            ll = np.max([abs(ii) for ii in ax.get_xlim()])
+            ax.set_xlim(-ll, ll)
 
             # Add lines of significance
             ax.axhline(
@@ -3108,8 +2533,8 @@ def plot_differential(
             ax.set_xlabel("Mean {}".format(quantity.lower()))
             ax.set_ylabel("log2(fold-change)")
             ax.axhline(0, linestyle='--', alpha=0.5, zorder=0, color="black")
-            l = np.max([abs(i) for i in ax.get_ylim()])
-            ax.set_ylim(-l, l)
+            ll = np.max([abs(ii) for ii in ax.get_ylim()])
+            ax.set_ylim(-ll, ll)
 
             # Add lines of significance
             if fold_change is not None:
@@ -3934,7 +3359,7 @@ def differential_enrichment(
     :type max_diff: number, optional
     :param sort_var: Variable to sort for when setting `max_diff`. Defaults to "pvalue".
     :type sort_var: str, optional
-    :param as_jobs: One of "serial" or "job". Defaults to True.
+    :param as_jobs: Whether work should be submitted as jobs. Defaults to True.
     :type as_jobs: bool, optional
     """
     import pandas as pd
@@ -4181,6 +3606,17 @@ def collect_differential_enrichment(
     if "{data_type}" in output_dir:
         output_dir = output_dir.format(data_type=data_type)
 
+    data_type_steps = {
+        "ATAC-seq": ['lola', 'motif', 'homer', 'homer_consensus', 'enrichr'],
+        "ChIP-seq": ['lola', 'motif', 'homer', 'homer_consensus', 'enrichr'],
+        "RNA-seq": ['enrichr']}
+    steps = [s for s in steps if s in data_type_steps[data_type]]
+
+    if len(steps) == 0:
+        msg = "No valid steps for the respective data type selected."
+        _LOGGER.error(msg)
+        raise ValueError(msg)
+
     error_msg = "{} results for comparison '{}', direction '{}' were not found!"
 
     lola_enr = pd.DataFrame()
@@ -4206,109 +3642,92 @@ def collect_differential_enrichment(
         for direction in params:
             comparison_dir = os.path.join(output_dir, "{}.{}".format(comp, direction))
 
-            if data_type == "RNA-seq":
-                _LOGGER.debug("Collecting enrichments of comparison '{}', direction '{}'.".format(comp, direction))
-                if 'enrichr' in steps:
-                    try:
-                        enr = pd.read_csv(os.path.join(comparison_dir, input_prefix + ".enrichr.csv"))
-                    except IOError as e:
-                        if permissive:
-                            _LOGGER.error(error_msg.format("Enrichr", comp, direction))
-                        else:
-                            raise e
-                    except pd.errors.EmptyDataError:
-                        continue
+            _LOGGER.debug("Collecting enrichments of comparison '{}', direction '{}'.".format(comp, direction))
+
+            # MEME/AME
+            if 'motif' in steps:
+                try:
+                    ame_motifs = parse_ame(comparison_dir).reset_index()
+                    ame_motifs.columns = ["TF", "p_value"]
+                except IOError as e:
+                    if permissive:
+                        _LOGGER.warn(error_msg.format("MEME/AME motif", comp, direction))
                     else:
-                        enr.loc[:, "comparison_name"] = comp
-                        enr.loc[:, "direction"] = direction
-                        pathway_enr = pathway_enr.append(enr, ignore_index=True)
-            elif data_type == "ATAC-seq":
-                _LOGGER.debug("Collecting enrichments of comparison '{}', direction '{}'.".format(comp, direction))
+                        raise e
+                else:
+                    if not ame_motifs.empty:  # work around no motifs enriched
+                        ame_motifs.loc[:, "comparison_name"] = comp
+                        ame_motifs.loc[:, "direction"] = direction
+                        meme_enr = meme_enr.append(ame_motifs, ignore_index=True)
 
-                # MEME/AME
-                if 'motif' in steps:
-                    try:
-                        ame_motifs = parse_ame(comparison_dir).reset_index()
-                        ame_motifs.columns = ["TF", "p_value"]
-                    except IOError as e:
-                        if permissive:
-                            _LOGGER.error(error_msg.format("MEME/AME motif", comp, direction))
-                        else:
-                            raise e
+                        # fix mouse TF names
+                        if (meme_enr['TF'].str.startswith("UP").sum() / float(meme_enr.shape[0])) >= 0.1:
+                            annot = pd.read_table(
+                                "~/resources/motifs/motif_databases/MOUSE/uniprobe_mouse.id_mapping.tsv",
+                                header=None, names=["TF", "TF_name"])
+                            annot.loc[:, "TF"] = annot['TF'].str.replace(r"_.*", "")
+                            meme_enr = pd.merge(meme_enr, annot).drop("TF", axis=1).rename(columns={"TF_name": "TF"})
                     else:
-                        if not ame_motifs.empty:  # work around no motifs enriched
-                            ame_motifs.loc[:, "comparison_name"] = comp
-                            ame_motifs.loc[:, "direction"] = direction
-                            meme_enr = meme_enr.append(ame_motifs, ignore_index=True)
+                        _LOGGER.warning("Comparison '{}' has no MEME enriched motifs.".format(comp))
 
-                            # fix mouse TF names
-                            if (meme_enr['TF'].str.startswith("UP").sum() / float(meme_enr.shape[0])) >= 0.1:
-                                annot = pd.read_table(
-                                    "~/resources/motifs/motif_databases/MOUSE/uniprobe_mouse.id_mapping.tsv",
-                                    header=None, names=["TF", "TF_name"])
-                                annot.loc[:, "TF"] = annot['TF'].str.replace(r"_.*", "")
-                                meme_enr = pd.merge(meme_enr, annot).drop("TF", axis=1).rename(columns={"TF_name": "TF"})
-                        else:
-                            _LOGGER.warning("Comparison '{}' has no MEME enriched motifs.".format(comp))
-
-                # HOMER DE NOVO - de novo motif enrichment independent for each sample
-                if 'homer' in steps:
-                    try:
-                        homer_motifs = parse_homer(os.path.join(comparison_dir, "homerResults"))
-                    except IOError as e:
-                        if permissive:
-                            _LOGGER.error(error_msg.format("HOMER motif", comp, direction))
-                        else:
-                            raise e
+            # HOMER DE NOVO - de novo motif enrichment independent for each sample
+            if 'homer' in steps:
+                try:
+                    homer_motifs = parse_homer(os.path.join(comparison_dir, "homerResults"))
+                except IOError as e:
+                    if permissive:
+                        _LOGGER.warn(error_msg.format("HOMER motif", comp, direction))
                     else:
-                        homer_motifs.loc[:, "comparison_name"] = comp
-                        homer_motifs.loc[:, "direction"] = direction
-                        homer_enr = homer_enr.append(homer_motifs, ignore_index=True)
+                        raise e
+                else:
+                    homer_motifs.loc[:, "comparison_name"] = comp
+                    homer_motifs.loc[:, "direction"] = direction
+                    homer_enr = homer_enr.append(homer_motifs, ignore_index=True)
 
-                # HOMER CONSENSUS - motif enrichment on a consensus set of motifs
-                if 'homer_consensus' in steps:
-                    try:
-                        homer_cons = pd.read_table(os.path.join(comparison_dir, "knownResults.txt"))
-                    except IOError as e:
-                        # Homer consensus is always permissive
-                        _LOGGER.error(error_msg.format("HOMER consensus", comp, direction))
+            # HOMER CONSENSUS - motif enrichment on a consensus set of motifs
+            if 'homer_consensus' in steps:
+                try:
+                    homer_cons = pd.read_table(os.path.join(comparison_dir, "knownResults.txt"))
+                except IOError as e:
+                    # Homer consensus is always permissive
+                    _LOGGER.warn(error_msg.format("HOMER consensus", comp, direction))
 
+                else:
+                    homer_cons.columns = homer_cons.columns.str.replace(r"\(of .*", "")
+                    homer_cons["# of Background Sequences with Motif"]
+                    for col in homer_cons.columns[homer_cons.columns.str.contains("%")]:
+                        homer_cons[col] = homer_cons[col].str.replace("%", "").astype(float)
+                    homer_cons.loc[:, "comparison_name"] = comp
+                    homer_cons.loc[:, "direction"] = direction
+                    homer_consensus = homer_consensus.append(homer_cons, ignore_index=True)
+
+            # LOLA
+            if 'lola' in steps:
+                try:
+                    lola = pd.read_csv(os.path.join(comparison_dir, "allEnrichments.tsv"), sep="\t")
+                except IOError as e:
+                    if permissive:
+                        _LOGGER.warn(error_msg.format("LOLA", comp, direction))
                     else:
-                        homer_cons.columns = homer_cons.columns.str.replace(r"\(of .*", "")
-                        homer_cons["# of Background Sequences with Motif"]
-                        for col in homer_cons.columns[homer_cons.columns.str.contains("%")]:
-                            homer_cons[col] = homer_cons[col].str.replace("%", "").astype(float)
-                        homer_cons.loc[:, "comparison_name"] = comp
-                        homer_cons.loc[:, "direction"] = direction
-                        homer_consensus = homer_consensus.append(homer_cons, ignore_index=True)
+                        raise e
+                else:
+                    lola.loc[:, "comparison_name"] = comp
+                    lola.loc[:, "direction"] = direction
+                    lola_enr = lola_enr.append(lola, ignore_index=True)
 
-                # LOLA
-                if 'lola' in steps:
-                    try:
-                        lola = pd.read_csv(os.path.join(comparison_dir, "allEnrichments.tsv"), sep="\t")
-                    except IOError as e:
-                        if permissive:
-                            _LOGGER.error(error_msg.format("LOLA", comp, direction))
-                        else:
-                            raise e
+            # ENRICHR
+            if 'enrichr' in steps:
+                try:
+                    enr = pd.read_csv(os.path.join(comparison_dir, input_prefix + "_genes.enrichr.csv"))
+                except IOError as e:
+                    if permissive:
+                        _LOGGER.warn(error_msg.format("Enrichr", comp, direction))
                     else:
-                        lola.loc[:, "comparison_name"] = comp
-                        lola.loc[:, "direction"] = direction
-                        lola_enr = lola_enr.append(lola, ignore_index=True)
-
-                # ENRICHR
-                if 'enrichr' in steps:
-                    try:
-                        enr = pd.read_csv(os.path.join(comparison_dir, input_prefix + "_genes.enrichr.csv"))
-                    except IOError as e:
-                        if permissive:
-                            _LOGGER.error(error_msg.format("Enrichr", comp, direction))
-                        else:
-                            raise e
-                    else:
-                        enr.loc[:, "comparison_name"] = comp
-                        enr.loc[:, "direction"] = direction
-                        pathway_enr = pathway_enr.append(enr, ignore_index=True)
+                        raise e
+                else:
+                    enr.loc[:, "comparison_name"] = comp
+                    enr.loc[:, "direction"] = direction
+                    pathway_enr = pathway_enr.append(enr, ignore_index=True)
 
     # write combined enrichments
     if 'enrichr' in steps:
@@ -4641,7 +4060,7 @@ def plot_differential_enrichment(
             enr.loc[:, 'Motif Name'] = enr['Motif Name'].str.replace(".*BestGuess:", "").str.replace(r"-ChIP-Seq.*", "")
 
             enr.loc[:, 'combined'] = enr[['enrichment_over_background', 'log_p_value']].apply(zscore).mean(axis=1)
-            cs = axis[i].scatter(
+            axis[i].scatter(
                 enr['enrichment_over_background'],
                 enr['log_p_value'],
                 c=enr['combined'],
@@ -5077,10 +4496,10 @@ def signed_max(x, f=0.66, axis=0):
         else:
             if types[0] not in [np.float_, float, np.int_, int]:
                 return np.nan
-        l = float(len(x))
+        ll = float(len(x))
         neg = sum(x < 0)
         pos = sum(x > 0)
-        obs_f = max(neg / l, pos / l)
+        obs_f = max(neg / ll, pos / ll)
         if obs_f >= f:
             if neg > pos:
                 return min(x)
@@ -5556,7 +4975,7 @@ def project_to_geo(
         os.makedirs(output_dir)
 
     cmds = list()
-    annot = pd.DataFrame()
+    annot = pd.DataFrame(index=pd.Index([], name="sample_name"))
     for sample in samples:
         various = len(sample.data_path.split(" ")) > 1
         cmd = ""
@@ -5599,7 +5018,6 @@ def project_to_geo(
                 _LOGGER.warning("'{}' sample '{}' does not have a 'bigwig'"
                                 .format(sample.library, sample.name) +
                                 " attribute set. Skipping bigWig file.")
-
         # Copy peaks
         if sample.library == "ATAC-seq":
             if hasattr(sample, "peaks"):
@@ -5621,8 +5039,7 @@ def project_to_geo(
                 _LOGGER.warning("'{}' sample '{}' does not have a 'peaks' attribute set."
                                 .format(sample.library, sample.name) +
                                 " Skipping peaks file.")
-
-        if distributed and not dry_run:
+        if distributed:
             from pypiper.ngstk import NGSTk
             import textwrap
             tk = NGSTk()
@@ -5639,7 +5056,8 @@ def project_to_geo(
 
             with open(job_file, "w") as handle:
                 handle.write(textwrap.dedent(job))
-            tk.slurm_submit_job(job_file)
+            if not dry_run:
+                tk.slurm_submit_job(job_file)
         else:
             cmds.append(cmd)
 
@@ -5649,6 +5067,29 @@ def project_to_geo(
             subprocess.call(cmd.split(" "))
 
     return annot
+
+
+def collect_md5_sums(df):
+    """
+    Given a dataframe with columns with paths to md5sum files ending in '_md5sum',
+    replace the paths to the md5sum files with the actual checksums.
+
+    Useful to use in combination with ``project_to_geo``.
+
+    :param df: A dataframe with columns ending in '_md5sum'.
+    :type df: pandas.DataFrame
+    :returns: pandas.DataFrame with md5sum columns replaced with the actual md5sums.
+    :rtype: pandas.DataFrame
+    """
+    cols = df.columns[df.columns.str.endswith("_md5sum")]
+    for col in cols:
+        for i, path in df.loc[:, col].iteritems():
+            if not pd.isnull(path):
+                cont = open(path, 'r').read().strip()
+                if any([x.isspace() for x in cont]):
+                    cont = cont.split(" ")[0]
+                df.loc[i, col] = cont
+    return df
 
 
 def rename_sample_files(
@@ -5872,7 +5313,7 @@ def subtract_principal_component(
     return X2
 
 
-def subtract_principal_component_by_attribute(df, pc=1, attributes=["CLL"]):
+def subtract_principal_component_by_attribute(df, attributes, pc=1):
     """
     Given a matrix (n_samples, n_variables), remove `pc` (1-based) from matrix.
     """

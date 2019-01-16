@@ -171,11 +171,13 @@ def test_rpm_normalization(various_analysis):
     for analysis in various_analysis:
         qnorm = analysis.normalize_coverage_rpm(save=False)
         assert qnorm.dtypes.all() == np.float
+        assert hasattr(analysis, "coverage_rpm")
         rpm_file = os.path.join(analysis.results_dir, analysis.name + "_peaks.coverage_rpm.csv")
         assert not os.path.exists(rpm_file)
         qnorm = analysis.normalize_coverage_rpm(save=True)
         assert os.path.exists(rpm_file)
         assert os.stat(rpm_file).st_size > 0
+        assert hasattr(analysis, "coverage_rpm")
 
 
 def test_quantile_normalization(various_analysis):
@@ -203,6 +205,7 @@ def test_quantile_normalization(various_analysis):
         # assert all(np.array(cors) > 0.99)
 
 
+@pytest.mark.skipif(travis, reason="This is anyway tested after")
 def test_cqn_normalization(analysis):
     # At some point, downloading a genome reference in Travis
     # caused memory error.
@@ -225,10 +228,15 @@ def test_normalize(analysis):
     qnorm = analysis.normalize_coverage_rpm(save=False)
     assert isinstance(qnorm, pd.DataFrame)
     assert hasattr(analysis, "coverage_rpm")
+    del analysis.coverage_rpm
     qnorm_d = analysis.normalize(method="total", save=False)
-    assert np.array_equal(qnorm_d, qnorm)
-    qnorm = analysis.normalize_coverage_quantiles(save=False)
+    assert isinstance(qnorm_d, pd.DataFrame)
     assert hasattr(analysis, "coverage_rpm")
+    assert np.array_equal(qnorm_d, qnorm)
+
+    qnorm = analysis.normalize_coverage_quantiles(save=False)
+    assert hasattr(analysis, "coverage_qnorm")
+    del analysis.coverage_rpm
     qnorm_d = analysis.normalize(method="quantile", save=False)
     assert isinstance(qnorm_d, pd.DataFrame)
     assert hasattr(analysis, "coverage_qnorm")
@@ -238,16 +246,10 @@ def test_normalize(analysis):
     # caused memory error.
     # This should now be fixed by implementing download/decompressing
     # functions working in chunks
-    try:
-        qnorm = analysis.normalize_gc_content(save=False)
-    except OSError:
-        if travis:
-            return
-        else:
-            raise
-
-    assert isinstance(qnorm, pd.DataFrame)
-    assert hasattr(analysis, "coverage_gc_corrected")
+    if not travis:
+        qnorm = analysis.normalize(method="gc_content", save=False)
+        assert isinstance(qnorm, pd.DataFrame)
+        assert hasattr(analysis, "coverage_gc_corrected")
 
 
 def test_get_matrix_stats(various_analysis):
@@ -267,7 +269,7 @@ def test_get_peak_gene_annotation(analysis):
 
     os.chdir(os.path.join(analysis.results_dir, os.pardir))
     annot = analysis.get_peak_gene_annotation(max_dist=1e10)
-    tss = os.path.join("reference",
+    tss = os.path.join(analysis.root_dir, 'reference',
                        "{}.{}.gene_annotation.protein_coding.tss.bed"
                        .format(analysis.organism, mapping[analysis.genome]))
     assert os.path.exists(tss)
@@ -278,7 +280,7 @@ def test_get_peak_gene_annotation(analysis):
 
 def test_get_peak_genomic_location(analysis):
     prefix = os.path.join(
-        analysis.results_dir, "..", "reference", "{}.{}.genomic_context")
+        analysis.root_dir, "reference", "{}.{}.genomic_context")
     fs = [prefix + a for a in [
         ".bed", ".exon.bed", ".genebody.bed", ".intergenic.bed",
         ".intron.bed", ".promoter.bed", ".utr3.bed", ".utr5.bed"]]

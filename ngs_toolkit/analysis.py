@@ -589,7 +589,7 @@ class Analysis(object):
             index = index.droplevel(drop)
 
         # Handle special case of single level
-        if isinstance(index, pd.core.indexes.base.Index):
+        if not isinstance(index, pd.core.indexes.multi.MultiIndex):
             index = pd.MultiIndex.from_arrays([index.values], names=[index.name])
 
         _cmap = plt.get_cmap(cmap)

@@ -640,6 +640,7 @@ def unsupervised_analysis(
     from scipy.stats import pearsonr
     import matplotlib.pyplot as plt
     import seaborn as sns
+    from statsmodels.sandbox.stats.multicomp import multipletests
 
     if data_type is None:
         msg = "Data type not defined and Analysis object does not have a `data_type` attribute."
@@ -814,7 +815,7 @@ def unsupervised_analysis(
                 if plot_group_centroids:
                     xx2 = xx.groupby(attr).mean()
                     # get the color of each attribute group
-                    cd = color_dataframe.loc[attr]
+                    cd = color_dataframe.loc[attr, :]
                     cd.name = None
                     cd.index = X.columns.get_level_values(attr)
                     cd = cd.apply(lambda x: tuple(x) if isinstance(x, list) else x)  # fix for deduplicating lists
@@ -1021,6 +1022,9 @@ def unsupervised_analysis(
             _LOGGER.warning(msg + hint)
             return
 
+        # correct p-values
+        associations.loc[:, 'adj_pvalue'] = multipletests(associations['p_value'], method="fdr_bh")[1]
+
         # write
         _LOGGER.info("Saving associations.")
         associations.to_csv(os.path.join(
@@ -1032,35 +1036,34 @@ def unsupervised_analysis(
             return
 
         # Plot
-        # associations[associations['p_value'] < 0.05].drop(['group_1', 'group_2'], axis=1).drop_duplicates()
-        # associations.drop(['group_1', 'group_2'], axis=1).drop_duplicates().pivot(index="pc", columns="attribute", values="p_value")
-        pivot = (
-            associations
-            .groupby(["pc", "attribute"])
-            .min()['p_value']
-            .reset_index()
-            .pivot(index="pc", columns="attribute", values="p_value")
-            .dropna(axis=1))
+        for var in ['p_value', 'adj_pvalue']:
+            pivot = (
+                associations
+                .groupby(["pc", "attribute"])
+                .min()[var]
+                .reset_index()
+                .pivot(index="pc", columns="attribute", values=var)
+                .dropna(axis=1))
 
-        # heatmap of -log p-values
-        g = sns.clustermap(
-            -np.log10(pivot), row_cluster=False,
-            annot=True, cbar_kws={"label": "-log10(p_value) of association"},
-            square=True, rasterized=rasterized)
-        g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=45, ha="right")
-        g.fig.savefig(os.path.join(
-            output_dir, "{}.{}.pca.variable_principle_components_association.svg"
-                        .format(analysis.name, plot_prefix)), bbox_inches="tight", dpi=dpi)
+            # heatmap of -log p-values
+            g = sns.clustermap(
+                -np.log10(pivot), row_cluster=False,
+                annot=True, cbar_kws={"label": "-log10(p_value) of association"},
+                square=True, rasterized=rasterized)
+            g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=45, ha="right")
+            g.fig.savefig(os.path.join(
+                output_dir, "{}.{}.pca.variable_principle_components_association.{}.svg"
+                            .format(analysis.name, plot_prefix, var)), bbox_inches="tight", dpi=dpi)
 
-        # heatmap of masked significant
-        g = sns.clustermap(
-            (pivot < 0.05).astype(int),
-            row_cluster=False, cbar_kws={"label": "significant association"},
-            square=True, rasterized=rasterized, vmin=0, vmax=1)
-        g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=45, ha="right")
-        g.fig.savefig(os.path.join(
-            output_dir, "{}.{}.pca.variable_principle_components_association.masked.svg"
-                        .format(analysis.name, plot_prefix)), bbox_inches="tight", dpi=dpi)
+            # heatmap of masked significant
+            g = sns.clustermap(
+                (pivot < 0.05).astype(int),
+                row_cluster=False, cbar_kws={"label": "significant association"},
+                square=True, rasterized=rasterized, vmin=0, vmax=1)
+            g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=45, ha="right")
+            g.fig.savefig(os.path.join(
+                output_dir, "{}.{}.pca.variable_principle_components_association.{}.masked.svg"
+                            .format(analysis.name, plot_prefix, var)), bbox_inches="tight", dpi=dpi)
 
 
 def deseq_analysis(

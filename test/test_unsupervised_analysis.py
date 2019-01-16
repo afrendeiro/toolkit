@@ -75,8 +75,10 @@ def outputs(analysis):
         prefix + "pca.explained_variance.svg",
         prefix + "pca.svg",
         prefix + "pca.variable_principle_components_association.csv",
-        prefix + "pca.variable_principle_components_association.masked.svg",
-        prefix + "pca.variable_principle_components_association.svg",
+        prefix + "pca.variable_principle_components_association.p_value.masked.svg",
+        prefix + "pca.variable_principle_components_association.p_value.svg",
+        prefix + "pca.variable_principle_components_association.adj_pvalue.masked.svg",
+        prefix + "pca.variable_principle_components_association.adj_pvalue.svg",
         prefix + "pearson_correlation.clustermap.svg",
         prefix + "spearman_correlation.clustermap.svg",
         prefix + "spectralembedding.svg",
@@ -130,8 +132,10 @@ class Test_unsupervised_analysis:
             prefix + "locallylinearembedding.svg",
             prefix + "spectralembedding.svg",
             prefix + "pca.variable_principle_components_association.csv",
-            prefix + "pca.variable_principle_components_association.masked.svg",
-            prefix + "pca.variable_principle_components_association.svg"]
+            prefix + "pca.variable_principle_components_association.p_value.masked.svg",
+            prefix + "pca.variable_principle_components_association.adj_pvalue.masked.svg",
+            prefix + "pca.variable_principle_components_association.p_value.svg",
+            prefix + "pca.variable_principle_components_association.adj_pvalue.svg"]
         unsupervised_analysis(analysis, samples=analysis.samples[:2])
         for output in outputs2:
             assert os.path.exists(output)
@@ -157,8 +161,10 @@ class Test_unsupervised_analysis:
         prefix = os.path.join(
             analysis.results_dir, "unsupervised_analysis_ATAC-seq", analysis.name + ".all_sites.")
         not_outputs = [
-            prefix + "pca.variable_principle_components_association.masked.svg",
-            prefix + "pca.variable_principle_components_association.svg"]
+            prefix + "pca.variable_principle_components_association.p_value.masked.svg",
+            prefix + "pca.variable_principle_components_association.p_value.svg",
+            prefix + "pca.variable_principle_components_association.adj_pvalue.masked.svg",
+            prefix + "pca.variable_principle_components_association.adj_pvalue.svg"]
         for i in range(1, len(analysis.group_attributes)):
             unsupervised_analysis(analysis, attributes_to_plot=analysis.group_attributes[:i])
             for output in outputs:

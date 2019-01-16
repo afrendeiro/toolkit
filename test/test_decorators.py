@@ -67,5 +67,5 @@ class Test_check_has_sites:
 
     def test_full_analysis(self, full_analysis):
         # This passes on the decorator
-        with pytest.raises(OSError):
+        with pytest.raises(IOError):
             full_analysis.calculate_peak_support()

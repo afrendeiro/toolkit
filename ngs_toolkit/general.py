@@ -883,14 +883,18 @@ def unsupervised_analysis(
 
         # plot % explained variance per PC
         _LOGGER.info("Plotting variance explained with PCA.")
-        fig, axis = plt.subplots(1, 2, figsize=(4 * 2, 4))
+        fig, axis = plt.subplots(1, 3, figsize=(4 * 3, 4))
         axis[0].plot(variance.index, variance['percent_variance'], 'o-')
+        axis[0].set_ylim((0, variance['percent_variance'].max() + variance['percent_variance'].max() * 0.1))
         axis[1].plot(variance.index, variance['log_variance'], 'o-')
+        axis[2].plot(variance.index, variance['percent_variance'].cumsum(), 'o-')
+        axis[2].set_ylim((0, 100))
         for ax in axis:
             ax.axvline(len(attributes_to_plot), linestyle='--')
             ax.set_xlabel("PC")
         axis[0].set_ylabel("% variance")
         axis[1].set_ylabel("log variance")
+        axis[2].set_ylabel("Cumulative % variance")
         sns.despine(fig)
         fig.savefig(os.path.join(
             output_dir, "{}.{}.pca.explained_variance.svg"
@@ -1049,7 +1053,7 @@ def unsupervised_analysis(
             g = sns.clustermap(
                 -np.log10(pivot), row_cluster=False,
                 annot=True, cbar_kws={"label": "-log10(p_value) of association"},
-                square=True, rasterized=rasterized)
+                square=True, rasterized=rasterized, vmin=0)
             g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=45, ha="right")
             g.fig.savefig(os.path.join(
                 output_dir, "{}.{}.pca.variable_principle_components_association.{}.svg"
@@ -1059,7 +1063,7 @@ def unsupervised_analysis(
             g = sns.clustermap(
                 (pivot < 0.05).astype(int),
                 row_cluster=False, cbar_kws={"label": "significant association"},
-                square=True, rasterized=rasterized, vmin=0, vmax=1)
+                square=True, rasterized=rasterized, vmin=0, vmax=1, cmap="Paired")
             g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=45, ha="right")
             g.fig.savefig(os.path.join(
                 output_dir, "{}.{}.pca.variable_principle_components_association.{}.masked.svg"

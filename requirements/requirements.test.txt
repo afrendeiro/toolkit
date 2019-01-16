@@ -1,4 +1,5 @@
 pytest>=4.0.2
 coverage>=4.5.2
 pytest-cov
+codecov
 codacy-coverage

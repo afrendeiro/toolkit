@@ -68,11 +68,11 @@ class Analysis(object):
         self.root_dir = os.path.abspath(self.root_dir)
 
         # # if given absolute paths, keep them, otherwise append to root directory
-        for dir_ in ['data_dir', 'results_dir']:
-            if not os.path.isabs(data_dir):
-                setattr(self, dir_, os.path.join(self.root_dir, eval(dir_)))
+        for dir_, attr in [(data_dir, 'data_dir'), (results_dir, 'results_dir')]:
+            if not os.path.isabs(dir_):
+                setattr(self, attr, os.path.join(self.root_dir, dir_))
             else:
-                setattr(self, dir_, eval(dir_))
+                setattr(self, attr, dir_)
 
         self.samples = samples
         self.prj = prj
@@ -137,11 +137,14 @@ class Analysis(object):
         """
         Detect whether a string should be formatted with attributes from obj.
         """
-        # TODO: implement
-        # Detect if string contains formattable fields
-        # if all vaiables are present, format accordingly
-        raise NotImplementedError
-        return string.format()
+        # TODO: test
+        to_format = pd.Series(string).str.extractall(r"{(.*?)}")[0].values
+        attrs = obj.__dict__.keys()
+        if not all([x in attrs for x in to_format]):
+            msg = "Not all required patterns were found as attributes of object '{}'.".format(obj)
+            _LOGGER.error(msg)
+            raise ValueError(msg)
+        return string.format(**obj.__dict__)
 
     @staticmethod
     def _check_data_type_is_supported(data_type):
@@ -471,7 +474,7 @@ class Analysis(object):
         elif self.data_type == "CNV":
             output_matrix = "cnv"
             if quant_matrix is None:
-                if type(getattr(self, quant_matrix)) is not pd.DataFrame:
+                if not isinstance(getattr(self, quant_matrix), pd.DataFrame):
                     _LOGGER.error("For CNV data type, the matrix to be annotated must be" +
                                   " directly passed to the function throught the `quant_matrix` argument!")
                     raise ValueError
@@ -491,7 +494,7 @@ class Analysis(object):
 
         matrix = getattr(self, quant_matrix)
 
-        if type(matrix.columns) is pd.core.indexes.multi.MultiIndex:
+        if isinstance(matrix.columns, pd.core.indexes.multi.MultiIndex):
             matrix.columns = matrix.columns.get_level_values("sample_name")
 
         samples = [s for s in self.samples if s.name in matrix.columns.tolist()]
@@ -570,7 +573,6 @@ class Analysis(object):
                   each of the variable.
         :rtype: {list}
         """
-        import numpy as np
         import matplotlib
         import matplotlib.pyplot as plt
         from collections import Counter
@@ -587,7 +589,7 @@ class Analysis(object):
             index = index.droplevel(drop)
 
         # Handle special case of single level
-        if type(index) is pd.core.indexes.base.Index:
+        if isinstance(index, pd.core.indexes.base.Index):
             index = pd.MultiIndex.from_arrays([index.values], names=[index.name])
 
         _cmap = plt.get_cmap(cmap)

@@ -817,7 +817,7 @@ def unsupervised_analysis(
                     cd = color_dataframe.loc[attr]
                     cd.name = None
                     cd.index = X.columns.get_level_values(attr)
-                    cd = cd.apply(lambda x: tuple(x) if type(x) is list else x)  # fix for deduplicating lists
+                    cd = cd.apply(lambda x: tuple(x) if isinstance(x, list) else x)  # fix for deduplicating lists
                     cd = cd.reset_index().drop_duplicates().set_index(attr)
                     for j, group in enumerate(xx2.index):
                         axis[i].scatter(
@@ -925,7 +925,7 @@ def unsupervised_analysis(
                     cd = color_dataframe.loc[attr, :]
                     cd.name = None
                     cd.index = X.columns.get_level_values(attr)
-                    cd = cd.apply(lambda x: tuple(x) if type(x) is list else x)  # fix for deduplicating lists
+                    cd = cd.apply(lambda x: tuple(x) if isinstance(x, list) else x)  # fix for deduplicating lists
                     cd = cd.reset_index().drop_duplicates().set_index(attr)
                     for j, group in enumerate(xx2.index):
                         axis[pc, i].scatter(
@@ -5011,7 +5011,6 @@ def project_to_geo(
                 _LOGGER.warning("'{}' sample '{}' does not have a 'bigwig'"
                                 .format(sample.library, sample.name) +
                                 " attribute set. Skipping bigWig file.")
-
         # Copy peaks
         if sample.library == "ATAC-seq":
             if hasattr(sample, "peaks"):
@@ -5033,7 +5032,6 @@ def project_to_geo(
                 _LOGGER.warning("'{}' sample '{}' does not have a 'peaks' attribute set."
                                 .format(sample.library, sample.name) +
                                 " Skipping peaks file.")
-
         if distributed:
             from pypiper.ngstk import NGSTk
             import textwrap
@@ -5062,6 +5060,29 @@ def project_to_geo(
             subprocess.call(cmd.split(" "))
 
     return annot
+
+
+def collect_md5_sums(df):
+    """
+    Given a dataframe with columns with paths to md5sum files ending in '_md5sum',
+    replace the paths to the md5sum files with the actual checksums.
+
+    Useful to use in combination with ``project_to_geo``.
+
+    :param df: A dataframe with columns ending in '_md5sum'.
+    :type df: pandas.DataFrame
+    :returns: pandas.DataFrame with md5sum columns replaced with the actual md5sums.
+    :rtype: pandas.DataFrame
+    """
+    cols = df.columns[df.columns.str.endswith("_md5sum")]
+    for col in cols:
+        for i, path in df.loc[:, col].iteritems():
+            if not pd.isnull(path):
+                cont = open(path, 'r').read().strip()
+                if any([x.isspace() for x in cont]):
+                    cont = cont.split(" ")[0]
+                df.loc[i, col] = cont
+    return df
 
 
 def rename_sample_files(

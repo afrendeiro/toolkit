@@ -1,25 +1,51 @@
 username: arendeiro
 email: arendeiro@cemm.oeaw.ac.at
 website_root: http://biomedical-sequencing.at/bocklab/arendeiro/
+supported_data_types:
+  - ATAC-seq
+  - ChIP-seq
+  - RNA-seq
+  - CNV
 metadata:
+  root_reference_dir: /home/$USER/reference/
   root_projects_dir: /scratch/lab_bock/shared/projects/
-default_genome_assemblies:
-  - human: hg19
-  - mouse: mm10
+preferences:
+  default_genome_assemblies:
+    - human: hg19
+    - mouse: mm10
+  graphics:
+    matplotlib:
+      backend: TkAgg # Agg
+      rcParams:
+        # this ensures text in plots is exported as text objects
+        - svg.fonttype: "none"
+    figure_saving:
+      # these arguments are passed to matplotlib.pyplot.savefig
+      # https://matplotlib.org/api/_as_gen/matplotlib.pyplot.savefig.html
+      - format: svg
+      - dpi: 300
+      - bbox_inches: "tight"
+    close_saved_figures: True
+
+sample_input_files:
+  # values in this section can use string formatting
+  # of the form {variable} to be completed with variables from the sample objects
+  # Example:
+  # ATAC-seq:
+  #   aligned_filtered_bam:
+  #     "{data_dir}/{sample_name}/mapped/{sample_name}.bowtie2.filtered.bam"
+  ATAC-seq:
+    aligned_filtered_bam: "{data_dir}/{sample_name}/mapped/{sample_name}.bowtie2.filtered.bam"
+    peaks: "{data_dir}/{sample_name}/peaks/{sample_name}_peaks.narrowPeak"
+    summits: "{data_dir}/{sample_name}/peaks/{sample_name}_summits.bed"
+  ChIP-seq:
+    aligned_filtered_bam: "{data_dir}/{sample_name}/mapped/{sample_name}.bowtie2.filtered.bam"
+  CNV:
+    aligned_filtered_bam: "{data_dir}/{sample_name}/mapped/{sample_name}.bowtie2.filtered.bam"
+  RNA-seq:
+    aligned_filtered_bam: "{data_dir}/{sample_name}/mapped/{sample_name}.bowtie2.filtered.bam"
+
 resources:
-  genomes:
-    2bit:
-      hg19: /data/groups/lab_bock/shared/resources/genomes/hg19/hg19.2bit
-      hg38: /data/groups/lab_bock/shared/resources/genomes/hg38/hg38.2bit
-      mm10: /data/groups/lab_bock/shared/resources/genomes/mm10/mm10.2bit
-    fasta:
-      hg19: /data/groups/lab_bock/shared/resources/genomes/hg19/hg19.fa
-      hg38: /data/groups/lab_bock/shared/resources/genomes/hg38/hg38.fa
-      mm10: /data/groups/lab_bock/shared/resources/genomes/mm10/mm10.fa
-    chrom_sizes:
-      hg19: /data/groups/lab_bock/shared/resources/genomes/hg19/hg19.chrom.sizes
-      hg38: /data/groups/lab_bock/shared/resources/genomes/hg38/hg38.chrom.sizes
-      mm10: /data/groups/lab_bock/shared/resources/genomes/mm10/mm10.chrom.sizes
   lola:
     region_databases:
       # under each section, there should be a list of items
@@ -62,34 +88,10 @@ resources:
       - "Reactome_2016"
       - "BioCarta_2016"
       - "NCI-Nature_2016"
+
 executables:
   twoBitToFa: twoBitToFa
   fasta-dinucleotide-shuffle: fasta-dinucleotide-shuffle
   ame: ame
   findMotifsGenome.pl: findMotifsGenome.pl
   compareMotifs.pl: compareMotifs.pl
-sample_input_files:
-  # values in this section can use string formatting
-  # of the form {variable} to be completed with variables from the sample objects
-  # Example:
-  # ATAC-seq:
-  #   aligned_filtered_bam:
-  #     "{data_dir}/{sample_name}/mapped/{sample_name}.bowtie2.filtered.bam"
-  ATAC-seq:
-    aligned_filtered_bam: "{data_dir}/{sample_name}/mapped/{sample_name}.bowtie2.filtered.bam"
-    peaks: "{data_dir}/{sample_name}/peaks/{sample_name}_peaks.narrowPeak"
-    summits: "{data_dir}/{sample_name}/peaks/{sample_name}_summits.bed"
-  ChIP-seq:
-    aligned_filtered_bam: "{data_dir}/{sample_name}/mapped/{sample_name}.bowtie2.filtered.bam"
-  CNV:
-    aligned_filtered_bam: "{data_dir}/{sample_name}/mapped/{sample_name}.bowtie2.filtered.bam"
-  RNA-seq:
-    aligned_filtered_bam: "{data_dir}/{sample_name}/mapped/{sample_name}.bowtie2.filtered.bam"
-graphics:
-  settings:
-    figure_saving:
-      - dpi: 300
-      - bbox_inches: "tight"
-    matplotlib:
-      backend: TkAgg # Agg
-    close_saved_figures: True

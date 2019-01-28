@@ -34,12 +34,12 @@ class RNASeqAnalysis(Analysis):
             **kwargs)
 
         self.data_type = self.__data_type__ = "RNA-seq"
-        self._var_names = "gene"
-        self._quantity = "expression"
-        self._norm_units = "RPM"
-        self._raw_matrix_name = "count_matrix"
-        self._norm_matrix_name = "expression"
-        self._annot_matrix_name = "expression_annotated"
+        self.var_names = "gene"
+        self.quantity = "expression"
+        self.norm_units = "RPM"
+        self.raw_matrix_name = "count_matrix"
+        self.norm_matrix_name = "expression"
+        self.annot_matrix_name = "expression_annotated"
 
     def collect_bitseq_output(self, samples=None, permissive=True, expression_type="counts"):
         """

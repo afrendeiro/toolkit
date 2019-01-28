@@ -6,7 +6,7 @@ import os
 import yaml
 from peppy import Project
 from ngs_toolkit.atacseq import ATACSeqAnalysis
-from ngs_toolkit.general import differential_analysis, differential_enrichment
+from ngs_toolkit.general import differential_analysis
 
 
 @pytest.fixture
@@ -85,7 +85,7 @@ def outputs(analysis):
 # @pytest.mark.skip(reason="no way of currently testing this")
 class Test_differential_enrichment:
     def test_no_arguments(self, analysis, outputs):
-        differential_enrichment(analysis, steps=['enrichr'])
+        analysis.differential_enrichment(steps=['enrichr'])
         for output in outputs:
             assert os.path.exists(output)
             assert os.stat(output).st_size > 0

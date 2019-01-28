@@ -6,7 +6,6 @@ import os
 import yaml
 from peppy import Project
 from ngs_toolkit.atacseq import ATACSeqAnalysis
-from ngs_toolkit.general import unsupervised_analysis
 import shutil
 
 
@@ -89,20 +88,20 @@ def outputs(analysis):
 class Test_unsupervised_analysis:
     def test_no_arguments(self, analysis, outputs):
         # no arguments
-        unsupervised_analysis(analysis)
+        analysis.unsupervised_analysis()
         for output in outputs:
             assert os.path.exists(output)
             assert os.stat(output).st_size > 0
 
     def test_matrix_with_no_multiIndex(self, analysis):
         with pytest.raises(TypeError):
-            unsupervised_analysis(analysis, quant_matrix="coverage")
+            analysis.unsupervised_analysis(quant_matrix="coverage")
         assert os.path.exists(os.path.join(analysis.results_dir, "unsupervised_analysis_ATAC-seq"))
 
     def test_various_matrices(self, analysis, outputs):
         for quant_matrix in ['coverage', 'coverage_rpm', 'coverage_qnorm']:
             analysis.annotate_with_sample_metadata(quant_matrix=quant_matrix)
-            unsupervised_analysis(analysis)
+            analysis.unsupervised_analysis()
             for output in outputs:
                 assert os.path.exists(output)
                 assert os.stat(output).st_size > 0
@@ -112,7 +111,7 @@ class Test_unsupervised_analysis:
     def test_too_low_numbers_of_samples_error(self, analysis):
         for i in range(2):
             with pytest.raises(ValueError):
-                unsupervised_analysis(analysis, samples=analysis.samples[:i])
+                analysis.unsupervised_analysis(samples=analysis.samples[:i])
             assert os.path.exists(os.path.join(analysis.results_dir, "unsupervised_analysis_ATAC-seq"))
             shutil.rmtree(os.path.join(analysis.results_dir, "unsupervised_analysis_ATAC-seq"))
 
@@ -136,7 +135,7 @@ class Test_unsupervised_analysis:
             prefix + "pca.variable_principle_components_association.adj_pvalue.masked.svg",
             prefix + "pca.variable_principle_components_association.p_value.svg",
             prefix + "pca.variable_principle_components_association.adj_pvalue.svg"]
-        unsupervised_analysis(analysis, samples=analysis.samples[:2])
+        analysis.unsupervised_analysis(samples=analysis.samples[:2])
         for output in outputs2:
             assert os.path.exists(output)
             assert os.stat(output).st_size > 0
@@ -146,7 +145,7 @@ class Test_unsupervised_analysis:
     # def test_high_samples_varying_all_outputs(self, analysis, outputs):
     #     for i in range(4, len(analysis.samples), 2):
     #         print(i)
-    #         unsupervised_analysis(analysis, samples=analysis.samples[i:])
+    #         analysis.unsupervised_analysis(samples=analysis.samples[i:])
     #         for output in outputs:
     #             assert os.path.exists(output)
     #             assert os.stat(output).st_size > 0
@@ -154,7 +153,7 @@ class Test_unsupervised_analysis:
 
     def test_no_plotting_attributes(self, analysis):
         with pytest.raises(ValueError):
-            unsupervised_analysis(analysis, attributes_to_plot=[])
+            analysis.unsupervised_analysis(attributes_to_plot=[])
         assert os.path.exists(os.path.join(analysis.results_dir, "unsupervised_analysis_ATAC-seq"))
 
     def test_various_plotting_attributes(self, analysis, outputs):
@@ -166,7 +165,7 @@ class Test_unsupervised_analysis:
             prefix + "pca.variable_principle_components_association.adj_pvalue.masked.svg",
             prefix + "pca.variable_principle_components_association.adj_pvalue.svg"]
         for i in range(1, len(analysis.group_attributes)):
-            unsupervised_analysis(analysis, attributes_to_plot=analysis.group_attributes[:i])
+            analysis.unsupervised_analysis(attributes_to_plot=analysis.group_attributes[:i])
             for output in outputs:
                 if output not in not_outputs:
                     assert os.path.exists(output)
@@ -176,13 +175,13 @@ class Test_unsupervised_analysis:
             shutil.rmtree(os.path.join(analysis.results_dir, "unsupervised_analysis_ATAC-seq"))
 
     def test_various_plot_prefixes_attributes(self, analysis, outputs):
-        unsupervised_analysis(analysis, plot_prefix="test")
+        analysis.unsupervised_analysis(plot_prefix="test")
         for output in outputs:
             assert os.path.exists(output.replace("all_sites", "test"))
             assert os.stat(output.replace("all_sites", "test")).st_size > 0
 
     def test_standardized_matrix(self, analysis, outputs):
-        unsupervised_analysis(analysis, standardize_matrix=True)
+        analysis.unsupervised_analysis(standardize_matrix=True)
         for output in outputs:
             assert os.path.exists(output)
             assert os.stat(output).st_size > 0

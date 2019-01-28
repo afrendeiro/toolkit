@@ -6,7 +6,6 @@ import os
 import yaml
 from peppy import Project
 from ngs_toolkit.atacseq import ATACSeqAnalysis
-from ngs_toolkit.general import differential_analysis
 
 
 @pytest.fixture
@@ -90,7 +89,7 @@ class Test_differential_analysis:
     def test_no_arguments(self, analysis, outputs):
         import pandas as pd
 
-        differential_analysis(analysis)
+        analysis.differential_analysis()
         assert os.path.exists(
             os.path.join(analysis.results_dir, "differential_analysis_ATAC-seq"))
         assert os.path.exists(outputs[0])
@@ -107,7 +106,7 @@ class Test_differential_analysis:
         assert analysis.differential_results.columns.tolist() == cols
 
     # def test_no_subdirectories(self, analysis, outputs):
-    #     differential_analysis(analysis)
+    #     analysis.differential_analysis()
     #     assert os.path.exists(
     #         os.path.join(analysis.results_dir, "differential_analysis_ATAC-seq"))
     #     assert os.path.exists(outputs[0])

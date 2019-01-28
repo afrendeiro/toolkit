@@ -139,7 +139,6 @@ def test_get_supported_peaks(various_analysis):
 
 
 def test_measure_coverage(various_analysis):
-    import pytest
     for analysis in various_analysis:
         with pytest.raises(IOError):
             analysis.measure_coverage()

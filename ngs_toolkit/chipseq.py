@@ -36,14 +36,14 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
             **kwargs)
 
         self.data_type = self.__data_type__ = "ChIP-seq"
-        self._var_names = "region"
-        self._quantity = "binding"
-        self._norm_units = "RPM"
-        self._raw_matrix_name = "coverage"
-        self._norm_matrix_name = "coverage_qnorm"  # or coverage_gc_corrected
+        self.var_names = "region"
+        self.quantity = "binding"
+        self.norm_units = "RPM"
+        self.raw_matrix_name = "coverage"
+        self.norm_matrix_name = "coverage_qnorm"  # or coverage_gc_corrected
         # TODO: have normalization method reset the above value, with info to user
         # or just overwrite
-        self._annot_matrix_name = "binding"
+        self.annot_matrix_name = "binding"
 
     def call_peaks_from_comparisons(
             self, comparison_table, output_dir="{results_dir}/chipseq_peaks",

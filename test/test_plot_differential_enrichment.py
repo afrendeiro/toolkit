@@ -6,7 +6,6 @@ import os
 import yaml
 from peppy import Project
 from ngs_toolkit.atacseq import ATACSeqAnalysis
-from ngs_toolkit.general import differential_analysis, differential_enrichment, plot_differential_enrichment
 
 
 @pytest.fixture
@@ -60,8 +59,8 @@ def analysis(tmp_path):
         a.get_peak_gene_annotation()
         a.annotate(quant_matrix="coverage_qnorm")
         a.annotate_with_sample_metadata(quant_matrix="coverage_qnorm")
-        differential_analysis(a)
-        differential_enrichment(a, steps=['enrichr'])
+        a.differential_analysis()
+        a.differential_enrichment(steps=['enrichr'])
         to_test.append(a)
     return to_test[0]
 
@@ -93,7 +92,7 @@ class Test_plot_differential_enrichment:
                          "differential_analysis_ATAC-seq",
                          "enrichments",
                          "differential_analysis.enrichr.csv"))
-        plot_differential_enrichment(enr, "enrichr")
+        analysis.plot_differential_enrichment(enr, "enrichr")
         for output in outputs:
             assert os.path.exists(output)
             assert os.stat(output).st_size > 0

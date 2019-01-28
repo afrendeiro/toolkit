@@ -14,6 +14,11 @@ ngs_toolkit
 .. automodule:: ngs_toolkit
     :members:
 
+ngs_toolkit.analysis
+-----------------------
+.. automodule:: ngs_toolkit.analysis
+    :members:
+
 ngs_toolkit.general
 -----------------------
 .. automodule:: ngs_toolkit.general

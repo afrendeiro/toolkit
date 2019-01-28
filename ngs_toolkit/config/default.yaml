@@ -1,6 +1,11 @@
 username: 
 email: 
 website_root: 
+supported_data_types:
+  - ATAC-seq
+  - ChIP-seq
+  - RNA-seq
+  - CNV
 metadata:
   root_projects_dir: 
 default_genome_assemblies:

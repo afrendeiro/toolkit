@@ -33,5 +33,6 @@ script:
   - pytest --disable-warnings --show-capture=no --cov ./ --cov-report term --cov-report xml test/test_*.py
 
 after_success:
+  - coverage xml
   - codecov -f coverage.xml
   - python-codacy-coverage -r coverage.xml

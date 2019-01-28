@@ -478,7 +478,7 @@ def plot_region_structure_results(
             data=spec.reset_index(),
             x=x, y=y, hue=z, ax=axis[i])
         # label top points
-        for s in enr.sort_values(y).tail(top_n).index:
+        for s in spec.sort_values(y).tail(top_n).index:
             axis[i].text(spec.loc[s, x], spec.loc[s, y], s=s)
         # equal x axis
         ll = spec.loc[:, x].abs().max()

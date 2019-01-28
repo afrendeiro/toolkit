@@ -2258,6 +2258,7 @@ class Analysis(object):
         from tqdm import tqdm
         from scipy.stats import fisher_exact
         from statsmodels.sandbox.stats.multicomp import multipletests
+        from ngs_toolkit.general import log_pvalues
 
         data_type = self._get_data_type(data_type)
         # Make output dir
@@ -2320,8 +2321,8 @@ class Analysis(object):
             intersections.loc[i, 'p_value'] = p
         # intersections['q_value'] = intersections['p_value'] * intersections.shape[0]
         intersections.loc[:, 'q_value'] = multipletests(intersections['p_value'])[1]
-        intersections.loc[:, 'log_p_value'] = (-np.log10(intersections['p_value'])).fillna(0).replace(np.inf, 300)
-        intersections.loc[:, 'log_q_value'] = (-np.log10(intersections['q_value'])).fillna(0).replace(np.inf, 300)
+        intersections.loc[:, 'log_p_value'] = log_pvalues(intersections['p_value'])
+        intersections.loc[:, 'log_q_value'] = log_pvalues(intersections['q_value'])
 
         # save
         intersections.to_csv(os.path.join(output_dir, output_prefix + ".differential_overlap.csv"), index=False)
@@ -2946,46 +2947,65 @@ class Analysis(object):
         Given a table of enrichment terms across several comparisons, produced
         plots illustrating these enrichments in the various comparisons.
 
-        # TODO: add plotting of genomic region and chromatin state enrichment.
-        `comp_variable` is the column in the enrichment table that labels groups.
-
         # TODO: split function in its smaller parts and call them appropriately.
 
-        :param enrichment_table: Data frame with enrichment results as produced by
-                                 ``ngs_toolkit.general.differential_enrichment`` or
-                                 ``ngs_toolkit.general.collect_differential_enrichment``.
-        :type enrichment_table: pandas.DataFrame
-        :param enrichment_type: One of 'lola', 'enrichr', 'motif', 'plot_differential_enrichment', great'.
-        :type enrichment_type: str
-        :param data_type: Data type. One of "ATAC-seq" and "RNA-seq". Defaults to "ATAC-seq".
-        :type data_type: str,optional
-        :param direction_dependent: Whether enrichments were made in a direction-dependent way
-                                    (up-regulated and down-regulated features separately).
-                                    This implies a column named "direction" exists". Defaults to True.
-        :type direction_dependent: bool,optional
+        :param pandas.DataFrame enrichment_table:
+            Data frame with enrichment results as produced by
+            ``differential_enrichment`` or ``collect_differential_enrichment``.
+
+        :param str enrichment_type:
+            One of 'region', 'lola', 'enrichr', 'motif', 'plot_differential_enrichment', great'.
+
+        :param data_type:
+            Data type. One of "ATAC-seq" and "RNA-seq".
+            Defaults to the analysis' own data_type.
+
+        :param direction_dependent:
+            Whether enrichments were made in a direction-dependent way (up-regulated and down-regulated features separately).
+            This implies a column named "direction" exists".
+            Defaults to True.
+
         :param str,optional output_dir:
             Directory to create output files.
             Defaults to "{results_dir}/differential_analysis_{data_type}/enrichments".
 
-        :param comp_variable: Column defining which comparison enrichment terms belong to. Defaults to "comparison_name".
-        :type comp_variable: str,optional
-        :param output_prefix: Prefix to use when creating output files. Defaults to "differential_analysis".
-        :type output_prefix: str,optional
-        :param rasterized: Whether or not to rasterize heatmaps for efficient plotting. Defaults to True.
-        :type rasterized: bool,optional
-        :param barplots: Whether barplots with top enriched terms per comparison should be produced. Defaults to True.
-        :type barplots: bool,optional
-        :param correlation_plots: Whether correlation plots of comparisons across enriched terms should be produced. Defaults to True.
-        :type correlation_plots: bool,optional
-        :param clustermap_metric: Distance metric to use for clustermap clustering, Default to "correlation" (Pearson's).
-        :type clustermap_metric: str,optional
-        :param top_n: Top terms to be used to make barplots. Defaults to 5
-        :type top_n: number,optional
-        :param z_score: Which dimention/axis to perform Z-score transformation for. Numpy/Pandas conventions are used:
-                        `0` is row-wise (in this case across comparisons) and `1` is column-wise (across terms). Defaults to 0.
-        :type z_score: number,optional
-        :param cmap: Colormap to use in heatmaps. Default None.
-        :type cmap: str,optional
+        :param comp_variable:
+            Column defining which comparison enrichment terms belong to.
+            Defaults to "comparison_name".
+
+        :param output_prefix:
+            Prefix to use when creating output files.
+            Defaults to "differential_analysis".
+
+        :param rasterized:
+            Whether or not to rasterize heatmaps for efficient plotting.
+            Defaults to True.
+
+        :param barplots:
+            Whether barplots with top enriched terms per comparison should be produced.
+            Defaults to True.
+
+        :param correlation_plots:
+            Whether correlation plots of comparisons across enriched terms should be produced.
+            Defaults to True.
+
+        :param clustermap_metric:
+            Distance metric to use for clustermap clustering,
+            Default to "correlation" (Pearson's).
+
+        :param top_n:
+            Top terms to be used to make barplots.
+            Defaults to 5
+
+        :param z_score:
+            Which dimention/axis to perform Z-score transformation for.
+            Numpy/Pandas conventions are used:
+            `0` is row-wise (in this case across comparisons) and `1` is column-wise (across terms).
+            Defaults to 0.
+
+        :param cmap:
+            Colormap to use in heatmaps.
+            Default None.
         """
         import numpy as np
         import matplotlib
@@ -3069,11 +3089,10 @@ class Analysis(object):
                 msg = "Plotting of correlation matrix failed: {}".format(output_file)
                 _LOGGER.warn(msg)
 
-        if enrichment_type not in ["lola", "enrichr", "motif", "homer_consensus", 'great']:
+        if enrichment_type not in ["region", "lola", "enrichr", "motif", "homer_consensus", 'great']:
             raise AssertionError("`enrichment_type` must be one of 'lola', 'enrichr', 'motif', 'homer_consensus', 'great'.")
 
-        if "{data_type}" in output_dir:
-            output_dir = output_dir.format(data_type=data_type)
+        output_dir = self._format_string_with_attributes(output_dir)
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
 
@@ -3094,6 +3113,9 @@ class Analysis(object):
         if enrichment_type == "region":
             from ngs_toolkit.graphics import plot_region_structure_results
             enrichment_table['-log10(p-value)'] = log_pvalues(enrichment_table['p_value'])
+
+            if not enrichment_table.index.name == "region":
+                enrichment_table = enrichment_table.set_index("region")
             # Plot terms of each comparison in barplots and volcano plots
             plot_region_structure_results(
                     enrichment_table,

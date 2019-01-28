@@ -3,7 +3,6 @@
 
 import os
 import pickle
-from collections import Counter
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -166,7 +165,9 @@ class ATACSeqAnalysis(Analysis):
             only_these_keys = [
                 "sites", "support", "coverage", "coverage_qnorm",
                 "nuc", "coverage_gc_corrected", "closest_tss_distances",
-                "gene_annotation", "region_annotation", "region_annotation_b",
+                "gene_annotation",
+                "region_annotation", "region_annotation_b",
+                "region_annotation_mapping", "region_annotation_b_mapping",
                 "chrom_state_annotation", "chrom_state_annotation_b",
                 "chrom_state_annotation_mapping", "chrom_state_annotation_b_mapping",
                 "stats",
@@ -1112,12 +1113,11 @@ class ATACSeqAnalysis(Analysis):
             annot_comp.index = bed_to_index(annot_comp)
             annot_comp.columns = ['chrom', 'start', 'end', 'genomic_region']
             # save to disk
-            a = "" if attr == "real" else "_" + attr
             annot.to_csv(os.path.join(
-                self.results_dir, self.name + "_peaks.region_annotation{}_mapping.csv".format(a)),
+                self.results_dir, self.name + "_peaks.{}_mapping.csv".format(attr)),
                 index=True)
             annot_comp.to_csv(os.path.join(
-                self.results_dir, self.name + "_peaks.region_annotation{}.csv".format(a)),
+                self.results_dir, self.name + "_peaks.{}.csv".format(attr)),
                 index=True)
 
         setattr(self, attr, annot_comp)
@@ -1836,7 +1836,7 @@ class ATACSeqAnalysis(Analysis):
         from scipy.stats import fisher_exact
         from ngs_toolkit.general import log_pvalues
 
-        output_dir = self._format_string_with_attributes(self, output_dir)
+        output_dir = self._format_string_with_attributes(output_dir)
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
 

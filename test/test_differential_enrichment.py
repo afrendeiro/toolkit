@@ -6,7 +6,6 @@ import os
 import yaml
 from peppy import Project
 from ngs_toolkit.atacseq import ATACSeqAnalysis
-from ngs_toolkit.general import differential_analysis
 
 
 @pytest.fixture
@@ -60,7 +59,7 @@ def analysis(tmp_path):
         a.get_peak_gene_annotation()
         a.annotate(quant_matrix="coverage_qnorm")
         a.annotate_with_sample_metadata(quant_matrix="coverage_qnorm")
-        differential_analysis(a)
+        a.differential_analysis()
         to_test.append(a)
     return to_test[0]
 

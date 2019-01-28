@@ -135,7 +135,6 @@ class Test_Analysis():
                 shutil.rmtree(tmp_path)
 
     def test_analysis_serialization(self, tmp_path):
-        import shutil
         import os
         import numpy as np
         import glob

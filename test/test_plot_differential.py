@@ -6,7 +6,6 @@ import os
 import yaml
 from peppy import Project
 from ngs_toolkit.atacseq import ATACSeqAnalysis
-from ngs_toolkit.general import differential_analysis, plot_differential
 
 
 @pytest.fixture
@@ -58,7 +57,7 @@ def analysis(tmp_path):
         a.normalize(method="total")
         a.normalize(method="quantile")
         a.annotate_with_sample_metadata(quant_matrix="coverage_qnorm")
-        differential_analysis(a)
+        a.differential_analysis()
         # # Sometimes the DESeq2 call fails, but it often works if repeated
         # i = 1
         # max_attempts = 10
@@ -101,7 +100,7 @@ def outputs(analysis):
 
 class Test_plot_differential:
     def test_no_arguments(self, analysis, outputs):
-        plot_differential(analysis)
+        analysis.plot_differential()
         for output in outputs:
             assert os.path.exists(output)
             assert os.stat(output).st_size > 0

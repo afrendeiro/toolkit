@@ -875,7 +875,7 @@ class Analysis(object):
 
         matrix = getattr(self, quant_matrix)
 
-        if type(matrix.columns) is not pd.core.indexes.multi.MultiIndex:
+        if not isinstance(matrix.columns, pd.core.indexes.multi.MultiIndex):
             msg = "Provided quantification matrix must have columns with MultiIndex."
             hint = " Use ngs_toolkit.general.annotate_with_sample_metadata to do that."
             _LOGGER.error(msg + hint)
@@ -1625,8 +1625,6 @@ class Analysis(object):
             Color map to use in numerical levels of `group_variables`.
             Will be passed to `analysis.get_level_colors`.
         """
-        import pandas as pd
-        import numpy as np
         import matplotlib.pyplot as plt
         import seaborn as sns
         from ngs_toolkit.graphics import add_colorbar_to_axis
@@ -1705,7 +1703,7 @@ class Analysis(object):
 
         # Handle group colouring
         if group_wise_colours:
-            if type(group_variables) is None:
+            if group_variables is None:
                 msg = "If `group_wise_colours` is True, a list of `group_variables` must be passed."
                 raise AssertionError(msg)
 
@@ -1870,7 +1868,7 @@ class Analysis(object):
                             (results["diff"] == True), p_value_column].squeeze())
                         _LOGGER.debug("Shapes: {} {} {}".format(a.shape, b.shape, diff_vars.shape))
                         # in case there's just one significant feature:
-                        if type(col) is np.float_:
+                        if isinstance(col, np.float_):
                             col = np.array([col])
                         collection = ax.scatter(
                             b.loc[diff_vars.index],
@@ -1882,7 +1880,7 @@ class Analysis(object):
                     # Name groups
                     xl = c.loc[c['comparison_side'] <= 0, 'sample_group'].drop_duplicates().squeeze()
                     yl = c.loc[c['comparison_side'] >= 1, 'sample_group'].drop_duplicates().squeeze()
-                    if not (type(xl) is str) and (type(yl) is str):
+                    if not (isinstance(xl, str) and isinstance(yl, str)):
                         xl = "Down-regulated"
                         yl = "Up-regulated"
                     ax.set_xlabel(xl)
@@ -2004,7 +2002,7 @@ class Analysis(object):
 
         # Observe values of variables across all comparisons
         all_diff = results[results["diff"] == True].index.drop_duplicates()
-        if type(matrix.columns) is pd.MultiIndex:
+        if isinstance(matrix.columns, pd.MultiIndex):
             sample_cols = matrix.columns.get_level_values("sample_name").tolist()
         else:
             sample_cols = matrix.columns.tolist()
@@ -2158,7 +2156,7 @@ class Analysis(object):
 
         # Sample level
         _LOGGER.info("Getting per sample values of {} in all differential {}s found.".format(quantity, var_name))
-        if type(matrix.columns) is pd.core.indexes.multi.MultiIndex:
+        if isinstance(matrix.columns, pd.core.indexes.multi.MultiIndex):
             matrix.columns = matrix.columns.get_level_values("sample_name")
 
         matrix2 = matrix.loc[all_diff, :].sort_index(axis=1)
@@ -2250,7 +2248,6 @@ class Analysis(object):
             Defaults to "differential_analysis".
 
         """
-        import numpy as np
         import itertools
         import matplotlib.pyplot as plt
         import matplotlib
@@ -2554,7 +2551,6 @@ class Analysis(object):
             Whether work should be submitted as jobs.
             Defaults to False.
         """
-        import pandas as pd
         from tqdm import tqdm
         from ngs_toolkit.general import run_enrichment_jobs
 
@@ -2806,7 +2802,6 @@ class Analysis(object):
             Whether to skip non-existing files, giving a warning.
             Defaults to True.
         """
-        import pandas as pd
         from ngs_toolkit.general import parse_ame, parse_homer
         from tqdm import tqdm
 
@@ -2883,7 +2878,7 @@ class Analysis(object):
                             pd.read_csv, {}, pathway_enr)]:
                     if enr_type in steps:
                         try:
-                            enr = pd.read_csv(file, **kwargs)
+                            enr = function(file, **kwargs)
                         except IOError as e:
                             if permissive:
                                 _LOGGER.warn(error_msg.format(enr_label, comp, direction))
@@ -2918,7 +2913,7 @@ class Analysis(object):
         if 'homer_consensus' in steps:
             # fix some columns
             homer_consensus.columns = homer_consensus.columns.str.replace(r"\(of .*", "")
-            homer_consensus["# of Background Sequences with Motif"]
+            # homer_consensus["# of Background Sequences with Motif"]
             for col in homer_consensus.columns[homer_consensus.columns.str.contains("%")]:
                 homer_consensus[col] = homer_consensus[col].str.replace("%", "").astype(float)
             homer_consensus.to_csv(
@@ -3007,7 +3002,6 @@ class Analysis(object):
             Colormap to use in heatmaps.
             Default None.
         """
-        import numpy as np
         import matplotlib
         import matplotlib.pyplot as plt
         import seaborn as sns
@@ -3028,11 +3022,11 @@ class Analysis(object):
 
             fig, axis = plt.subplots(n_side, n_side, figsize=(
                 4 * n_side, n_side * max(5, 0.12 * top_n)), sharex=False, sharey=False)
-            if type(axis) == np.ndarray:
+            if isinstance(axis, np.ndarray):
                 axis = iter(axis.flatten())
             else:
                 axis = iter(np.array([axis]))
-            for i, comp in enumerate(top_data[group_variable].drop_duplicates().sort_values()):
+            for comp in top_data[group_variable].drop_duplicates().sort_values():
                 df2 = top_data.loc[top_data[group_variable] == comp, :]
                 ax = next(axis)
                 sns.barplot(
@@ -3066,19 +3060,17 @@ class Analysis(object):
                 input_df,
                 output_file,
                 label="Enrichment\nof differential regions",
-                z_score=None):
+                z_score=None, params={}):
             # plot clustered heatmap
             shape = input_df.shape
             if z_score is not None:
-                params = {"cmap": "RdBu_r", "center": 0, "z_score": z_score}
-            else:
-                params = {}
+                params.update({"cmap": "RdBu_r", "center": 0, "z_score": z_score})
             try:
                 g = sns.clustermap(
                     input_df, figsize=(
                         max(6, 0.12 * shape[1]), max(6, 0.12 * shape[0])),
                     metric=clustermap_metric,
-                    xticklabels=True, yticklabels=True, rasterized=rasterized, cmap=cmap,
+                    xticklabels=True, yticklabels=True, rasterized=rasterized,
                     cbar_kws={"label": label}, **params)
                 g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(),
                                              rotation=90, ha="right", fontsize="xx-small")
@@ -3138,12 +3130,7 @@ class Analysis(object):
             enrichment_clustermap(
                 region_pivot,
                 output_file=os.path.join(output_dir, output_prefix + ".region_type_enrichment.cluster_specific.svg"),
-                label="log2(odd ratio) of enrichment\nof differential regions")
-            if z_score is not None:
-                enrichment_clustermap(
-                    region_pivot,
-                    output_file=os.path.join(output_dir, output_prefix + ".region_type_enrichment.cluster_specific.{}_z_score.svg".format(z_score_label)),
-                    label="{} Z-score of enrichment\nof differential regions".format(z_score_label), z_score=z_score)
+                label="log2(odd ratio) of enrichment\nof differential regions", params={"cmap": "RdBu_r", "center": 0})
 
         if enrichment_type == "lola":
             # get a unique label for each lola region set
@@ -3166,7 +3153,7 @@ class Analysis(object):
 
             # Plot top_n terms of each comparison in barplots
             if barplots:
-                barplots(
+                enrichment_barplot(
                     enrichment_table, x="label", y="pValueLog",
                     group_variable=comp_variable, top_n=top_n,
                     output_file=os.path.join(output_dir, output_prefix + ".lola.barplot.top_{}.svg".format(top_n)))
@@ -3204,7 +3191,7 @@ class Analysis(object):
 
             # Plot top_n terms of each comparison in barplots
             if barplots:
-                barplots(
+                enrichment_barplot(
                     enrichment_table, x="TF", y="log_p_value",
                     group_variable=comp_variable, top_n=top_n,
                     output_file=os.path.join(output_dir, output_prefix + ".lola.barplot.top_{}.svg".format(top_n)))
@@ -3241,7 +3228,7 @@ class Analysis(object):
             # Plot top_n terms of each comparison in barplots
             top_n = min(top_n, enrichment_table.set_index("Motif Name").groupby(comp_variable)["log_p_value"].count().min() - 1)
             if barplots:
-                barplots(
+                enrichment_barplot(
                     enrichment_table, x="Motif Name", y="log_p_value",
                     group_variable=comp_variable,
                     output_file=os.path.join(output_dir, output_prefix + ".lola.barplot.top_{}.svg".format(top_n)))
@@ -3329,7 +3316,7 @@ class Analysis(object):
                         .nlargest(top_n)
                         .reset_index())
 
-                    barplots(
+                    enrichment_barplot(
                         top_data, x="description", y="log_p_value",
                         group_variable=comp_variable, top_n=top_n,
                         output_file=os.path.join(output_dir, output_prefix + ".lola.barplot.top_{}.svg".format(top_n)))

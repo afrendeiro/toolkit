@@ -40,7 +40,7 @@ def parse_arguments(cli_string=None):
         help="Project name.")
     # # parse default assemblies from config
     default = ",".join([":".join([k, v])
-                        for x in _CONFIG["default_genome_assemblies"]
+                        for x in _CONFIG["preferences"]["default_genome_assemblies"]
                         for k, v in x.items()])
     # default = "human:hg19,mouse:mm10"
     create_subparser.add_argument(

@@ -113,7 +113,6 @@ def radar_plot(
 
     Heavy inspiration from here: https://matplotlib.org/examples/api/radar_chart.html
     """
-    import numpy as np
     from matplotlib.path import Path
     from matplotlib.spines import Spine
     from matplotlib.projections.polar import PolarAxes
@@ -353,7 +352,7 @@ def plot_projection(
                 cd = color_dataframe.loc[attr, :]
                 cd.name = None
                 cd.index = df.index.get_level_values(attr)
-                cd = cd.apply(lambda x: tuple(x) if type(x) is list else x)  # fix for deduplicating lists
+                cd = cd.apply(lambda x: tuple(x) if isinstance(x, list) else x)  # fix for deduplicating lists
                 cd = cd.reset_index().drop_duplicates().set_index(attr)
                 for j, group in enumerate(df2.index):
                     axis[pc, i].scatter(

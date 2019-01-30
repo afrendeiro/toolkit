@@ -792,7 +792,7 @@ class ATACSeqAnalysis(Analysis):
             _LOGGER.info("Reference genome FASTA file was not given, will try to get it.")
             _LOGGER.info("Getting genome FASTA file for organism '{}', genome '{}'. "
                          .format(self.organism, self.genome))
-            fasta_file = self.get_annotations(steps=['fasta'])['fasta_file']
+            fasta_file = self.get_annotations(steps=['genome'])['genome_file']['fasta']
 
         nuc = sites.nucleotide_content(fi=fasta_file).to_dataframe(comment="#")[["score", "blockStarts"]]
         nuc.columns = ["gc_content", "length"]
@@ -1113,11 +1113,12 @@ class ATACSeqAnalysis(Analysis):
             annot_comp.index = bed_to_index(annot_comp)
             annot_comp.columns = ['chrom', 'start', 'end', 'genomic_region']
             # save to disk
+            a = "" if (label == "real") else ("_" + label)
             annot.to_csv(os.path.join(
-                self.results_dir, self.name + "_peaks.{}_mapping.csv".format(attr)),
+                self.results_dir, self.name + "_peaks.region_annotation{}_mapping.csv".format(a)),
                 index=True)
             annot_comp.to_csv(os.path.join(
-                self.results_dir, self.name + "_peaks.{}.csv".format(attr)),
+                self.results_dir, self.name + "_peaks.region_annotation{}.csv".format(a)),
                 index=True)
 
         setattr(self, attr, annot_comp)

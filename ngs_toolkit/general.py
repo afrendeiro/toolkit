@@ -15,7 +15,7 @@ Analysis
 
 def get_genome_reference(
         organism, genome_assembly=None, output_dir=None,
-        genome_provider="UCSC", file_format="fasta", dry_run=False, force=False):
+        genome_provider="UCSC", file_format="2bit", dry_run=False, overwrite=True):
     """
     Get genome FASTA/2bit file.
     Saves results to disk and returns path to file.
@@ -37,6 +37,11 @@ def get_genome_reference(
 
     :param bool,optional dry_run:
         Whether to not download and just return path to file.
+
+    :param bool,optional overwrite:
+        Whether existing files should be overwritten by new ones.
+        Otherwise they will be kept and no action is made.
+        Defaults to True.
 
     :returns str|tuple:
         If not ``dry_run``, path to genome FASTA/2bit file,
@@ -61,6 +66,15 @@ def get_genome_reference(
             bed.nucleotide_content(fi=fasta)
         except pybedtools.helpers.BEDToolsError:
             pass
+
+    def twobit_to_fasta(genome_file):
+        if which("twoBitToFa"):
+            import subprocess
+            subprocess.call(
+                "twoBitToFa {} {}"
+                .format(genome_file, genome_file.replace(".2bit", ".fa"))
+                .split(" "))
+            index_fasta(genome_file.replace(".2bit", ".fa"))
 
     if output_dir is None:
         output_dir = os.path.join(os.path.abspath(os.path.curdir), "reference")
@@ -130,15 +144,15 @@ def get_genome_reference(
     genome_file = os.path.join(output_dir, "{}.{}.{}".format(
         organism, genome_assembly, 'fa.gz' if file_format == 'fasta' else '2bit'))
 
-    if os.path.exists(genome_file):
-        msg1 = "Genome file already exists: {} ".format(genome_file)
-        if not force:
-            msg2 = " - will not download."
-            _LOGGER.warning(msg1 + msg2)
-            return genome_file
-        else:
-            msg2 = " - will download due to force."
-            _LOGGER.warning(msg1 + msg2)
+    if os.path.exists(genome_file) and (not overwrite):
+        msg = "Genome file already exists and 'overwrite' is set to False."
+        hint = " Returning existing file: {}".format(genome_file)
+        _LOGGER.warn(msg + hint)
+        # even so, if 2bit and FASTA not there try to get fasta
+        if file_format == "2bit":
+            if not os.path.exists(genome_file.replace(".2bit", ".fa")):
+                twobit_to_fasta(genome_file)
+        return genome_file
 
     # create .fai index for fasta file
     if file_format == 'fasta':
@@ -149,18 +163,14 @@ def get_genome_reference(
     else:
         if not dry_run:
             download_file(url, genome_file)
-
-            if which("twoBitToFa"):
-                import subprocess
-                subprocess.call("twoBitToFa {} {}".format(genome_file, genome_file.replace("2bit", "fa")).split(" "))
-                index_fasta(genome_file.replace("2bit", "fa"))
+            twobit_to_fasta(genome_file)
             return genome_file
 
     return (url, genome_file)
 
 
 def get_blacklist_annotations(
-        organism, genome_assembly=None, output_dir=None):
+        organism, genome_assembly=None, output_dir=None, overwrite=True):
     """
     Get annotations of blacklisted genomic regions for a given organism/genome assembly.
     Saves results to disk and returns a path to a BED file.
@@ -178,6 +188,11 @@ def get_blacklist_annotations(
         Directory to write output to.
         Defaults to "reference" in current directory.
 
+    :param bool,optional overwrite:
+        Whether existing files should be overwritten by new ones.
+        Otherwise they will be kept and no action is made.
+        Defaults to True.
+
     :returns str: Path to blacklist BED file
     """
     from ngs_toolkit.general import download_gzip_file
@@ -192,21 +207,29 @@ def get_blacklist_annotations(
         genome_assembly = organisms[organism]
         _LOGGER.warn("Genome assembly not selected. Using assembly '{}' for '{}'."
                      .format(genome_assembly, organism))
+
+    output_file = os.path.join(output_dir, "{}.{}.blacklist.bed"
+                               .format(organism, genome_assembly))
+    if os.path.exists(output_file) and (not overwrite):
+        msg = "Annotation file already exists and 'overwrite' is set to False."
+        hint = " Returning existing annotation file: {}".format(output_file)
+        _LOGGER.warn(msg + hint)
+        return output_file
+
     url = "http://mitra.stanford.edu/kundaje/akundaje/release/blacklists/"
     if genome_assembly not in ['hg19']:
         url += "{0}-{1}/{0}.blacklist.bed.gz".format(genome_assembly, organism)
     else:
         url += "{0}-human/wgEncodeHg19ConsensusSignalArtifactRegions.bed.gz".format(genome_assembly)
-    output = os.path.join(output_dir, "{}.{}.blacklist.bed"
-                          .format(organism, genome_assembly))
 
-    download_gzip_file(url, output)
-    return output
+    download_gzip_file(url, output_file)
+    return output_file
 
 
 def get_tss_annotations(
         organism, genome_assembly=None, save=True, output_dir=None, chr_prefix=True,
-        gene_types=['protein_coding', 'processed_transcript', 'lincRNA', 'antisense']):
+        gene_types=['protein_coding', 'processed_transcript', 'lincRNA', 'antisense'],
+        overwrite=True):
     """
     Get annotations of TSS for a given organism/genome assembly.
     This is a simple approach using Biomart's API querying the Ensembl database.
@@ -239,6 +262,11 @@ def get_tss_annotations(
       See here the available biotypes https://www.ensembl.org/Help/Faq?id=468
       Defaults to 'protein_coding', 'processed_transcript', 'lincRNA', 'antisense'.
 
+    :param bool,optional overwrite:
+        Whether existing files should be overwritten by new ones.
+        Otherwise they will be kept and no action is made.
+        Defaults to True.
+
     :returns pandas.DataFrame: DataFrame with genome annotations
     """
     from ngs_toolkit.general import query_biomart
@@ -258,6 +286,15 @@ def get_tss_annotations(
         genome_assembly = "grcm38"
     if genome_assembly == "sacCer3":
         genome_assembly = "R64"
+
+    output_file = os.path.join(output_dir, "{}.{}.gene_annotation.tss.bed"
+                               .format(organism, genome_assembly))
+    if os.path.exists(output_file) and (not overwrite):
+        msg = "Annotation file already exists and 'overwrite' is set to False."
+        hint = " Returning existing annotation from file: {}".format(output_file)
+        _LOGGER.warn(msg + hint)
+        annot = pd.read_csv(output_file, header=None, sep="\t")
+        return annot
 
     if save:
         if output_dir is None:
@@ -308,15 +345,12 @@ def get_tss_annotations(
 
     # save
     if save:
-        res.to_csv(
-            os.path.join(output_dir, "{}.{}.gene_annotation.tss.bed"
-                         .format(organism, genome_assembly)),
-            index=False, header=False, sep="\t")
+        res.to_csv(output_file, index=False, header=False, sep="\t")
 
+        output_file = os.path.join(output_dir, "{}.{}.gene_annotation.protein_coding.tss.bed"
+                                   .format(organism, genome_assembly))
         res[res['transcript_biotype'] == "protein_coding"].drop(attributes[-1], axis=1).to_csv(
-            os.path.join(output_dir, "{}.{}.gene_annotation.protein_coding.tss.bed"
-                         .format(organism, genome_assembly)),
-            index=False, header=False, sep="\t")
+            output_file, index=False, header=False, sep="\t")
 
     return res
 
@@ -325,7 +359,7 @@ def get_genomic_context(
         organism, genome_assembly=None, save=True, output_dir=None, chr_prefix=True,
         region_subset=['promoter', 'exon', '5utr', '3utr', 'intron', 'genebody', 'intergenic'],
         gene_types=['protein_coding', 'processed_transcript', 'lincRNA', 'antisense'],
-        promoter_width=3000):
+        promoter_width=3000, overwrite=True):
     """
     Get annotations of TSS for a given organism/genome assembly.
     This is a simple approach using Biomart's API querying the Ensembl database.
@@ -358,6 +392,11 @@ def get_genomic_context(
         See here the available biotypes https://www.ensembl.org/Help/Faq?id=468
         Defaults to 'protein_coding', 'processed_transcript', 'lincRNA', 'antisense'.
 
+    :param bool,optional overwrite:
+        Whether existing files should be overwritten by new ones.
+        Otherwise they will be kept and no action is made.
+        Defaults to True.
+
     :returns pandas.DataFrame: DataFrame with genome annotations
     """
     from ngs_toolkit.general import query_biomart
@@ -384,6 +423,15 @@ def get_genomic_context(
     else:
         _LOGGER.warning()
         ensembl_genome_assembly = genome_assembly
+
+    output_file = os.path.join(output_dir, "{}.{}.genomic_context.bed"
+                               .format(organism, ensembl_genome_assembly))
+    if os.path.exists(output_file) and (not overwrite):
+        msg = "Annotation file already exists and 'overwrite' is set to False."
+        hint = " Returning existing annotation from file: {}".format(output_file)
+        _LOGGER.warn(msg + hint)
+        annot = pd.read_csv(output_file, header=None, sep="\t")
+        return annot
 
     if save:
         if output_dir is None:
@@ -496,10 +544,7 @@ def get_genomic_context(
 
     # save
     if save:
-        annot.to_csv(
-            os.path.join(output_dir, "{}.{}.genomic_context.bed"
-                         .format(organism, ensembl_genome_assembly)),
-            index=False, header=False, sep="\t")
+        annot.to_csv(output_file, index=False, header=False, sep="\t")
     return annot
 
 

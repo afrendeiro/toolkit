@@ -9,10 +9,7 @@ import os
 import sys
 import textwrap
 import ngs_toolkit
-
-
-_LOGGER = ngs_toolkit._LOGGER
-_CONFIG = ngs_toolkit._CONFIG
+from ngs_toolkit import _CONFIG, _LOGGER
 
 
 def parse_arguments(cli_string=None):
@@ -44,14 +41,14 @@ def parse_arguments(cli_string=None):
                         for k, v in x.items()])
     # default = "human:hg19,mouse:mm10"
     create_subparser.add_argument(
-        '-g', '--genome-assembly',
+        "-g", "--genome-assembly",
         default=default,
         dest="genome_assemblies",
         help="List of 'organism:assembly' pairs for project. "
              "Comma-separated list of pairs of supported organism/genome assembly. "
              "Defaults to '{}'.".format(default))
     create_subparser.add_argument(
-        '-r', '--root-dir',
+        "-r", "--root-dir",
         default=os.path.curdir,
         dest="root_dir",
         help="Root directory to create projects.")
@@ -108,13 +105,13 @@ def create_project(
 
     # Get defaults from config
     if username is None:
-        username = _CONFIG['username']
+        username = _CONFIG["username"]
     if username is None:
         username = os.getenv("USER")
     if email is None:
-        email = _CONFIG['email']
+        email = _CONFIG["email"]
     if url is None:
-        url = _CONFIG['website_root']
+        url = _CONFIG["website_root"]
     if url is not None:
         if "{project_name}" in url:
             url = url.format(project_name=project_name)
@@ -200,11 +197,11 @@ def create_requirements_file(
     """
     def get_current_requirements():
         import requests
-        package_name = 'ngs-toolkit'
-        url = 'https://pypi.python.org/pypi/' + str(package_name) + '/json'
+        package_name = "ngs-toolkit"
+        url = "https://pypi.python.org/pypi/" + str(package_name) + "/json"
         data = requests.get(url).json()
         requirements = [x.replace(r" ", "").replace("(", "").replace(")", "")
-                        for x in data['info']['requires_dist'] if "extra" not in x]
+                        for x in data["info"]["requires_dist"] if "extra" not in x]
         requirements.append("ngs_toolkit=={}".format(ngs_toolkit.__version__))
         return requirements
 
@@ -285,7 +282,7 @@ def run_recipe(recipe_name, project_config):
 
 def main():
     """
-    Program's main entry point.
+    Program"s main entry point.
     """
     # Parse command-line arguments.
     _LOGGER.debug("Parsing command-line arguments")
@@ -333,7 +330,7 @@ def main():
     _LOGGER.info("Completed.")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     try:
         sys.exit(main())
     except KeyboardInterrupt:

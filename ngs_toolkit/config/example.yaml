@@ -6,10 +6,10 @@ supported_data_types:
   - ChIP-seq
   - RNA-seq
   - CNV
-metadata:
-  root_reference_dir: /home/$USER/reference/
-  root_projects_dir: /scratch/lab_bock/shared/projects/
 preferences:
+  # For the next item, environment variables are formatted if they are of the form ${VAR}
+  root_reference_dir: /home/${USER}/reference/
+  root_projects_dir: /scratch/lab_bock/shared/projects/
   default_genome_assemblies:
     - human: hg19
     - mouse: mm10

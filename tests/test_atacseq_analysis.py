@@ -264,11 +264,16 @@ def test_get_matrix_stats(various_analysis):
 
 
 def test_get_peak_gene_annotation(analysis):
+    from ngs_toolkit import _CONFIG
+    reference_dir = ATACSeqAnalysis._format_string_with_environment_variables(
+        _CONFIG['preferences']['root_reference_dir'])
+    if reference_dir is None:
+        reference_dir = os.path.join(analysis.root_dir, "reference")
+
     mapping = {"hg19": "grch37", "hg38": "grch38", "mm10": "grcm38"}
 
-    os.chdir(os.path.join(analysis.results_dir, os.pardir))
     annot = analysis.get_peak_gene_annotation(max_dist=1e10)
-    tss = os.path.join(analysis.root_dir, 'reference',
+    tss = os.path.join(reference_dir,
                        "{}.{}.gene_annotation.protein_coding.tss.bed"
                        .format(analysis.organism, mapping[analysis.genome]))
     assert os.path.exists(tss)
@@ -278,14 +283,16 @@ def test_get_peak_gene_annotation(analysis):
 
 
 def test_get_peak_genomic_location(analysis):
-    prefix = os.path.join(
-        analysis.root_dir, "reference", "{}.{}.genomic_context")
+    from ngs_toolkit import _CONFIG
+    reference_dir = ATACSeqAnalysis._format_string_with_environment_variables(
+        _CONFIG['preferences']['root_reference_dir'])
+    if reference_dir is None:
+        reference_dir = os.path.join(analysis.root_dir, "reference")
+    prefix = os.path.join(reference_dir, "{}.{}.genomic_context")
+
     fs = [prefix + a for a in [
         ".bed", ".exon.bed", ".genebody.bed", ".intergenic.bed",
         ".intron.bed", ".promoter.bed", ".utr3.bed", ".utr5.bed"]]
-
-    os.chdir(os.path.join(analysis.results_dir, os.pardir))
-
     # At some point, downloading a genome reference in Travis
     # caused memory error.
     # This should now be fixed by implementing download/decompressing

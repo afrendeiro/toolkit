@@ -125,16 +125,16 @@ class Test_unsupervised_analysis:
             prefix + "pca.svg",
             prefix + "pearson_correlation.clustermap.svg",
             prefix + "spearman_correlation.clustermap.svg",
-            prefix + "tsne.svg"]
-        not_outputs = [
-            prefix + "isomap.svg",
-            prefix + "locallylinearembedding.svg",
-            prefix + "spectralembedding.svg",
+            prefix + "tsne.svg",
             prefix + "pca.variable_principle_components_association.csv",
             prefix + "pca.variable_principle_components_association.p_value.masked.svg",
             prefix + "pca.variable_principle_components_association.adj_pvalue.masked.svg",
             prefix + "pca.variable_principle_components_association.p_value.svg",
             prefix + "pca.variable_principle_components_association.adj_pvalue.svg"]
+        not_outputs = [
+            prefix + "isomap.svg",
+            prefix + "locallylinearembedding.svg",
+            prefix + "spectralembedding.svg"]
         analysis.unsupervised_analysis(samples=analysis.samples[:2])
         for output in outputs2:
             assert os.path.exists(output)

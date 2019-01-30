@@ -78,7 +78,7 @@ class Analysis(object):
         self.root_dir = os.path.abspath(self.root_dir)
 
         # # if given absolute paths, keep them, otherwise append to root directory
-        for dir_, attr in [(data_dir, 'data_dir'), (results_dir, 'results_dir')]:
+        for dir_, attr in [(data_dir, "data_dir"), (results_dir, "results_dir")]:
             if not os.path.isabs(dir_):
                 setattr(self, attr, os.path.join(self.root_dir, dir_))
             else:
@@ -155,7 +155,7 @@ class Analysis(object):
         :param str data_type:
             Data type to check.
         """
-        supported = _CONFIG['supported_data_types']
+        supported = _CONFIG["supported_data_types"]
         return data_type in supported
 
     def _get_data_type(self, data_type=None):
@@ -189,6 +189,14 @@ class Analysis(object):
         return data_type
 
     def _check_samples_have_file(self, attr, f=all):
+        """
+        Checks that there are existing files for an attribute of the analysis samples.
+        This requires a reducing function such as 'all' or 'any' to evaluate how to
+        return a value across all samples.
+
+        :param str attr: An attribute of the analysis' samples to check existence of files.
+        :returns bool: Bool
+        """
         return f([os.path.exists(str(getattr(sample, attr))) for sample in self.samples])
 
     def _get_samples_have_file(self, attr):
@@ -196,6 +204,26 @@ class Analysis(object):
 
     def _get_samples_missing_file(self, attr):
         return [sample for sample in self.samples if not os.path.exists(str(getattr(sample, attr)))]
+
+    @staticmethod
+    def _format_string_with_environment_variables(string):
+        """
+        Given a string, containing curly braces, format it with the attributes from self.
+
+        Attributes:
+
+        :param str string:
+            String to format.
+        """
+        to_format = pd.Series(string).str.extractall(r"\${(.*?)}")[0].values
+        attrs = os.environ
+        if not all([x in attrs for x in to_format]):
+            msg = "Not all required patterns were found in the environment variables."
+            _LOGGER.error(msg)
+            raise ValueError(msg)
+        for attr in to_format:
+            string = string.replace("${" + attr + "}", "{" + attr + "}")
+        return string.format(**attrs)
 
     def _format_string_with_attributes(self, string):
         """
@@ -216,17 +244,21 @@ class Analysis(object):
 
     def update(self, pickle_file=None):
         """
-        Update all of the object's attributes with the attributes from a serialized
+        Update all of the object"s attributes with the attributes from a serialized
         object (i.e. object stored in a file) object.
 
         Attributes:
 
         :param str,optional pickle_file:
-            Pickle file to load. By default this is the object's attribute `pickle_file`.
+            Pickle file to load. By default this is the object"s attribute `pickle_file`.
         """
         self.__dict__.update(self.from_pickle(pickle_file=pickle_file).__dict__)
 
     def set_organism_genome(self):
+        """
+        Attempt to derive the analysis' organism and genome assembly
+        by inspecting the same attributes of its samples.
+        """
         if self.samples is None:
             _LOGGER.warning("Genome assembly for analysis was not set and cannot be derived from samples.")
         else:
@@ -293,7 +325,7 @@ class Analysis(object):
         """
         Add input file values to sample objects dependent on data type.
         These are specified in the `ngs_toolkit` configuration file
-        under 'sample_input_files:<data type>:<attribute>'.
+        under "sample_input_files:<data type>:<attribute>".
 
         Attributes:
 
@@ -308,9 +340,9 @@ class Analysis(object):
             return
 
         msg = "Setting '{}' in sample {} as '{}'."
-        for data_type in _CONFIG['sample_input_files']:
+        for data_type in _CONFIG["sample_input_files"]:
             for sample in [s for s in self.samples if s.protocol == data_type]:
-                for attr, value in _CONFIG['sample_input_files'][data_type].items():
+                for attr, value in _CONFIG["sample_input_files"][data_type].items():
                     if value is None:
                         pass
                     elif ("{data_dir}" in value) and ("{sample_name}" in value):
@@ -347,11 +379,11 @@ class Analysis(object):
         if timestamp:
             import time
             import datetime
-            ts = datetime.datetime.fromtimestamp(time.time()).strftime('%Y%m%d-%H%M%S')
+            ts = datetime.datetime.fromtimestamp(time.time()).strftime("%Y%m%d-%H%M%S")
             p = self.pickle_file.replace(".pickle", ".{}.pickle".format(ts))
         else:
             p = self.pickle_file
-        pickle.dump(self, open(p, 'wb'), protocol=pickle.HIGHEST_PROTOCOL)
+        pickle.dump(self, open(p, "wb"), protocol=pickle.HIGHEST_PROTOCOL)
 
     def from_pickle(self, pickle_file=None):
         """
@@ -359,47 +391,55 @@ class Analysis(object):
 
         :param str,optional pickle_file:
             Pickle file to load.
-            By default this is the object's attribute `pickle_file`.
+            By default this is the object"s attribute `pickle_file`.
         """
         import pickle
         if pickle_file is None:
             pickle_file = self.pickle_file
-        return pickle.load(open(pickle_file, 'rb'))
+        return pickle.load(open(pickle_file, "rb"))
 
     @check_organism_genome
     def get_annotations(
             self,
             organism=None, genome_assembly=None, output_dir=None,
-            steps=['blacklist', 'tss', 'genomic_context']):
+            steps=["blacklist", "tss", "genomic_context"], overwrite=False):
         """
         Get genome annotations and other resources for several ngs_toolkit analysis.
 
         Attributes:
 
         :param str,optional organism:
-            Organism to get for. Currently supported are 'human' and 'mouse'.
+            Organism to get for. Currently supported are "human" and "mouse".
             Defaults to analysis' own organism.
 
         :param str,optional genome_assembly:
             Genome assembly to get for.
-            Currently supported are 'hg19', 'hg38' and 'mm10'.
+            Currently supported are "hg19", "hg38" and "mm10".
             Defaults to analysis' own genome assembly.
 
         :param str,optional output_dir:
             Directory to save results to.
-            Defaults to 'reference' in analysis root directory.
+            Defaults to the value of "preferences:root_reference_dir" in the configuration,
+            if that is not set, to a directory called "reference" in the analysis root directory.
 
         :param list,optional steps:
             What kind of annotations to get.
             Options are:
-                 - 'fasta': Genome sequence in FASTA format
-                 - 'blacklist': Locations of blacklisted regions for genome
-                 - 'tss': Locations of gene's TSSs
-                 - 'genomic_context': Genomic context of genome
-            Defaults to ['blacklist', 'tss', 'genomic_context']
+                 - "genome": Genome sequence (2bit format)
+                 - "blacklist": Locations of blacklisted regions for genome
+                 - "tss": Locations of gene"s TSSs
+                 - "genomic_context": Genomic context of genome
+            Defaults to ["blacklist", "tss", "genomic_context"]
+
+        :param bool,optional overwrite:
+            Whether existing files should be overwritten by new ones.
+            Otherwise they will be kept and no action is made.
+            Defaults to False.
 
         :returns dict:
             Dictionary with keys same as the options as steps, containing paths to the requested files.
+            The values of the 'genome' step are also a dictionary with keys "2bit" and "fasta" for
+            each file type respectively.
         """
         from ngs_toolkit.general import (
             get_genome_reference,
@@ -412,26 +452,34 @@ class Analysis(object):
         if genome_assembly is None:
             genome_assembly = self.genome
         if output_dir is None:
-            output_dir = os.path.join(self.root_dir, "reference")
+            output_dir = self._format_string_with_environment_variables(
+                _CONFIG['preferences']['root_reference_dir'])
+            if output_dir is None:
+                output_dir = os.path.join(self.root_dir, "reference")
 
-        args = {'organism': organism,
-                'genome_assembly': genome_assembly,
-                'output_dir': output_dir}
+        args = {"organism": organism,
+                "genome_assembly": genome_assembly,
+                "output_dir": output_dir,
+                "overwrite": overwrite}
         mapping = {"hg19": "grch37", "hg38": "grch38", "mm10": "grcm38"}
         output = dict()
 
-        if 'fasta' in steps:
-            output['fasta_file'] = get_genome_reference(**args)
-        if 'blacklist' in steps:
-            output['blacklist_file'] = get_blacklist_annotations(**args)
-        if 'tss' in steps:
+        if "genome" in steps:
+            output["genome_file"] = dict()
+            output["genome_file"]["2bit"] = get_genome_reference(**args)
+            fasta = output["genome_file"]["2bit"].replace(".2bit", ".fa")
+            if os.path.exists(fasta):
+                output["genome_file"]["fasta"] = fasta
+        if "blacklist" in steps:
+            output["blacklist_file"] = get_blacklist_annotations(**args)
+        if "tss" in steps:
             get_tss_annotations(**args)
-            output['tss_file'] = os.path.join(
+            output["tss_file"] = os.path.join(
                 output_dir, "{}.{}.gene_annotation.protein_coding.tss.bed"
                 .format(self.organism, mapping[self.genome]))
-        if 'genomic_context' in steps:
+        if "genomic_context" in steps:
             get_genomic_context(**args)
-            output['genomic_context_file'] = os.path.join(
+            output["genomic_context_file"] = os.path.join(
                 output_dir, "{}.{}.genomic_context.bed"
                 .format(self.organism, mapping[self.genome]))
 
@@ -495,11 +543,11 @@ class Analysis(object):
 
         :param list attributes:
             Desired attributes to be annotated.
-            Defaults to all attributes in the original sample annotation sheet of the analysis' Project.
+            Defaults to all attributes in the original sample annotation sheet of the analysis" Project.
 
         :param list numerical_attributes:
             Attributes which are numeric even though they
-            might be so in the samples' attributes. Will attempt
+            might be so in the samples" attributes. Will attempt
             to convert values to numeric.
 
         :param bool save:
@@ -513,7 +561,7 @@ class Analysis(object):
              - ``expression`` if ``data_type`` is "RNA-seq.
 
         :var pd.DataFrame {accessibility,binding,expression}:
-            A pandas DataFrame with  MultiIndex column index containing the sample's attributes specified.
+            A pandas DataFrame with  MultiIndex column index containing the sample"s attributes specified.
 
         :returns pd.DataFrame: Annotated dataframe with requested sample attributes.
         """
@@ -601,11 +649,11 @@ class Analysis(object):
     def get_level_colors(
             self, index=None, matrix=None, levels=None,
             pallete="tab20", cmap="RdBu_r", nan_color=(0.662745, 0.662745, 0.662745, 1.0),
-            # TODO: implement dataframe return
+            # TODO: test dataframe return
             as_dataframe=False):
         """
         Get tuples of floats representing a colour for a sample in a given variable in a
-        dataframe's index (particularly useful with MultiIndex dataframes).
+        dataframe"s index (particularly useful with MultiIndex dataframes).
 
         If given, will use the provieded ``index`` argument, otherwise, the the columns
         and its levels of an attribute of self named ``matrix``.
@@ -720,14 +768,14 @@ class Analysis(object):
 
     def unsupervised_analysis(
             self,
-            steps=['correlation', 'manifold', 'pca', 'pca_association'],
+            steps=["correlation", "manifold", "pca", "pca_association"],
             data_type=None,
             quant_matrix=None,
             samples=None,
             attributes_to_plot=None,
             plot_prefix=None,
             standardize_matrix=False,
-            manifold_algorithms=['MDS', "Isomap", "LocallyLinearEmbedding", "SpectralEmbedding", "TSNE"],
+            manifold_algorithms=["MDS", "Isomap", "LocallyLinearEmbedding", "SpectralEmbedding", "TSNE"],
             display_corr_values=False,
             plot_max_pcs=8,
             prettier_sample_names=True,
@@ -944,9 +992,9 @@ class Analysis(object):
         #         .str.replace("RNA-seq_", "")
         #         .str.replace("ChIP-seq_", ""))
 
-        if 'correlation' in steps:
+        if "correlation" in steps:
             # Pairwise correlations
-            for method in ['pearson', 'spearman']:
+            for method in ["pearson", "spearman"]:
                 _LOGGER.info("Plotting pairwise correlation with '{}' metric.".format(method))
                 g = sns.clustermap(
                     X.astype(float).corr(method),
@@ -954,23 +1002,23 @@ class Analysis(object):
                     cmap="Spectral_r", figsize=(0.2 * X.shape[1], 0.2 * X.shape[1]),
                     cbar_kws={"label": "{} correlation".format(method.capitalize())},
                     row_colors=color_dataframe.T, col_colors=color_dataframe.T)
-                g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize='xx-small')
+                g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small")
                 g.ax_heatmap.set_xlabel(None, visible=False)
                 g.ax_heatmap.set_ylabel(None, visible=False)
                 g.fig.savefig(os.path.join(
                     output_dir, "{}.{}.{}_correlation.clustermap.svg"
-                    .format(self.name, plot_prefix, method)), bbox_inches='tight', dpi=dpi)
+                    .format(self.name, plot_prefix, method)), bbox_inches="tight", dpi=dpi)
 
-        if 'manifold' in steps:
+        if "manifold" in steps:
             # Manifolds
             # TODO: test usage of non default manifolds from sklearn
             params = defaultdict(dict)
             params.update({
-                "MDS": {'n_jobs': -1},
-                "Isomap": {'n_jobs': -1},
+                "MDS": {"n_jobs": -1},
+                "Isomap": {"n_jobs": -1},
                 "LocallyLinearEmbedding": {},
-                "SpectralEmbedding": {'n_jobs': -1},
-                "TSNE": {'init': 'pca'},
+                "SpectralEmbedding": {"n_jobs": -1},
+                "TSNE": {"init": "pca"},
             })
             for algo in manifold_algorithms:
                 msg = "Learning manifold with '{}' algorithm".format(algo)
@@ -994,7 +1042,7 @@ class Analysis(object):
                         .format(self.name, plot_prefix, algo.lower())),
                     attributes_to_plot=attributes_to_plot, **kwargs)
 
-        if 'pca' in steps:
+        if "pca" in steps:
             # PCA
             pcs = min(*X.shape) - 1
             _LOGGER.info("Decomposing data with 'PCA' algorithm for {} dimensions.".format(pcs))
@@ -1016,7 +1064,7 @@ class Analysis(object):
                 pca.explained_variance_ratio_ * 100,
                 name="percent_variance", index=pcs_order
                 ).to_frame()
-            variance['log_variance'] = np.log10(pca.explained_variance_)
+            variance["log_variance"] = np.log10(pca.explained_variance_)
             variance.index.name = "PC"
             variance.to_csv(
                 os.path.join(output_dir, "{}.{}.pca.explained_variance.csv".format(
@@ -1025,13 +1073,13 @@ class Analysis(object):
             # plot % explained variance per PC
             _LOGGER.info("Plotting variance explained with PCA.")
             fig, axis = plt.subplots(1, 3, figsize=(4 * 3, 4))
-            axis[0].plot(variance.index, variance['percent_variance'], 'o-')
-            axis[0].set_ylim((0, variance['percent_variance'].max() + variance['percent_variance'].max() * 0.1))
-            axis[1].plot(variance.index, variance['log_variance'], 'o-')
-            axis[2].plot(variance.index, variance['percent_variance'].cumsum(), 'o-')
+            axis[0].plot(variance.index, variance["percent_variance"], "o-")
+            axis[0].set_ylim((0, variance["percent_variance"].max() + variance["percent_variance"].max() * 0.1))
+            axis[1].plot(variance.index, variance["log_variance"], "o-")
+            axis[2].plot(variance.index, variance["percent_variance"].cumsum(), "o-")
             axis[2].set_ylim((0, 100))
             for ax in axis:
-                ax.axvline(len(attributes_to_plot), linestyle='--')
+                ax.axvline(len(attributes_to_plot), linestyle="--")
                 ax.set_xlabel("PC")
             axis[0].set_ylabel("% variance")
             axis[1].set_ylabel("log variance")
@@ -1039,7 +1087,7 @@ class Analysis(object):
             sns.despine(fig)
             fig.savefig(os.path.join(
                 output_dir, "{}.{}.pca.explained_variance.svg"
-                            .format(self.name, plot_prefix)), bbox_inches='tight', dpi=dpi)
+                            .format(self.name, plot_prefix)), bbox_inches="tight", dpi=dpi)
 
             # plot pca
             pcs = min(x_new.shape[1] - 1, plot_max_pcs)
@@ -1050,7 +1098,7 @@ class Analysis(object):
                                          self.name, plot_prefix)),
                 attributes_to_plot=attributes_to_plot, **kwargs)
 
-        if ('pca' in steps) and ('pca_association' in steps):
+        if ("pca" in steps) and ("pca_association" in steps):
             # Test association of PCs with attributes
             _LOGGER.info("Computing association of given attributes with principal components.")
             associations = list()
@@ -1104,7 +1152,7 @@ class Analysis(object):
                 return
 
             # correct p-values
-            associations.loc[:, 'adj_pvalue'] = multipletests(associations['p_value'], method="fdr_bh")[1]
+            associations.loc[:, "adj_pvalue"] = multipletests(associations["p_value"], method="fdr_bh")[1]
 
             # write
             _LOGGER.info("Saving associations.")
@@ -1117,7 +1165,7 @@ class Analysis(object):
                 return
 
             # Plot
-            for var in ['p_value', 'adj_pvalue']:
+            for var in ["p_value", "adj_pvalue"]:
                 pivot = (
                     associations
                     .groupby(["pc", "attribute"])
@@ -1165,8 +1213,8 @@ class Analysis(object):
         This implies the rpy2 library and the respective R library are installed.
 
         Requires the R package "DESeq2" to be installed:
-            >>> source('http://bioconductor.org/biocLite.R')
-            >>> biocLite('DESeq2')
+            >>> source("http://bioconductor.org/biocLite.R")
+            >>> biocLite("DESeq2")
 
         For other implementations of differential analysis see `ngs_toolkit.general.least_squares_fit`
         and `ngs_toolkit.general.differential_from_bivariate_fit`.
@@ -1174,12 +1222,12 @@ class Analysis(object):
         Attributes:
 
         :param pandas.DataFrame comparison_table:
-            A dataframe with 'comparison_name', 'comparison_side' and 'sample_name', 'sample_group' columns.
-            Defaults to the analysis's own 'comparison_table' attribute.
+            A dataframe with "comparison_name", "comparison_side" and "sample_name", "sample_group" columns.
+            Defaults to the analysis' own "comparison_table" attribute.
 
         :param str,optional data_type:
             Type of data under analysis. One of "ATAC-seq" or "RNA-seq".
-            Defaults to Analysis' own data_type.
+            Defaults to analysis' own data_type.
 
         :param list,optional samples:
             Samples to limit analysis to.
@@ -1241,23 +1289,23 @@ class Analysis(object):
 
         # Check comparisons
         # check comparison table has required columns
-        req_attrs = ['comparison_name', 'comparison_side', 'sample_name', 'sample_group']
+        req_attrs = ["comparison_name", "comparison_side", "sample_name", "sample_group"]
         if not all([x in comparison_table.columns for x in req_attrs]):
             raise AssertionError("Given comparison table does not have all of '{}' columns."
-                                 .format("', '".join(req_attrs)))
+                                 .format("", "".join(req_attrs)))
         # check all comparisons have samples in two sides
         if not all(comparison_table.groupby("comparison_name")["comparison_side"].nunique() == 2):
             msg = "All comparisons must have samples in each side of the comparison."
             raise AssertionError(msg)
         # check if any comparison and sample group has samples disagreeing in their side
-        if not all(comparison_table.groupby(['comparison_name', "sample_group"])['comparison_side'].nunique() == 1):
+        if not all(comparison_table.groupby(["comparison_name", "sample_group"])["comparison_side"].nunique() == 1):
             msg = "Samples in same comparison and group must agree on their side of the comparison."
             raise AssertionError(msg)
 
         # Handle samples under self
         if samples is None:
             samples = self.samples
-        samples = [s for s in samples if s.name in comparison_table['sample_name'].tolist()]
+        samples = [s for s in samples if s.name in comparison_table["sample_name"].tolist()]
 
         # Make output dir
         output_dir = self._format_string_with_attributes(output_dir)
@@ -1276,7 +1324,7 @@ class Analysis(object):
         if samples is None:
             samples = self.samples
         samples = [s for s in samples if
-                   (s.name in comparison_table['sample_name'].tolist()) &
+                   (s.name in comparison_table["sample_name"].tolist()) &
                    (s.name in count_matrix.columns)]
         count_matrix = count_matrix[[s.name for s in samples]]
 
@@ -1321,19 +1369,19 @@ class Analysis(object):
             from pypiper.ngstk import NGSTk
             import textwrap
             tk = NGSTk()
-            for comparison_name in comparison_table['comparison_name'].drop_duplicates():
+            for comparison_name in comparison_table["comparison_name"].drop_duplicates():
                 # make directory for comparison input/output
                 out = os.path.join(os.path.abspath(output_dir), comparison_name)
                 if not os.path.exists(out):
                     os.makedirs(out)
 
-                comp = comparison_table[comparison_table['comparison_name'] == comparison_name]
+                comp = comparison_table[comparison_table["comparison_name"] == comparison_name]
                 comp.to_csv(os.path.join(out, "comparison_table.csv"), index=False)
 
-                exp = experiment_matrix[experiment_matrix['sample_name'].isin(comp['sample_name'].tolist())]
+                exp = experiment_matrix[experiment_matrix["sample_name"].isin(comp["sample_name"].tolist())]
                 exp.to_csv(os.path.join(out, "experiment_matrix.csv"), index=False)
 
-                count = count_matrix[comp['sample_name'].drop_duplicates()]
+                count = count_matrix[comp["sample_name"].drop_duplicates()]
                 count.to_csv(os.path.join(out, "count_matrix.csv"), index=True)
 
                 job_name = "deseq_job.{}".format(comparison_name)
@@ -1374,12 +1422,12 @@ class Analysis(object):
         Attributes:
 
         :param pandas.DataFrame comparison_table:
-            A dataframe with 'comparison_name', 'comparison_side' and 'sample_name', 'sample_group' columns.
-            Defaults to the analysis's own 'comparison_table' attribute.
+            A dataframe with "comparison_name", "comparison_side" and "sample_name", "sample_group" columns.
+            Defaults to the analysis's own "comparison_table" attribute.
 
         :param str,optional data_type:
             Type of data under analysis. One of "ATAC-seq" or "RNA-seq".
-            Defaults to Analysis' own data_type.
+            Defaults to analysis' own data_type.
 
         :param str,optional output_dir:
             Output directory for analysis.
@@ -1698,7 +1746,7 @@ class Analysis(object):
                 _LOGGER.info(hint)
 
         if only_comparison_samples and comparison_table is not None:
-            samples = [s for s in samples if s.name in comparison_table['sample_name'].tolist()]
+            samples = [s for s in samples if s.name in comparison_table["sample_name"].tolist()]
         matrix = matrix[[s.name for s in samples]]
 
         # Handle group colouring
@@ -1738,9 +1786,9 @@ class Analysis(object):
                 results.loc[(results[comparison_column] == comparison) & results.index.isin(i), "diff_rank"] = True
             results.loc[:, "diff_rank"] = results.loc[:, "diff_rank"].fillna(False)
             if respect_stat_thresholds:
-                results.loc[:, 'diff'] = (results.loc[:, 'diff'] == True) & (results.loc[:, 'diff_rank'] == True)
+                results.loc[:, "diff"] = (results.loc[:, "diff"] == True) & (results.loc[:, "diff_rank"] == True)
             else:
-                results.loc[:, 'diff'] = results.loc[:, 'diff_rank']
+                results.loc[:, "diff"] = results.loc[:, "diff_rank"]
 
         # Annotate direction of change
         results.loc[:, "direction"] = results.loc[
@@ -1789,13 +1837,13 @@ class Analysis(object):
         _LOGGER.info("Calculating number of differential {}s per comparison.".format(var_name))
         n_vars = float(matrix.shape[0])
         total_diff = results.groupby(
-            [comparison_column])['diff'].sum().sort_values(ascending=False).reset_index()
+            [comparison_column])["diff"].sum().sort_values(ascending=False).reset_index()
         split_diff = results.groupby(
-            [comparison_column, "direction"])['diff'].sum().sort_values(ascending=False).reset_index()
-        split_diff.loc[split_diff['direction'] == 'down', "diff"] *= -1
-        split_diff['label'] = split_diff[comparison_column].astype(str) + ", " + split_diff['direction']
-        total_diff['diff_perc'] = (total_diff['diff'] / n_vars) * 100
-        split_diff['diff_perc'] = (split_diff['diff'] / n_vars) * 100
+            [comparison_column, "direction"])["diff"].sum().sort_values(ascending=False).reset_index()
+        split_diff.loc[split_diff["direction"] == "down", "diff"] *= -1
+        split_diff["label"] = split_diff[comparison_column].astype(str) + ", " + split_diff["direction"]
+        total_diff["diff_perc"] = (total_diff["diff"] / n_vars) * 100
+        split_diff["diff_perc"] = (split_diff["diff"] / n_vars) * 100
 
         _LOGGER.info("Plotting number of differential {}s per comparison.".format(var_name))
         fig, axis = plt.subplots(2, 2, figsize=(4 * 2, 4 * 2))
@@ -1811,9 +1859,9 @@ class Analysis(object):
         axis[-1, 1].set_xlabel("Frequency of differential {}s (% of total)".format(var_name))
         for ax in axis[1, :].flatten():
             ax.axvline(0, linestyle="--", color="black", alpha=0.6)
-        m = split_diff['diff'].abs().max()
+        m = split_diff["diff"].abs().max()
         axis[1, 0].set_xlim((-m, m))
-        m = split_diff['diff_perc'].abs().max()
+        m = split_diff["diff_perc"].abs().max()
         axis[1, 1].set_xlim((-m, m))
         sns.despine(fig)
         fig.savefig(
@@ -1844,8 +1892,8 @@ class Analysis(object):
                 for comparison in comparisons:
                     _LOGGER.debug("Comparison '{}'...".format(comparison))
                     c = comparison_table.loc[comparison_table[comparison_column] == comparison, :]
-                    a = c.loc[c['comparison_side'] >= 1, "sample_name"]
-                    b = c.loc[c['comparison_side'] <= 0, "sample_name"]
+                    a = c.loc[c["comparison_side"] >= 1, "sample_name"]
+                    b = c.loc[c["comparison_side"] <= 0, "sample_name"]
 
                     a = matrix.loc[:, [s.name for s in samples if s.name in a.tolist() and s.library == data_type]].mean(axis=1)
                     b = matrix.loc[:, [s.name for s in samples if s.name in b.tolist() and s.library == data_type]].mean(axis=1)
@@ -1855,7 +1903,7 @@ class Analysis(object):
                     ax.hexbin(
                         b, a,
                         alpha=0.85, cmap="Greys", color="black", edgecolors="white",
-                        linewidths=0, bins='log', mincnt=1, rasterized=True)
+                        linewidths=0, bins="log", mincnt=1, rasterized=True)
 
                     # Scatter for significant features
                     diff_vars = results.loc[
@@ -1878,8 +1926,8 @@ class Analysis(object):
                         add_colorbar_to_axis(collection, label="-log10(p-value)")
                     ax.set_title(comparison)
                     # Name groups
-                    xl = c.loc[c['comparison_side'] <= 0, 'sample_group'].drop_duplicates().squeeze()
-                    yl = c.loc[c['comparison_side'] >= 1, 'sample_group'].drop_duplicates().squeeze()
+                    xl = c.loc[c["comparison_side"] <= 0, "sample_group"].drop_duplicates().squeeze()
+                    yl = c.loc[c["comparison_side"] >= 1, "sample_group"].drop_duplicates().squeeze()
                     if not (isinstance(xl, str) and isinstance(yl, str)):
                         xl = "Down-regulated"
                         yl = "Up-regulated"
@@ -1892,8 +1940,8 @@ class Analysis(object):
                         np.max([ax.get_xlim(), ax.get_ylim()])]
                     ax.plot(
                         lims, lims,
-                        linestyle='--', alpha=0.5, zorder=0, color="black")
-                    ax.set_aspect('equal')
+                        linestyle="--", alpha=0.5, zorder=0, color="black")
+                    ax.set_aspect("equal")
                     ax.set_xlim(lims)
                     ax.set_ylim(lims)
                 for ax in axes:
@@ -1919,7 +1967,7 @@ class Analysis(object):
                 ax.hexbin(
                     t[log_fold_change_column], -np.log10(t[p_value_column]),
                     alpha=0.85, cmap="Greys", color="black", edgecolors="white",
-                    linewidths=0, bins='log', mincnt=1, rasterized=True)
+                    linewidths=0, bins="log", mincnt=1, rasterized=True)
 
                 # Scatter for significant
                 diff_vars = t.loc[t["diff"] == True, :]
@@ -1933,17 +1981,17 @@ class Analysis(object):
                 ax.set_title(comparison)
                 ax.set_xlabel("log2(fold-change)")
                 ax.set_ylabel("-log10(p-value)")
-                ax.axvline(0, linestyle='--', alpha=0.5, zorder=0, color="black")
+                ax.axvline(0, linestyle="--", alpha=0.5, zorder=0, color="black")
                 ll = np.max([abs(ii) for ii in ax.get_xlim()])
                 ax.set_xlim(-ll, ll)
 
                 # Add lines of significance
                 ax.axhline(
                     -np.log10(t.loc[t["diff"] == True, p_value_column].max()),
-                    linestyle='--', alpha=0.5, zorder=0, color="black")
+                    linestyle="--", alpha=0.5, zorder=0, color="black")
                 if fold_change is not None:
-                    ax.axvline(-fold_change, linestyle='--', alpha=0.5, zorder=0, color="black")
-                    ax.axvline(fold_change, linestyle='--', alpha=0.5, zorder=0, color="black")
+                    ax.axvline(-fold_change, linestyle="--", alpha=0.5, zorder=0, color="black")
+                    ax.axvline(fold_change, linestyle="--", alpha=0.5, zorder=0, color="black")
             for ax in axes:
                 ax.set_visible(False)
             sns.despine(fig)
@@ -1967,7 +2015,7 @@ class Analysis(object):
                 ax.hexbin(
                     np.log10(t[mean_column]), t[log_fold_change_column],
                     alpha=0.85, cmap="Greys", color="black", edgecolors="white",
-                    linewidths=0, bins='log', mincnt=1, rasterized=True)
+                    linewidths=0, bins="log", mincnt=1, rasterized=True)
 
                 # Scatter for significant
                 diff_vars = t.loc[t["diff"] == True, :]
@@ -1981,14 +2029,14 @@ class Analysis(object):
                 ax.set_title(comparison)
                 ax.set_xlabel("Mean {}".format(quantity.lower()))
                 ax.set_ylabel("log2(fold-change)")
-                ax.axhline(0, linestyle='--', alpha=0.5, zorder=0, color="black")
+                ax.axhline(0, linestyle="--", alpha=0.5, zorder=0, color="black")
                 ll = np.max([abs(ii) for ii in ax.get_ylim()])
                 ax.set_ylim(-ll, ll)
 
                 # Add lines of significance
                 if fold_change is not None:
-                    ax.axhline(-fold_change, linestyle='--', alpha=0.5, zorder=0, color="black")
-                    ax.axhline(fold_change, linestyle='--', alpha=0.5, zorder=0, color="black")
+                    ax.axhline(-fold_change, linestyle="--", alpha=0.5, zorder=0, color="black")
+                    ax.axhline(fold_change, linestyle="--", alpha=0.5, zorder=0, color="black")
             for ax in axes:
                 ax.set_visible(False)
             sns.despine(fig)
@@ -2282,10 +2330,10 @@ class Analysis(object):
         differential.loc[:, "intersect"] = 1
         piv = pd.pivot_table(
             differential.reset_index(),
-            index='index', columns=['comparison_name', 'direction'], values='intersect', fill_value=0)
+            index="index", columns=["comparison_name", "direction"], values="intersect", fill_value=0)
 
         intersections = pd.DataFrame(columns=["group1", "group2", "dir1", "dir2", "size1", "size2", "intersection", "union"])
-        perms = list(itertools.permutations(piv.T.groupby(level=['comparison_name', 'direction']).groups.items(), 2))
+        perms = list(itertools.permutations(piv.T.groupby(level=["comparison_name", "direction"]).groups.items(), 2))
         for ((k1, dir1), i1), ((k2, dir2), i2) in tqdm(perms, total=len(perms), desc="Permutations"):
             i1 = set(piv[i1][piv[i1] == 1].dropna().index)
             i2 = set(piv[i2][piv[i2] == 1].dropna().index)
@@ -2297,29 +2345,29 @@ class Analysis(object):
                 ignore_index=True
             )
         # convert to %
-        intersections.loc[:, 'intersection'] = intersections['intersection'].astype(float)
-        intersections.loc[:, 'perc_1'] = intersections['intersection'] / intersections['size1'] * 100.
-        intersections.loc[:, 'perc_2'] = intersections['intersection'] / intersections['size2'] * 100.
-        intersections.loc[:, 'intersection_max_perc'] = intersections[['perc_1', 'perc_2']].max(axis=1)
+        intersections.loc[:, "intersection"] = intersections["intersection"].astype(float)
+        intersections.loc[:, "perc_1"] = intersections["intersection"] / intersections["size1"] * 100.
+        intersections.loc[:, "perc_2"] = intersections["intersection"] / intersections["size2"] * 100.
+        intersections.loc[:, "intersection_max_perc"] = intersections[["perc_1", "perc_2"]].max(axis=1)
 
-        # calculate p-value from Fisher's exact test
-        intersections.loc[:, 'a'] = total - intersections[['size1', 'size2', 'intersection']].sum(axis=1)
-        intersections.loc[:, 'b'] = intersections['size1'] - intersections['intersection']
-        intersections.loc[:, 'c'] = intersections['size2'] - intersections['intersection']
-        intersections.loc[:, 'd'] = intersections['intersection']
+        # calculate p-value from Fisher"s exact test
+        intersections.loc[:, "a"] = total - intersections[["size1", "size2", "intersection"]].sum(axis=1)
+        intersections.loc[:, "b"] = intersections["size1"] - intersections["intersection"]
+        intersections.loc[:, "c"] = intersections["size2"] - intersections["intersection"]
+        intersections.loc[:, "d"] = intersections["intersection"]
 
-        for i, row in intersections[['d', 'b', 'c', 'a']].astype(int).iterrows():
+        for i, row in intersections[["d", "b", "c", "a"]].astype(int).iterrows():
             odds, p = fisher_exact(
                 row
                 .values
                 .reshape((2, 2)),
                 alternative="greater")
-            intersections.loc[i, 'odds_ratio'] = odds
-            intersections.loc[i, 'p_value'] = p
-        # intersections['q_value'] = intersections['p_value'] * intersections.shape[0]
-        intersections.loc[:, 'q_value'] = multipletests(intersections['p_value'])[1]
-        intersections.loc[:, 'log_p_value'] = log_pvalues(intersections['p_value'])
-        intersections.loc[:, 'log_q_value'] = log_pvalues(intersections['q_value'])
+            intersections.loc[i, "odds_ratio"] = odds
+            intersections.loc[i, "p_value"] = p
+        # intersections["q_value"] = intersections["p_value"] * intersections.shape[0]
+        intersections.loc[:, "q_value"] = multipletests(intersections["p_value"])[1]
+        intersections.loc[:, "log_p_value"] = log_pvalues(intersections["p_value"])
+        intersections.loc[:, "log_q_value"] = log_pvalues(intersections["q_value"])
 
         # save
         intersections.to_csv(os.path.join(output_dir, output_prefix + ".differential_overlap.csv"), index=False)
@@ -2332,10 +2380,10 @@ class Analysis(object):
             _LOGGER.info(metric)
             # make pivot tables
             piv_up = pd.pivot_table(
-                intersections[(intersections['dir1'] == "up") & (intersections['dir2'] == "up")],
+                intersections[(intersections["dir1"] == "up") & (intersections["dir2"] == "up")],
                 index="group1", columns="group2", values=metric).fillna(fill_value)
             piv_down = pd.pivot_table(
-                intersections[(intersections['dir1'] == "down") & (intersections['dir2'] == "down")],
+                intersections[(intersections["dir1"] == "down") & (intersections["dir2"] == "down")],
                 index="group1", columns="group2", values=metric).fillna(fill_value)
             if metric == "intersection":
                 piv_up = np.log10(1 + piv_up)
@@ -2348,7 +2396,7 @@ class Analysis(object):
                 extra = {"vmin": 0, "vmax": 100}
             else:
                 extra = {}
-            fig, axis = plt.subplots(1, 2, figsize=(8 * 2, 8), subplot_kw={"aspect": 'equal'})
+            fig, axis = plt.subplots(1, 2, figsize=(8 * 2, 8), subplot_kw={"aspect": "equal"})
             sns.heatmap(
                 piv_down,
                 square=True, cmap="Blues",
@@ -2398,25 +2446,25 @@ class Analysis(object):
             if metric == "log_pvalue":
                 r = pd.melt(
                     piv_combined.reset_index(),
-                    id_vars=['group1'], var_name="group2", value_name="agreement")
-                r = r.dropna().sort_values('agreement')
+                    id_vars=["group1"], var_name="group2", value_name="agreement")
+                r = r.dropna().sort_values("agreement")
                 r = r.iloc[range(0, r.shape[0], 2)]
-                r['rank'] = r['agreement'].rank(ascending=False)
+                r["rank"] = r["agreement"].rank(ascending=False)
 
                 fig, axis = plt.subplots(1, 3, figsize=(3 * 4, 4))
-                axis[0].scatter(r['rank'], r['agreement'])
+                axis[0].scatter(r["rank"], r["agreement"])
                 axis[0].axhline(0, linestyle="--", color="black")
-                axis[1].scatter(r['rank'].tail(10), r['agreement'].tail(10))
-                axis[2].scatter(r['rank'].head(10), r['agreement'].head(10))
+                axis[1].scatter(r["rank"].tail(10), r["agreement"].tail(10))
+                axis[2].scatter(r["rank"].head(10), r["agreement"].head(10))
                 for i, row in r.tail(10).iterrows():
                     axis[1].text(
-                        row['rank'], row['agreement'],
-                        s=row['group1'] + "\n" + row['group2'],
+                        row["rank"], row["agreement"],
+                        s=row["group1"] + "\n" + row["group2"],
                         fontsize=5)
                 for i, row in r.head(10).iterrows():
                     axis[2].text(
-                        row['rank'], row['agreement'],
-                        s=row['group1'] + "\n" + row['group2'],
+                        row["rank"], row["agreement"],
+                        s=row["group1"] + "\n" + row["group2"],
                         fontsize=5)
                 for ax in axis:
                     ax.set_ylabel("Agreement (-log(p-value))")
@@ -2429,10 +2477,10 @@ class Analysis(object):
             # Observe disagreement
             # (overlap of down-regulated with up-regulated and vice-versa)
             piv_up = pd.pivot_table(
-                intersections[(intersections['dir1'] == "up") & (intersections['dir2'] == "down")],
+                intersections[(intersections["dir1"] == "up") & (intersections["dir2"] == "down")],
                 index="group1", columns="group2", values=metric)
             piv_down = pd.pivot_table(
-                intersections[(intersections['dir1'] == "down") & (intersections['dir2'] == "up")],
+                intersections[(intersections["dir1"] == "down") & (intersections["dir2"] == "up")],
                 index="group1", columns="group2", values=metric)
 
             piv_disagree = pd.concat([piv_up, piv_down]).groupby(level=0).max()
@@ -2440,7 +2488,7 @@ class Analysis(object):
                 piv_disagree = np.log10(1 + piv_disagree)
             np.fill_diagonal(piv_disagree.values, np.nan)
 
-            fig, axis = plt.subplots(1, 2, figsize=(16, 8), subplot_kw={"aspect": 'equal'})
+            fig, axis = plt.subplots(1, 2, figsize=(16, 8), subplot_kw={"aspect": "equal"})
             sns.heatmap(
                 piv_disagree, square=True, cmap="Greens",
                 cbar_kws={"label": "Discordant {}s ({})".format(unit, description)}, ax=axis[0])
@@ -2466,18 +2514,18 @@ class Analysis(object):
             if metric == "log_pvalue":
                 r = pd.melt(
                     piv_disagree.reset_index(),
-                    id_vars=['group1'], var_name="group2", value_name="disagreement")
-                r = r.dropna().sort_values('disagreement')
+                    id_vars=["group1"], var_name="group2", value_name="disagreement")
+                r = r.dropna().sort_values("disagreement")
                 r = r.iloc[range(0, r.shape[0], 2)]
-                r['rank'] = r['disagreement'].rank(ascending=False)
+                r["rank"] = r["disagreement"].rank(ascending=False)
 
-                fig, axis = plt.subplots(1, 2, figsize=(2 * 4, 4), subplot_kw={"aspect": 'equal'})
-                axis[0].scatter(r['rank'], r['disagreement'])
-                axis[1].scatter(r['rank'].tail(10), r['disagreement'].tail(10))
+                fig, axis = plt.subplots(1, 2, figsize=(2 * 4, 4), subplot_kw={"aspect": "equal"})
+                axis[0].scatter(r["rank"], r["disagreement"])
+                axis[1].scatter(r["rank"].tail(10), r["disagreement"].tail(10))
                 for i, row in r.tail(10).iterrows():
                     axis[1].text(
-                        row['rank'], row['disagreement'],
-                        s=row['group1'] + "\n" + row['group2'],
+                        row["rank"], row["disagreement"],
+                        s=row["group1"] + "\n" + row["group2"],
                         fontsize=5)
                 for ax in axis:
                     ax.set_ylabel("Disagreement (-log(p-value))")
@@ -2496,7 +2544,7 @@ class Analysis(object):
             output_dir="{results_dir}/differential_analysis_{data_type}/enrichments",
             output_prefix="differential_analysis",
             genome=None,
-            steps=['region', 'lola', 'meme', 'homer', 'enrichr'],
+            steps=["region", "lola", "meme", "homer", "enrichr"],
             directional=True,
             max_diff=1000,
             sort_var="pvalue",
@@ -2531,7 +2579,7 @@ class Analysis(object):
 
         :param list,optional steps:
             Steps of the analysis to perform.
-            Defaults to ['region', lola', 'meme', 'homer', 'enrichr'].
+            Defaults to ["region", lola", "meme", "homer", "enrichr"].
 
         :param bool,optional directional:
             Whether enrichments should be performed in a direction-dependent way
@@ -2599,7 +2647,7 @@ class Analysis(object):
             msg = "Differential enrichment is only implemented for data types 'ATAC-seq' and 'RNA-seq'."
             raise ValueError(msg)
 
-        known = ['region', 'lola', 'meme', 'homer', 'enrichr']
+        known = ["region", "lola", "meme", "homer", "enrichr"]
         if not all([x in known for x in steps]):
             _LOGGER.warning("Not all provided steps for enrichment are known! Proceeding anyway.")
 
@@ -2609,7 +2657,7 @@ class Analysis(object):
 
         # Examine each region cluster
         max_diff = max_diff
-        comps = differential['comparison_name'].drop_duplicates()
+        comps = differential["comparison_name"].drop_duplicates()
         for comp in tqdm(comps, total=len(comps), desc="Comparison"):
             if directional:
                 # Separate in up/down-regulated genes
@@ -2664,12 +2712,12 @@ class Analysis(object):
                     _LOGGER.info("Doing genes of comparison '{}', direction '{}'.".format(comp, direction))
                     comparison_df.index.name = "gene_name"
                     # write gene names to file
-                    clean = comparison_df.reset_index()['gene_name'].drop_duplicates().sort_values()
+                    clean = comparison_df.reset_index()["gene_name"].drop_duplicates().sort_values()
                     clean.to_csv(
                         os.path.join(comparison_dir, output_prefix + ".gene_symbols.txt"),
                         header=None, index=False)
 
-                    if 'enrichr' in steps:
+                    if "enrichr" in steps:
                         if serial:
                             if not os.path.exists(os.path.join(comparison_dir, output_prefix + ".enrichr.csv")):
                                 enr = enrichr(comparison_df.reset_index())
@@ -2694,34 +2742,34 @@ class Analysis(object):
                     # collect enrichments
                     if serial:
                         # read/parse, label and append
-                        if 'region' in steps:
+                        if "region" in steps:
                             region = pd.read_csv(os.path.join(comparison_dir, "region_type_enrichment.csv"))
                             region["comparison_name"] = comp
                             region["direction"] = direction
                             region["label"] = "{}.{}".format(comp, direction)
                             region_enr = region_enr.append(region, ignore_index=True)
-                        if 'meme' in steps:
+                        if "meme" in steps:
                             meme_motifs = parse_ame(comparison_dir)
                             meme_motifs["comparison_name"] = comp
                             meme_motifs["direction"] = direction
                             meme_motifs["label"] = "{}.{}".format(comp, direction)
                             meme_enr = meme_enr.append(meme_motifs, ignore_index=True)
-                        if 'homer' in steps:
+                        if "homer" in steps:
                             homer_motifs = parse_homer(os.path.join(comparison_dir, "homerResults"))
                             homer_motifs["comparison_name"] = comp
                             homer_motifs["direction"] = direction
                             homer_motifs["label"] = "{}.{}".format(comp, direction)
                             homer_enr = homer_enr.append(homer_motifs, ignore_index=True)
-                        if 'lola' in steps:
+                        if "lola" in steps:
                             lola = pd.read_csv(os.path.join(comparison_dir, "allEnrichments.tsv"), sep="\t")
                             lola["comparison_name"] = comp
                             lola["direction"] = direction
                             lola["label"] = "{}.{}".format(comp, direction)
                             lola_enr = lola_enr.append(lola, ignore_index=True)
-                        if 'enrichr' in steps:
+                        if "enrichr" in steps:
                             enr = pd.read_csv(
                                 os.path.join(comparison_dir, output_prefix + "_regions.enrichr.csv"),
-                                encoding='utf-8')
+                                encoding="utf-8")
                             enr["comparison_name"] = comp
                             enr["direction"] = direction
                             enr["label"] = "{}.{}".format(comp, direction)
@@ -2731,19 +2779,19 @@ class Analysis(object):
             # write combined enrichments
             _LOGGER.info("Saving combined enrichments for all comparisons.")
             if data_type == "ATAC-seq":
-                if 'region' in steps:
+                if "region" in steps:
                     region_enr.to_csv(
                         os.path.join(output_dir, output_prefix + ".region_type_enrichment.csv"), index=False)
-                if 'meme' in steps:
+                if "meme" in steps:
                     meme_enr.to_csv(
                         os.path.join(output_dir, output_prefix + ".meme_ame.csv"), index=False)
-                if 'homer' in steps:
+                if "homer" in steps:
                     homer_enr.to_csv(
                         os.path.join(output_dir, output_prefix + ".homer_motifs.csv"), index=False)
-                if 'lola' in steps:
+                if "lola" in steps:
                     lola_enr.to_csv(
                         os.path.join(output_dir, output_prefix + ".lola.csv"), index=False)
-            if 'enrichr' in steps:
+            if "enrichr" in steps:
                 pathway_enr.to_csv(
                     os.path.join(output_dir, output_prefix + ".enrichr.csv"), index=False, encoding="utf-8")
         else:
@@ -2762,7 +2810,7 @@ class Analysis(object):
             self,
             differential,
             directional=True,
-            steps=['region', 'lola', 'motif', 'homer', 'homer_consensus', 'enrichr'],
+            steps=["region", "lola", "motif", "homer", "homer_consensus", "enrichr"],
             data_type=None,
             output_dir="{results_dir}/differential_analysis_{data_type}/enrichments",
             input_prefix="differential_analysis",
@@ -2784,7 +2832,7 @@ class Analysis(object):
 
         :param list,optional steps:
             Steps of the enrichment analysis to collect results for.
-            Defaults to ['region', 'lola', 'meme', 'homer', 'enrichr'].
+            Defaults to ["region", "lola", "meme", "homer", "enrichr"].
 
         :param str,optional data_type:
             Data type. One of "ATAC-seq" and "RNA-seq".
@@ -2814,9 +2862,9 @@ class Analysis(object):
             os.makedirs(output_dir)
 
         data_type_steps = {
-            "ATAC-seq": ['region', 'lola', 'motif', 'homer', 'homer_consensus', 'enrichr'],
-            "ChIP-seq": ['region', 'lola', 'motif', 'homer', 'homer_consensus', 'enrichr'],
-            "RNA-seq": ['enrichr']}
+            "ATAC-seq": ["region", "lola", "motif", "homer", "homer_consensus", "enrichr"],
+            "ChIP-seq": ["region", "lola", "motif", "homer", "homer_consensus", "enrichr"],
+            "RNA-seq": ["enrichr"]}
         steps = [s for s in steps if s in data_type_steps[data_type]]
 
         if len(steps) == 0:
@@ -2834,19 +2882,19 @@ class Analysis(object):
         homer_consensus = pd.DataFrame()
         pathway_enr = pd.DataFrame()
         # Examine each region cluster
-        comps = differential['comparison_name'].drop_duplicates()
+        comps = differential["comparison_name"].drop_duplicates()
         for comp in tqdm(comps, total=len(comps), desc="Comparison"):
             if directional:
                 # Separate in up/down-regulated genes
                 params = list()
                 if differential[
-                        (differential['comparison_name'] == comp) &
-                        (differential['log2FoldChange'] > 0)].shape[0] > 0:
-                    params.append('up')
+                        (differential["comparison_name"] == comp) &
+                        (differential["log2FoldChange"] > 0)].shape[0] > 0:
+                    params.append("up")
                 if differential[
-                        (differential['comparison_name'] == comp) &
-                        (differential['log2FoldChange'] < 0)].shape[0] > 0:
-                    params.append('down')
+                        (differential["comparison_name"] == comp) &
+                        (differential["log2FoldChange"] < 0)].shape[0] > 0:
+                    params.append("down")
                 if len(params) == 0:
                     continue
             else:
@@ -2858,22 +2906,22 @@ class Analysis(object):
 
                 # For each data type, if in steps, read in, label and append to respective db.
                 for enr_type, enr_label, file, function, kwargs, db in [
-                        ('region', "Region type enrichment",
+                        ("region", "Region type enrichment",
                             os.path.join(comparison_dir, "region_type_enrichment.csv"),
                             pd.read_csv, {}, region_enr),
-                        ('lola', 'LOLA',
+                        ("lola", "LOLA",
                             os.path.join(comparison_dir, "allEnrichments.tsv"),
                             pd.read_csv, {"sep": "\t"}, lola_enr),
-                        ('motif', 'MEME/AME motif',
+                        ("motif", "MEME/AME motif",
                             comparison_dir,
                             parse_ame, {}, meme_enr),
-                        ('homer', 'HOMER motifs',
+                        ("homer", "HOMER motifs",
                             os.path.join(comparison_dir, "homerResults"),
                             parse_homer, {}, homer_enr),
-                        ('homer_consensus', 'HOMER consensus',
+                        ("homer_consensus", "HOMER consensus",
                             os.path.join(comparison_dir, "knownResults.txt"),
                             pd.read_csv, {"sep": "\t"}, homer_consensus),
-                        ('enrichr', 'Enrichr',
+                        ("enrichr", "Enrichr",
                             os.path.join(comparison_dir, input_prefix + "_genes.enrichr.csv"),
                             pd.read_csv, {}, pathway_enr)]:
                     if enr_type in steps:
@@ -2893,24 +2941,24 @@ class Analysis(object):
                                 _LOGGER.warning("Comparison '{}' {} results are empty!".format(comp, enr_label))
 
         # write combined enrichments
-        if 'enrichr' in steps:
+        if "enrichr" in steps:
             pathway_enr.to_csv(
                 os.path.join(output_dir, output_prefix + ".enrichr.csv"), index=False, encoding="utf-8")
-        if 'motif' in steps:
+        if "motif" in steps:
             # fix mouse TF names
-            if (meme_enr['TF'].str.startswith("UP").sum() / float(meme_enr.shape[0])) >= 0.1:
+            if (meme_enr["TF"].str.startswith("UP").sum() / float(meme_enr.shape[0])) >= 0.1:
                 id_mapping_file = "~/resources/motifs/motif_databases/MOUSE/uniprobe_mouse.id_mapping.tsv"
                 if os.path.exists(id_mapping_file):
                     annot = pd.read_table(id_mapping_file, header=None, names=["TF", "TF_name"])
-                    annot.loc[:, "TF"] = annot['TF'].str.replace(r"_.*", "")
+                    annot.loc[:, "TF"] = annot["TF"].str.replace(r"_.*", "")
                 meme_enr = pd.merge(meme_enr, annot).drop("TF", axis=1).rename(columns={"TF_name": "TF"})
             # save
             meme_enr.to_csv(
                 os.path.join(output_dir, output_prefix + ".meme_ame.csv"), index=False)
-        if 'homer' in steps:
+        if "homer" in steps:
             homer_enr.to_csv(
                 os.path.join(output_dir, output_prefix + ".homer_motifs.csv"), index=False)
-        if 'homer_consensus' in steps:
+        if "homer_consensus" in steps:
             # fix some columns
             homer_consensus.columns = homer_consensus.columns.str.replace(r"\(of .*", "")
             # homer_consensus["# of Background Sequences with Motif"]
@@ -2918,7 +2966,7 @@ class Analysis(object):
                 homer_consensus[col] = homer_consensus[col].str.replace("%", "").astype(float)
             homer_consensus.to_csv(
                 os.path.join(output_dir, output_prefix + ".homer_consensus.csv"), index=False)
-        if 'lola' in steps:
+        if "lola" in steps:
             lola_enr.to_csv(
                 os.path.join(output_dir, output_prefix + ".lola.csv"), index=False)
 
@@ -2934,7 +2982,7 @@ class Analysis(object):
             rasterized=True,
             barplots=True,
             correlation_plots=True,
-            clustermap_metric='correlation',
+            clustermap_metric="correlation",
             top_n=5,
             z_score=0,
             cmap=None):
@@ -2949,7 +2997,7 @@ class Analysis(object):
             ``differential_enrichment`` or ``collect_differential_enrichment``.
 
         :param str enrichment_type:
-            One of 'region', 'lola', 'enrichr', 'motif', 'plot_differential_enrichment', great'.
+            One of "region", "lola", "enrichr", "motif", "plot_differential_enrichment", great".
 
         :param data_type:
             Data type. One of "ATAC-seq" and "RNA-seq".
@@ -3081,7 +3129,7 @@ class Analysis(object):
                 msg = "Plotting of correlation matrix failed: {}".format(output_file)
                 _LOGGER.warn(msg)
 
-        if enrichment_type not in ["region", "lola", "enrichr", "motif", "homer_consensus", 'great']:
+        if enrichment_type not in ["region", "lola", "enrichr", "motif", "homer_consensus", "great"]:
             raise AssertionError("`enrichment_type` must be one of 'lola', 'enrichr', 'motif', 'homer_consensus', 'great'.")
 
         output_dir = self._format_string_with_attributes(output_dir)
@@ -3104,7 +3152,7 @@ class Analysis(object):
 
         if enrichment_type == "region":
             from ngs_toolkit.graphics import plot_region_structure_results
-            enrichment_table['-log10(p-value)'] = log_pvalues(enrichment_table['p_value'])
+            enrichment_table["-log10(p-value)"] = log_pvalues(enrichment_table["p_value"])
 
             if not enrichment_table.index.name == "region":
                 enrichment_table = enrichment_table.set_index("region")
@@ -3144,7 +3192,7 @@ class Analysis(object):
                 enrichment_table["label"]
                 .str.replace("nan", "").str.replace("None", "")
                 .str.replace(", , ", "").str.replace(", $", "")
-                .str.decode('unicode_escape').str.encode('ascii', 'ignore'))
+                .str.decode("unicode_escape").str.encode("ascii", "ignore"))
 
             # Replace inf values with maximum non-inf p-value observed
             r = enrichment_table.loc[enrichment_table["pValueLog"] != np.inf, "pValueLog"]
@@ -3174,8 +3222,8 @@ class Analysis(object):
                     output_file=os.path.join(output_dir, output_prefix + ".lola.correlation.svg"))
 
             # plot clustered heatmaps of top terms
-            top = enrichment_table.set_index('label').groupby(comp_variable)['pValueLog'].nlargest(top_n)
-            top_terms = top.index.get_level_values('label').unique()
+            top = enrichment_table.set_index("label").groupby(comp_variable)["pValueLog"].nlargest(top_n)
+            top_terms = top.index.get_level_values("label").unique()
             enrichment_clustermap(
                 lola_pivot.loc[top_terms, :],
                 output_file=os.path.join(output_dir, output_prefix + ".lola.cluster_specific.svg"),
@@ -3207,8 +3255,8 @@ class Analysis(object):
                     output_file=os.path.join(output_dir, output_prefix + ".motifs.correlation.svg"))
 
             # plot clustered heatmaps of top terms
-            top = enrichment_table.set_index('TF').groupby(comp_variable)['log_p_value'].nlargest(top_n)
-            top_terms = top.index.get_level_values('TF').unique()
+            top = enrichment_table.set_index("TF").groupby(comp_variable)["log_p_value"].nlargest(top_n)
+            top_terms = top.index.get_level_values("TF").unique()
             enrichment_clustermap(
                 motifs_pivot.loc[:, top_terms],
                 output_file=os.path.join(output_dir, output_prefix + ".motifs.cluster_specific.svg"),
@@ -3220,9 +3268,9 @@ class Analysis(object):
                     label="{} Z-score of enrichment\nof differential regions".format(z_score_label), z_score=z_score)
 
         if enrichment_type == "homer_consensus":
-            enrichment_table.loc[:, 'enrichment_over_background'] = (
-                enrichment_table['% of Target Sequences with Motif'] /
-                enrichment_table['% of Background Sequences with Motif'])
+            enrichment_table.loc[:, "enrichment_over_background"] = (
+                enrichment_table["% of Target Sequences with Motif"] /
+                enrichment_table["% of Background Sequences with Motif"])
             enrichment_table.loc[:, "log_p_value"] = log_pvalues(enrichment_table["P-value"])
 
             # Plot top_n terms of each comparison in barplots
@@ -3240,20 +3288,20 @@ class Analysis(object):
             axis = axis.flatten()
             for i, comp in enumerate(enrichment_table[comp_variable].drop_duplicates().sort_values()):
                 enr = enrichment_table[enrichment_table[comp_variable] == comp]
-                enr.loc[:, 'Motif Name'] = enr['Motif Name'].str.replace(".*BestGuess:", "").str.replace(r"-ChIP-Seq.*", "")
+                enr.loc[:, "Motif Name"] = enr["Motif Name"].str.replace(".*BestGuess:", "").str.replace(r"-ChIP-Seq.*", "")
 
-                enr.loc[:, 'combined'] = enr[['enrichment_over_background', 'log_p_value']].apply(zscore).mean(axis=1)
+                enr.loc[:, "combined"] = enr[["enrichment_over_background", "log_p_value"]].apply(zscore).mean(axis=1)
                 axis[i].scatter(
-                    enr['enrichment_over_background'],
-                    enr['log_p_value'],
-                    c=enr['combined'],
+                    enr["enrichment_over_background"],
+                    enr["log_p_value"],
+                    c=enr["combined"],
                     s=8, alpha=0.75)
 
                 # label top points
-                for j in enr['combined'].sort_values().tail(5).index:
+                for j in enr["combined"].sort_values().tail(5).index:
                     axis[i].text(
-                        enr.loc[j, 'enrichment_over_background'],
-                        enr.loc[j, 'log_p_value'],
+                        enr.loc[j, "enrichment_over_background"],
+                        enr.loc[j, "log_p_value"],
                         s=enr.loc[j, "Motif Name"], ha="right", fontsize=5)
                 axis[i].set_title(comp)
 
@@ -3271,8 +3319,8 @@ class Analysis(object):
                 return
 
             for label, metric in [
-                    ('-log10(p-value) of enrichment\nin', 'log_p_value'),
-                    ('Enrichment over background of\n', 'enrichment_over_background')]:
+                    ("-log10(p-value) of enrichment\nin", "log_p_value"),
+                    ("Enrichment over background of\n", "enrichment_over_background")]:
                 # pivot table
                 motifs_pivot = pd.pivot_table(
                     enrichment_table, values=metric, columns="Motif Name", index=comp_variable).fillna(0)
@@ -3283,8 +3331,8 @@ class Analysis(object):
                         input_df=motifs_pivot, label="Correlation of enrichment\nof differential regions",
                         output_file=os.path.join(output_dir, output_prefix + ".homer_consensus.correlation.svg"))
 
-                top = enrichment_table.set_index('Motif Name').groupby(comp_variable)[metric].nlargest(top_n)
-                top_terms = top.index.get_level_values('Motif Name').unique()
+                top = enrichment_table.set_index("Motif Name").groupby(comp_variable)[metric].nlargest(top_n)
+                top_terms = top.index.get_level_values("Motif Name").unique()
 
                 # plot clustered heatmaps of top terms
                 enrichment_clustermap(
@@ -3294,7 +3342,9 @@ class Analysis(object):
                 if z_score is not None:
                     enrichment_clustermap(
                         motifs_pivot.loc[:, top_terms].T,
-                        output_file=os.path.join(output_dir, output_prefix + ".homer_consensus.cluster_specific.{}_z_score.svg".format(z_score_label)),
+                        output_file=os.path.join(
+                            output_dir, output_prefix + ".homer_consensus.cluster_specific.{}_z_score.svg"
+                            .format(z_score_label)),
                         label="{} Z-score of {} differential regions".format(z_score_label, label), z_score=z_score)
 
         if enrichment_type == "enrichr":
@@ -3319,13 +3369,15 @@ class Analysis(object):
                     enrichment_barplot(
                         top_data, x="description", y="log_p_value",
                         group_variable=comp_variable, top_n=top_n,
-                        output_file=os.path.join(output_dir, output_prefix + ".lola.barplot.top_{}.svg".format(top_n)))
+                        output_file=os.path.join(
+                            output_dir, output_prefix + ".enrichr.{}.barplot.top_{}.svg"
+                            .format(gene_set_library, top_n)))
 
                     # # ^^ possible replacement
                     # grid = sns.catplot(
-                    #     data=top_data, x='log_p_value', y="description",
-                    #     order=top_data.groupby('description')['log_p_value'].mean().sort_values(ascending=False).index,
-                    #     kind='bar', orient="horiz", col=comp_variable, col_wrap=n_side, palette="magma_r")
+                    #     data=top_data, x="log_p_value", y="description",
+                    #     order=top_data.groupby("description")["log_p_value"].mean().sort_values(ascending=False).index,
+                    #     kind="bar", orient="horiz", col=comp_variable, col_wrap=n_side, palette="magma_r")
                     # grid.savefig(os.path.join(output_dir, output_prefix + ".enrichr.{}.barplot.top_{}.joint_comparisons.svg".format(
                     #         gene_set_library, top_n)), bbox_inches="tight", dpi=300)
 
@@ -3336,8 +3388,10 @@ class Analysis(object):
                     sharex=True, sharey=True)
                 axis = axis.flatten()
                 # normalize color across comparisons
-                d = enrichment_table.loc[(enrichment_table["gene_set_library"] == gene_set_library), "combined_score"].describe()
-                norm = matplotlib.colors.Normalize(vmin=d['min'], vmax=d['max'])
+                d = enrichment_table.loc[
+                    (enrichment_table["gene_set_library"] == gene_set_library),
+                    "combined_score"].describe()
+                norm = matplotlib.colors.Normalize(vmin=d["min"], vmax=d["max"])
                 for i, comparison in enumerate(enrichment_table[comp_variable].unique()):
                     enr = enrichment_table[
                             (enrichment_table["gene_set_library"] == gene_set_library) &
@@ -3350,12 +3404,14 @@ class Analysis(object):
                     axis[i].set_title(comparison)
 
                     done = list()
-                    for metric in ['log_p_value', 'z_score', 'combined_score']:
+                    for metric in ["log_p_value", "z_score", "combined_score"]:
                         f = pd.DataFrame.head if metric == "z_score" else pd.DataFrame.tail
                         for s in f(enr.sort_values(metric), top_n).index:
-                            if enr.loc[s, 'description'] not in done:
-                                axis[i].text(enr.loc[s, 'z_score'], enr.loc[s, 'log_p_value'], s=enr.loc[s, 'description'])
-                                done.append(enr.loc[s, 'description'])
+                            if enr.loc[s, "description"] not in done:
+                                axis[i].text(
+                                    enr.loc[s, "z_score"], enr.loc[s, "log_p_value"],
+                                    s=enr.loc[s, "description"])
+                                done.append(enr.loc[s, "description"])
                 sns.despine(fig)
                 fig.savefig(
                     os.path.join(
@@ -3376,11 +3432,11 @@ class Analysis(object):
                 if correlation_plots:
                     enrichment_correlation_plot(
                         input_df=enrichr_pivot, label="Correlation of enrichment\nof differential gene sets",
-                        output_file=os.path.join(output_dir, output_prefix + ".enrichr.correlation.svg"))
+                        output_file=os.path.join(output_dir, output_prefix + ".enrichr.{}.correlation.svg".format(gene_set_library)))
 
                 top = enrichment_table[enrichment_table["gene_set_library"] == gene_set_library].set_index(
-                    'description').groupby(comp_variable)['p_value'].nsmallest(top_n)
-                top_terms = top.index.get_level_values('description').unique()
+                    "description").groupby(comp_variable)["p_value"].nsmallest(top_n)
+                top_terms = top.index.get_level_values("description").unique()
                 # top_terms = top_terms[top_terms.isin(lola_pivot.columns[lola_pivot.sum() > 5])]
 
                 # plot clustered heatmap
@@ -3451,8 +3507,8 @@ class Analysis(object):
                         output_file=os.path.join(output_dir, output_prefix + ".great.{}.correlation.svg".format(gene_set_library)))
 
                 top = enrichment_table[enrichment_table["Ontology"] == gene_set_library].set_index(
-                    'Desc').groupby(comp_variable)['HyperP'].nsmallest(top_n)
-                top_terms = top.index.get_level_values('Desc').unique()
+                    "Desc").groupby(comp_variable)["HyperP"].nsmallest(top_n)
+                top_terms = top.index.get_level_values("Desc").unique()
 
                 # plot clustered heatmaps
                 enrichment_clustermap(

@@ -267,12 +267,14 @@ def clustermap_rasterize_heatmap(grid):
     q.set_rasterized(True)
 
 
-def savefig(fig, fname, **kwargs):
+def savefig(fig, file_name, **kwargs):
     if isinstance(fig, sns.axisgrid.Grid):
         fig = fig.fig
     default_kwargs = _CONFIG['graphics']['settings']['figure_saving']
     default_kwargs.update(kwargs)
-    fig.savefig(fname, **default_kwargs)
+    fig.savefig(file_name, **default_kwargs)
+    if _CONFIG['preferences']['graphics']['close_saved_figures']:
+        plt.close(fig)
 
 
 def plot_projection(
@@ -388,7 +390,7 @@ def plot_projection(
                         if pc == (dims - 1):
                             axis[pc, i].legend(
                                 by_label.values(), by_label.keys())
-    fig.savefig(output_file, bbox_inches="tight")
+    savefig(fig, output_file)
 
 
 def plot_region_structure_results(
@@ -459,9 +461,7 @@ def plot_region_structure_results(
                 m += m * 0.1
                 axis[i].set_xlim((-m, m))
                 axis[i].axvline(0, linestyle="--", color="grey")
-        fig.savefig(
-            os.path.join(output_dir, output_prefix + ".{}.barplot.svg".format(var)),
-            dpi=300, bbox_inches="tight")
+        savefig(fig, os.path.join(output_dir, output_prefix + ".{}.barplot.svg".format(var)))
 
     # volcano plot
     fig, axis = plt.subplots(row, col, figsize=(col * 3, row * 3))
@@ -483,6 +483,4 @@ def plot_region_structure_results(
         ll = spec.loc[:, x].abs().max()
         ll += ll * 0.1
         axis[i].set_xlim((-ll, ll))
-    fig.savefig(
-        os.path.join(output_dir, output_prefix + ".volcano_plot.top_{}_labeled.svg".format(top_n)),
-        dpi=300, bbox_inches="tight")
+    savefig(fig, os.path.join(output_dir, output_prefix + ".volcano_plot.top_{}_labeled.svg".format(top_n)))

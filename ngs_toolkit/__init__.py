@@ -109,6 +109,27 @@ def setup_config(custom_yaml_config=None):
     return _CONFIG
 
 
+def setup_graphic_preferences():
+    """
+    Set up graphic preferences.
+
+    It uses the values under "preferences:graphics:matplotlib:rcParams"
+    and "preferences:graphics:seaborn:parameters" to matplotlib and seaborn respectively.
+    """
+    import matplotlib
+    import seaborn as sns
+
+    # matplotlib
+    rc_params = _CONFIG['preferences']['graphics']['matplotlib']['rcParams']
+    matplotlib.rcParams.update(rc_params)
+    matplotlib.rcParams["svg.fonttype"] = "none"
+    matplotlib.rc('text', usetex=False)
+
+    # seaborn
+    seaborn_params = _CONFIG['preferences']['graphics']['seaborn']['parameters']
+    sns.set(**seaborn_params)
+
+
 def clear_log():
     import os
     logfile = os.path.join(os.path.expanduser("~"), ".ngs_toolkit.log.txt")
@@ -117,6 +138,8 @@ def clear_log():
 
 setup_logger()
 setup_config()
+setup_graphic_preferences()
+
 
 _LOGGER
 _CONFIG

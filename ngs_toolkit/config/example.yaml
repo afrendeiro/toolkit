@@ -16,15 +16,23 @@ preferences:
   graphics:
     matplotlib:
       backend: TkAgg # Agg
+      # key:values under rcParams are used to update matplotlib.rcParams
       rcParams:
         # this ensures text in plots is exported as text objects
-        - svg.fonttype: "none"
+        svg.fonttype: "none"
+    seaborn:
+      # key:values under parameters are passed to seaborn.set
+      parameters:
+        context: "paper"
+        style: "white"
+        palette: "colorblind"
+        color_codes: True
     figure_saving:
       # these arguments are passed to matplotlib.pyplot.savefig
       # https://matplotlib.org/api/_as_gen/matplotlib.pyplot.savefig.html
-      - format: svg
-      - dpi: 300
-      - bbox_inches: "tight"
+      format: svg
+      dpi: 300
+      bbox_inches: "tight"
     close_saved_figures: True
 
 sample_input_files:

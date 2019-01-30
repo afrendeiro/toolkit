@@ -894,6 +894,7 @@ class Analysis(object):
         from statsmodels.sandbox.stats.multicomp import multipletests
         from ngs_toolkit.graphics import plot_projection
         from collections import defaultdict
+        from ngs_toolkit.graphics import savefig
 
         data_type = self._get_data_type(data_type)
 
@@ -1009,9 +1010,9 @@ class Analysis(object):
                 g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small")
                 g.ax_heatmap.set_xlabel(None, visible=False)
                 g.ax_heatmap.set_ylabel(None, visible=False)
-                g.fig.savefig(os.path.join(
+                savefig(g.fig, os.path.join(
                     output_dir, "{}.{}.{}_correlation.clustermap.svg"
-                    .format(self.name, plot_prefix, method)), bbox_inches="tight", dpi=dpi)
+                    .format(self.name, plot_prefix, method)))
 
         if "manifold" in steps:
             # Manifolds
@@ -1089,9 +1090,9 @@ class Analysis(object):
             axis[1].set_ylabel("log variance")
             axis[2].set_ylabel("Cumulative % variance")
             sns.despine(fig)
-            fig.savefig(os.path.join(
+            savefig(fig, os.path.join(
                 output_dir, "{}.{}.pca.explained_variance.svg"
-                            .format(self.name, plot_prefix)), bbox_inches="tight", dpi=dpi)
+                            .format(self.name, plot_prefix)))
 
             # plot pca
             pcs = min(x_new.shape[1] - 1, plot_max_pcs)
@@ -1184,9 +1185,9 @@ class Analysis(object):
                     annot=True, cbar_kws={"label": "-log10(p_value) of association"},
                     square=True, rasterized=rasterized, vmin=0)
                 g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=45, ha="right")
-                g.fig.savefig(os.path.join(
+                savefig(g.fig, os.path.join(
                     output_dir, "{}.{}.pca.variable_principle_components_association.{}.svg"
-                                .format(self.name, plot_prefix, var)), bbox_inches="tight", dpi=dpi)
+                                .format(self.name, plot_prefix, var)))
 
                 # heatmap of masked significant
                 g = sns.clustermap(
@@ -1194,9 +1195,9 @@ class Analysis(object):
                     row_cluster=False, cbar_kws={"label": "significant association"},
                     square=True, rasterized=rasterized, vmin=0, vmax=1, cmap="Paired")
                 g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=45, ha="right")
-                g.fig.savefig(os.path.join(
+                savefig(g.fig, os.path.join(
                     output_dir, "{}.{}.pca.variable_principle_components_association.{}.masked.svg"
-                                .format(self.name, plot_prefix, var)), bbox_inches="tight", dpi=dpi)
+                                .format(self.name, plot_prefix, var)))
 
     def differential_analysis(
             self,
@@ -1541,7 +1542,6 @@ class Analysis(object):
             adjusted_p_value_column="padj",
             comparison_column="comparison_name",
             rasterized=True,
-            dpi=300,
             robust=False,
             feature_labels=False,
             group_wise_colours=False,
@@ -1648,10 +1648,6 @@ class Analysis(object):
             Whether plots with many objects should be rasterized.
             Defaults to True.
 
-        :param number,optional dpi:
-            Rasterization resolution (dpi).
-            Defaults to 300.
-
         :param bool,optional robust:
             Whether heatmap color scale ranges should be robust (using quantiles) rather than extreme values.
             Useful for noisy/extreme data.
@@ -1679,7 +1675,7 @@ class Analysis(object):
         """
         import matplotlib.pyplot as plt
         import seaborn as sns
-        from ngs_toolkit.graphics import add_colorbar_to_axis
+        from ngs_toolkit.graphics import add_colorbar_to_axis, savefig
 
         if results is None:
             msg = "Differential results dataframe not given and Analysis object does not"
@@ -1818,9 +1814,7 @@ class Analysis(object):
             axis.set_xlabel(label)
             axis.set_ylabel(var_name.capitalize() + "s (frequency)")
             sns.despine(fig)
-            fig.savefig(
-                os.path.join(output_dir, output_prefix + "." + variable + ".distribution.svg"),
-                bbox_inches="tight")
+            savefig(fig, os.path.join(output_dir, output_prefix + "." + variable + ".distribution.svg"))
 
             if plot_each_comparison:
                 # per comparison
@@ -1833,9 +1827,7 @@ class Analysis(object):
                     ax.set_xlabel(label)
                     ax.set_ylabel(var_name.capitalize() + "s (frequency)")
                 sns.despine(g.fig)
-                g.fig.savefig(
-                    os.path.join(output_dir, output_prefix + "." + variable + ".distribution.per_comparison.svg"),
-                    box_inches="tight")
+                savefig(g.fig, os.path.join(output_dir, output_prefix + "." + variable + ".distribution.per_comparison.svg"))
 
         # Number of differential vars
         _LOGGER.info("Calculating number of differential {}s per comparison.".format(var_name))
@@ -1868,9 +1860,7 @@ class Analysis(object):
         m = split_diff["diff_perc"].abs().max()
         axis[1, 1].set_xlim((-m, m))
         sns.despine(fig)
-        fig.savefig(
-            os.path.join(output_dir, output_prefix + ".number_differential.directional.svg"),
-            bbox_inches="tight")
+        savefig(fig, os.path.join(output_dir, output_prefix + ".number_differential.directional.svg"))
 
         if plot_each_comparison:
             _LOGGER.info("Doing detailed plotting per comparison:")
@@ -1951,9 +1941,7 @@ class Analysis(object):
                 for ax in axes:
                     ax.set_visible(False)
                 sns.despine(fig)
-                fig.savefig(
-                    os.path.join(output_dir, output_prefix + ".scatter_plots.svg"),
-                    bbox_inches="tight", dpi=dpi)
+                savefig(fig,  os.path.join(output_dir, output_prefix + ".scatter_plots.svg"))
 
             # Volcano plots
             _LOGGER.info("Plotting volcano plots for each comparison.")
@@ -1999,9 +1987,7 @@ class Analysis(object):
             for ax in axes:
                 ax.set_visible(False)
             sns.despine(fig)
-            fig.savefig(
-                os.path.join(output_dir, output_prefix + ".volcano_plots.svg"),
-                bbox_inches="tight", dpi=dpi)
+            savefig(fig, os.path.join(output_dir, output_prefix + ".volcano_plots.svg"))
 
             # MA plots
             _LOGGER.info("Plotting MA plots for each comparison.")
@@ -2044,7 +2030,7 @@ class Analysis(object):
             for ax in axes:
                 ax.set_visible(False)
             sns.despine(fig)
-            fig.savefig(os.path.join(output_dir, output_prefix + ".ma_plots.svg"), bbox_inches="tight", dpi=dpi)
+            savefig(fig, os.path.join(output_dir, output_prefix + ".ma_plots.svg"))
 
         if results.loc[:, "diff"].sum() < 1:
             msg = "No significantly different regions found in any comparison."
@@ -2112,7 +2098,7 @@ class Analysis(object):
                             xticklabels=False, yticklabels=True, cbar_kws={"label": "Pearson correlation\non differential {}s".format(var_name)},
                             cmap="BuGn", metric="correlation", rasterized=True, figsize=(figsize[0], figsize[0]))
                         g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small")
-                        g.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.groups.clustermap.corr.svg".format(var_name)), bbox_inches="tight", dpi=dpi, metric="correlation")
+                        savefig(g.fig, os.path.join(output_dir, output_prefix + ".diff_{}.groups.clustermap.corr.svg".format(var_name)))
 
                         g = sns.clustermap(
                             groups,
@@ -2121,7 +2107,7 @@ class Analysis(object):
                         g.ax_heatmap.set_ylabel("Differential {}s (n = {})".format(var_name, groups.shape[0]))
                         g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90, fontsize="xx-small")
                         g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small")
-                        g.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.groups.clustermap.svg".format(var_name)), bbox_inches="tight", dpi=dpi)
+                        savefig(g.fig, os.path.join(output_dir, output_prefix + ".diff_{}.groups.clustermap.svg".format(var_name)))
 
                         g = sns.clustermap(
                             groups,
@@ -2130,7 +2116,7 @@ class Analysis(object):
                         g.ax_heatmap.set_ylabel("Differential {}s (n = {})".format(var_name, groups.shape[0]))
                         g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90, fontsize="xx-small")
                         g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small")
-                        g.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.groups.clustermap.z0.svg".format(var_name)), bbox_inches="tight", dpi=dpi)
+                        savefig(g.fig, os.path.join(output_dir, output_prefix + ".diff_{}.groups.clustermap.z0.svg".format(var_name)))
 
                         # same without clustering
                         g = sns.clustermap(
@@ -2141,7 +2127,7 @@ class Analysis(object):
                         g.ax_heatmap.set_ylabel("Differential {}s (n = {})".format(var_name, groups.shape[0]))
                         g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90, fontsize="xx-small")
                         g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small")
-                        g.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.groups.sorted.clustermap.svg".format(var_name)), bbox_inches="tight", dpi=dpi)
+                        savefig(g.fig, os.path.join(output_dir, output_prefix + ".diff_{}.groups.sorted.clustermap.svg".format(var_name)))
 
                         g = sns.clustermap(
                             groups,
@@ -2151,7 +2137,7 @@ class Analysis(object):
                         g.ax_heatmap.set_ylabel("Differential {}s (n = {})".format(var_name, groups.shape[0]))
                         g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90, fontsize="xx-small")
                         g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small")
-                        g.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.groups.sorted.clustermap.z0.svg".format(var_name)), bbox_inches="tight", dpi=dpi)
+                        savefig(g.fig, os.path.join(output_dir, output_prefix + ".diff_{}.groups.sorted.clustermap.z0.svg".format(var_name)))
 
         # Fold-changes and P-values
         # pivot table of genes vs comparisons
@@ -2184,10 +2170,10 @@ class Analysis(object):
                 grid.ax_heatmap.set_yticklabels(grid.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small")
                 grid.ax_heatmap.set_xlabel("Comparison groups")
                 grid.ax_heatmap.set_ylabel("Comparison groups")
-                grid.fig.savefig(
+                savefig(
+                    grid.fig,
                     os.path.join(output_dir,
-                                 output_prefix + ".diff_{}.groups.{}.clustermap.corr.svg".format(var_name, label.replace(" ", "_"))),
-                    bbox_inches="tight", dpi=dpi, metric="correlation")
+                                 output_prefix + ".diff_{}.groups.{}.clustermap.corr.svg".format(var_name, label.replace(" ", "_"))))
                 _LOGGER.info("Plotting clustered heatmaps of {}s per sample groups in all differential {}s found.".format(var_name, label))
                 try:
                     grid = sns.clustermap(
@@ -2199,10 +2185,10 @@ class Analysis(object):
                     grid.ax_heatmap.set_xticklabels(grid.ax_heatmap.get_xticklabels(), rotation=90, fontsize="xx-small")
                     grid.ax_heatmap.set_yticklabels(grid.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small")
                     grid.ax_heatmap.set_xlabel("Comparison groups")
-                    grid.fig.savefig(
+                    savefig(
+                        grid.fig,
                         os.path.join(output_dir,
-                                     output_prefix + ".diff_{}.groups.{}.clustermap.svg".format(var_name, label.replace(" ", "_"))),
-                        bbox_inches="tight", dpi=dpi)
+                                     output_prefix + ".diff_{}.groups.{}.clustermap.svg".format(var_name, label.replace(" ", "_"))))
                 except FloatingPointError:
                     _LOGGER.error("{} contain null of infinite values. Cannot plot.".format(label))
 
@@ -2232,7 +2218,7 @@ class Analysis(object):
             cbar_kws={"label": "Pearson correlation\non differential {}s".format(var_name)},
             cmap="BuGn", metric="correlation", figsize=(figsize[0], figsize[0]), rasterized=rasterized, robust=robust, **extra)
         grid.ax_heatmap.set_yticklabels(grid.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small")
-        grid.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.samples.clustermap.corr.svg".format(var_name)), bbox_inches="tight", dpi=dpi)
+        savefig(grid.fig, os.path.join(output_dir, output_prefix + ".diff_{}.samples.clustermap.corr.svg".format(var_name)))
 
         _LOGGER.info("Plotting clustered heatmaps of {} values per sample in all differential {}s found.".format(quantity, var_name))
         grid = sns.clustermap(
@@ -2242,7 +2228,7 @@ class Analysis(object):
         grid.ax_heatmap.set_ylabel("Differential {}s (n = {})".format(var_name, matrix2.shape[0]))
         grid.ax_heatmap.set_xticklabels(grid.ax_heatmap.get_xticklabels(), rotation=90, fontsize="xx-small")
         grid.ax_heatmap.set_yticklabels(grid.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small")
-        grid.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.samples.clustermap.svg".format(var_name)), bbox_inches="tight", dpi=dpi)
+        savefig(grid.fig, os.path.join(output_dir, output_prefix + ".diff_{}.samples.clustermap.svg".format(var_name)))
 
         grid = sns.clustermap(
             matrix2,
@@ -2251,7 +2237,7 @@ class Analysis(object):
         grid.ax_heatmap.set_ylabel("Differential {}s (n = {})".format(var_name, matrix2.shape[0]))
         grid.ax_heatmap.set_xticklabels(grid.ax_heatmap.get_xticklabels(), rotation=90, fontsize="xx-small")
         grid.ax_heatmap.set_yticklabels(grid.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small")
-        grid.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.samples.clustermap.z0.svg".format(var_name)), bbox_inches="tight", dpi=dpi)
+        savefig(grid.fig, os.path.join(output_dir, output_prefix + ".diff_{}.samples.clustermap.z0.svg".format(var_name)))
 
         grid = sns.clustermap(
             matrix2,
@@ -2261,7 +2247,7 @@ class Analysis(object):
         grid.ax_heatmap.set_ylabel("Differential {}s (n = {})".format(var_name, matrix2.shape[0]))
         grid.ax_heatmap.set_xticklabels(grid.ax_heatmap.get_xticklabels(), rotation=90, fontsize="xx-small")
         grid.ax_heatmap.set_yticklabels(grid.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small")
-        grid.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.samples.sorted.clustermap.svg".format(var_name)), bbox_inches="tight", dpi=dpi)
+        savefig(grid.fig, os.path.join(output_dir, output_prefix + ".diff_{}.samples.sorted.clustermap.svg".format(var_name)))
 
         grid = sns.clustermap(
             matrix2,
@@ -2271,7 +2257,7 @@ class Analysis(object):
         grid.ax_heatmap.set_ylabel("Differential {}s (n = {})".format(var_name, matrix2.shape[0]))
         grid.ax_heatmap.set_xticklabels(grid.ax_heatmap.get_xticklabels(), rotation=90, fontsize="xx-small")
         grid.ax_heatmap.set_yticklabels(grid.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small")
-        grid.fig.savefig(os.path.join(output_dir, output_prefix + ".diff_{}.samples.sorted.clustermap.z0.svg".format(var_name)), bbox_inches="tight", dpi=dpi)
+        savefig(grid.fig, os.path.join(output_dir, output_prefix + ".diff_{}.samples.sorted.clustermap.z0.svg".format(var_name)))
 
     def differential_overlap(
             self,
@@ -2308,6 +2294,7 @@ class Analysis(object):
         from scipy.stats import fisher_exact
         from statsmodels.sandbox.stats.multicomp import multipletests
         from ngs_toolkit.general import log_pvalues
+        from ngs_toolkit.graphics import savefig
 
         data_type = self._get_data_type(data_type)
         # Make output dir
@@ -2417,9 +2404,7 @@ class Analysis(object):
             axis[1].set_xticklabels(axis[1].get_xticklabels(), rotation=90, ha="center")
             axis[0].set_yticklabels(axis[0].get_yticklabels(), rotation=0, ha="right")
             axis[1].set_yticklabels(axis[1].get_yticklabels(), rotation=0, ha="right")
-            fig.savefig(
-                os.path.join(output_dir, output_prefix + ".differential_overlap.{}.up_down_split.svg".format(label)),
-                bbox_inches="tight")
+            savefig(fig, os.path.join(output_dir, output_prefix + ".differential_overlap.{}.up_down_split.svg".format(label)))
 
             # combined heatmap
             # with upregulated {}s in upper square matrix and downredulated in down square
@@ -2442,9 +2427,7 @@ class Analysis(object):
                 ax=axis, **extra)
             axis.set_xticklabels(axis.get_xticklabels(), rotation=90, ha="center")
             axis.set_yticklabels(axis.get_yticklabels(), rotation=0, ha="right")
-            fig.savefig(os.path.join(
-                    output_dir, output_prefix + ".differential_overlap.{}.up_down_together.svg".format(label)),
-                bbox_inches="tight")
+            savefig(fig, os.path.join(output_dir, output_prefix + ".differential_overlap.{}.up_down_together.svg".format(label)))
 
             # Rank plots
             if metric == "log_pvalue":
@@ -2474,9 +2457,7 @@ class Analysis(object):
                     ax.set_ylabel("Agreement (-log(p-value))")
                     ax.set_xlabel("Rank")
                 sns.despine(fig)
-                fig.savefig(os.path.join(
-                        output_dir, output_prefix + ".differential_overlap.{}.agreement.rank.svg".format(label)),
-                    bbox_inches="tight")
+                savefig(fig, os.path.join(output_dir, output_prefix + ".differential_overlap.{}.agreement.rank.svg".format(label)))
 
             # Observe disagreement
             # (overlap of down-regulated with up-regulated and vice-versa)
@@ -2510,9 +2491,7 @@ class Analysis(object):
             axis[0].set_yticklabels(axis[0].get_yticklabels(), rotation=0, ha="right")
             axis[1].set_xlim((0, len(piv_disagree.index)))
             axis[1].set_ylim((0, len(piv_disagree.columns)))
-            fig.savefig(os.path.join(
-                    output_dir, output_prefix + ".differential_overlap.{}.disagreement.svg".format(label)),
-                bbox_inches="tight")
+            savefig(fig, os.path.join(output_dir, output_prefix + ".differential_overlap.{}.disagreement.svg".format(label)))
 
             # Rank plots
             if metric == "log_pvalue":
@@ -2535,11 +2514,7 @@ class Analysis(object):
                     ax.set_ylabel("Disagreement (-log(p-value))")
                     ax.set_xlabel("Rank")
                 sns.despine(fig)
-                fig.savefig(
-                    os.path.join(
-                        output_dir,
-                        output_prefix + ".differential_overlap.{}.disagreement.rank.svg".format(label)),
-                    bbox_inches="tight")
+                savefig(fig, os.path.join(output_dir, output_prefix + ".differential_overlap.{}.disagreement.rank.svg".format(label)))
 
     def differential_enrichment(
             self,
@@ -3062,6 +3037,7 @@ class Analysis(object):
         import seaborn as sns
         from scipy.stats import zscore
         from ngs_toolkit.general import log_pvalues
+        from ngs_toolkit.graphics import savefig
 
         def enrichment_barplot(
                 input_df,
@@ -3091,7 +3067,7 @@ class Analysis(object):
             for ax in axis:
                 ax.set_visible(False)
             sns.despine(fig)
-            fig.savefig(output_file, bbox_inches="tight", dpi=300)
+            savefig(fig, output_file)
 
         def enrichment_correlation_plot(
                 input_df,
@@ -3106,7 +3082,7 @@ class Analysis(object):
                     cbar_kws={"label": label})
                 g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90)
                 g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0)
-                g.fig.savefig(output_file, bbox_inches="tight", dpi=300)
+                savefig(g.fig, output_file)
             except FloatingPointError:
                 msg = "Plotting of correlation matrix failed: {}".format(output_file)
                 _LOGGER.warn(msg)
@@ -3131,7 +3107,7 @@ class Analysis(object):
                                              rotation=90, ha="right", fontsize="xx-small")
                 g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(),
                                              rotation=0, fontsize="xx-small")
-                g.fig.savefig(output_file, bbox_inches="tight", dpi=300)
+                savefig(g.fig, output_file)
             except FloatingPointError:
                 msg = "Plotting of correlation matrix failed: {}".format(output_file)
                 _LOGGER.warn(msg)
@@ -3143,7 +3119,7 @@ class Analysis(object):
                 _LOGGER.error(msg)
                 raise ValueError(msg)
             else:
-                for enrichment_type, enrichment_table in self.enrichment_results.items():
+                for enrichment_name, enrichment_table in self.enrichment_results.items():
                     self.plot_differential_enrichment(
                         enrichment_table=enrichment_table,
                         enrichment_type=enrichment_type,
@@ -3155,7 +3131,7 @@ class Analysis(object):
                         barplots=barplots,
                         correlation_plots=correlation_plots,
                         clustermap_metric=clustermap_metric,
-                        top_n=top_n,
+                        top_n=top_n if enrichment_name != "motif" else 300,
                         z_score=z_score,
                         cmap=cmap)
 
@@ -3308,7 +3284,7 @@ class Analysis(object):
             if barplots:
                 enrichment_barplot(
                     enrichment_table, x="Motif Name", y="log_p_value",
-                    group_variable=comp_variable,
+                    group_variable=comp_variable, top_n=top_n,
                     output_file=os.path.join(output_dir, output_prefix + ".lola.barplot.top_{}.svg".format(top_n)))
 
             # Significance vs fold enrichment over background
@@ -3340,9 +3316,7 @@ class Analysis(object):
             for ax in axis.reshape((n_side, n_side))[-1, :]:
                 ax.set_xlabel("Enrichment over background")
             sns.despine(fig)
-            fig.savefig(
-                os.path.join(output_dir, output_prefix + ".homer_consensus.scatterplot.svg"),
-                bbox_inches="tight", dpi=300)
+            savefig(fig, os.path.join(output_dir, output_prefix + ".homer_consensus.scatterplot.svg"))
 
             # Plot heatmaps of terms for each comparison
             if len(enrichment_table[comp_variable].drop_duplicates()) < 2:
@@ -3443,11 +3417,7 @@ class Analysis(object):
                                     s=enr.loc[s, "description"])
                                 done.append(enr.loc[s, "description"])
                 sns.despine(fig)
-                fig.savefig(
-                    os.path.join(
-                        output_dir, output_prefix + ".enrichr.{}.zscore_vs_pvalue.scatterplot.svg"
-                        .format(gene_set_library)),
-                    bbox_inches="tight", dpi=300)
+                savefig(fig, os.path.join(output_dir, output_prefix + ".enrichr.{}.zscore_vs_pvalue.scatterplot.svg".format(gene_set_library)))
 
                 # Plot heatmaps of terms for each comparison
                 if len(enrichment_table[comp_variable].drop_duplicates()) < 2:
@@ -3518,8 +3488,7 @@ class Analysis(object):
                     for ax in axis:
                         ax.set_visible(False)
                     sns.despine(fig)
-                    fig.savefig(os.path.join(output_dir, output_prefix + ".great.{}.barplot.top_{}.svg".format(
-                        gene_set_library, top_n)), bbox_inches="tight", dpi=300)
+                    savefig(fig, os.path.join(output_dir, output_prefix + ".great.{}.barplot.top_{}.svg".format(gene_set_library, top_n)))
 
                 # Plot heatmaps of terms for each comparison
                 if len(enrichment_table[comp_variable].drop_duplicates()) < 2:

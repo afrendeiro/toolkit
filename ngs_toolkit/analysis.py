@@ -215,6 +215,8 @@ class Analysis(object):
         :param str string:
             String to format.
         """
+        if string is None:
+            return string
         to_format = pd.Series(string).str.extractall(r"\${(.*?)}")[0].values
         attrs = os.environ
         if not all([x in attrs for x in to_format]):
@@ -234,6 +236,8 @@ class Analysis(object):
         :param str string:
             String to format.
         """
+        if string is None:
+            return string
         to_format = pd.Series(string).str.extractall(r"{(.*?)}")[0].values
         attrs = self.__dict__.keys()
         if not all([x in attrs for x in to_format]):
@@ -2942,6 +2946,7 @@ class Analysis(object):
 
         # write combined enrichments
         if "enrichr" in steps:
+            self.enrichment_results["enrichr"] = pathway_enr
             pathway_enr.to_csv(
                 os.path.join(output_dir, output_prefix + ".enrichr.csv"), index=False, encoding="utf-8")
         if "motif" in steps:
@@ -2953,9 +2958,11 @@ class Analysis(object):
                     annot.loc[:, "TF"] = annot["TF"].str.replace(r"_.*", "")
                 meme_enr = pd.merge(meme_enr, annot).drop("TF", axis=1).rename(columns={"TF_name": "TF"})
             # save
+            self.enrichment_results["motif"] = meme_enr
             meme_enr.to_csv(
                 os.path.join(output_dir, output_prefix + ".meme_ame.csv"), index=False)
         if "homer" in steps:
+            self.enrichment_results["homer"] = homer_enr
             homer_enr.to_csv(
                 os.path.join(output_dir, output_prefix + ".homer_motifs.csv"), index=False)
         if "homer_consensus" in steps:
@@ -2964,17 +2971,18 @@ class Analysis(object):
             # homer_consensus["# of Background Sequences with Motif"]
             for col in homer_consensus.columns[homer_consensus.columns.str.contains("%")]:
                 homer_consensus[col] = homer_consensus[col].str.replace("%", "").astype(float)
+            self.enrichment_results["homer_consensus"] = homer_consensus
             homer_consensus.to_csv(
                 os.path.join(output_dir, output_prefix + ".homer_consensus.csv"), index=False)
         if "lola" in steps:
+            self.enrichment_results["lola"] = lola_enr
             lola_enr.to_csv(
                 os.path.join(output_dir, output_prefix + ".lola.csv"), index=False)
 
     def plot_differential_enrichment(
             self,
-            enrichment_table,
-            enrichment_type,
-            data_type="ATAC-seq",
+            enrichment_table=None,
+            enrichment_type=None,
             direction_dependent=True,
             output_dir="{results_dir}/differential_analysis_{data_type}/enrichments",
             comp_variable="comparison_name",
@@ -2987,23 +2995,22 @@ class Analysis(object):
             z_score=0,
             cmap=None):
         """
-        Given a table of enrichment terms across several comparisons, produced
-        plots illustrating these enrichments in the various comparisons.
+        Make plots illustrating enrichment of features for various comparisons.
+
+        Input can be a table of enrichment terms across several comparisons for a give type of enrichment
+        (both attributes enrichment_table and enrichment_type must be given),
+        or otherwise the dictionary of "enrichment_results" of the analysis object will be used.
 
         # TODO: split function in its smaller parts and call them appropriately.
 
-        :param pandas.DataFrame enrichment_table:
+        :param pandas.DataFrame,optional enrichment_table:
             Data frame with enrichment results as produced by
             ``differential_enrichment`` or ``collect_differential_enrichment``.
 
-        :param str enrichment_type:
+        :param str,optional enrichment_type:
             One of "region", "lola", "enrichr", "motif", "plot_differential_enrichment", great".
 
-        :param data_type:
-            Data type. One of "ATAC-seq" and "RNA-seq".
-            Defaults to the analysis' own data_type.
-
-        :param direction_dependent:
+        :param bool,optional direction_dependent:
             Whether enrichments were made in a direction-dependent way (up-regulated and down-regulated features separately).
             This implies a column named "direction" exists".
             Defaults to True.
@@ -3128,6 +3135,29 @@ class Analysis(object):
             except FloatingPointError:
                 msg = "Plotting of correlation matrix failed: {}".format(output_file)
                 _LOGGER.warn(msg)
+
+        if (enrichment_table is None) and (enrichment_type is None):
+            if not hasattr(self, "enrichment_results"):
+                msg = "'enrichment_table' and 'enrichment_type' were not given"
+                msg += "but analysis also does not have a 'enrichment_results' attribute."
+                _LOGGER.error(msg)
+                raise ValueError(msg)
+            else:
+                for enrichment_type, enrichment_table in self.enrichment_results.items():
+                    self.plot_differential_enrichment(
+                        enrichment_table=enrichment_table,
+                        enrichment_type=enrichment_type,
+                        direction_dependent=direction_dependent,
+                        output_dir=output_dir,
+                        comp_variable=comp_variable,
+                        output_prefix=output_prefix,
+                        rasterized=rasterized,
+                        barplots=barplots,
+                        correlation_plots=correlation_plots,
+                        clustermap_metric=clustermap_metric,
+                        top_n=top_n,
+                        z_score=z_score,
+                        cmap=cmap)
 
         if enrichment_type not in ["region", "lola", "enrichr", "motif", "homer_consensus", "great"]:
             raise AssertionError("`enrichment_type` must be one of 'lola', 'enrichr', 'motif', 'homer_consensus', 'great'.")

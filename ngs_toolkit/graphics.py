@@ -270,7 +270,7 @@ def clustermap_rasterize_heatmap(grid):
 def savefig(fig, file_name, **kwargs):
     if isinstance(fig, sns.axisgrid.Grid):
         fig = fig.fig
-    default_kwargs = _CONFIG['graphics']['settings']['figure_saving']
+    default_kwargs = _CONFIG['preferences']['graphics']['figure_saving']
     default_kwargs.update(kwargs)
     fig.savefig(file_name, **default_kwargs)
     if _CONFIG['preferences']['graphics']['close_saved_figures']:

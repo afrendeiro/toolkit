@@ -1,14 +1,19 @@
 #!/usr/bin/env python
 
-import pytest
+
 import os
-import yaml
+
 from .data_generator import generate_project
-from peppy import Project
+from ngs_toolkit import _CONFIG
 from ngs_toolkit.atacseq import ATACSeqAnalysis
-import pybedtools
-import pandas as pd
+from ngs_toolkit.utils import download_gzip_file
 import numpy as np
+import pandas as pd
+from peppy import Project
+import pybedtools
+import pytest
+import yaml
+# import scipy
 
 
 travis = 'TRAVIS' in os.environ
@@ -111,7 +116,6 @@ def analysis(tmp_path):
 
 @pytest.fixture
 def chrom_file():
-    from ngs_toolkit.general import download_gzip_file
     url = (
         "https://egg2.wustl.edu/roadmap/data/byFileType/" +
         "chromhmmSegmentations/ChmmModels/coreMarks/jointModel/" +
@@ -122,7 +126,6 @@ def chrom_file():
 
 
 def test_get_consensus_sites(various_analysis):
-    import pytest
     for analysis in various_analysis:
         with pytest.raises(IOError):
             analysis.get_consensus_sites()
@@ -197,7 +200,6 @@ def test_quantile_normalization(various_analysis):
         assert os.path.exists(f)
         assert os.stat(f).st_size > 0
 
-        # import scipy
         # cors = list()
         # for col in qnorm_p.columns:
         #     cors.append(scipy.stats.pearsonr(qnorm_p[col], qnorm_r[col])[0])
@@ -264,7 +266,6 @@ def test_get_matrix_stats(various_analysis):
 
 
 def test_get_peak_gene_annotation(analysis):
-    from ngs_toolkit import _CONFIG
     reference_dir = ATACSeqAnalysis._format_string_with_environment_variables(
         _CONFIG['preferences']['root_reference_dir'])
     if reference_dir is None:
@@ -283,7 +284,6 @@ def test_get_peak_gene_annotation(analysis):
 
 
 def test_get_peak_genomic_location(analysis):
-    from ngs_toolkit import _CONFIG
     reference_dir = ATACSeqAnalysis._format_string_with_environment_variables(
         _CONFIG['preferences']['root_reference_dir'])
     if reference_dir is None:

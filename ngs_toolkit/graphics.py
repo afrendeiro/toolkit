@@ -1,14 +1,23 @@
 #!/usr/bin/env python
 
 
+from collections import OrderedDict
 import os
-import matplotlib.pyplot as plt
-import numpy as np
-import pandas as pd
-import seaborn as sns
 
+import matplotlib
+from matplotlib.path import Path
+from matplotlib.projections import register_projection
+from matplotlib.projections.polar import PolarAxes
+import matplotlib.pyplot as plt
+from matplotlib.spines import Spine
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 from ngs_toolkit import _CONFIG
 from ngs_toolkit import _LOGGER
+import numpy as np
+import pandas as pd
+import scipy
+from scipy.stats import zscore
+import seaborn as sns
 
 
 def barmap(x, figsize=None, square=False, row_colors=None, z_score=None, ylims=None):
@@ -39,7 +48,6 @@ def barmap(x, figsize=None, square=False, row_colors=None, z_score=None, ylims=N
         if z_score not in [1, 0]:
             _LOGGER.error("z_score must be one of 0 (row-wise) or 1 (column-wise).")
             raise AssertionError(msg)
-        from scipy.stats import zscore
         rows, cols = x.index, x.columns
         x = zscore(x, axis=z_score)
         x = pd.DataFrame(x, index=rows, columns=cols)
@@ -113,10 +121,6 @@ def radar_plot(
 
     Heavy inspiration from here: https://matplotlib.org/examples/api/radar_chart.html
     """
-    from matplotlib.path import Path
-    from matplotlib.spines import Spine
-    from matplotlib.projections.polar import PolarAxes
-    from matplotlib.projections import register_projection
 
     def radar_factory(num_vars, frame='circle'):
         """Create a radar chart with `num_vars` axes.
@@ -132,7 +136,7 @@ def radar_plot(
 
         """
         # calculate evenly-spaced axis angles
-        theta = np.linspace(0, 2* np.pi, num_vars, endpoint=False)
+        theta = np.linspace(0, 2 * np.pi, num_vars, endpoint=False)
         # rotate theta such that the first axis is at the top
         theta += np.pi / 2
 
@@ -247,7 +251,6 @@ def radar_plot(
 
 
 def add_colorbar_to_axis(collection, label=None, position="right", size="5%", pad=0.05):
-    from mpl_toolkits.axes_grid1 import make_axes_locatable
     divider = make_axes_locatable(collection.axes)
     cax = divider.append_axes(position, size=size, pad=pad)
     plt.colorbar(mappable=collection, cax=cax, label=label, alpha=1)
@@ -261,7 +264,6 @@ def clustermap_fix_label_orientation(grid, fontsize="xx-small", **kwargs):
 
 
 def clustermap_rasterize_heatmap(grid):
-    import matplotlib
     q = [x for x in grid.ax_heatmap.get_children()
          if isinstance(x, matplotlib.collections.QuadMesh)][0]
     q.set_rasterized(True)
@@ -326,7 +328,6 @@ def plot_projection(
                           Defaults to False.
     :type always_legend: bool, optional
     """
-    from collections import OrderedDict
 
     n_attr = len(attributes_to_plot)
     fig, axis = plt.subplots(dims, n_attr, figsize=(4 * n_attr, 4 * dims))
@@ -484,3 +485,103 @@ def plot_region_structure_results(
         ll += ll * 0.1
         axis[i].set_xlim((-ll, ll))
     savefig(fig, os.path.join(output_dir, output_prefix + ".volcano_plot.top_{}_labeled.svg".format(top_n)))
+
+
+def plot_comparison_correlations(
+        diff,
+        output_dir,
+        output_prefix="comparison_correlations"):
+    """
+    Plot pairwise log fold changes for various comparisons.
+
+
+    Attributes:
+
+    :param pandas.DataFrame diff:
+        Dataframe with differential results
+
+    :param str output_dir:
+        Output directory for plots.
+
+    :param str,optional output_prefix:
+        Prefix for plots.
+        Defaults to "comparison_correlations"
+    """
+
+    comps = diff['comparison_name'].unique()
+    n = len(comps)
+    rows = cols = int(np.ceil(np.sqrt(n)))
+    v = diff['log2FoldChange'].abs().max()
+    # vmax = (-np.log10(diff['pvalue'])).max()
+
+    fig, axis = plt.subplots(rows, cols, figsize=(cols * 3, rows * 3), tight_layout=True)
+    for i, (base, comps) in enumerate(comps):
+        a = diff.loc[diff['comparison_name'] == base, "log2FoldChange"]
+        sign = (a > 0).astype(int).replace(0, -1)
+        c = sign * (-np.log10(diff.loc[diff['comparison_name'] == base, "pvalue"]))
+        vmax = np.sqrt(c.abs().max())
+        for j, comp in enumerate(comps):
+            b = diff.loc[diff['comparison_name'] == comp, "log2FoldChange"]
+            axis[i, j].set_xlabel(base)
+            axis[i, j].set_ylabel(comp)
+            # equal limits and x = y line
+            axis[i, j].set_xlim((-v, v))
+            axis[i, j].set_ylim((-v, v))
+            axis[i, j].plot((-v, -v), (v, v), linestyle="--", alpha=0.75, color="black")
+            # quadrant lines
+            axis[i, j].axhline(0, linestyle="--", alpha=0.5, color="black")
+            axis[i, j].axvline(0, linestyle="--", alpha=0.5, color="black")
+
+            # fit and plot regression line
+            d = a.to_frame(name=base).join(b.to_frame(name=comp)).dropna()
+            slope, intercept, r, p, error = scipy.stats.linregress(d[base], d[comp])
+            x = np.linspace(-v, v, 1000)
+            y = x * slope + intercept
+            axis[i, j].plot(x, y, color="orange")
+            axis[i, j].text(
+                -7, 7, s="y = {:.2f}x + {:.2f}\n".format(slope, intercept) +
+                "r = {:.3f}\n".format(r) +
+                "p = {:.3E}\n".format(p), fontsize=7, va="top")
+
+            # lastly the actual scatter
+            axis[i, j].scatter(a, b, s=2, alpha=0.5, rasterized=True, c=c, cmap="RdBu_r", vmin=-vmax, vmax=vmax)  # color="grey")
+
+        for ax in axis[i, (j + 1):]:
+            ax.set_visible(False)
+    savefig(fig, os.path.join(output_dir, output_prefix + ".lmfit.svg"))
+
+    fig, axis = plt.subplots(rows, cols, figsize=(cols * 3, rows * 3), tight_layout=True)
+    for i, (base, comps) in enumerate(comps):
+        a = diff.loc[diff['comparison_name'] == base, "log2FoldChange"]
+        sign = (a > 0).astype(int).replace(0, -1)
+        c = sign * (-np.log10(diff.loc[diff['comparison_name'] == base, "pvalue"]))
+        vmax = np.sqrt(c.abs().max())
+        for j, comp in enumerate(comps):
+            b = diff.loc[diff['comparison_name'] == comp, "log2FoldChange"]
+            axis[i, j].set_xlabel(base)
+            axis[i, j].set_ylabel(comp)
+            # equal limits and x = y line
+            axis[i, j].set_xlim((-v, v))
+            axis[i, j].set_ylim((-v, v))
+            axis[i, j].plot((-v, -v), (v, v), linestyle="--", alpha=0.75, color="black")
+            # quadrant lines
+            axis[i, j].axhline(0, linestyle="--", alpha=0.5, color="black")
+            axis[i, j].axvline(0, linestyle="--", alpha=0.5, color="black")
+
+            # fit and plot regression line
+            d = a.to_frame(name=base).join(b.to_frame(name=comp)).dropna()
+            slope, intercept, r, p, error = scipy.stats.linregress(d[base], d[comp])
+            x = np.linspace(-v, v, 1000)
+            y = x * slope + intercept
+            axis[i, j].plot(x, y, color="orange")
+            axis[i, j].text(
+                -7, 7, s="y = {:.2f}x + {:.2f}\n".format(slope, intercept) +
+                "r = {:.3f}\n".format(r) +
+                "p = {:.3E}\n".format(p), fontsize=7, va="top")
+
+            # lastly the actual scatter
+            axis[i, j].scatter(a, b, s=2, alpha=0.5, rasterized=True, color="grey")
+
+        for ax in axis[i, (j + 1):]:
+            ax.set_visible(False)
+    savefig(fig, os.path.join(output_dir, output_prefix + ".lmfit.no_color.svg"))

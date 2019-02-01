@@ -1,6 +1,19 @@
 #!/usr/bin/env python
 
 
+import os
+import string
+
+from ngs_toolkit.general import query_biomart
+from ngs_toolkit.utils import location_index_to_bed
+from ngs_toolkit.project_manager import create_project
+import numpy as np
+import pandas as pd
+import patsy
+import pybedtools
+import yaml
+
+
 class RandomDataGenerator(object):
     def generate_random_data(
             self,
@@ -8,11 +21,6 @@ class RandomDataGenerator(object):
             distribution="negative_binomial", group_fold_differences=5,
             fraction_of_different=0.2,
             data_type="ATAC-seq", genome_assembly="hg19"):
-        import string
-        import patsy
-        import pandas as pd
-        import numpy as np
-
         if not isinstance(group_fold_differences, list):
             # _LOGGER.warning("Assuming same fold difference for all factors between samples")
             group_fold_differences = [group_fold_differences] * n_factors
@@ -80,10 +88,6 @@ class RandomDataGenerator(object):
             size,
             width_mean=500, width_std=400, min_width=300, distribution="normal",
             genome_assembly="hg19"):
-        import pybedtools
-        import numpy as np
-        import pandas as pd
-
         chrom = ['chr1'] * size
         start = np.array([0] * size)
         end = np.absolute(np.random.normal(width_mean, width_std, size)).astype(int)
@@ -96,10 +100,6 @@ class RandomDataGenerator(object):
     def get_random_genes(
             size,
             genome_assembly="hg19"):
-        from ngs_toolkit.general import query_biomart
-        import numpy as np
-        import pandas as pd
-
         m = {"hg19": "grch37", "hg38": "grch38", "mm10": "grcm38"}
 
         g = query_biomart(
@@ -112,12 +112,6 @@ def generate_project(
         output_dir="tests", project_name="test_project",
         organism="human", genome_assembly="hg19", data_type="ATAC-seq",
         only_metadata=False, **kwargs):
-    from ngs_toolkit.project_manager import create_project
-    import os
-    import yaml
-    import pandas as pd
-    import string
-
     output_dir = os.path.abspath(output_dir)
 
     # Create project with projectmanager
@@ -171,7 +165,6 @@ def generate_project(
 
     if not only_metadata:
         if data_type == "ATAC-seq":
-            from ngs_toolkit.general import location_index_to_bed
             bed = location_index_to_bed(n.index)
             bed.to_csv(os.path.join(
                 output_dir, project_name, "results", project_name + "_peak_set.bed"), index=False, sep="\t", header=False)

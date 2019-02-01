@@ -1,3 +1,6 @@
+#!/usr/bin/env python
+
+
 import argparse
 import os
 import re
@@ -5,9 +8,10 @@ import string
 import sys
 import textwrap
 
+import matplotlib.pyplot as plt
+import ngs_toolkit
 import pandas as pd
 from peppy import Project
-import ngs_toolkit
 
 
 def parse_arguments():
@@ -44,7 +48,6 @@ def get_colors(level, pallete="gist_rainbow", nan_color=[0.5, 0.5, 0.5]):
     Given a level (list or iterable) with length n,
     return a same-sized list of RGB colors  for each unique value in the level.
     """
-    import matplotlib.pyplot as plt
 
     pallete = plt.get_cmap(pallete)
     level_unique = list(set(level))

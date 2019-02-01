@@ -1,13 +1,44 @@
 #!/usr/bin/env python
 
+
+from collections import Counter, defaultdict
+import datetime
+import itertools
 import os
+import pickle
+import textwrap
+import time
+import matplotlib
+import matplotlib.pyplot as plt
+
+from ngs_toolkit import _CONFIG, _LOGGER
+from ngs_toolkit.decorators import check_organism_genome
+from ngs_toolkit.graphics import (
+    add_colorbar_to_axis,
+    savefig,
+    plot_projection)
+from ngs_toolkit.parsers import parse_ame, parse_homer
+from ngs_toolkit.general import (
+    deseq_analysis,
+    enrichr,
+    run_enrichment_jobs,
+    get_genome_reference,
+    get_blacklist_annotations,
+    get_tss_annotations,
+    get_genomic_context)
+from ngs_toolkit.utils import log_pvalues
 
 import numpy as np
 import pandas as pd
-
-from ngs_toolkit import _LOGGER
-from ngs_toolkit import _CONFIG
-from ngs_toolkit.decorators import check_organism_genome
+from peppy import Sample
+from pypiper.ngstk import NGSTk
+from scipy.stats import fisher_exact, kruskal, pearsonr, zscore
+import seaborn as sns
+from sklearn import manifold
+from sklearn.decomposition import PCA
+from sklearn.preprocessing import StandardScaler
+from statsmodels.sandbox.stats.multicomp import multipletests
+from tqdm import tqdm
 
 
 class Analysis(object):
@@ -140,8 +171,6 @@ class Analysis(object):
         """
         Make peppy.Sample objects have a more pretty representation.
         """
-        from peppy import Sample
-
         def r(self): return self.name
         Sample.__repr__ = r
 
@@ -379,10 +408,7 @@ class Analysis(object):
         :param bool timestamp:
             Whether to timestamp the file.
         """
-        import pickle
         if timestamp:
-            import time
-            import datetime
             ts = datetime.datetime.fromtimestamp(time.time()).strftime("%Y%m%d-%H%M%S")
             p = self.pickle_file.replace(".pickle", ".{}.pickle".format(ts))
         else:
@@ -397,7 +423,6 @@ class Analysis(object):
             Pickle file to load.
             By default this is the object"s attribute `pickle_file`.
         """
-        import pickle
         if pickle_file is None:
             pickle_file = self.pickle_file
         return pickle.load(open(pickle_file, "rb"))
@@ -445,12 +470,6 @@ class Analysis(object):
             The values of the 'genome' step are also a dictionary with keys "2bit" and "fasta" for
             each file type respectively.
         """
-        from ngs_toolkit.general import (
-            get_genome_reference,
-            get_blacklist_annotations,
-            get_tss_annotations,
-            get_genomic_context)
-
         if organism is None:
             organism = self.organism
         if genome_assembly is None:
@@ -704,10 +723,6 @@ class Analysis(object):
             Matrix of shape (level, sample) with rgb values of each of the variable.
             If as_dataframe, this will be a pandas.DataFrame otherwise, list of lists.
         """
-        import matplotlib
-        import matplotlib.pyplot as plt
-        from collections import Counter
-
         if index is None:
             if matrix is None:
                 msg = "One of `index` or `matrix` must be provided."
@@ -883,19 +898,6 @@ class Analysis(object):
 
         :returns: None
         """
-        from sklearn.preprocessing import StandardScaler
-        from sklearn.decomposition import PCA
-        from sklearn import manifold
-        import itertools
-        from scipy.stats import kruskal
-        from scipy.stats import pearsonr
-        import matplotlib.pyplot as plt
-        import seaborn as sns
-        from statsmodels.sandbox.stats.multicomp import multipletests
-        from ngs_toolkit.graphics import plot_projection
-        from collections import defaultdict
-        from ngs_toolkit.graphics import savefig
-
         data_type = self._get_data_type(data_type)
 
         if data_type == "ATAC-seq":
@@ -1279,7 +1281,6 @@ class Analysis(object):
             Results for all comparisons.
             Will be `None` if `distributed` is `True`.
         """
-        from ngs_toolkit.general import deseq_analysis
         if comparison_table is None:
             msg = "`comparison_table` was not given and is not set in analysis object."
             hint = "Add a `comparison_table` attribute to the analysis object."
@@ -1371,8 +1372,6 @@ class Analysis(object):
             return results
 
         else:
-            from pypiper.ngstk import NGSTk
-            import textwrap
             tk = NGSTk()
             for comparison_name in comparison_table["comparison_name"].drop_duplicates():
                 # make directory for comparison input/output
@@ -1466,8 +1465,6 @@ class Analysis(object):
             Results for all comparisons.
             Will be `None` if `overwrite` is `False` and a results file already exists.
         """
-        from tqdm import tqdm
-
         if comparison_table is None:
             msg = "`comparison_table` was not given and is not set in analysis object."
             hint = "Add a `comparison_table` attribute to the analysis object."
@@ -1673,10 +1670,6 @@ class Analysis(object):
             Color map to use in numerical levels of `group_variables`.
             Will be passed to `analysis.get_level_colors`.
         """
-        import matplotlib.pyplot as plt
-        import seaborn as sns
-        from ngs_toolkit.graphics import add_colorbar_to_axis, savefig
-
         if results is None:
             msg = "Differential results dataframe not given and Analysis object does not"
             msg += " have a `differential_results` attribute."
@@ -2286,16 +2279,6 @@ class Analysis(object):
             Defaults to "differential_analysis".
 
         """
-        import itertools
-        import matplotlib.pyplot as plt
-        import matplotlib
-        import seaborn as sns
-        from tqdm import tqdm
-        from scipy.stats import fisher_exact
-        from statsmodels.sandbox.stats.multicomp import multipletests
-        from ngs_toolkit.general import log_pvalues
-        from ngs_toolkit.graphics import savefig
-
         data_type = self._get_data_type(data_type)
         # Make output dir
         output_dir = self._format_string_with_attributes(output_dir)
@@ -2578,9 +2561,6 @@ class Analysis(object):
             Whether work should be submitted as jobs.
             Defaults to False.
         """
-        from tqdm import tqdm
-        from ngs_toolkit.general import run_enrichment_jobs
-
         serial = not as_jobs
 
         if differential is None:
@@ -2611,7 +2591,6 @@ class Analysis(object):
                 raise ValueError
 
         if data_type == "ATAC-seq":
-            from ngs_toolkit.general import parse_ame, parse_homer
             matrix = self.coverage_annotated
             region_enr = pd.DataFrame()
             lola_enr = pd.DataFrame()
@@ -2619,7 +2598,6 @@ class Analysis(object):
             homer_enr = pd.DataFrame()
             pathway_enr = pd.DataFrame()
         elif data_type == "RNA-seq":
-            from ngs_toolkit.general import enrichr
             matrix = self.expression
             pathway_enr = pd.DataFrame()
         else:
@@ -2829,9 +2807,6 @@ class Analysis(object):
             Whether to skip non-existing files, giving a warning.
             Defaults to True.
         """
-        from ngs_toolkit.general import parse_ame, parse_homer
-        from tqdm import tqdm
-
         data_type = self._get_data_type(data_type)
         if data_type not in ["ATAC-seq", "RNA-seq"]:
             raise ValueError("`data_type` must match one of 'ATAC-seq' or 'RNA-seq'.")
@@ -3032,13 +3007,6 @@ class Analysis(object):
             Colormap to use in heatmaps.
             Default None.
         """
-        import matplotlib
-        import matplotlib.pyplot as plt
-        import seaborn as sns
-        from scipy.stats import zscore
-        from ngs_toolkit.general import log_pvalues
-        from ngs_toolkit.graphics import savefig
-
         def enrichment_barplot(
                 input_df,
                 x,

@@ -1,17 +1,21 @@
 #!/usr/bin/env python
 
 
+import glob
 import os
-import pytest
+import shutil
+
 from .data_generator import generate_project
 from ngs_toolkit.analysis import Analysis
 from ngs_toolkit.atacseq import ATACSeqAnalysis
+import numpy as np
+from peppy import Project
+import pytest
+import yaml
 
 
 @pytest.fixture
 def analysis(tmp_path):
-    import yaml
-    from peppy import Project
     tmp_path = str(tmp_path)  # for Python2
 
     # Let's make several "reallish" test projects
@@ -58,10 +62,6 @@ def analysis(tmp_path):
 
 class Test_Analysis():
     def test_analysis_creation(self, tmp_path):
-        import os
-        from peppy import Project
-        import yaml
-        import shutil
 
         tmp_path = str(tmp_path)  # for Python2
 
@@ -135,9 +135,6 @@ class Test_Analysis():
                 shutil.rmtree(tmp_path)
 
     def test_analysis_serialization(self, tmp_path):
-        import os
-        import numpy as np
-        import glob
 
         tmp_path = str(tmp_path)  # for Python2
 
@@ -163,8 +160,6 @@ class Test_Analysis():
                 )) == 2
 
     def test_analysis_loading(self, tmp_path):
-        import shutil
-        import os
 
         tmp_path = str(tmp_path)  # for Python2
 

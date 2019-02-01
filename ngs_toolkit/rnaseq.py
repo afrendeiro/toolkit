@@ -1,12 +1,20 @@
+#!/usr/bin/env python
+
 
 import os
-from ngs_toolkit.general import Analysis
+
 import matplotlib.pyplot as plt
+from ngs_toolkit import _LOGGER
+from ngs_toolkit.analysis import Analysis
+from ngs_toolkit.general import normalize_quantiles_p
+from ngs_toolkit.general import query_biomart
+from ngs_toolkit.general import unsupervised_analysis
 import numpy as np
 import pandas as pd
+import scipy
+from scipy.stats import zscore
 import seaborn as sns
-
-from . import _LOGGER
+# import requests
 
 
 class RNASeqAnalysis(Analysis):
@@ -195,9 +203,6 @@ class RNASeqAnalysis(Analysis):
         # TODO: Save all matrices of both levels with clear, consistent naming
         # TODO: Declare saved files and outputs in docstring
         """
-        from ngs_toolkit.general import query_biomart
-        from ngs_toolkit.general import normalize_quantiles_p
-
         if samples is None:
             samples = [s for s in self.samples if s.library == "RNA-seq"]
 
@@ -255,13 +260,13 @@ class RNASeqAnalysis(Analysis):
         _samples = [s for s in samples if s.name in self.expression.columns]
         attrs = list()
         for attr in sample_attributes:
-            l = list()
+            ll = list()
             for sample in _samples:  # keep order of samples in matrix
                 try:
-                    l.append(getattr(sample, attr))
+                    ll.append(getattr(sample, attr))
                 except AttributeError:
-                    l.append(np.nan)
-            attrs.append(l)
+                    ll.append(np.nan)
+            attrs.append(ll)
 
         # Generate multiindex columns
         index = pd.MultiIndex.from_arrays(attrs, names=sample_attributes)
@@ -354,7 +359,6 @@ class RNASeqAnalysis(Analysis):
                         bbox_inches="tight")
 
         # # Plot gene expression along chromossomes
-        # import requests
         # url_query = "".join([
         #     """http://grch37.ensembl.org/biomart/martservice?query=""",
         #     """<?xml version="1.0" encoding="UTF-8"?>""",
@@ -389,7 +393,6 @@ class RNASeqAnalysis(Analysis):
         in the future.
         Please use ngs_toolkit.general.unsupervised_analysis(RNASeqAnalysis) in the future.
         """
-        from ngs_toolkit.general import unsupervised_analysis
 
         _LOGGER.warning(PendingDeprecationWarning(
             "RNASeqAnalysis.unsupervised is provided for backward compatibility "
@@ -412,7 +415,6 @@ def knockout_plot(
     """
     Plot expression of knocked-out genes in all samples.
     """
-    import scipy
 
     if (analysis is None) and (expression_matrix is None):
         raise AssertionError("One of `analysis` or `expression_matrix` must be provided.")
@@ -595,10 +597,8 @@ def assess_cell_cycle(analysis, quant_matrix=None, output_dir=None, output_prefi
     :returns: [description]
     :rtype: {[type]}
     """
-    from scipy.stats import zscore
     import anndata
     import scanpy.api as sc
-    from ngs_toolkit.rnaseq import knockout_plot
 
     if quant_matrix is None:
         quant_matrix = analysis.expression

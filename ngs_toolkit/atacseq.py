@@ -3,16 +3,35 @@
 
 import os
 import pickle
+import re
 
 import matplotlib.pyplot as plt
+from ngs_toolkit import _LOGGER
+from ngs_toolkit.analysis import Analysis
+from ngs_toolkit.decorators import check_organism_genome, check_has_sites
+from ngs_toolkit.general import (
+    get_blacklist_annotations,
+    count_reads_in_intervals,
+    normalize_quantiles_r,
+    normalize_quantiles_p,
+    bed_to_fasta, meme_ame,
+    homer_motifs, lola, enrichr)
+from ngs_toolkit.utils import bed_to_index, log_pvalues, standard_score
+
+from tqdm import tqdm
+
+from rpy2 import robjects
+from rpy2.rinterface import RRuntimeWarning
+from scipy.stats import fisher_exact
+import multiprocessing
+import parmap
+import pysam
 import numpy as np
 import pandas as pd
 import pybedtools
+from scipy.stats import mannwhitneyu
 import seaborn as sns
-
-from ngs_toolkit import _LOGGER
-from ngs_toolkit.general import Analysis
-from ngs_toolkit.decorators import (check_organism_genome, check_has_sites)
+from statsmodels.sandbox.stats.multicomp import multipletests
 
 
 class ATACSeqAnalysis(Analysis):
@@ -54,9 +73,8 @@ class ATACSeqAnalysis(Analysis):
     :Example:
 
     .. code-block:: python
-
-        import os
         from peppy import Project
+        import os
         from ngs_toolkit.atacseq import ATACSeqAnalysis
 
         prj = Project(os.path.join("metadata", "project_config.yaml"))
@@ -268,7 +286,6 @@ class ATACSeqAnalysis(Analysis):
 
     @staticmethod
     def set_region_index(matrix):
-        from ngs_toolkit.atacseq import ATACSeqAnalysis
         if ATACSeqAnalysis.check_region_index(matrix):
             _LOGGER.warning("Matrix already has well-formatted index.")
             return matrix
@@ -329,8 +346,6 @@ class ATACSeqAnalysis(Analysis):
             Sets a `sites` variable with consensus peak set.
         :returns: `None`
         """
-        from tqdm import tqdm
-
         if region_type not in ['summits', 'peaks']:
             msg = "`region_type` attribute must be one of 'summits' or 'peaks'!"
             _LOGGER.error(msg)
@@ -352,7 +367,6 @@ class ATACSeqAnalysis(Analysis):
             samples = self._get_samples_have_file(attr=region_type)
 
         if blacklist_bed is None:
-            from ngs_toolkit.general import get_blacklist_annotations
             _LOGGER.info("Blacklist file not provided. Downloading...")
             try:
                 get_blacklist_annotations(self.organism, self.genome)
@@ -472,8 +486,6 @@ class ATACSeqAnalysis(Analysis):
         :var pandas.DataFrame support:
             Sets a `support` variable with peak set overlap.
         """
-        from tqdm import tqdm
-
         if samples is None:
             samples = self.samples
 
@@ -579,10 +591,6 @@ class ATACSeqAnalysis(Analysis):
         :returns pd.DataFrame:
             Pandas DataFrame with read counts of shape (n_sites, m_samples).
         """
-        import multiprocessing
-        import parmap
-        from ngs_toolkit.general import count_reads_in_intervals
-
         if samples is None:
             samples = self.samples
 
@@ -731,13 +739,11 @@ class ATACSeqAnalysis(Analysis):
             to_norm = matrix
 
         if implementation == "R":
-            from ngs_toolkit.general import normalize_quantiles_r
             coverage_qnorm = pd.DataFrame(
                 normalize_quantiles_r(to_norm.values),
                 index=to_norm.index,
                 columns=to_norm.columns)
         elif implementation == "Python":
-            from ngs_toolkit.general import normalize_quantiles_p
             coverage_qnorm = normalize_quantiles_p(to_norm)
         else:
             msg = "Implementation of quantile normalization must be one of 'R' of 'Python'"
@@ -851,10 +857,8 @@ class ATACSeqAnalysis(Analysis):
             # install R package
             # source('http://bioconductor.org/biocLite.R')
             # biocLite('cqn')
-            from rpy2 import robjects
             import rpy2.robjects.pandas2ri
             import warnings
-            from rpy2.rinterface import RRuntimeWarning
             warnings.filterwarnings("ignore", category=RRuntimeWarning)
             robjects.numpy2ri.deactivate()
             rpy2.robjects.pandas2ri.activate()
@@ -985,7 +989,6 @@ class ATACSeqAnalysis(Analysis):
         :returns pandas.DataFrame:
             A dataframe with genes annotated for the peak set.
         """
-        from ngs_toolkit.general import bed_to_index
         cols = [6, 8, 9]
 
         if tss_file is None:
@@ -1077,7 +1080,6 @@ class ATACSeqAnalysis(Analysis):
         :returns:
             A dataframe with genomic context annotation for the peak set.
         """
-        from ngs_toolkit.general import bed_to_index
 
         if genomic_context_file is None:
             _LOGGER.info("Reference genomic context file was not given, will try to get it.")
@@ -1160,7 +1162,6 @@ class ATACSeqAnalysis(Analysis):
 
         :returns: A dataframe with chromatin state annotation for the peak set.
         """
-        from ngs_toolkit.general import bed_to_index
 
         states = pybedtools.BedTool(chrom_state_file)
 
@@ -1391,7 +1392,6 @@ class ATACSeqAnalysis(Analysis):
         """
         @staticmethod
         def get_sample_reads(bam_file):
-            import pysam
             return pysam.AlignmentFile(bam_file).count()
 
         @staticmethod
@@ -1799,15 +1799,13 @@ class ATACSeqAnalysis(Analysis):
         ATACSeqAnalysis.unsupervised is provided for backward compatibility only and will be removed in the future.
         Please use ngs_toolkit.general.unsupervised_analysis(ATACSeqAnalysis) in the future.
         """
-        from ngs_toolkit.general import unsupervised_analysis
-
         _LOGGER.warning(PendingDeprecationWarning(
             "ATACSeqAnalysis.unsupervised is provided for backward compatibility "
             "only and will be removed. Please use "
             "ngs_toolkit.general.unsupervised_analysis(ATACSeqAnalysis) "
             "in the future."))
 
-        unsupervised_analysis(args, **kwargs)
+        self.unsupervised_analysis(args, **kwargs)
 
     def region_context_enrichment(
             self, regions,
@@ -1834,9 +1832,6 @@ class ATACSeqAnalysis(Analysis):
             Defaults to all available: ['genomic_region', 'chromatin_state']
 
         """
-        from scipy.stats import fisher_exact
-        from ngs_toolkit.general import log_pvalues
-
         output_dir = self._format_string_with_attributes(output_dir)
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
@@ -1933,10 +1928,6 @@ class ATACSeqAnalysis(Analysis):
             Default is all: ['region', 'lola', 'meme', 'homer', 'enrichr']
 
         """
-        from ngs_toolkit.general import (
-            bed_to_fasta, meme_ame, homer_motifs,
-            lola, enrichr, standard_score)
-
         # use all sites as universe
         if universe_file is None:
             try:
@@ -2286,7 +2277,6 @@ def investigate_nucleosome_positions(self, samples, cluster=True):
     signals = pd.DataFrame(columns=['group', 'region', 'label'])
     # signals = pd.read_csv(os.path.join(self.results_dir, "nucleoatac", "collected_coverage.csv"))
 
-    import re
     for group in [g for g in groups if any([re.match(".*%s.*" % x, g) for x in ["C631", "HAP1_ARID1", "HAP1_SMARCA"]])]:
         output_dir = os.path.join(self.results_dir, "nucleoatac", group)
         signal_files = [
@@ -2933,10 +2923,6 @@ def tfbs_to_gene(
 
     Returns TFBS-gene assignment matrix.
     """
-    import os
-    import pybedtools
-    import pandas as pd
-
     # read in gene body + promoter info
     promoter_and_genesbody = pybedtools.BedTool(promoter_and_genesbody_file)
     # read in TSS info
@@ -2999,11 +2985,6 @@ def piq_to_network(
 
     Records in `peak_universe_file` are recommended to be enlarged (e.g. up to 500bp in each direction).
     """
-    import re
-    import os
-    import pybedtools
-    import pandas as pd
-
     output_dir = os.path.abspath(output_dir)
     foots_dir = os.path.join(output_dir, "footprint_calls")
     group_foot_dir = os.path.join(foots_dir, group_name)
@@ -3135,9 +3116,6 @@ def differential_interactions(
     Compare TF-gene interactions between two sets of groups (e.g. KO and WT)
     and visualize differences.
     """
-    from scipy.stats import mannwhitneyu
-    from statsmodels.sandbox.stats.multicomp import multipletests
-
     def add_xy_line(axis):
         lims = [np.min([axis.get_xlim(), axis.get_ylim()]), np.max([axis.get_xlim(), axis.get_ylim()])]
         axis.plot(lims, lims, '--', alpha=0.5, zorder=0)

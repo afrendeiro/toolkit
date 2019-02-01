@@ -1,16 +1,39 @@
 #!/usr/bin/env python
 
-import os
 
+import glob
+import json
+import os
+from shutil import which
+import subprocess
+import textwrap
+import warnings
+
+import matplotlib.pyplot as plt
+from ngs_toolkit import _CONFIG, _LOGGER
+from ngs_toolkit.graphics import savefig
+from ngs_toolkit.utils import download_gzip_file, download_file, r2pandas_df
 import numpy as np
 import pandas as pd
-
-from ngs_toolkit import _LOGGER
-from ngs_toolkit import _CONFIG
-from ngs_toolkit.analysis import Analysis
-
-
-Analysis
+import patsy
+from pybedtools import BedTool
+import pybedtools
+from pypiper.ngstk import NGSTk
+import pysam
+import requests
+import rpy2
+from rpy2.rinterface import RRuntimeError, RRuntimeWarning
+from rpy2.robjects import numpy2ri, pandas2ri
+import rpy2.robjects as robjects
+import rpy2.robjects.numpy2ri
+from scipy import stats
+from scipy.linalg import lstsq
+from scipy.stats import gaussian_kde
+import seaborn as sns
+from sklearn.decomposition import PCA
+from sklearn.preprocessing import StandardScaler
+from statsmodels.sandbox.stats.multicomp import multipletests
+from tqdm import tqdm
 
 
 def get_genome_reference(
@@ -47,10 +70,6 @@ def get_genome_reference(
         If not ``dry_run``, path to genome FASTA/2bit file,
         otherwise tuple of URL of reference genome and path to file.
     """
-    from ngs_toolkit.general import download_gzip_file, download_file
-    import pybedtools
-    from shutil import which
-
     def index_fasta(fasta):
         """
         # The idea is to use a hidden method of bedtools
@@ -69,7 +88,6 @@ def get_genome_reference(
 
     def twobit_to_fasta(genome_file):
         if which("twoBitToFa"):
-            import subprocess
             subprocess.call(
                 "twoBitToFa {} {}"
                 .format(genome_file, genome_file.replace(".2bit", ".fa"))
@@ -195,7 +213,6 @@ def get_blacklist_annotations(
 
     :returns str: Path to blacklist BED file
     """
-    from ngs_toolkit.general import download_gzip_file
     if output_dir is None:
         output_dir = os.path.join(os.path.abspath(os.path.curdir), "reference")
     if not os.path.exists(output_dir):
@@ -269,7 +286,6 @@ def get_tss_annotations(
 
     :returns pandas.DataFrame: DataFrame with genome annotations
     """
-    from ngs_toolkit.general import query_biomart
     organisms = {
         "human": {"species": "hsapiens", "ensembl_version": "grch37"},
         "mouse": {"species": "mmusculus", "ensembl_version": "grcm38"},
@@ -399,10 +415,6 @@ def get_genomic_context(
 
     :returns pandas.DataFrame: DataFrame with genome annotations
     """
-    from ngs_toolkit.general import query_biomart
-    import pybedtools
-    from pybedtools import BedTool
-
     organisms = {
         "human": {"species": "hsapiens", "ensembl_version": "grch37", "ucsc_version": "hg19"},
         "mouse": {"species": "mmusculus", "ensembl_version": "grcm38", "ucsc_version": "mm10"},
@@ -565,7 +577,6 @@ def count_reads_in_intervals(bam, intervals):
     :returns dict:
         Dict of read counts for each interval.
     """
-    import pysam
     counts = dict()
 
     bam = pysam.AlignmentFile(bam, mode='rb')
@@ -598,11 +609,6 @@ def normalize_quantiles_r(array):
     :returns numpy.array:
         Normalized numeric array.
     """
-    import numpy as np
-    import rpy2.robjects as robjects
-    import rpy2.robjects.numpy2ri
-    import warnings
-    from rpy2.rinterface import RRuntimeWarning
     warnings.filterwarnings("ignore", category=RRuntimeWarning)
     rpy2.robjects.numpy2ri.activate()
 
@@ -683,14 +689,6 @@ def deseq_analysis(
 
     :returns pandas.DataFrame: Data frame with results, statistics for each feature.
     """
-    import pandas as pd
-    from tqdm import tqdm
-    import rpy2
-    from rpy2.robjects import numpy2ri, pandas2ri
-    import rpy2.robjects as robjects
-    from rpy2.rinterface import RRuntimeError, RRuntimeWarning
-    from ngs_toolkit.general import r2pandas_df
-    import warnings
     numpy2ri.activate()
     pandas2ri.activate()
     warnings.filterwarnings("ignore", category=RRuntimeWarning)
@@ -786,39 +784,6 @@ def deseq_analysis(
     return results
 
 
-def deseq_results_to_bed_file(
-        deseq_result_file, bed_file, sort=True, ascending=False, normalize=False,
-        significant_only=False, alpha=0.05, abs_fold_change=1.):
-    """
-    Write BED file with fold changes from DESeq2 as score value.
-    """
-    df = pd.read_csv(deseq_result_file, index_col=0)
-
-    msg = "DESeq2 results do not have a 'log2FoldChange' column."
-    if not ("log2FoldChange" in df.columns.tolist()):
-        _LOGGER.error(msg)
-        raise AssertionError(msg)
-
-    if sort is True:
-        df = df.sort_values("log2FoldChange", ascending=ascending)
-
-    if significant_only is True:
-        df = df.loc[(df['padj'] < alpha) & (df['log2FoldChange'].abs() > abs_fold_change), :]
-
-    # decompose index string (chrom:start-end) into columns
-    df['chrom'] = map(lambda x: x[0], df.index.str.split(":"))
-    r = pd.Series(map(lambda x: x[1], df.index.str.split(":")))
-    df['start'] = map(lambda x: x[0], r.str.split("-"))
-    df['end'] = map(lambda x: x[1], r.str.split("-"))
-    df['name'] = df.index
-    if normalize:
-        from sklearn.preprocessing import MinMaxScaler
-        MinMaxScaler(feature_range=(0, 1000)).fit_transform(df["log2FoldChange"])
-    df['score'] = df["log2FoldChange"]
-
-    df[["chrom", "start", "end", "name", "score"]].to_csv(bed_file, sep="\t", header=False, index=False)
-
-
 def least_squares_fit(
         quant_matrix, design_matrix, test_model,
         null_model="~ 1", standardize_data=True,
@@ -827,26 +792,32 @@ def least_squares_fit(
     Fit a least squares model with only categorical predictors.
     Computes p-values by comparing the log likelihood ratio of the chosen model to a `null_model`.
 
-    :param quant_matrix: A Data frame of shape (samples, variables).
-    :type quant_matrix: pandas.DataFrame
-    :param design_matrix: A Data frame of shape (samples, variables) with all the variables in `test_model`.
-    :type design_matrix: pandas.DataFrame
-    :param test_model: Model design to test in R/patsy notation.
-    :type test_model: str
-    :param null_model: Null model design in R/patsy notation. Defaults to "~ 1".
-    :type null_model: str,optional
-    :param standardize_data: Whether data should be standardized prior to fitting. Defaults to True.
-    :type standardize_data: bool,optional
-    :param multiple_correction_method: Method to use for multiple test correction.
-                                       See statsmodels.sandbox.stats.multicomp.multipletests. Defaults to "fdr_bh".
-    :type multiple_correction_method: str,optional
-    :returns: Statistics of model fitting and comparison between models for each feature.
-    :rtype: pandas.DataFrame
+    Attributes:
+
+    :param pandas.DataFrame quant_matrix:
+        A Data frame of shape (samples, variables).
+
+    :param pandas.DataFrame design_matrix:
+        A Data frame of shape (samples, variables) with all the variables in `test_model`.
+
+    :param str test_model:
+        Model design to test in R/patsy notation.
+
+    :param str,optional null_model:
+        Null model design in R/patsy notation. Defaults to "~ 1".
+
+    :param bool,optional standardize_data:
+        Whether data should be standardized prior to fitting. Defaults to True.
+
+    :param str,optional multiple_correction_method:
+        Method to use for multiple test correction.
+        See statsmodels.sandbox.stats.multicomp.multipletests. Defaults to "fdr_bh".
+
+    :returns pandas.DataFrame:
+        Statistics of model fitting and comparison between models for each feature.
 
     :Example:
 
-    import numpy as np; import pandas as pd
-    from ngs_toolkit.general import least_squares_fit
     quant_matrix = np.random.random(10000000).reshape(100, 100000)
     P = np.concatenate([[0] * 50, [1] * 50])  # dependent variable
     Q = np.concatenate([[0] * 25, [1] * 25] + [[0] * 25, [1] * 25])  # covariate
@@ -859,14 +830,6 @@ def least_squares_fit(
     res.head()
 
     """
-    from sklearn.preprocessing import StandardScaler
-    import patsy
-    from scipy.linalg import lstsq
-    from scipy import stats
-    from statsmodels.sandbox.stats.multicomp import multipletests
-
-    # # to test
-
     if standardize_data:
         norm = StandardScaler()
         quant_matrix = pd.DataFrame(
@@ -908,21 +871,38 @@ def differential_from_bivariate_fit(
     Perform differential analysis using a bivariate gaussian fit
     on the relationship between mean and fold-change for each comparison.
 
-    :param pandas.DataFrame comparison_table: Dataframe with 'comparison_name', 'comparison_side' and 'sample_name', 'sample_group' columns.
-    :param pandas.DataFrame matrix: Matrix of `n_features, n_samples` with normalized, log-transformed values to perform analysis on.
-    :param str output_dir: Output directory
-    :param str output_prefix: Prefix for outputs.
-    :param int n_bins: Number of bins of mean values along which to standardize fold-changes.
-    :param str multiple_correction_method: Multiple correction method from `statsmodels.sandbox.stats.multicomp.multipletests`.
-    :param bool plot: Whether to generate plots.
-    :param str palette: Color palette to use. This can be any matplotlib palette and is passed to `sns.color_palette`.
-    :param bool make_values_positive: Whether to transform `matrix` to have minimum value 0. Default False.
-    """
-    from scipy.stats import gaussian_kde
-    from statsmodels.sandbox.stats.multicomp import multipletests
-    import matplotlib.pyplot as plt
-    import seaborn as sns
+    Attributes:
 
+    :param pandas.DataFrame comparison_table:
+        Dataframe with 'comparison_name', 'comparison_side' and 'sample_name', 'sample_group' columns.
+
+    :param pandas.DataFrame matrix:
+        Matrix of `n_features, n_samples` with normalized, log-transformed values to perform analysis on.
+
+    :param str output_dir:
+        Output directory
+
+    :param str output_prefix:
+        Prefix for outputs.
+
+    :param int n_bins:
+        Number of bins of mean values along which to standardize fold-changes.
+
+    :param str multiple_correction_method:
+        Multiple correction method from `statsmodels.sandbox.stats.multicomp.multipletests`.
+
+    :param bool plot:
+        Whether to generate plots.
+
+    :param str palette:
+        Color palette to use. This can be any matplotlib palette and is passed to `sns.color_palette`.
+
+    :param bool make_values_positive:
+        Whether to transform `matrix` to have minimum value 0. Default False.
+
+    :returns pandas.DataFrame:
+        Results of fitting and comparison between groups for each feature.
+    """
     comparisons = comparison_table['comparison_name'].drop_duplicates().sort_values()
     if plot:
         fig, axis = plt.subplots(
@@ -1021,7 +1001,7 @@ def differential_from_bivariate_fit(
         results = results.append(res.reset_index(), ignore_index=True)
 
     # save figure
-    fig.savefig(os.path.join(output_dir, output_prefix + ".deseq_result.all_comparisons.scatter.svg"), dpi=300, bbox_inches="tight")
+    savefig(fig, os.path.join(output_dir, output_prefix + ".deseq_result.all_comparisons.scatter.svg"))
 
     # save all
     results = results.set_index("index")
@@ -1033,12 +1013,8 @@ def differential_from_bivariate_fit(
 # def independent_filtering(df, alpha=0.05, n_quantiles=100):
 #     """
 #     """
-#     raise NotImplementedError
-#     import numpy as np
-
 #     req_columns = ["pvalue", "baseMean"]
 #     assert all([x in df.columns for x in req_columns])
-
 #     # compute quantiles accross mean and pvalue distributions
 #     stats = pd.DataFrame()
 #     p = (np.arange(n_quantiles) / float(n_quantiles)) * 100
@@ -1052,30 +1028,20 @@ def differential_from_bivariate_fit(
 #         stats.loc[start, "mean"] = df.loc[i, "baseMean"].mean()
 #         stats.loc[start, "mean_p"] = df.loc[i, "pvalue"].mean()
 #         stats.loc[start, "n_sig_p"] = (df.loc[i, "pvalue"] < alpha).sum()
-
 #     # plot
 #     fig, axis = plt.subplots(1, 2, figsize=(4 * 2, 4 * 1))
 #     axis[0].scatter(stats.index, stats.loc[:, "n_sig_p"])
 #     axis[1].scatter(stats.index, -np.log10(stats.loc[:, "mean_p"]))
-
 #     # choose inflection point
-
 #     return
 
 
 # def fit_curve():
-#     import numpy as np
-#     import matplotlib.pyplot as plt
-#     from scipy.optimize import curve_fit
-
 #     def func(x, a, b, c):
 #         return a * np.exp(-b * x) + c
-
 #     plt.plot(stats.index, -np.log10(stats['mean_p']), 'b-', label='data')
-
 #     popt, pcov = curve_fit(func, stats.index, -np.log10(stats['mean_p']))
 #     plt.plot(stats.index, func(stats.index, *popt), 'r-', label='fit')
-
 #     popt, pcov = curve_fit(func, stats.index, stats['mean_p'], bounds=(0, [3., 2., 1.]))
 #     plt.plot(stats.index, func(stats.index, *popt), 'g--', label='fit-with-bounds')
 #     plt.xlabel('x')
@@ -1098,27 +1064,30 @@ def lola(bed_files, universe_file, output_folder, output_prefixes=None, genome="
         >>> source('http://bioconductor.org/biocLite.R')
         >>> biocLite('LOLA')
 
-    :param bed_files: A string path to a BED file or a list of paths.
-    :type bed_files: {str, list}
-    :param universe_file: A path to a BED file representing the universe from where the
-                          BED file(s) come from.
-    :type universe_file: str
-    :param output_folder: Output folder for resulting files
-    :type output_folder: str
-    :param output_prefixes: A list of strings with prefixes to be used in case
-                          ``bed_files`` is a list. Defaults to None
-    :type output_prefixes: list,optional
-    :param genome: Genome assembly from which the BED files come from. This is used
-                   to get the LOLA databases from the ngs_toolkit._CONFIG parameters. Defaults to "hg19".
-    :type genome: str
-    :param cpus: Number of CPUs/threads to use. Defaults to 8
-    :type cpus: int,optional
+    Attributes:
+
+    :param str,list bed_files:
+        A string path to a BED file or a list of paths.
+
+    :param str universe_file:
+        A path to a BED file representing the universe from where the BED file(s) come from.
+
+    :param str output_folder:
+        Output folder for resulting files.
+
+    :param list,optional output_prefixes:
+        A list of strings with prefixes to be used in case ``bed_files`` is a list.
+        Defaults to None
+
+    :param str,optional genome:
+        Genome assembly from which the BED files come from.
+        This is used to get the LOLA databases from the ngs_toolkit._CONFIG parameters.
+        Defaults to "hg19".
+
+    :param int,optional cpus:
+        Number of CPUs/threads to use.
+        Defaults to 8
     """
-    from rpy2.robjects import numpy2ri, pandas2ri
-    import rpy2.robjects as robjects
-    from ngs_toolkit.general import r2pandas_df
-    import warnings
-    from rpy2.rinterface import RRuntimeWarning
     numpy2ri.activate()
     pandas2ri.activate()
     warnings.filterwarnings("ignore", category=RRuntimeWarning)
@@ -1186,10 +1155,6 @@ def lola(bed_files, universe_file, output_folder, output_prefixes=None, genome="
 
 
 def bed_to_fasta(bed_file, fasta_file, genome="hg19", genome_2bit=None):
-    import os
-    import pandas as pd
-    import subprocess
-
     if genome_2bit is None:
         # Get region databases from config
         _LOGGER.info("Getting 2bit reference genome for genome '{}' from configuration.".format(genome))
@@ -1224,9 +1189,12 @@ def bed_to_fasta(bed_file, fasta_file, genome="hg19", genome_2bit=None):
     # subprocess.call("rm %s" % bed_file + ".tmp.bed")
 
 
-def meme_ame(input_fasta, output_dir, background_fasta=None, organism="human", motif_database_file=None):
-    import subprocess
-
+def meme_ame(
+        input_fasta,
+        output_dir,
+        background_fasta=None,
+        organism="human",
+        motif_database_file=None):
     if motif_database_file is None:
         # Get region databases from config
         _LOGGER.info("Getting 2bit reference genome for genome '{}' from configuration.".format(organism))
@@ -1262,110 +1230,11 @@ def meme_ame(input_fasta, output_dir, background_fasta=None, organism="human", m
     # subprocess.call("rm {}".format(shuffled).split(" "))
 
 
-def parse_ame(ame_dir):
-    """
-    Parse results of MEME-AME motif enrichment.
-
-    :param ame_dir: Directory with MEME-AME results.
-    :type ame_dir: str
-    :returns: Data frame with enrichment statistics for each found TF motif.
-    :rtype: pandas.DataFrame
-    :raises: IOError
-    """
-    import os
-    import pandas as pd
-
-    with open(os.path.join(ame_dir, "ame.txt"), 'r') as handle:
-        lines = handle.readlines()
-
-    output = list()
-    for line in lines:
-        # skip header lines
-        if line[0] not in [str(i) for i in range(10)]:
-            continue
-
-        # get motif string and the first half of it (simple name)
-        motif = line.strip().split(" ")[5].split("_")[0]
-        # get corrected p-value
-        q_value = float(line.strip().split(" ")[-2])
-        # append
-        output.append((motif, q_value))
-
-    r = pd.Series(dict(output)).reset_index()
-    r.columns = ["TF", "p_value"]
-    return r
-
-
 def homer_motifs(bed_file, output_dir, genome="hg19"):
-    import subprocess
     cmd = "findMotifsGenome.pl {bed} {genome}r {out_dir} \
     -size 1000 -h -p 2 -len 8,10,12,14 -noknown".format(
-        bed=bed_file, genome=genome, out_dir=output_dir
-    )
+        bed=bed_file, genome=genome, out_dir=output_dir)
     subprocess.call(cmd.split(" "))
-
-
-def parse_homer(homer_dir):
-    """
-    Parse results of HOMER findMotifs.pl de novo motif enrichment.
-
-    :param homer_dir: Directory with HOMER results.
-    :type homer_dir: str
-    :returns: Data frame with enrichment statistics for each found TF motif.
-    :rtype: pandas.DataFrame
-    :raises: IOError
-    """
-    import glob
-    import os
-    import re
-    import pandas as pd
-
-    motif_htmls = sorted(glob.glob(os.path.join(homer_dir, "motif*.info.html")))
-
-    if len(motif_htmls) < 1:
-        raise IOError("Homer directory does not contain any discovered motifs.")
-
-    output = pd.DataFrame()
-    for motif_html in motif_htmls:
-
-        motif = int(re.sub(".info.html", "", re.sub(os.path.join(homer_dir, "motif"), "", motif_html)))
-
-        with open(motif_html, 'r') as handle:
-            content = handle.read()
-
-        # Parse table with motif info
-        info_table = content[
-            re.search("""<TABLE border="1" cellpading="0" cellspacing="0">""", content).end():
-            re.search("</TABLE>", content).start()].strip()
-
-        info_table = pd.DataFrame([x.split("</TD><TD>") for x in info_table.replace("<TR><TD>", "").split("</TD></TR>")])
-        info_table.columns = ["description", "value"]
-        info_table["description"] = info_table["description"].str.strip()
-        info_table["motif"] = motif
-
-        # Add most probable known motif name
-        info_table["known_motif"] = content[
-            re.search("<H4>", content).end():
-            re.search("</H4>", content).start()]
-
-        # append
-        output = output.append(info_table, ignore_index=True)
-
-    return output.sort_values("motif")
-
-
-def parse_great_enrichment(input_tsv):
-    """
-    Parse output from GREAT enrichment (http://great.stanford.edu).
-
-    :param input_tsv: TSV file exported from GREAT through the option "All data as .tsv" in "Global Controls".
-    :type input_tsv: str
-    :returns: Pandas dataframe with enrichment results.
-    :rtype: pandas.DataFrame
-    """
-    df = pd.read_csv(input_tsv, sep="\t", skiprows=3)
-    df.columns = df.columns.str.replace("# ", "")
-    return df.loc[~df.iloc[:, 0].str.startswith("#")]
 
 
 def homer_combine_motifs(
@@ -1378,33 +1247,44 @@ def homer_combine_motifs(
     """
     Create consensus of de novo discovered motifs from HOMER
 
-    :param comparison_dirs: Iterable of comparison directories where homer was run.
-                            Should contain a "homerMotifs.all.motifs" file.
-    :type comparison_dirs: list
-    :param output_dir: Output directory.
-    :type output_dir: str
-    :param p_value_threshold: Threshold for inclusion of a motif in the consensus set.
-                              Defaults to 1e-5
-    :type p_value_threshold: number,optional
-    :param cpus: Number of available CPUS/threads for multithread processing.
-                 Defaults to 8
-    :type cpus: number,optional
-    :param run: Whether to run enrichment of each comparison in the consensus motifs. Default is True
-    :type run: bool,optional
-    :param as_jobs: Whether to run enrichment as a cluster job. Default is True
-    :type as_jobs: bool,optional
-    :param genome: Genome assembly of the data. Default is 'hg19'.
-    :type genome: str
-    :param known_vertebrates_TFs_only: Deprecated. Pass a given motif_database to `motif_database` directly.
-    :type known_vertebrates_TFs_only: bool
-    :param motif_database: Motif database to restrict motif matching too.
-    :type motif_database: str
-    :returns: If `run` is `False`, returns path to consensus motif file. Otherwise `None`.
-    :rtype: str
-    """
-    import glob
-    import subprocess
+    Attributes:
 
+    :param list comparison_dirs:
+        Iterable of comparison directories where homer was run.
+        Should contain a "homerMotifs.all.motifs" file.
+
+    :param str output_dir:
+        Output directory.
+
+    :param number,optional p_value_threshold:
+        Threshold for inclusion of a motif in the consensus set.
+        Defaults to 1e-5
+
+    :param number,optional cpus:
+        Number of available CPUS/threads for multithread processing.
+        Defaults to 8
+
+    :param bool,optional run:
+        Whether to run enrichment of each comparison in the consensus motifs.
+        Default is True
+
+    :param bool,optional as_jobs:
+        Whether to run enrichment as a cluster job.
+        Default is True
+
+    :param str genome:
+        Genome assembly of the data.
+        Default is 'hg19'.
+
+    :param bool known_vertebrates_TFs_only:
+        Deprecated. Pass a given motif_database to `motif_database` directly.
+
+    :param str motif_database:
+        Motif database to restrict motif matching too.
+
+    :returns str:
+        If `run` is `False`, returns path to consensus motif file. Otherwise `None`.
+    """
     if known_vertebrates_TFs_only:
         _LOGGER.warning("WARNING! `known_vertebrates_TFs_only` option is deprecated!" +
                         "Pass a given motif_database to `motif_database` directly.")
@@ -1470,12 +1350,24 @@ def homer_combine_motifs(
 def enrichr(dataframe, gene_set_libraries=None, kind="genes"):
     """
     Use Enrichr on a list of genes (currently only genes supported through the API).
-    """
-    import json
-    import requests
-    import pandas as pd
-    from tqdm import tqdm
 
+    :param str dataframe:
+        DataFrame with column "gene_name".
+
+    :param list,optional gene_set_libraries:
+        Gene set libraries to use.
+        Defaults to values in initial configuration file.
+        To see them, do: ``ngs_toolkit._CONFIG['resources']['enrichr']['gene_set_libraries']``
+
+    :param str,optional kind:
+        Kind of input. Right now, only "genes" is supported.
+        Defaults to "genes"
+
+    :returns pandas.DataFrame:
+        Results of enrichment analysis
+
+    :raises: Exception
+    """
     ENRICHR_ADD = 'http://amp.pharm.mssm.edu/Enrichr/addList'
     ENRICHR_RETRIEVE = 'http://amp.pharm.mssm.edu/Enrichr/enrich'
     query_string = '?userListId=%s&backgroundType=%s'
@@ -1568,7 +1460,6 @@ def run_enrichment_jobs(
     """
     Submit enrichment jobs for a specifc analysis.
     """
-    import subprocess
     cmds = list()
 
     # LOLA
@@ -1632,587 +1523,6 @@ done""".format(results_dir=results_dir)]
         subprocess.call(cmd.split(" "))
 
 
-def chunks(l, n):
-    """
-    Partition iterable in `n` chunks.
-
-    :param iterable l: Iterable (e.g. list or numpy array).
-    :param int n: Number of chunks to generate.
-    """
-    n = max(1, n)
-    return (l[i:i + n] for i in range(0, len(l), n))
-
-
-def sorted_nicely(l):
-    """
-    Sort an iterable in the way that humans expect.
-
-    :param l: Iterable to be sorted
-    :type l: iterable
-    :returns: Sorted interable
-    :rtype: list
-    """
-    import re
-    convert = lambda text: int(text) if text.isdigit() else text
-    alphanum_key = lambda key: [convert(c) for c in re.split('([0-9]+)', key)]
-    return sorted(l, key=alphanum_key)
-
-
-def standard_score(x):
-    """
-    Compute a standard score, defined as (x - min(x)) / (max(x) - min(x)).
-
-    :param numpy.array x: Numeric array.
-    """
-    return (x - x.min()) / (x.max() - x.min())
-
-
-def z_score(x):
-    """
-    Compute a Z-score, defined as (x - mean(x)) / std(x).
-
-    :param numpy.array x: Numeric array.
-    """
-    return (x - x.mean()) / x.std()
-
-
-def count_dataframe_values(x):
-    """
-    Count number of non-null values in a dataframe.
-
-    :param x: Pandas DataFrame
-    :type x: pandas.DataFrame
-    :returns: Number of non-null values.
-    :rtype: int
-    """
-    return np.multiply(*x.shape) - x.isnull().sum().sum()
-
-
-def location_index_to_bed(index):
-    bed = pd.DataFrame(index=index)
-    index = index.to_series(name='region')
-    bed['chrom'] = index.str.split(":").str[0]
-    index2 = index.str.split(":").str[1]
-    bed['start'] = index2.str.split("-").str[0]
-    bed['end'] = index2.str.split("-").str[1]
-    return bed
-
-
-def bed_to_index(df):
-    """
-    Get an index of the form chrom:start-end
-    from a a dataframe with such columns.
-
-    :param pandas.DataFrame df: DataFrame with columns
-                                 'chr', 'start' and 'end'.
-    """
-    cols = ['chrom', 'start', 'end']
-    if not all([x in df.columns for x in cols]):
-        raise AttributeError("DataFrame does not have '{}' columns."
-                             .format("', '".join(cols)))
-    index = (
-        df['chrom'] +
-        ":" +
-        df['start'].astype(int).astype(str) +
-        "-" +
-        df['end'].astype(int).astype(str))
-    return pd.Index(index, name="region")
-
-
-def timedelta_to_years(x):
-    """
-    Convert a timedelta to years.
-
-    :param x: A timedelta.
-    :type x:
-    :returns: [description]
-    :rtype: {[type]}
-    """
-    return x / np.timedelta64(60 * 60 * 24 * 365, 's')
-
-
-def signed_max(x, f=0.66, axis=0):
-    """
-    Return maximum or minimum of array `x` depending on the sign of the majority of values.
-    If there isn't a clear majority (at least `f` fraction in one side), return mean of values.
-    If given a pandas DataFrame or 2D numpy array, will apply this across rows (columns-wise, axis=0)
-    or across columns (row-wise, axis=1).
-    Will return NaN for non-numeric values.
-
-    :param numpy.array x: Numeric array or pandas Dataframe or Series.
-    :param float f: Threshold fraction of majority agreement.
-    :param int axis: Whether to apply across rows (0, columns-wise) or across columns (1, row-wise).
-    :returns: Pandas Series with values reduced to the signed maximum.
-    :rtype: pandas.Series
-    """
-    if axis not in [0, 1]:
-        raise ValueError("Axis must be one of 0 (columns) or 1 (rows).")
-
-    if len(x.shape) == 1:
-        # Return nan if not numeric
-        if x.dtype not in [np.float_, np.int_]:
-            return np.nan
-
-        types = [type(i) for i in x]
-        if not all(types):
-            return np.nan
-        else:
-            if types[0] not in [np.float_, float, np.int_, int]:
-                return np.nan
-        ll = float(len(x))
-        neg = sum(x < 0)
-        pos = sum(x > 0)
-        obs_f = max(neg / ll, pos / ll)
-        if obs_f >= f:
-            if neg > pos:
-                return min(x)
-            else:
-                return max(x)
-        else:
-            return np.mean(x)
-    else:
-        if type(x) != pd.DataFrame:
-            x = pd.DataFrame(x)
-
-        if axis == 1:
-            x = x.T
-        res = pd.Series(np.empty(x.shape[1]), index=x.columns)
-        for v in x.columns:
-            res[v] = signed_max(x.loc[:, v])
-
-        return res
-
-
-def log_pvalues(x, f=0.1):
-    """
-    Calculate -log10(p-value) replacing infinite values with:
-        ``max(x) + max(x) * f``
-
-    Attributes:
-
-    :param pandas.Series x:
-        Series with numeric values
-
-    :returns pandas.Series:
-        Transformed values
-    """
-    ll = (-np.log10(x))
-    rmax = ll[ll != np.inf].max()
-    return ll.replace(np.inf, rmax + rmax * f)
-
-
-def r2pandas_df(r_df):
-    import numpy as np
-    df = pd.DataFrame(np.asarray(r_df)).T
-    df.columns = [str(x) for x in r_df.colnames]
-    df.index = [str(x) for x in r_df.rownames]
-    return df
-
-
-# def detect_peaks(x, mph=None, mpd=1, threshold=0, edge='rising',
-#                  kpsh=False, valley=False):
-#     """Detect peaks in data based on their amplitude and other features.
-
-#     Parameters
-#     ----------
-#     x : 1D array_like
-#         data.
-#     mph : {None, number},optional (default = None)
-#         detect peaks that are greater than minimum peak height.
-#     mpd : positive integer,optional (default = 1)
-#         detect peaks that are at least separated by minimum peak distance (in
-#         number of data).
-#     threshold : positive number,optional (default = 0)
-#         detect peaks (valleys) that are greater (smaller) than `threshold`
-#         in relation to their immediate neighbors.
-#     edge : {None, 'rising', 'falling', 'both'},optional (default = 'rising')
-#         for a flat peak, keep only the rising edge ('rising'), only the
-#         falling edge ('falling'), both edges ('both'), or don't detect a
-#         flat peak (None).
-#     kpsh : bool,optional (default = False)
-#         keep peaks with same height even if they are closer than `mpd`.
-#     valley : bool,optional (default = False)
-#         if True (1), detect valleys (local minima) instead of peaks.
-#     show : bool,optional (default = False)
-#         if True (1), plot data in matplotlib figure.
-#     ax : a matplotlib.axes.Axes instance,optional (default = None).
-
-#     Returns
-#     -------
-#     ind : 1D array_like
-#         indeces of the peaks in `x`.
-
-#     Notes
-#     -----
-#     The detection of valleys instead of peaks is performed internally by simply
-#     negating the data: `ind_valleys = detect_peaks(-x)`
-
-#     The function can handle NaN's
-
-#     See this IPython Notebook [1]_.
-
-#     References
-#     ----------
-#     .. [1] http://nbviewer.ipython.org/github/demotu/BMC/blob/master/notebooks/DetectPeaks.ipynb
-
-#     Examples
-#     --------
-#     >>> from detect_peaks import detect_peaks
-#     >>> x = np.random.randn(100)
-#     >>> x[60:81] = np.nan
-#     >>> # detect all peaks and plot data
-#     >>> ind = detect_peaks(x, show=True)
-#     >>> print(ind)
-
-#     >>> x = np.sin(2*np.pi*5*np.linspace(0, 1, 200)) + np.random.randn(200)/5
-#     >>> # set minimum peak height = 0 and minimum peak distance = 20
-#     >>> detect_peaks(x, mph=0, mpd=20, show=True)
-
-#     >>> x = [0, 1, 0, 2, 0, 3, 0, 2, 0, 1, 0]
-#     >>> # set minimum peak distance = 2
-#     >>> detect_peaks(x, mpd=2, show=True)
-
-#     >>> x = np.sin(2*np.pi*5*np.linspace(0, 1, 200)) + np.random.randn(200)/5
-#     >>> # detection of valleys instead of peaks
-#     >>> detect_peaks(x, mph=0, mpd=20, valley=True, show=True)
-
-#     >>> x = [0, 1, 1, 0, 1, 1, 0]
-#     >>> # detect both edges
-#     >>> detect_peaks(x, edge='both', show=True)
-
-#     >>> x = [-2, 1, -2, 2, 1, 1, 3, 0]
-#     >>> # set threshold = 2
-#     >>> detect_peaks(x, threshold = 2, show=True)
-#     """
-#     import numpy as np
-
-#     x = np.atleast_1d(x).astype('float64')
-#     if x.size < 3:
-#         return np.array([], dtype=int)
-#     if valley:
-#         x = -x
-#     # find indices of all peaks
-#     dx = x[1:] - x[:-1]
-#     # handle NaN's
-#     indnan = np.where(np.isnan(x))[0]
-#     if indnan.size:
-#         x[indnan] = np.inf
-#         dx[np.where(np.isnan(dx))[0]] = np.inf
-#     ine, ire, ife = np.array([[], [], []], dtype=int)
-#     if not edge:
-#         ine = np.where((np.hstack((dx, 0)) < 0) & (np.hstack((0, dx)) > 0))[0]
-#     else:
-#         if edge.lower() in ['rising', 'both']:
-#             ire = np.where((np.hstack((dx, 0)) <= 0) & (np.hstack((0, dx)) > 0))[0]
-#         if edge.lower() in ['falling', 'both']:
-#             ife = np.where((np.hstack((dx, 0)) < 0) & (np.hstack((0, dx)) >= 0))[0]
-#     ind = np.unique(np.hstack((ine, ire, ife)))
-#     # handle NaN's
-#     if ind.size and indnan.size:
-#         # NaN's and values close to NaN's cannot be peaks
-#         ind = ind[np.in1d(ind, np.unique(np.hstack((indnan, indnan - 1, indnan + 1))), invert=True)]
-#     # first and last values of x cannot be peaks
-#     if ind.size and ind[0] == 0:
-#         ind = ind[1:]
-#     if ind.size and ind[-1] == x.size - 1:
-#         ind = ind[:-1]
-#     # remove peaks < minimum peak height
-#     if ind.size and mph is not None:
-#         ind = ind[x[ind] >= mph]
-#     # remove peaks - neighbors < threshold
-#     if ind.size and threshold > 0:
-#         dx = np.min(np.vstack([x[ind] - x[ind - 1], x[ind] - x[ind + 1]]), axis=0)
-#         ind = np.delete(ind, np.where(dx < threshold)[0])
-#     # detect small peaks closer than minimum peak distance
-#     if ind.size and mpd > 1:
-#         ind = ind[np.argsort(x[ind])][::-1]  # sort ind by peak height
-#         idel = np.zeros(ind.size, dtype=bool)
-#         for i in range(ind.size):
-#             if not idel[i]:
-#                 # keep peaks with the same height if kpsh is True
-#                 idel = idel | (ind >= ind[i] - mpd) & (ind <= ind[i] + mpd) \
-#                     & (x[ind[i]] > x[ind] if kpsh else True)
-#                 idel[i] = 0  # Keep current peak
-#         # remove the small peaks and sort back the indices by their occurrence
-#         ind = np.sort(ind[~idel])
-
-#     return ind
-
-
-def count_jobs_running(cmd="squeue", sep="\n"):
-    """
-    Count running jobs on a cluster by invoquing a command that lists the jobs.
-    """
-    import subprocess
-    return subprocess.check_output(cmd).split(sep).__len__()
-
-
-def submit_job_if_possible(cmd, total_job_lim=800, refresh_time=10, in_between_time=5):
-    from ngs_toolkit.general import count_jobs_running
-    import subprocess
-    import time
-
-    submit = count_jobs_running() < total_job_lim
-    while not submit:
-        time.sleep(refresh_time)
-        submit = count_jobs_running() < total_job_lim
-    subprocess.call(cmd.split(" "))
-    time.sleep(in_between_time)
-
-
-def sra_id2geo_id(sra_ids):
-    """Query SRA ID from GEO ID"""
-    import subprocess
-
-    cmd = "esearch -db sra -query {}"
-    cmd += " | efetch -format docsum"
-    cmd += " | xtract -pattern DocumentSummary -element Runs"
-    cmd += """ |  perl -ne '@mt = ($_ =~ /SRR\\d+/g); print "@mt"'"""
-
-    geo_ids = list()
-    for id in sra_ids:
-        geo_ids.append(subprocess.call(cmd.format(id).split(" ")).read())
-    return
-
-
-def sra2fastq(input_sra, output_dir):
-    cmd = """
-\t\tfastq-dump --split-3 --outdir {} {}
-    """.format(output_dir, input_sra)
-
-    return cmd
-
-
-def fastq2bam(input_fastq, output_bam, sample_name, input_fastq2=None):
-    cmd = """
-\t\tjava -Xmx4g -jar /cm/shared/apps/picard-tools/1.118/FastqToSam.jar"""
-    cmd += " FASTQ={0}".format(input_fastq)
-    cmd += " SAMPLE_NAME={0}".format(sample_name)
-    if input_fastq2 is not None:
-        cmd += " FASTQ2={0}".format(input_fastq2)
-    cmd += """ OUTPUT={0}""".format(output_bam)
-
-    return cmd
-
-
-def decompress_file(file, output_file=None):
-    """
-    Decompress a gzip-compressed file in chunks (not in memory).
-    """
-    """
-    # test:
-    file = "file.bed.gz"
-    """
-    import gzip
-
-    if output_file is None:
-        if not file.endswith(".gz"):
-            msg = "`output_file` not given and input_file does not end in '.gz'."
-            _LOGGER.error(msg)
-            raise ValueError(msg)
-        output_file = file.replace(".gz", "")
-    with gzip.open(file, 'rb') as _in:
-        with open(output_file, 'w') as _out:
-            for line in _in.readlines():
-                _out.write(line.decode('utf-8'))
-
-
-def download_file(url, output_file, chunk_size=1024):
-    """
-    Download a file and write to disk in chunks (not in memory).
-    """
-    """
-    # test:
-    url = 'https://egg2.wustl.edu/roadmap/data/byFileType/chromhmmSegmentations'
-    url += '/ChmmModels/coreMarks/jointModel/final/E001_15_coreMarks_dense.bed.gz'
-    output_file = "file.bed.gz"
-    chunk_size = 1024
-    """
-    import requests
-    response = requests.get(url, stream=True)
-    with open(output_file, 'wb') as outfile:
-        outfile.writelines(
-            response.iter_content(chunk_size=chunk_size))
-
-
-def download_gzip_file(url, output_file):
-    if not output_file.endswith(".gz"):
-        output_file += '.gz'
-    download_file(url, output_file)
-    decompress_file(output_file)
-    if (
-            os.path.exists(output_file) and
-            os.path.exists(output_file.replace(".gz", ""))):
-        os.remove(output_file)
-
-
-def download_cram(link, output_dir):
-    cmd = """
-    cd {}
-    wget '{}'
-    cd -
-    """.format(output_dir, link)
-
-    return cmd
-
-
-def cram2bam(input_cram, output_bam):
-    cmd = """
-    samtools view -b -o {} {}
-    """.format(output_bam, input_cram)
-
-    return cmd
-
-
-def download_sra(link, output_dir):
-    cmd = """
-    cd {}
-    wget '{}'
-    cd -
-    """.format(output_dir, link)
-
-    return cmd
-
-
-def sra2bam_job(sra_id, base_path):
-    from pypiper import NGSTk
-    import textwrap
-    tk = NGSTk()
-
-    # Slurm header
-    job_file = os.path.join(base_path, "%s_sra2bam.sh" % sra_id)
-    log_file = os.path.join(base_path, "%s_sra2bam.log" % sra_id)
-
-    cmd = tk.slurm_header("-".join(["sra2bam", sra_id]), log_file, cpus_per_task=2)
-
-    # SRA to FASTQ
-    cmd += sra2fastq(os.path.join(base_path, sra_id + ".sra"), base_path)
-
-    # FASTQ to BAM
-    cmd += fastq2bam(
-        os.path.join(base_path, sra_id + "_1.fastq"),
-        os.path.join(base_path, sra_id + ".bam"),
-        sra_id,
-        os.path.join(base_path, sra_id + "_2.fastq"))
-
-    # Slurm footer
-    cmd += tk.slurm_footer() + "\n"
-
-    # Write job to file
-
-    with open(job_file, "w") as handle:
-        handle.write(textwrap.dedent(cmd))
-
-    # Submit
-    tk.slurm_submit_job(job_file)
-
-
-def link2bam_job(sample_name, link, base_path):
-    from pypiper import NGSTk
-    import textwrap
-    tk = NGSTk()
-
-    # Slurm header
-    job_file = os.path.join(base_path, "%s_link2bam.sh" % sample_name)
-    log_file = os.path.join(base_path, "%s_link2bam.log" % sample_name)
-
-    cmd = tk.slurm_header("-".join(["link2bam", sample_name]), log_file, cpus_per_task=2)
-
-    # Download CRAM
-    cmd += download_cram(
-        link,
-        base_path)
-
-    # CRAM to BAM
-    cmd += cram2bam(
-        os.path.join(base_path, sample_name + ".cram"),
-        os.path.join(base_path, sample_name + ".bam"))
-
-    # Slurm footer
-    cmd += tk.slurm_footer() + "\n"
-
-    # Write job to file
-
-    with open(job_file, "w") as handle:
-        handle.write(textwrap.dedent(cmd))
-
-    # Submit
-    tk.slurm_submit_job(job_file)
-
-
-def sralink2bam_job(sra_id, base_path):
-    from pypiper import NGSTk
-    import textwrap
-    tk = NGSTk()
-
-    # Slurm header
-    job_file = os.path.join(base_path, "%s_sra2bam.sh" % sra_id)
-    log_file = os.path.join(base_path, "%s_sra2bam.log" % sra_id)
-
-    cmd = tk.slurm_header("-".join(["sra2bam", sra_id]), log_file, cpus_per_task=2)
-
-    # SRA to FASTQ
-    cmd += sra2fastq(sra_id, base_path)
-
-    # FASTQ to BAM
-    cmd += fastq2bam(
-        os.path.join(base_path, sra_id + "_1.fastq"),
-        os.path.join(base_path, sra_id + ".bam"),
-        sra_id,
-        os.path.join(base_path, sra_id + "_2.fastq"))
-
-    # Slurm footer
-    cmd += tk.slurm_footer() + "\n"
-
-    # Write job to file
-
-    with open(job_file, "w") as handle:
-        handle.write(textwrap.dedent(cmd))
-
-    # Submit
-    tk.slurm_submit_job(job_file)
-    _LOGGER.info(job_file)
-
-
-def series_matrix2csv(matrix_url, prefix=None):
-    """
-    matrix_url: gziped URL with GEO series matrix.
-    """
-    import subprocess
-    import gzip
-    import pandas as pd
-
-    subprocess.call("wget {}".format(matrix_url).split(" "))
-    filename = matrix_url.split("/")[-1]
-
-    with gzip.open(filename, 'rb') as f:
-        file_content = f.read()
-
-    # separate lines with only one field (project-related)
-    # from lines with >2 fields (sample-related)
-    prj_lines = dict()
-    sample_lines = dict()
-
-    for line in file_content.decode("utf-8").strip().split("\n"):
-        line = line.strip().split("\t")
-        if len(line) == 2:
-            prj_lines[line[0].replace("\"", "")] = line[1].replace("\"", "")
-        elif len(line) > 2:
-            sample_lines[line[0].replace("\"", "")] = [x.replace("\"", "") for x in line[1:]]
-
-    prj = pd.Series(prj_lines)
-    prj.index = prj.index.str.replace("!Series_", "")
-
-    samples = pd.DataFrame(sample_lines)
-    samples.columns = samples.columns.str.replace("!Sample_", "")
-
-    if prefix is not None:
-        prj.to_csv(os.path.join(prefix + ".project_annotation.csv"), index=True)
-        samples.to_csv(os.path.join(prefix + ".sample_annotation.csv"), index=False)
-
-    return prj, samples
-
-
 def project_to_geo(
         project, output_dir="geo_submission",
         samples=None, distributed=False, dry_run=False):
@@ -2228,27 +1538,29 @@ def project_to_geo(
 
     A pandas DataFrame with info on the sample's files and md5sums will be returned.
 
-    :param project: A peppy Project object to process.
-    :type project: peppy.Project
-    :param output_dir: Directory to create output. Will be created/overwriten
-                       if existing.
-                       Defaults to "geo_submission".
-    :type output_dir: str,optional
-    :param samples: List of peppy.Sample objects in project to restrict to.
-                    Defaults to all samples in project.
-    :type samples: list,optional
-    :param distributed: Whether processing should be distributed as jobs in a
-                        computing cluster for each sample.
-                        Currently available implementation supports a SLURM
-                        cluster only. Defaults to False.
-    :type distributed: bool,optional
-    :param dry_run: Whether copy/execution/submisison commands should be not be run to test.
-    :type dry_run: bool,optional
-    :returns: pandas.DataFrame with annotation of samples and their BAM, BigWig, narrowPeak
-              files and respective md5sums.
-    :rtype: pandas.DataFrame
+    :param peppy.Project project:
+        A peppy Project object to process.
+
+    :param str,optional output_dir:
+        Directory to create output. Will be created/overwriten if existing.
+        Defaults to "geo_submission".
+
+    :param list,optional samples:
+        List of peppy.Sample objects in project to restrict to.
+        Defaults to all samples in project.
+
+    :param bool,optional distributed:
+        Whether processing should be distributed as jobs in a computing cluster for each sample.
+        Currently available implementation supports a SLURM cluster only.
+        Defaults to False.
+
+    :param bool,optional dry_run:
+        Whether copy/execution/submisison commands should be not be run to test.
+        Default is False.
+
+    :returns pandas.DataFrame:
+        Annotation of samples and their BAM, BigWig, narrowPeak files and respective md5sums.
     """
-    import subprocess
     output_dir = os.path.abspath(output_dir)
     if samples is None:
         samples = project.samples
@@ -2321,8 +1633,6 @@ def project_to_geo(
                                 .format(sample.library, sample.name) +
                                 " Skipping peaks file.")
         if distributed:
-            from pypiper.ngstk import NGSTk
-            import textwrap
             tk = NGSTk()
 
             job_name = "project_to_geo.{}".format(sample.name)
@@ -2350,29 +1660,6 @@ def project_to_geo(
     return annot
 
 
-def collect_md5_sums(df):
-    """
-    Given a dataframe with columns with paths to md5sum files ending in '_md5sum',
-    replace the paths to the md5sum files with the actual checksums.
-
-    Useful to use in combination with ``project_to_geo``.
-
-    :param df: A dataframe with columns ending in '_md5sum'.
-    :type df: pandas.DataFrame
-    :returns: pandas.DataFrame with md5sum columns replaced with the actual md5sums.
-    :rtype: pandas.DataFrame
-    """
-    cols = df.columns[df.columns.str.endswith("_md5sum")]
-    for col in cols:
-        for i, path in df.loc[:, col].iteritems():
-            if not pd.isnull(path):
-                cont = open(path, 'r').read().strip()
-                if any([x.isspace() for x in cont]):
-                    cont = cont.split(" ")[0]
-                df.loc[i, col] = cont
-    return df
-
-
 def rename_sample_files(
         annotation_mapping,
         old_sample_name_column="old_sample_name",
@@ -2389,27 +1676,30 @@ def rename_sample_files(
 
     NEEDS TESTING!
 
-    :param annotation_mapping: DataFrame with mapping of
-    old (column "previous_sample_name") vs new ("new_sample_name") sample names.
-    :type annotation_mapping: pandas.DataFrame
-    :param old_sample_name_column: Name of column with old sample names.
-                        Defaults to "old_sample_name"
-    :type old_sample_name_column: str,optional
-    :param new_sample_name_column: Name of column with new sample names.
-                        Defaults to "new_sample_name"
-    :type new_sample_name_column: str,optional
-    :param tmp_prefix: Prefix for temporary files to avoid overlap between old and new names.
-                        Defaults to "rename_sample_files"
-    :type tmp_prefix: str,optional
-    :param results_dir: Pipeline output directory containing sample output directories.
-                        Defaults to "results_pipeline"
-    :type results_dir: str,optional
-    :param dry_run: Whether to print commands instead of running them. Defaults to False
-    :type dry_run: bool,optional
+    :param pandas.DataFrame annotation_mapping:
+        DataFrame with mapping of old (column "previous_sample_name") vs new ("new_sample_name") sample names.
+
+    :param str,optional old_sample_name_column:
+        Name of column with old sample names.
+        Defaults to "old_sample_name"
+
+    :param str,optional new_sample_name_column:
+        Name of column with new sample names.
+        Defaults to "new_sample_name"
+
+    :param str,optional tmp_prefix:
+        Prefix for temporary files to avoid overlap between old and new names.
+        Defaults to "rename_sample_files"
+
+    :param str,optional results_dir:
+        Pipeline output directory containing sample output directories.
+        Defaults to "results_pipeline"
+
+    :param bool,optional dry_run:
+        Whether to print commands instead of running them. Defaults to False
 
     :returns: None
     """
-    import subprocess
     cmds = list()
     # 1) move to tmp name
     for i, series in annotation_mapping.iterrows():
@@ -2469,21 +1759,21 @@ def query_biomart(
     Query Biomart for gene attributes. Returns pandas dataframe with query results.
     If a certain field contains commas, it will attemp to return dataframe but it might fail.
 
-    :param attributes: List of ensembl atrributes to query.
-                       Defaults to ["ensembl_gene_id", "external_gene_name", "hgnc_id", "hgnc_symbol"].
-    :type attributes: list,optional
-    :param species: Ensembl string of species to query. Must be vertebrate. Defaults to "hsapiens".
-    :type species: str,optional
-    :param ensembl_version: Ensembl version to query. Currently "grch37", "grch38" and "grcm38" are tested.
-                            Defaults to "grch37".
-    :type ensembl_version: str,optional
-    :returns: Dataframe with required attributes for each entry.
-    :rtype: pandas.DataFrame
-    """
-    import requests
-    import pandas as pd
-    import numpy as np
+    :param list,optional attributes:
+        List of ensembl atrributes to query.
+        Defaults to ["ensembl_gene_id", "external_gene_name", "hgnc_id", "hgnc_symbol"].
 
+    :param str,optional species:
+        Ensembl string of species to query. Must be vertebrate.
+        Defaults to "hsapiens".
+
+    :param str,optional ensembl_version:
+        Ensembl version to query. Currently "grch37", "grch38" and "grcm38" are tested.
+        Defaults to "grch37".
+
+    :returns pandas.DataFrame:
+        Dataframe with required attributes for each entry.
+    """
     supported = ['grch37', 'grch38', 'grcm38']
     if ensembl_version not in supported:
         msg = "Ensembl version might not be supported."
@@ -2556,14 +1846,10 @@ def subtract_principal_component(
     """
     Given a matrix (n_samples, n_variables), remove `pc` (1-based) from matrix.
     """
-    import numpy as np
-    from sklearn.decomposition import PCA
-
     pc -= 1
 
     # All regions
     if norm:
-        from sklearn.preprocessing import StandardScaler
         X = StandardScaler().fit_transform(X)
 
     # PCA
@@ -2575,7 +1861,6 @@ def subtract_principal_component(
 
     # plot
     if plot:
-        import matplotlib.pyplot as plt
         X2_hat = pca.fit_transform(X2)
         fig, axis = plt.subplots(pcs_to_plot, 2, figsize=(4 * 2, 4 * pcs_to_plot))
         for pc in range(pcs_to_plot):
@@ -2598,9 +1883,6 @@ def subtract_principal_component_by_attribute(df, attributes, pc=1):
     """
     Given a matrix (n_samples, n_variables), remove `pc` (1-based) from matrix.
     """
-    import numpy as np
-    from sklearn.decomposition import PCA
-
     pc -= 1
 
     X2 = pd.DataFrame(index=df.index, columns=df.columns)
@@ -2636,12 +1918,6 @@ def fix_batch_effect_limma(matrix, batch_variable="batch", covariates=None):
     :returns: [description]
     :rtype: {[type]}
     """
-    import patsy
-    import pandas as pd
-    from rpy2.robjects import numpy2ri, pandas2ri
-    import rpy2.robjects as robjects
-    import warnings
-    from rpy2.rinterface import RRuntimeWarning
     warnings.filterwarnings("ignore", category=RRuntimeWarning)
     numpy2ri.activate()
     pandas2ri.activate()
@@ -2668,3 +1944,6 @@ def fix_batch_effect_limma(matrix, batch_variable="batch", covariates=None):
         columns=matrix.columns)
     return fixed
     # fixed.to_csv(os.path.join(analysis.results_dir, analysis.name + "_peaks.limma_fixed.csv"))
+
+
+from ngs_toolkit.analysis import Analysis

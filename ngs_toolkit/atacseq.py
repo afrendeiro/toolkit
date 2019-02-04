@@ -838,23 +838,6 @@ class ATACSeqAnalysis(Analysis):
         :param bool assign:
             Whether to assign the normalized DataFrame to an attribute ``.
         """
-
-        """
-        # Run manually:
-        library("cqn")
-        gc = read.csv("gccontent_length.csv", sep=",", row.names=1)
-        cov = read.csv("coverage_qnorm.csv", sep=",", row.names=1)
-        cov2 = cov[, 1:(length(cov) - 3)]
-
-        cqn_out = cqn(cov2, x=gc$gc_content, lengths=gc$length)
-
-        y = cqn_out$y +cqn_out$offset
-        y2 = cbind(y, cov[, c("chrom", "start", "end")])
-        write.csv(y2, "coverage_gc_corrected.csv", sep=",")
-
-        # Fix R's stupid colnames replacement
-        sed -i 's/ATAC.seq_/ATAC-seq_/g' coverage_gc_corrected.csv
-        """
         def cqn(cov, gc_content, lengths):
             # install R package
             # source('http://bioconductor.org/biocLite.R')
@@ -2029,7 +2012,7 @@ def nucleosome_changes(analysis, samples):
     df = analysis.prj.sheet.df[analysis.prj.sheet.df["library"] == "ATAC-seq"]
 
     groups = list()
-    for attrs, index in df.groupby(["library", "cell_line", "knockout", "clone"]).groups.items():
+    for attrs, _ in df.groupby(["library", "cell_line", "knockout", "clone"]).groups.items():
         name = "_".join([a for a in attrs if not pd.isnull(a)])
         groups.append(name)
     groups = sorted(groups)
@@ -2428,6 +2411,7 @@ def investigate_nucleosome_positions(self, samples, cluster=True):
 
 def phasograms(self, samples, max_dist=10000, rolling_window=50, plotting_window=(0, 500)):
     from ngs_toolkit.general import detect_peaks
+    from scipy.ndimage.filters import gaussian_filter1d
 
     df = self.prj.sheet.df[self.prj.sheet.df["library"] == "ATAC-seq"]
     groups = list()
@@ -2460,7 +2444,6 @@ def phasograms(self, samples, max_dist=10000, rolling_window=50, plotting_window
     distances = pickle.load(open(os.path.join(self.results_dir, "nucleoatac", "phasogram.distances.pickle"), "rb"))
 
     # Plot distances between dyads
-    from scipy.ndimage.filters import gaussian_filter1d
     n_rows = n_cols = int(np.ceil(np.sqrt(len(groups))))
     n_rows -= 1
     fig, axis = plt.subplots(n_rows, n_cols, sharex=True, sharey=True, figsize=(n_cols * 3, n_rows * 2))
@@ -2514,7 +2497,6 @@ def phasograms(self, samples, max_dist=10000, rolling_window=50, plotting_window
     lengths = pickle.load(open(os.path.join(self.results_dir, "nucleoatac", "nfr.lengths.pickle"), "rb"))
 
     # plot NFR lengths
-    from scipy.ndimage.filters import gaussian_filter1d
     n_rows = n_cols = int(np.ceil(np.sqrt(len(groups))))
     n_rows -= 1
     fig, axis = plt.subplots(n_rows, n_cols, sharex=True, sharey=True, figsize=(n_cols * 3, n_rows * 2))
@@ -2840,7 +2822,6 @@ def footprint(
     until the whole job queue has `total_job_limit` jobs
     and retry after `refresh_time` (seconds).
     """
-    import os
     import subprocess
     import time
     import textwrap

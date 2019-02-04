@@ -23,9 +23,8 @@ import pysam
 import requests
 import rpy2
 from rpy2.rinterface import RRuntimeError, RRuntimeWarning
-from rpy2.robjects import numpy2ri, pandas2ri
 import rpy2.robjects as robjects
-import rpy2.robjects.numpy2ri
+from rpy2.robjects import numpy2ri, pandas2ri
 from scipy import stats
 from scipy.linalg import lstsq
 from scipy.stats import gaussian_kde
@@ -88,10 +87,11 @@ def get_genome_reference(
 
     def twobit_to_fasta(genome_file):
         if distutils.spawn.find_executable("twoBitToFa") is not None:
-            subprocess.call(
+            args = (
                 "twoBitToFa {} {}"
                 .format(genome_file, genome_file.replace(".2bit", ".fa"))
                 .split(" "))
+            subprocess.check_output(args, shell=False)
             index_fasta(genome_file.replace(".2bit", ".fa"))
 
     if output_dir is None:
@@ -621,6 +621,8 @@ def normalize_quantiles_p(df_input):
     """
     Quantile normalization with a ure Python implementation.
     Code from https://github.com/ShawnLYU/Quantile_Normalize.
+
+    Attributes:
 
     :param pandas.DataFrame df_input:
         Dataframe to normalize.

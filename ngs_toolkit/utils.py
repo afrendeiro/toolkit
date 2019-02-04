@@ -629,3 +629,23 @@ def deseq_results_to_bed_file(
     df['score'] = df["log2FoldChange"]
 
     df[["chrom", "start", "end", "name", "score"]].to_csv(bed_file, sep="\t", header=False, index=False)
+
+
+def homer_peaks_to_bed(homer_peaks, output_bed):
+    """
+    Convert HOMER peak calls to BED format.
+    The fifth column (score) is the -log10(p-value) of the peak.
+
+    :param str homer_peaks:
+        HOMER output with peak calls.
+    :param str output_bed:
+        Output BED file.
+    """
+    df = pd.read_csv(homer_peaks, sep="\t", comment="#", header=None)
+    df['-log_pvalue'] = (-np.log10(df.iloc[:, -2])).replace(pd.np.inf, 1000)
+    df['name'] = df[1] + ":" + df[2].astype(str) + "-" + df[3].astype(str)
+
+    (
+        df[[1, 2, 3, 'name', '-log_pvalue']]
+        .sort_values([1, 2, 3], ascending=True)
+        .to_csv(output_bed, header=False, index=False, sep="\t"))

@@ -650,7 +650,6 @@ class CNVAnalysis(Analysis):
             Whether results should be assigned to an attribute in the Analsyis object.
             Defaults to True
 
-
         :returns dict:
             Dictionary with segmentation for each resolution.
 
@@ -747,7 +746,6 @@ class CNVAnalysis(Analysis):
         :param bool, optional assign:
             Whether results should be assigned to an attribute in the Analsyis object.
             Defaults to True
-
 
         :returns dict:
             Dictionary with annotated segmentation for each resolution.
@@ -865,6 +863,8 @@ def all_to_igv(coverage, output_prefix, **kwargs):
     """
     Convert dictionary of DataFrame with CNV data in several resolutions to IGV format.
 
+    Attributes:
+
     :param pandas.DataFrame coverage:
         DataFrame with CNV data to convert.
 
@@ -892,6 +892,8 @@ def all_to_igv(coverage, output_prefix, **kwargs):
 def to_igv(matrix, output_file=None, save=True, viewLimits=(-2, 2)):
     """
     Convert DataFrame with CNV data to IGV format.
+
+    Attributes:
 
     :param pandas.DataFrame matrix:
         DataFrame with CNV data to convert.

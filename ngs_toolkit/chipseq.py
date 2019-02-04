@@ -2,13 +2,18 @@
 
 
 import os
+import re
+import subprocess
+import textwrap
 
+from ngs_toolkit import _LOGGER
+from ngs_toolkit.atacseq import ATACSeqAnalysis
+from ngs_toolkit.utils import homer_peaks_to_bed
 import numpy as np
 import pandas as pd
 import pybedtools
-
-from ngs_toolkit.atacseq import ATACSeqAnalysis
-from ngs_toolkit import _LOGGER
+from pypiper.ngstk import NGSTk
+from tqdm import tqdm
 
 
 class ChIPSeqAnalysis(ATACSeqAnalysis):
@@ -51,18 +56,25 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
             self, comparison_table, output_dir="{results_dir}/chipseq_peaks",
             permissive=True, overwrite=True, as_jobs=True):
         """
-        Call peaks for ChIP-seq samples using an annotation of which samples belong in each comparison and which
-        samples represent signal or background.
+        Call peaks for ChIP-seq samples using an annotation of which samples
+        belong in each comparison and which samples represent signal or background.
 
-        :param pandas.DataFrame comparison_table: Comparison table with the following required columns:
+        Attributes:
+
+        :param pandas.DataFrame comparison_table:
+            Comparison table with the following required columns:
             "comparison_name", "sample_name", "comparison_side", "sample_group".
-        :param str output_dir: Parent directory where peaks will be created. Will be created if does not exist.
-        :param bool permissive: If incomplete/incoherent comparisons should be skipped or an error should be thrown.
-        :raises ValueError: Will be raised if not `permissive` and incomplete/incoherent comparisons are detected.
-        """
-        from tqdm import tqdm
-        import subprocess
 
+        :param str output_dir:
+            Parent directory where peaks will be created.
+            Will be created if does not exist.
+
+        :param bool permissive:
+            If incomplete/incoherent comparisons should be skipped or an error should be thrown.
+
+        :raises ValueError:
+            Will be raised if not `permissive` and incomplete/incoherent comparisons are detected.
+        """
         req_columns = ["comparison_name", "sample_name", "comparison_side", "sample_group"]
         msg = "Comparison table is missing some of the following columns: '{}'.".format(",".join(req_columns))
         if not all([col in comparison_table.columns for col in req_columns]):
@@ -136,17 +148,24 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
                     _LOGGER.info("Calling peaks for comparison '{}' with command: '{}'.\n".format(comparison, cmd))
                     subprocess.call(cmd.split(" "))
 
-    def filter_peaks(self, comparison_table, filter_bed="blacklist.mm10_liftOver.bed", peaks_dir="{results_dir}/chipseq_peaks"):
+    def filter_peaks(
+            self, comparison_table,
+            filter_bed="blacklist.mm10_liftOver.bed",
+            peaks_dir="{results_dir}/chipseq_peaks"):
         """
         Filter BED file for entries that overlap another BED file.
 
-        :param str input_bed: BED file to filter.
-        :param str filter_bed: BED file with entries to filter from input_bed.
-        :param str output_bed: Output BED file.
-        """
-        import pybedtools
-        from ngs_toolkit.chipseq import homer_peaks_to_bed
+        Attributes:
 
+        :param str input_bed:
+            BED file to filter.
+
+        :param str filter_bed:
+            BED file with entries to filter from input_bed.
+
+        :param str output_bed:
+            Output BED file.
+        """
         if filter_bed == "blacklist.mm10_liftOver.bed":
             _LOGGER.warning("Using blacklist features of mm10 genome!")
 
@@ -161,9 +180,14 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
             """
             Filter BED file for entries that overlap another BED file.
 
-            :param str input_bed: BED file to filter.
-            :param str filter_bed: BED file with entries to filter from input_bed.
-            :param str output_bed: Output BED file.
+            :param str input_bed:
+                BED file to filter.
+
+            :param str filter_bed:
+                BED file with entries to filter from input_bed.
+
+            :param str output_bed:
+                Output BED file.
             """
             (
                 pybedtools.BedTool(input_bed)
@@ -181,16 +205,27 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
             homer_peaks_to_bed(prefix + ".histone.narrowPeak", prefix + ".histone.bed")
             _filter(prefix + ".histone.bed", filter_bed, prefix + ".histone.filtered.bed")
 
-    def summarize_peaks_from_comparisons(self, comparison_table, output_dir="{results_dir}/chipseq_peaks", filtered=True, permissive=True):
+    def summarize_peaks_from_comparisons(
+            self,
+            comparison_table,
+            output_dir="{results_dir}/chipseq_peaks",
+            filtered=True, permissive=True):
         """
         Call peaks for ChIP-seq samples using an annotation of which samples belong in each comparison and which
         samples represent signal or background.
 
-        :param pandas.DataFrame comparison_table: Comparison table with the following required columns:
+        :param pandas.DataFrame comparison_table:
+            Comparison table with the following required columns:
             "comparison_name", "sample_name", "comparison_side", "sample_group".
-        :param str output_dir: Parent directory where peaks will be created. Will be created if does not exist.
-        :param bool permissive: If incomplete/incoherent comparisons should be skipped or an error should be thrown.
-        :raises ValueError: Will be raised if not `permissive` and incomplete/incoherent comparisons are detected.
+
+        :param str output_dir:
+            Parent directory where peaks will be created. Will be created if does not exist.
+
+        :param bool permissive:
+            If incomplete/incoherent comparisons should be skipped or an error should be thrown.
+
+        :raises ValueError:
+            Will be raised if not `permissive` and incomplete/incoherent comparisons are detected.
         """
         req_columns = ["comparison_name", "sample_name", "comparison_side", "sample_group"]
         msg = "Comparison table is missing some of the following columns: '{}'.".format(",".join(req_columns))
@@ -249,7 +284,8 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
         return peak_counts  # .fillna(0)
 
     def get_consensus_sites(
-            self, comparison_table, peak_dir="{results_dir}/chipseq_peaks", region_type="peaks", extension=250,
+            self, comparison_table, peak_dir="{results_dir}/chipseq_peaks",
+            region_type="peaks", extension=250,
             blacklist_bed="wgEncodeDacMapabilityConsensusExcludable.bed"):
         """
         Get consensus (union) of enriched sites (peaks) across all comparisons.
@@ -258,10 +294,6 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
 
         `blacklist_bed` is a 3 column BED file with genomic positions to exclude from consensus peak set.
         """
-        import re
-        from tqdm import tqdm
-        import pybedtools
-
         # Complement default `peak_dir`
         if "{results_dir}" in peak_dir:
             peak_dir = os.path.abspath(peak_dir.format(results_dir=self.results_dir))
@@ -330,8 +362,6 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
         Calculate a measure of support for each region in peak set
         (i.e. ratio of samples containing a peak overlapping region in union set of peaks).
         """
-        from tqdm import tqdm
-
         if "{results_dir}" in peak_dir:
             peak_dir = os.path.abspath(peak_dir.format(results_dir=self.results_dir))
 
@@ -342,7 +372,7 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
         # calculate support (number of samples overlaping each merged peak)
         comps = comparison_table["comparison_name"].drop_duplicates()
         support = pd.DataFrame(index=index)
-        for i, comparison in tqdm(enumerate(comps), total=comps.shape[0], desc="Comparison"):
+        for comparison in tqdm(comps, total=comps.shape[0], desc="Comparison"):
             peak_files = [
                 ("MACS", os.path.join(peak_dir, comparison, comparison + "_peaks.narrowPeak")),
                 ("HOMER_factor", os.path.join(peak_dir, comparison, comparison + "_homer_peaks.factor.bed")),
@@ -379,9 +409,13 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
         Get mask of sites with 0 support in the given samples.
         Requires support matrix produced by `ngs_toolkit.atacseq.ATACSeqAnalysis.calculate_peak_support`.
 
-        :param list samples: Iterable of peppy.Sample objects to restrict to.
-        :returns pd.Series: Boolean Pandas Series with sites with at least one of the \
-                            given samples having a peak called.
+        Attributes:
+
+        :param list samples:
+            Iterable of peppy.Sample objects to restrict to.
+
+        :returns pd.Series:
+            Boolean Pandas Series with sites with at least one of the given samples having a peak called.
         """
         return self.support[[c for c in comparisons]].sum(1) != 0
 
@@ -390,11 +424,22 @@ def macs2_call_chipseq_peak(signal_samples, control_samples, output_dir, name, a
     """
     Call ChIP-seq peaks with MACS2 in a slurm job.
 
-    :param list signal_samples: Signal Sample objects.
-    :param list control_samples: Background Sample objects.
-    :param list output_dir: Parent directory where MACS2 outputs will be stored.
-    :param str name: Name of the MACS2 comparison being performed.
-    :param bool as_job: Whether to submit a SLURM job or to return a string with the runnable.
+    Attributes:
+
+    :param list signal_samples:
+        Signal Sample objects.
+
+    :param list control_samples:
+        Background Sample objects.
+
+    :param list output_dir:
+        Parent directory where MACS2 outputs will be stored.
+
+    :param str name:
+        Name of the MACS2 comparison being performed.
+
+    :param bool as_job:
+        Whether to submit a SLURM job or to return a string with the runnable.
     """
     output_path = os.path.join(output_dir, name)
     if not os.path.exists(output_path):
@@ -407,8 +452,6 @@ def macs2_call_chipseq_peak(signal_samples, control_samples, output_dir, name, a
             " ".join([s.filtered for s in control_samples]), name, output_path))
 
     if as_job:
-        from pypiper.ngstk import NGSTk
-        import textwrap
         tk = NGSTk()
         job_name = "macs2_{}".format(name)
         cmd = tk.slurm_header(
@@ -429,10 +472,19 @@ def homer_call_chipseq_peak_job(signal_samples, control_samples, output_dir, nam
     """
     Call ChIP-seq peaks with MACS2 in a slurm job.
 
-    :param list signal_samples: Signal Sample objects.
-    :param list control_samples: Background Sample objects.
-    :param list output_dir: Parent directory where MACS2 outputs will be stored.
-    :param str name: Name of the MACS2 comparison being performed.
+    Attributes:
+
+    :param list signal_samples:
+        Signal Sample objects.
+
+    :param list control_samples:
+        Background Sample objects.
+
+    :param list output_dir:
+        Parent directory where MACS2 outputs will be stored.
+
+    :param str name:
+        Name of the MACS2 comparison being performed.
     """
     output_path = os.path.join(output_dir, name)
     if not os.path.exists(output_path):
@@ -455,8 +507,6 @@ def homer_call_chipseq_peak_job(signal_samples, control_samples, output_dir, nam
         output_file=output_file, background=background_tag_directory, signal=signal_tag_directory)
 
     if as_job:
-        from pypiper.ngstk import NGSTk
-        import textwrap
         tk = NGSTk()
         job_name = "homer_findPeaks_{}".format(name)
         cmd = tk.slurm_header(
@@ -471,21 +521,3 @@ def homer_call_chipseq_peak_job(signal_samples, control_samples, output_dir, nam
         tk.slurm_submit_job(job_file)
     else:
         return runnable
-
-
-def homer_peaks_to_bed(homer_peaks, output_bed):
-    """
-    Convert HOMER peak calls to BED format.
-    The fifth column (score) is the -log10(p-value) of the peak.
-
-    :param str homer_peaks: HOMER output with peak calls.
-    :param str output_bed: Output BED file.
-    """
-    df = pd.read_csv(homer_peaks, sep="\t", comment="#", header=None)
-    df['-log_pvalue'] = (-np.log10(df.iloc[:, -2])).replace(pd.np.inf, 1000)
-    df['name'] = df[1] + ":" + df[2].astype(str) + "-" + df[3].astype(str)
-
-    (
-        df[[1, 2, 3, 'name', '-log_pvalue']]
-        .sort_values([1, 2, 3], ascending=True)
-        .to_csv(output_bed, header=False, index=False, sep="\t"))

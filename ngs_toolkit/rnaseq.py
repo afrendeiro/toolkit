@@ -8,7 +8,6 @@ from ngs_toolkit import _LOGGER
 from ngs_toolkit.analysis import Analysis
 from ngs_toolkit.general import normalize_quantiles_p
 from ngs_toolkit.general import query_biomart
-from ngs_toolkit.general import unsupervised_analysis
 import numpy as np
 import pandas as pd
 import scipy
@@ -195,11 +194,22 @@ class RNASeqAnalysis(Analysis):
         normalizes expression matrix (quantile normalization), and
         annotates samples with given attributes (generates pandas dataframe with MultiIndex columns).
 
-        :param samples | peppy.Sample: Samples to get expression for. Default all in analysis.
-        :param sample_attributes | list: Sample attributes to annotate expression matrix with.
-        :param expression_type | str: Type of expression quantification to get. One of "counts" or "rpkm".
-        :param genome_assembly | str: Genome assembly to use (e.g. "grch38") or Ensembl prefix to archive ("aug2014.archive")
-        :param species | str: Ensembl species name (e.g. "hsapiens", "mmusculus")
+        Attributes:
+
+        :param peppy.Sample samples:
+            Samples to get expression for. Default all in analysis.
+
+        :param list sample_attributes:
+            Sample attributes to annotate expression matrix with.
+
+        :param str expression_type:
+            Type of expression quantification to get. One of "counts" or "rpkm".
+
+        :param str genome_assembly:
+            Genome assembly to use (e.g. "grch38") or Ensembl prefix to archive ("aug2014.archive")
+
+        :param str species:
+            Ensembl species name (e.g. "hsapiens", "mmusculus")
 
         # TODO: Rewrite to have loop perform same transformations on transcript and gene-level quantifications
         # TODO: Save all matrices of both levels with clear, consistent naming
@@ -399,10 +409,9 @@ class RNASeqAnalysis(Analysis):
         _LOGGER.warning(PendingDeprecationWarning(
             "RNASeqAnalysis.unsupervised is provided for backward compatibility "
             "only and will be removed. Please use "
-            "ngs_toolkit.general.unsupervised_analysis(RNASeqAnalysis) "
-            "in the future."))
+            "RNASeqAnalysis.unsupervised_analysis in the future."))
 
-        unsupervised_analysis(args, **kwargs)
+        self.unsupervised_analysis(args, **kwargs)
 
 
 def knockout_plot(
@@ -417,7 +426,6 @@ def knockout_plot(
     """
     Plot expression of knocked-out genes in all samples.
     """
-
     if (analysis is None) and (expression_matrix is None):
         raise AssertionError("One of `analysis` or `expression_matrix` must be provided.")
 

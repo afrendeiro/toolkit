@@ -4,11 +4,11 @@
 import glob
 import json
 import os
-from shutil import which
 import subprocess
 import textwrap
 import warnings
 
+import distutils.spawn
 import matplotlib.pyplot as plt
 from ngs_toolkit import _CONFIG, _LOGGER
 from ngs_toolkit.graphics import savefig
@@ -87,7 +87,7 @@ def get_genome_reference(
             pass
 
     def twobit_to_fasta(genome_file):
-        if which("twoBitToFa"):
+        if distutils.spawn.find_executable("twoBitToFa") is not None:
             subprocess.call(
                 "twoBitToFa {} {}"
                 .format(genome_file, genome_file.replace(".2bit", ".fa"))

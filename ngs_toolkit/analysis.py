@@ -30,7 +30,7 @@ from ngs_toolkit.utils import log_pvalues
 
 import numpy as np
 import pandas as pd
-from peppy import Sample
+from peppy import Project, Sample
 from pypiper.ngstk import NGSTk
 from scipy.stats import fisher_exact, kruskal, pearsonr, zscore
 import seaborn as sns
@@ -39,6 +39,7 @@ from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 from statsmodels.sandbox.stats.multicomp import multipletests
 from tqdm import tqdm
+import yaml
 
 
 class Analysis(object):
@@ -101,6 +102,7 @@ class Analysis(object):
             results_dir="results",
             pickle_file=None,
             from_pickle=False,
+            pep=False,
             **kwargs):
         # parse kwargs with default
         self.name = name
@@ -143,6 +145,10 @@ class Analysis(object):
         for directory in [self.data_dir, self.results_dir]:
             if not os.path.exists(directory):
                 os.makedirs(directory)
+
+        # Generate from PEP configuration file
+        if pep is not False:
+            self.from_pep(pep)
 
         # Store projects attributes in self
         _LOGGER.debug("Trying to set analysis attributes.")
@@ -274,6 +280,15 @@ class Analysis(object):
             _LOGGER.error(msg)
             raise ValueError(msg)
         return string.format(**self.__dict__)
+
+    def from_pep(self, pep_config):
+        msg = "Provided PEP configuration file could not be read."
+        try:
+            self.prj = Project(pep_config)
+        except (KeyError, yaml.scanner.ScannerError):  # This is for a malformed yaml
+            # Does not cover a bad path: IsADirectoryError (Python3) and IOError (Python2)
+            _LOGGER.error(msg)
+            raise
 
     def update(self, pickle_file=None):
         """

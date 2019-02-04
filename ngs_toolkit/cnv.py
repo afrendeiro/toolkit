@@ -32,6 +32,7 @@ class CNVAnalysis(Analysis):
             pickle_file=None,
             from_pickle=False,
             resolutions=['1000kb', '100kb', '20kb', '10kb'],
+            pep=False,
             **kwargs):
         super(CNVAnalysis, self).__init__(
             name=name,
@@ -41,6 +42,7 @@ class CNVAnalysis(Analysis):
             samples=samples,
             prj=prj,
             from_pickle=from_pickle,
+            pep=pep,
             **kwargs)
 
         self.data_type = self.__data_type__ = "CNV"
@@ -57,15 +59,20 @@ class CNVAnalysis(Analysis):
         """
         Load data from a previous analysis.
 
-        :param resolutions: Resolutions of analysis, defaults to resolutions in
-                            Analysis object.
-        :type resolutions: list, optional
-        :param permissive: Whether missing files should be allowed. Defaults to True
-        :type permissive: bool, optional
-        :param norm_method: Normalization method used in the previous files.
-                            Defaults to "median".
-        :type norm_method: str, optional
-        :raises: ValueError, e
+        Attributes:
+
+        :param list, optional resolutions:
+            Resolutions of analysis, defaults to resolutions in Analysis object.
+
+        :param bool, optional permissive:
+            Whether missing files should be allowed.
+            Defaults to True
+
+        :param str, optional norm_method:
+            Normalization method used in the previous files.
+            Defaults to "median".
+
+        :raises: ValueError
         """
         if resolutions is None:
             resolutions = self.resolutions
@@ -110,26 +117,35 @@ class CNVAnalysis(Analysis):
         """
         Load CNV data from ATAC-seq CNV pipeline and create CNV matrix at various resolutions.
 
-        :param resolutions: Resolutions of analysis. Defaults to resolutions in
-                            Analysis object.
-        :type resolutions: list, optional
-        :param samples: Samples to restrict analysis to. Defaults to samples in
-                        Analysis object.
-        :type samples: list, optional
-        :param save: Whether results should be saved to disc. Defaults to True
-        :type save: bool, optional
-        :param assign: Whether results should be assigned to an attribute in the
-                       Analsyis object. Defaults to True
-        :type assign: bool, optional
-        :param permissive: :param permissive: Whether missing files should be allowed.
-                                              Defaults to False
-        :type permissive: bool, optional
-        :returns: Dictionary with CNV matrices for each resolution.
-        :rtype: dict
+        Attributes:
+
+        :param list, optional resolutions:
+            Resolutions of analysis.
+            Defaults to resolutions in Analysis object.
+
+        :param list, optional samples:
+            Samples to restrict analysis to.
+            Defaults to samples in Analysis object.
+
+        :param bool, optional save:
+            Whether results should be saved to disc.
+            Defaults to True
+
+        :param bool, optional assign:
+            Whether results should be assigned to an attribute in the Analsyis object.
+            Defaults to True
+
+        :param bool, optional permissive:
+            Whether missing files should be allowed.
+            Defaults to False
+
+        :returns dict:
+            Dictionary with CNV matrices for each resolution.
+
         :raises: IOError
 
-        :var dict coverage: Sets a `coverage` dictionary with CNV matrices for
-                            each resolution.
+        :var dict coverage:
+            Sets a `coverage` dictionary with CNV matrices for each resolution.
         """
         if resolutions is None:
             resolutions = self.resolutions
@@ -196,30 +212,41 @@ class CNVAnalysis(Analysis):
         Normalization of matrices of (n_features, n_samples) by subtracting the
         median from each sample/feature.
 
-        :param matrix: Attribute name of dictionary of matrices to normalize.
-                       Defaults to `coverage`.
-        :type matrix: str, optional
-        :param resolutions: Resolutions of analysis. Defaults to resolutions in
-                            Analysis object.
-        :type resolutions: list, optional
-        :param samples: Samples to restrict analysis to. Defaults to samples in
-                        Analysis object.
-        :type samples: list, optional
-        :param function: An alternative function to calculate across samples.
-                         Data will be subtracted by this. Defaults to numpy.nanmedian
-        :type function: function, optional
-        :param fillna: Whether to fill NaN with zero. Defaults to True
-        :type fillna: bool, optional
-        :param save: Whether results should be saved to disc. Defaults to True
-        :type save: bool, optional
-        :param assign: Whether results should be assigned to an attribute in the
-                       Analsyis object. Defaults to True
-        :type assign: bool, optional
+        Attributes:
 
-        :returns: Dictionary with normalized CNV matrices for each resolution.
-        :rtype: dict
-        :var dict coverage_norm: Sets a `coverage_norm` dictionary with CNV matrices
-                                 for each resolution.
+        :param str, optional matrix:
+            Attribute name of dictionary of matrices to normalize.
+            Defaults to `coverage`.
+
+        :param list, optional resolutions:
+            Resolutions of analysis.
+            Defaults to resolutions in Analysis object.
+
+        :param list, optional samples:
+            Samples to restrict analysis to.
+            Defaults to samples in Analysis object.
+
+        :param function, optional function:
+            An alternative function to calculate across samples. Data will be subtracted by this.
+            Defaults to numpy.nanmedian
+
+        :param bool, optional fillna:
+            Whether to fill NaN with zero.
+            Defaults to True
+
+        :param bool, optional save:
+            Whether results should be saved to disc.
+            Defaults to True
+
+        :param bool, optional assign:
+            Whether results should be assigned to an attribute in the Analsyis object.
+            Defaults to True
+
+        :returns dict:
+            Dictionary with normalized CNV matrices for each resolution.
+
+        :var dict coverage_norm:
+            Sets a `coverage_norm` dictionary with CNV matrices for each resolution.
         """
         if matrix is None:
             matrix = self.coverage
@@ -247,34 +274,43 @@ class CNVAnalysis(Analysis):
         return coverage_norm
 
     def normalize_coverage_pca(
-            self, matrix=None, resolutions=None,
-            samples=None, pc=None,
+            self, pc,
+            matrix=None, resolutions=None, samples=None,
             save=True, assign=True):
         """
         Normalization of matrices of (n_features, n_samples) by subtracting the
         contribution of a Principal Component from each sample/feature.
 
-        :param matrix: Attribute name of dictionary of matrices to normalize.
-                       Defaults to `coverage`.
-        :type matrix: str, optional
-        :param resolutions: Resolutions of analysis. Defaults to resolutions in
-                            Analysis object.
-        :type resolutions: list, optional
-        :param samples: Samples to restrict analysis to. Defaults to samples in
-                        Analysis object.
-        :type samples: list, optional
-        :param pc: Principal Component to remove. 1-based. Must be specified.
-        :type pc: int
-        :param save: Whether results should be saved to disc. Defaults to True
-        :type save: bool, optional
-        :param assign: Whether results should be assigned to an attribute in the
-                       Analsyis object. Defaults to True
-        :type assign: bool, optional
+        Attributes:
 
-        :returns: Dictionary with normalized CNV matrices for each resolution.
-        :rtype: dict
-        :var dict coverage_norm: Sets a `coverage_norm` dictionary with CNV matrices
-                                 for each resolution.
+        :param int pc:
+            Principal Component to remove. 1-based.
+
+        :param str, optional matrix:
+            Attribute name of dictionary of matrices to normalize.
+            Defaults to `coverage`.
+
+        :param list, optional resolutions:
+            Resolutions of analysis.
+            Defaults to resolutions in Analysis object.
+
+        :param list, optional samples:
+            Samples to restrict analysis to.
+            Defaults to samples in Analysis object.
+
+        :param bool, optional save:
+            Whether results should be saved to disc.
+            Defaults to True
+
+        :param bool, optional assign:
+            Whether results should be assigned to an attribute in the Analsyis object.
+            Defaults to True
+
+        :returns dict:
+            Dictionary with normalized CNV matrices for each resolution.
+
+        :var dict coverage_norm:
+            Sets a `coverage_norm` dictionary with CNV matrices for each resolution.
         """
         if pc is None:
             raise ValueError("Principal Component to remove must be specified!")
@@ -313,32 +349,42 @@ class CNVAnalysis(Analysis):
         """
         Normalization of dictionary of matrices with (n_features, n_samples).
 
-        :param resolutions: Resolutions of analysis. Defaults to resolutions in
-                            Analysis object.
-        :type resolutions: list, optional
-        :param method: Normalization method to apply. One of: a) `median`
-                       (subtract median value across all samples; b) `pca`
-                       (subtraction of principal component number `pc`).
-        :type method: str
-        :param pc: Principal Component to remove. 1-based. Must be specified if
-                   `method=="pca"`.
-        :type pc: int
-        :param matrix: Attribute name of dictionary of matrices to normalize.
-                       Defaults to `coverage`.
-        :type matrix: str, optional
-        :param samples: Iterable of peppy.Sample objects to restrict matrix to.
-                        If not provided (`None` is passed) the matrix will not be subsetted.
-        :type samples: list
-        :param save: Whether results should be saved to disc. Defaults to True
-        :type save: bool, optional
-        :param assign: Whether results should be assigned to an attribute in the
-                       Analsyis object. Defaults to True
-        :type assign: bool, optional
+        Attributes:
 
-        :returns: Dictionary with normalized CNV matrices for each resolution.
-        :rtype: dict
-        :var dict coverage_norm: Sets a `coverage_norm` dictionary with CNV matrices
-                                 for each resolution.
+        :param list, optional resolutions:
+            Resolutions of analysis.
+            Defaults to resolutions in Analysis object.
+
+        :param str method:
+            Normalization method to apply. One of:
+                a) `median` (subtract median value across all samples;
+                b) `pca` (subtraction of principal component number `pc`).
+
+        :param int pc:
+            Principal Component to remove. 1-based.
+            Must be specified if `method=="pca"`.
+
+        :param str, optional matrix:
+            Attribute name of dictionary of matrices to normalize.
+            Defaults to `coverage`.
+
+        :param list samples:
+            Iterable of peppy.Sample objects to restrict matrix to.
+            Default is all in analysis.
+
+        :param bool, optional save:
+            Whether results should be saved to disc.
+            Defaults to True
+
+        :param bool, optional assign:
+            Whether results should be assigned to an attribute in the Analsyis object.
+            Defaults to True
+
+        :returns dict:
+            Dictionary with normalized CNV matrices for each resolution.
+
+        :var dict coverage_norm:
+            Sets a `coverage_norm` dictionary with CNV matrices for each resolution.
         """
         if method == "median":
             return self.normalize_coverage_median(
@@ -363,32 +409,50 @@ class CNVAnalysis(Analysis):
         Visualize CNV data genome-wide using heatmaps.
         Will be done independently for each specified resolution.
 
-        :param matrix: Attribute name of dictionary of matrices to normalize.
-                       Defaults to `coverage_norm`.
-        :type matrix: str, optional
-        :param resolutions: Resolutions of analysis. Defaults to resolutions
-                            in Analysis object.
-        :type resolutions: list, optional
-        :param samples: Samples to restrict analysis to. Defaults to samples
-                            in Analysis object.
-        :type samples: list, optional
-        :param output_dir: Output directory. Defaults to Analysis results directory.
-        :type output_dir: str, optional
-        :param output_prefix: Prefix to add to plots. Defaults to "{analysis_name}.all_data"
-        :type output_prefix: str, optional
-        :param robust: Whether to scale the color scale robustly (to quantiles rather
-                       than extremes). Defaults to True
-        :type robust: bool, optional
-        :param vmin: Minimum value of color scale.
-        :type vmin: float, optional
-        :param vmax: Maximum value of color scale. Defaults to None
-        :type vmax: float, optional
-        :param rasterized: Whether to rasterize main heatmap. Defaults to True
-        :type rasterized: bool, optional
-        :param dpi: DPI resolution of rasterized image. Defaults to 300
-        :type dpi: int, optional
-        :param sample_labels: Whether to label samples with their name. Defaults to True
-        :type sample_labels: bool, optional
+        Attributes:
+
+        :param str, optional matrix:
+            Attribute name of dictionary of matrices to normalize.
+            Defaults to `coverage_norm`.
+
+        :param list, optional resolutions:
+            Resolutions of analysis.
+            Defaults to resolutions in Analysis object.
+
+        :param list, optional samples:
+            Samples to restrict analysis to.
+            Defaults to samples in Analysis object.
+
+        :param str, optional output_dir:
+            Output directory.
+            Defaults to Analysis results directory.
+
+        :param str, optional output_prefix:
+            Prefix to add to plots.
+            Defaults to "{analysis_name}.all_data"
+
+        :param bool, optional robust:
+            Whether to scale the color scale robustly (to quantiles rather than extremes).
+            Defaults to True
+
+        :param float, optional vmin:
+            Minimum value of color scale.
+
+        :param float, optional vmax:
+            Maximum value of color scale.
+            Defaults to None
+
+        :param bool, optional rasterized:
+            Whether to rasterize main heatmap.
+            Defaults to True
+
+        :param int, optional dpi:
+            DPI resolution of rasterized image.
+            Defaults to 300
+
+        :param bool, optional sample_labels:
+            Whether to label samples with their name.
+            Defaults to True
         """
 
         # TODO:
@@ -451,28 +515,43 @@ class CNVAnalysis(Analysis):
         Will be done independently for each specified resolution.
         Will also be done once for all chromosomes and another time without sex chromosomes.
 
-        :param matrix: Attribute name of dictionary of matrices to normalize.
+        Attributes:
+
+        :param str, optional matrix:
+            Attribute name of dictionary of matrices to normalize.
                        Defaults to `coverage_norm`.
-        :type matrix: str, optional
-        :param resolutions: Resolutions of analysis. Defaults to resolutions
-                            in Analysis object.
-        :type resolutions: list, optional
-        :param samples: Samples to restrict analysis to. Defaults to samples
-                            in Analysis object.
-        :type samples: list, optional
-        :param output_dir: Output directory. Defaults to Analysis results directory.
-        :type output_dir: str, optional
-        :param output_prefix: Prefix to add to plots. Defaults to "{analysis_name}.all_data"
-        :type output_prefix: str, optional
-        :param robust: Whether to scale the color scale robustly (to quantiles
-                       rather than extremes). Defaults to True
-        :type robust: bool, optional
-        :param rasterized: Whether to rasterize main heatmap. Defaults to True
-        :type rasterized: bool, optional
-        :param dpi: DPI resolution of rasterized image. Defaults to 300
-        :type dpi: int, optional
-        :param sample_labels: Whether to label samples with their name. Defaults to True
-        :type sample_labels: bool, optional
+
+        :param list, optional resolutions:
+            Resolutions of analysis.
+            Defaults to resolutions in Analysis object.
+
+        :param list, optional samples:
+            Samples to restrict analysis to.
+            Defaults to samples in Analysis object.
+
+        :param str, optional output_dir:
+            Output directory.
+            Defaults to Analysis results directory.
+
+        :param str, optional output_prefix:
+            Prefix to add to plots.
+            Defaults to "{analysis_name}.all_data"
+
+        :param bool, optional robust:
+            Whether to scale the color scale robustly (to quantiles rather than extremes).
+            Defaults to True
+
+        :param bool, optional rasterized:
+            Whether to rasterize main heatmap.
+            Defaults to True
+
+        :param int, optional dpi:
+            DPI resolution of rasterized image.
+            Defaults to 300
+
+        :param bool, optional sample_labels:
+            Whether to label samples with their name.
+            Defaults to True
         """
         if matrix is None:
             matrix = self.coverage_norm
@@ -549,27 +628,35 @@ class CNVAnalysis(Analysis):
             >>> source('http://bioconductor.org/biocLite.R')
             >>> biocLite('DNAcopy')
 
-        :param matrix: Attribute name of dictionary of matrices to segment.
-                       Defaults to `coverage_norm`.
-        :type matrix: str, optional
-        :param resolutions: Resolutions of analysis. Defaults to resolutions in
-                            Analysis object.
-        :type resolutions: list, optional
-        :param samples: Samples to restrict analysis to. Defaults to samples in
-                        Analysis object.
-        :type samples: list, optional
-        :param save: Whether results should be saved to disc. Defaults to True
-        :type save: bool, optional
-        :param assign: Whether results should be assigned to an attribute in the
-                       Analsyis object. Defaults to True
-        :type assign: bool, optional
+        Attributes:
 
-        :returns: Dictionary with segmentation for each resolution.
-        :rtype: dict
-        :var dict segmentation: Sets a `segmentation` dictionary with CNV matrices
-                                for each resolution.
+        :param str, optional matrix:
+            Attribute name of dictionary of matrices to segment.
+            Defaults to `coverage_norm`.
+
+        :param list, optional resolutions:
+            Resolutions of analysis.
+            Defaults to resolutions in Analysis object.
+
+        :param list, optional samples:
+            Samples to restrict analysis to.
+            Defaults to samples in Analysis object.
+
+        :param bool, optional save:
+            Whether results should be saved to disc.
+            Defaults to True
+
+        :param bool, optional assign:
+            Whether results should be assigned to an attribute in the Analsyis object.
+            Defaults to True
+
+
+        :returns dict:
+            Dictionary with segmentation for each resolution.
+
+        :var dict segmentation:
+            Sets a `segmentation` dictionary with CNV matrices for each resolution.
         """
-
         # TODO: implement as_job
 
         warnings.filterwarnings("ignore", category=RRuntimeWarning)
@@ -639,25 +726,34 @@ class CNVAnalysis(Analysis):
         Annotate segmentation with chromosome bands and overlaping genes.
         Will be done independently for each specified resolution.
 
-        :param segmentation: Attribute name of dictionary of segmentation results.
-                             Defaults to `segmentation`.
-        :type segmentation: str, optional
-        :param resolutions: Resolutions of analysis. Defaults to resolutions in
-                            Analysis object.
-        :type resolutions: list, optional
-        :param samples: Samples to restrict analysis to. Defaults to samples in
-                        Analysis object.
-        :type samples: list, optional
-        :param save: Whether results should be saved to disc. Defaults to True
-        :type save: bool, optional
-        :param assign: Whether results should be assigned to an attribute in the
-                       Analsyis object. Defaults to True
-        :type assign: bool, optional
+        Attributes:
 
-        :returns: Dictionary with annotated segmentation for each resolution.
-        :rtype: dict
-        :var dict segmentation_annot: Sets a `segmentation_annot` dictionary with
-                                      CNV matrices for each resolution.
+        :param str, optional segmentation:
+            Attribute name of dictionary of segmentation results.
+            Defaults to `segmentation`.
+
+        :param list, optional resolutions:
+            Resolutions of analysis.
+            Defaults to resolutions in Analysis object.
+
+        :param list, optional samples:
+            Samples to restrict analysis to.
+            Defaults to samples in Analysis object.
+
+        :param bool, optional save:
+            Whether results should be saved to disc.
+            Defaults to True
+
+        :param bool, optional assign:
+            Whether results should be assigned to an attribute in the Analsyis object.
+            Defaults to True
+
+
+        :returns dict:
+            Dictionary with annotated segmentation for each resolution.
+
+        :var dict segmentation_annot:
+            Sets a `segmentation_annot` dictionary with CNV matrices for each resolution.
         """
         if resolutions is None:
             resolutions = self.resolutions
@@ -712,18 +808,26 @@ class CNVAnalysis(Analysis):
         Visualize distribution of statistics of CNV data segmentation.
         Will be done independently for each specified resolution.
 
-        :param segmentation: Dictionary of segmentation results.
-                             Defaults to `segmentation`.
-        :type segmentation: str, optional
-        :param resolutions: Resolutions of analysis. Defaults to resolutions in Analysis object.
-        :type resolutions: list, optional
-        :param per_sample: Whether plots should be made for each sample too. Defaults to False
-        :type per_sample: bool, optional
-        :param output_dir: Output directory. Defaults to Analysis results directory.
-        :type output_dir: str, optional
-        :param output_prefix: Prefix to add to plots. Defaults to
-                              "{resolution}.segmentation_metrics"
-        :type output_prefix: str, optional
+        Attributes:
+
+        :param str, optional segmentation:
+            Dictionary of segmentation results.
+            Defaults to `segmentation`.
+
+        :param list, optional resolutions:
+            Resolutions of analysis. Defaults to resolutions in Analysis object.
+
+        :param bool, optional per_sample:
+            Whether plots should be made for each sample too.
+            Defaults to False
+
+        :param str, optional output_dir:
+            Output directory.
+            Defaults to Analysis results directory.
+
+        :param str, optional output_prefix:
+            Prefix to add to plots.
+            Defaults to "{resolution}.segmentation_metrics"
         """
         if segmentation is None:
             segmentation = self.segmentation
@@ -761,14 +865,17 @@ def all_to_igv(coverage, output_prefix, **kwargs):
     """
     Convert dictionary of DataFrame with CNV data in several resolutions to IGV format.
 
-    :param coverage: DataFrame with CNV data to convert.
-    :type coverage: pandas.DataFrame
-    :param output_prefix: Prefix to add to plots.
-    :type output_prefix: str, optional
-    :param kwargs: Additional parameters will be passed to ngs_toolkit.cnv.to_igv
-    :type kwargs: dict, optional
-    :returns: Dictionary of CNV data in IGV format for each resolution.
-    :rtype: dict
+    :param pandas.DataFrame coverage:
+        DataFrame with CNV data to convert.
+
+    :param str, optional output_prefix:
+        Prefix to add to plots.
+
+    :param dict, optional kwargs:
+        Additional parameters will be passed to ngs_toolkit.cnv.to_igv
+
+    :returns dict:
+        Dictionary of CNV data in IGV format for each resolution.
     """
     igvs = dict()
     resolutions = coverage.keys()
@@ -786,17 +893,24 @@ def to_igv(matrix, output_file=None, save=True, viewLimits=(-2, 2)):
     """
     Convert DataFrame with CNV data to IGV format.
 
-    :param matrix: DataFrame with CNV data to convert.
-    :type matrix: pandas.DataFrame
-    :param output_file: Output file. Required is `save` is True.
-    :type output_file: str, optional
-    :param save: Whether results should be saved to disc. Defaults to True
-    :type save: bool, optional
-    :param viewLimits: Extreme values (min, max) of color scale used to visualize in IGV.
-                       Defaults to (-2, 2).
-    :type viewLimits: tuple, optional
-    :returns: CNV data in IGV format.
-    :rtype: pandas.DataFrame
+    :param pandas.DataFrame matrix:
+        DataFrame with CNV data to convert.
+
+    :param str, optional output_file:
+        Output file.
+        Required is `save` is True.
+
+    :param bool, optional save:
+        Whether results should be saved to disc.
+        Defaults to True
+
+    :param tuple, optional viewLimits:
+        Extreme values (min, max) of color scale used to visualize in IGV.
+        Defaults to (-2, 2).
+
+    :returns pandas.DataFrame:
+        CNV data in IGV format.
+
     :raises: ValueError
     """
     print("Making IGV visualization")

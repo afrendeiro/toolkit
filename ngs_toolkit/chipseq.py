@@ -24,6 +24,7 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
             results_dir="results",
             pickle_file=None,
             from_pickle=False,
+            pep=False,
             **kwargs):
         super(ChIPSeqAnalysis, self).__init__(
             name=name,
@@ -33,6 +34,7 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
             samples=samples,
             prj=prj,
             from_pickle=from_pickle,
+            pep=pep,
             **kwargs)
 
         self.data_type = self.__data_type__ = "ChIP-seq"

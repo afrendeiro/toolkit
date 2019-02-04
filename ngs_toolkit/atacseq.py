@@ -119,6 +119,7 @@ class ATACSeqAnalysis(Analysis):
             results_dir="results",
             pickle_file=None,
             from_pickle=False,
+            pep=False,
             **kwargs):
         super(ATACSeqAnalysis, self).__init__(
             name=name,
@@ -128,6 +129,7 @@ class ATACSeqAnalysis(Analysis):
             samples=samples,
             prj=prj,
             from_pickle=from_pickle,
+            pep=pep,
             **kwargs)
 
         self.data_type = self.__data_type__ = "ATAC-seq"

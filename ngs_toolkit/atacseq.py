@@ -371,7 +371,7 @@ class ATACSeqAnalysis(Analysis):
         if blacklist_bed is None:
             _LOGGER.info("Blacklist file not provided. Downloading...")
             try:
-                get_blacklist_annotations(self.organism, self.genome)
+                blacklist_bed = get_blacklist_annotations(self.organism, self.genome)
             except AttributeError:
                 msg = "Blacklist file was not provided and cannot"
                 msg += " get one without analysis having `organism` and `genome` set."

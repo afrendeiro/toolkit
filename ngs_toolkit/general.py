@@ -87,10 +87,7 @@ def get_genome_reference(
 
     def twobit_to_fasta(genome_file):
         if distutils.spawn.find_executable("twoBitToFa") is not None:
-            args = (
-                "twoBitToFa {} {}"
-                .format(genome_file, genome_file.replace(".2bit", ".fa"))
-                .split(" "))
+            args = ["twoBitToFa"] + [genome_file, genome_file.replace(".2bit", ".fa")]
             subprocess.check_output(args, shell=False)
             index_fasta(genome_file.replace(".2bit", ".fa"))
 
@@ -766,7 +763,7 @@ def deseq_analysis(
                 _LOGGER.error(e2)
                 raise e2
 
-        if type(res) == rpy2.robjects.vectors.DataFrame:
+        if isinstance(res, rpy2.robjects.vectors.DataFrame):
             # convert to pandas dataframe
             res = r2pandas_df(res)
 
@@ -1113,8 +1110,8 @@ def lola(bed_files, universe_file, output_folder, output_prefixes=None, genome="
         _LOGGER.error(msg)
         return
 
-    if type(databases) is not list:
-        if type(databases) is str:
+    if not isinstance(databases, list):
+        if isinstance(databases, str):
             databases = list(databases)
         else:
             _LOGGER.error(msg)
@@ -1124,7 +1121,7 @@ def lola(bed_files, universe_file, output_folder, output_prefixes=None, genome="
         _LOGGER.error(msg)
         return
 
-    if type(bed_files) is str:
+    if isinstance(bed_files, str):
         bed_files = [bed_files]
     if output_prefixes is None:
         if len(bed_files) > 1:
@@ -1170,7 +1167,7 @@ def bed_to_fasta(bed_file, fasta_file, genome="hg19", genome_2bit=None):
             _LOGGER.error(msg)
             return
 
-        if type(genome_2bit) is not str:
+        if not isinstance(genome_2bit, str):
             _LOGGER.error(msg)
             return
 
@@ -1210,7 +1207,7 @@ def meme_ame(
             _LOGGER.error(msg)
             return
 
-        if type(motif_database_file) is not str:
+        if not isinstance(motif_database_file, str):
             _LOGGER.error(msg)
             return
 
@@ -1387,8 +1384,8 @@ def enrichr(dataframe, gene_set_libraries=None, kind="genes"):
             _LOGGER.error(msg)
             return
 
-        if type(gene_set_libraries) is not list:
-            if type(gene_set_libraries) is str:
+        if not isinstance(gene_set_libraries, list):
+            if isinstance(gene_set_libraries, str):
                 gene_set_libraries = list(gene_set_libraries)
             else:
                 _LOGGER.error(msg)
@@ -1809,7 +1806,7 @@ def query_biomart(
         _LOGGER.error(msg)
         raise ValueError(msg)
 
-    if type(content[0]) == bytes:
+    if isinstance(content[0], bytes):
         content = [x.decode("utf-8") for x in content]
 
     try:

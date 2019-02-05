@@ -154,7 +154,7 @@ def signed_max(x, f=0.66, axis=0):
         else:
             return np.mean(x)
     else:
-        if type(x) != pd.DataFrame:
+        if not isinstance(x, pd.DataFrame):
             x = pd.DataFrame(x)
 
         if axis == 1:
@@ -368,8 +368,8 @@ def sra_id2geo_id(sra_ids):
     cmd += """ |  perl -ne '@mt = ($_ =~ /SRR\\d+/g); print "@mt"'"""
 
     geo_ids = list()
-    for id in sra_ids:
-        geo_ids.append(subprocess.call(cmd.format(id).split(" ")).read())
+    for id_ in sra_ids:
+        geo_ids.append(subprocess.call(cmd.format(id_).split(" ")).read())
     return
 
 

@@ -361,7 +361,7 @@ class Analysis(object):
                                 _LOGGER.debug("{} already exist for analysis, not overwriting."
                                               .format(attr.replace("_", " ").capitalize()))
             if hasattr(self, "comparison_table"):
-                if isinstance(self.comparison_table, str):
+                if isinstance(getattr(self, "comparison_table"), str):
                     _LOGGER.debug("Reading up comparison table.")
                     self.comparison_table = pd.read_csv(self.comparison_table)
         else:
@@ -1132,9 +1132,9 @@ class Analysis(object):
                     groups = x_new.index.get_level_values(attr)
 
                     # Determine if attr is categorical or continuous
-                    if all([type(i) in [str, bool] for i in groups]) or len(groups) == 2:
+                    if all([isinstance(i, (str, bool)) for i in groups]) or len(groups) == 2:
                         variable_type = "categorical"
-                    elif all([type(i) in [int, float, np.int64, np.float64] for i in groups]):
+                    elif all([isinstance(i, (int, float, np.int64, np.float64)) for i in groups]):
                         variable_type = "numerical"
                     else:
                         _LOGGER.warning("attr %s cannot be tested." % attr)
@@ -1313,7 +1313,7 @@ class Analysis(object):
         req_attrs = ["comparison_name", "comparison_side", "sample_name", "sample_group"]
         if not all([x in comparison_table.columns for x in req_attrs]):
             raise AssertionError("Given comparison table does not have all of '{}' columns."
-                                 .format("", "".join(req_attrs)))
+                                 .format("".join(req_attrs)))
         # check all comparisons have samples in two sides
         if not all(comparison_table.groupby("comparison_name")["comparison_side"].nunique() == 2):
             msg = "All comparisons must have samples in each side of the comparison."

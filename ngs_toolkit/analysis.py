@@ -39,7 +39,6 @@ from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 from statsmodels.sandbox.stats.multicomp import multipletests
 from tqdm import tqdm
-import yaml
 
 
 class Analysis(object):
@@ -235,16 +234,87 @@ class Analysis(object):
         This requires a reducing function such as 'all' or 'any' to evaluate how to
         return a value across all samples.
 
-        :param str attr: An attribute of the analysis' samples to check existence of files.
-        :returns bool: Bool
+        Attributes:
+
+        :param str attr:
+            An attribute of the analysis' samples to check existence of files.
+
+        :returns: Bool
         """
         return f([os.path.exists(str(getattr(sample, attr))) for sample in self.samples])
 
-    def _get_samples_have_file(self, attr):
-        return [sample for sample in self.samples if os.path.exists(str(getattr(sample, attr)))]
+    def _get_samples_have_file(self, attr, samples=None):
+        """
+        Get samples with an existing file under `attr`.
 
-    def _get_samples_missing_file(self, attr):
-        return [sample for sample in self.samples if not os.path.exists(str(getattr(sample, attr)))]
+        :param str attr:
+            Attribute to check
+
+        :param list,optional samplse:
+            Samples to consider.
+            Defaults to all in analysis
+
+        :returns list:
+            List of peppy.Sample objects
+        """
+        if samples is None:
+            samples = self.samples
+        return [sample for sample in samples if os.path.exists(str(getattr(sample, attr)))]
+
+    def _get_samples_missing_file(self, attr, samples=None):
+        """
+        Get samples without an existing file under `attr`.
+
+        :param str attr:
+            Attribute to check
+
+        :param list,optional samplse:
+            Samples to consider.
+            Defaults to all in analysis
+
+        :returns list:
+            List of peppy.Sample objects
+        """
+        if samples is None:
+            samples = self.samples
+        return [sample for sample in samples if sample not in self._get_samples_have_file(attr, samples=samples)]
+
+    def _get_samples_with_input_file(self, input_file, permissive=False, samples=None):
+        """
+        Check whether amples have input_file files and return accordingly.
+        If permissive, return samples with an existing file for attribute `input_file`.
+        Otherwise return only with all samples have it, otherwise throw IOError.
+
+        :param str input_file:
+            Attribute to check
+
+        :param bool,optional permissive:
+            Whether to allow returning a subset of samples if not all have file.
+            Defaults to False
+
+        :param list,optional samplse:
+            Samples to consider.
+            Defaults to all in analysis
+
+        :returns list:
+            List of peppy.Sample objects
+
+        :raises: IOError
+        """
+        if samples is None:
+            samples = self.samples
+        check = self._check_samples_have_file(attr=input_file, f=any if permissive else all, samples=samples)
+        missing = self._get_samples_missing_file(attr=input_file, samples=samples)
+        msg = "Not all samples have '{}' files.".format(input_file)
+        hint = " Samples missing files: {}".format(", ".join([s.name for s in missing]))
+        if not check:
+            if permissive:
+                _LOGGER.warning(msg + hint)
+                return [s for s in samples if s not in missing]
+            else:
+                raise IOError(msg)
+        else:
+            return samples
 
     @staticmethod
     def _format_string_with_environment_variables(string):
@@ -288,6 +358,18 @@ class Analysis(object):
         return string.format(**self.__dict__)
 
     def from_pep(self, pep_config):
+        """
+        Create a peppy.Project from a PEP configuration file
+        and associate is with the analysis.
+
+        Attributes:
+
+        :param str pep_config:
+            PEP configuration file.
+
+        :attr peppy.Project prj:
+            Project
+        """
         self.prj = Project(pep_config)
         # msg = "Provided PEP configuration file could not be read."
         # try:

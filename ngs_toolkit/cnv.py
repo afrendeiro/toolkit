@@ -5,7 +5,7 @@ import string
 import warnings
 
 import matplotlib.pyplot as plt
-from ngs_toolkit.general import Analysis
+from ngs_toolkit.analysis import Analysis
 from ngs_toolkit.general import query_biomart
 from ngs_toolkit.general import subtract_principal_component
 import numpy as np

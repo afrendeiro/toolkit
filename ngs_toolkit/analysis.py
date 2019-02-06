@@ -141,9 +141,8 @@ class Analysis(object):
                     if getattr(self, "prj").name is not None:
                         name = getattr(getattr(self, "prj"), "name")
                         _LOGGER.info("Setting Project's name as the analysis's name: '{}'.".format(name))
-                        name = name
-        if name is None:
-            self.name = "analysis"
+                        self.name = name
+        self.name = "analysis" if name is None else name
 
         # Set default location for the pickle
         if self.pickle_file is None:
@@ -289,13 +288,14 @@ class Analysis(object):
         return string.format(**self.__dict__)
 
     def from_pep(self, pep_config):
-        msg = "Provided PEP configuration file could not be read."
-        try:
-            self.prj = Project(pep_config)
-        except (KeyError, yaml.scanner.ScannerError):  # This is for a malformed yaml
-            # Does not cover a bad path: IsADirectoryError (Python3) and IOError (Python2)
-            _LOGGER.error(msg)
-            raise
+        self.prj = Project(pep_config)
+        # msg = "Provided PEP configuration file could not be read."
+        # try:
+        #     self.prj = Project(pep_config)
+        # except (KeyError, yaml.scanner.ScannerError):  # This is for a malformed yaml
+        #     # Does not cover a bad path: IsADirectoryError (Python3) and IOError (Python2)
+        #     _LOGGER.error(msg)
+        #     raise
 
     def update(self, pickle_file=None):
         """

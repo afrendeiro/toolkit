@@ -23,8 +23,8 @@ import pysam
 import requests
 import rpy2
 from rpy2.rinterface import RRuntimeError, RRuntimeWarning
-import rpy2.robjects as robjects
 from rpy2.robjects import numpy2ri, pandas2ri
+import rpy2.robjects as robjects
 from scipy import stats
 from scipy.linalg import lstsq
 from scipy.stats import gaussian_kde
@@ -1951,6 +1951,3 @@ def fix_batch_effect_limma(matrix, batch_variable="batch", covariates=None):
         columns=matrix.columns)
     return fixed
     # fixed.to_csv(os.path.join(analysis.results_dir, analysis.name + "_peaks.limma_fixed.csv"))
-
-
-from ngs_toolkit.analysis import Analysis

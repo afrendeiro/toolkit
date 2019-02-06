@@ -208,7 +208,8 @@ def get_blacklist_annotations(
         Otherwise they will be kept and no action is made.
         Defaults to True.
 
-    :returns str: Path to blacklist BED file
+    :returns str:
+        Path to blacklist BED file
     """
     if output_dir is None:
         output_dir = os.path.join(os.path.abspath(os.path.curdir), "reference")
@@ -281,7 +282,8 @@ def get_tss_annotations(
         Otherwise they will be kept and no action is made.
         Defaults to True.
 
-    :returns pandas.DataFrame: DataFrame with genome annotations
+    :returns pandas.DataFrame:
+        DataFrame with genome annotations
     """
     organisms = {
         "human": {"species": "hsapiens", "ensembl_version": "grch37"},
@@ -410,7 +412,8 @@ def get_genomic_context(
         Otherwise they will be kept and no action is made.
         Defaults to True.
 
-    :returns pandas.DataFrame: DataFrame with genome annotations
+    :returns pandas.DataFrame:
+        DataFrame with genome annotations
     """
     organisms = {
         "human": {"species": "hsapiens", "ensembl_version": "grch37", "ucsc_version": "hg19"},
@@ -483,14 +486,19 @@ def get_genomic_context(
     for col in bed_cols[1:3]:
         promoter.loc[:, col] = promoter.loc[:, col].astype(int)
 
+    # # # fix where promoter start < 0
+    promoter.loc[promoter['start_position'] < 0, 'start_position'] = 0
+    # # # remove end < start
+    promoter = promoter.loc[~(promoter['start_position'] > promoter['end_position'])]
+
     # # genebody = start->end + promoter
     gb = res[bed_cols].drop_duplicates()
     for col in gb.columns:
         if ("start" in col) or ("end" in col):
             gb.loc[:, col] = gb.loc[:, col].astype(int)
     gb = gb.append(promoter)
-    for col in bed_cols[1:3]:
-        gb.loc[:, col] = gb.loc[:, col].astype(int)
+    # for col in bed_cols[1:3]:
+    #     gb.loc[:, col] = gb.loc[:, col].astype(int)
     gb = gb.sort_values(gb.columns.tolist())
     genebody_bed = BedTool.from_dataframe(gb)
     genebody_bed = genebody_bed.sort().merge()

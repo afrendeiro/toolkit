@@ -41,17 +41,17 @@ sample_input_files:
   # Example:
   # ATAC-seq:
   #   aligned_filtered_bam:
-  #     "{data_dir}/{sample_name}/mapped/{sample_name}.bowtie2.filtered.bam"
+  #     "{data_dir}/{sample_name}/mapped/{sample_name}.trimmed.bowtie2.filtered.bam"
   ATAC-seq:
-    aligned_filtered_bam: "{data_dir}/{sample_name}/mapped/{sample_name}.bowtie2.filtered.bam"
+    aligned_filtered_bam: "{data_dir}/{sample_name}/mapped/{sample_name}.trimmed.bowtie2.filtered.bam"
     peaks: "{data_dir}/{sample_name}/peaks/{sample_name}_peaks.narrowPeak"
     summits: "{data_dir}/{sample_name}/peaks/{sample_name}_summits.bed"
   ChIP-seq:
-    aligned_filtered_bam: "{data_dir}/{sample_name}/mapped/{sample_name}.bowtie2.filtered.bam"
+    aligned_filtered_bam: "{data_dir}/{sample_name}/mapped/{sample_name}.trimmed.bowtie2.filtered.bam"
   CNV:
-    aligned_filtered_bam: "{data_dir}/{sample_name}/mapped/{sample_name}.bowtie2.filtered.bam"
+    aligned_filtered_bam: "{data_dir}/{sample_name}/mapped/{sample_name}.trimmed.bowtie2.filtered.bam"
   RNA-seq:
-    aligned_filtered_bam: "{data_dir}/{sample_name}/mapped/{sample_name}.bowtie2.filtered.bam"
+    aligned_filtered_bam: "{data_dir}/{sample_name}/mapped/{sample_name}.trimmed.bowtie2.filtered.bam"
 
 resources:
   lola:

@@ -94,7 +94,7 @@ class Analysis(object):
     """
     def __init__(
             self,
-            name="analysis",
+            name=None,
             samples=None,
             prj=None,
             root_dir=None,
@@ -102,10 +102,9 @@ class Analysis(object):
             results_dir="results",
             pickle_file=None,
             from_pickle=False,
-            pep=False,
+            from_pep=False,
             **kwargs):
         # parse kwargs with default
-        self.name = name
         if root_dir is None:
             self.root_dir = os.curdir
         self.root_dir = os.path.abspath(self.root_dir)
@@ -134,6 +133,18 @@ class Analysis(object):
             if not hasattr(self, attr):
                 setattr(self, attr, None)
 
+        # Generate from PEP configuration file
+        if from_pep is not False:
+            self.from_pep(from_pep)
+            if name is None:
+                if hasattr(getattr(self, "prj"), "name"):
+                    if getattr(self, "prj").name is not None:
+                        name = getattr(getattr(self, "prj"), "name")
+                        _LOGGER.info("Setting Project's name as the analysis's name: '{}'.".format(name))
+                        name = name
+        if name is None:
+            self.name = "analysis"
+
         # Set default location for the pickle
         if self.pickle_file is None:
             self.pickle_file = os.path.join(results_dir, "{}.pickle".format(self.name))
@@ -145,10 +156,6 @@ class Analysis(object):
         for directory in [self.data_dir, self.results_dir]:
             if not os.path.exists(directory):
                 os.makedirs(directory)
-
-        # Generate from PEP configuration file
-        if pep is not False:
-            self.from_pep(pep)
 
         # Store projects attributes in self
         _LOGGER.debug("Trying to set analysis attributes.")
@@ -828,21 +835,21 @@ class Analysis(object):
 
         This analysis has 4 possible steps:
          - "correlation":
-            Pairwise sample correlation with 2 distance metrics plotted as heatmap.
+                Pairwise sample correlation with 2 distance metrics plotted as heatmap.
          - "manifold":
-            Manifold learning of latent spaces for projection of samples.
-            See here available algorithms:
-            http://scikit-learn.org/stable/modules/classes.html#module-sklearn.manifold
+                Manifold learning of latent spaces for projection of samples.
+                See here available algorithms:
+                http://scikit-learn.org/stable/modules/classes.html#module-sklearn.manifold
          - "pca":
-            For PCA analysis, if `test_pc_association` is `True`, will compute association of PCs
-            with sample attributes given in `attributes_to_plot`. For numeric attributes,
-            the Pearson correlation will be computed and for categoriacal, a pairwise
-            Kruskal-Wallis H-test (ANOVA).
+                For PCA analysis, if `test_pc_association` is `True`, will compute association of PCs
+                with sample attributes given in `attributes_to_plot`. For numeric attributes,
+                the Pearson correlation will be computed and for categoriacal, a pairwise
+                Kruskal-Wallis H-test (ANOVA).
          - "pca_association":
-            For PCA analysis, if `test_pc_association` is `True`, will compute association of PCs
-            with sample attributes given in `attributes_to_plot`. For numeric attributes,
-            the Pearson correlation will be computed and for categoriacal, a pairwise
-            Kruskal-Wallis H-test (ANOVA).
+                For PCA analysis, if `test_pc_association` is `True`, will compute association of PCs
+                with sample attributes given in `attributes_to_plot`. For numeric attributes,
+                the Pearson correlation will be computed and for categoriacal, a pairwise
+                Kruskal-Wallis H-test (ANOVA).
 
         Attributes:
 
@@ -1375,6 +1382,8 @@ class Analysis(object):
 
         # Run DESeq2 analysis
         if not distributed:
+            # TODO: for complex designs (one sample is in multiple groups/comparisons)
+            #       implement running one comparison after the other
             results = deseq_analysis(
                 count_matrix, experiment_matrix, comparison_table,
                 formula, output_dir, output_prefix, alpha=alpha, overwrite=overwrite)
@@ -1397,7 +1406,9 @@ class Analysis(object):
                 comp = comparison_table[comparison_table["comparison_name"] == comparison_name]
                 comp.to_csv(os.path.join(out, "comparison_table.csv"), index=False)
 
-                exp = experiment_matrix[experiment_matrix["sample_name"].isin(comp["sample_name"].tolist())]
+                exp = experiment_matrix[
+                    experiment_matrix["sample_name"].isin(comp["sample_name"].tolist()) &
+                    experiment_matrix["sample_group"].isin(comp["sample_group"].tolist())]
                 exp.to_csv(os.path.join(out, "experiment_matrix.csv"), index=False)
 
                 count = count_matrix[comp["sample_name"].drop_duplicates()]
@@ -1471,7 +1482,7 @@ class Analysis(object):
 
         :param bool,optional overwrite:
             Whether results should be overwritten in case they already exist.
-            Defaults to True.
+            Defaults to False.
 
         :var pandas.DataFrame differential_results:
             Pandas dataframe with results.
@@ -1479,6 +1490,8 @@ class Analysis(object):
         :returns pandas.DataFrame:
             Results for all comparisons.
             Will be `None` if `overwrite` is `False` and a results file already exists.
+
+        # TODO: Add "input_dir" and input_prefix"
         """
         if comparison_table is None:
             msg = "`comparison_table` was not given and is not set in analysis object."
@@ -1497,9 +1510,10 @@ class Analysis(object):
 
         results_file = os.path.join(output_dir, output_prefix + ".deseq_result.all_comparisons.csv")
         if not overwrite and os.path.exists(results_file):
-            msg = "Differential analysis results '{}' already exist and argument `overwrite` is True."
-            _LOGGER.warning(msg.format(results_file))
-            return None
+            msg = "Differential analysis results '{}' already exist and argument `overwrite` is False."
+            hint = " Will not do anything."
+            _LOGGER.warning(msg.format(results_file) + hint)
+            return
 
         comps = comparison_table["comparison_name"].drop_duplicates().sort_values()
         results = pd.DataFrame()

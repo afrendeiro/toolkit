@@ -17,23 +17,31 @@ from sklearn.preprocessing import MinMaxScaler
 
 def chunks(l, n):
     """
-    Partition iterable in `n` chunks.
+    Partition iterable in chunks of size `n`.
 
-    :param iterable l: Iterable (e.g. list or numpy array).
-    :param int n: Number of chunks to generate.
+    Attributes:
+
+    :param iterable l:
+        Iterable (e.g. list or numpy array).
+
+    :param int n:
+        Size of chunks to generate.
     """
     n = max(1, n)
-    return (l[i:i + n] for i in range(0, len(l), n))
+    return list(l[i:i + n] for i in range(0, len(l), n))
 
 
 def sorted_nicely(l):
     """
     Sort an iterable in the way that humans expect.
 
-    :param l: Iterable to be sorted
-    :type l: iterable
-    :returns: Sorted interable
-    :rtype: list
+    Attributes:
+
+    :param iterable l:
+        Iterable to be sorted
+
+    :returns iterable:
+        Sorted interable
     """
     def convert(text): return int(text) if text.isdigit() else text
 

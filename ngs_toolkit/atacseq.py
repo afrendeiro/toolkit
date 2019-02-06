@@ -456,6 +456,7 @@ class ATACSeqAnalysis(Analysis):
                 os.rename(default_sites + ".new", default_sites)
             else:
                 self.sites.saveas(default_sites)
+        # TODO: warn if not overwrite and file exists already
 
     @check_has_sites
     def calculate_peak_support(self, samples=None, region_type="summits", permissive=False):
@@ -562,6 +563,8 @@ class ATACSeqAnalysis(Analysis):
         Measure read coverage (counts) of each sample in each region in consensus sites.
         Will try to use parallel computing using the `parmap` library.
 
+        Attributes:
+
         :param list samples:
             Iterable of peppy.Sample objects to restrict to. Must have a `filtered` attribute set.
             If not provided (`None` is passed) if will default to all samples in the analysis (`samples` attribute).
@@ -614,7 +617,7 @@ class ATACSeqAnalysis(Analysis):
 
         # Count reads with pysam
         # make strings with intervals
-        if isinstance(sites, pybedtools.bedtool.BedTool):
+        if isinstance(sites, pybedtools.BedTool):
             sites_str = [
                 str(i.chrom) + ":" +
                 str(i.start) + "-" +
@@ -628,7 +631,7 @@ class ATACSeqAnalysis(Analysis):
             sites_str = [
                 str(i.chrom) + ":" +
                 str(i.start) + "-" +
-                str(i.stop) for i in pybedtools.bedtool.BedTool(sites)]
+                str(i.stop) for i in pybedtools.BedTool(sites)]
 
         # count, create dataframe
         coverage = pd.DataFrame(

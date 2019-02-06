@@ -356,17 +356,8 @@ class ATACSeqAnalysis(Analysis):
         if samples is None:
             samples = self.samples
 
-        # Check whether all or any samples have input files (dependent on permissive)
-        check = self._check_samples_have_file(attr=region_type, f=all if permissive else any)
-        if (not permissive) and (not check):
-            miss = self._get_samples_missing_file(attr=region_type)
-            msg = "Not all samples have '{}' files.".format(region_type)
-            hint = " Samples missing files: {}".format(", ".join([s.name for s in miss]))
-            _LOGGER.error(msg + hint)
-            raise IOError(msg)
-        if permissive:
-            # if permissive, work only with samples with file
-            samples = self._get_samples_have_file(attr=region_type)
+        # Check which samples to run (dependent on permissive)
+        samples = self._get_samples_with_input_file(region_type, permissive=permissive, samples=samples)
 
         if blacklist_bed is None:
             _LOGGER.info("Blacklist file not provided. Downloading...")
@@ -492,17 +483,8 @@ class ATACSeqAnalysis(Analysis):
         if samples is None:
             samples = self.samples
 
-        # Check whether all or any samples have input files (dependent on permissive)
-        check = self._check_samples_have_file(attr=region_type, f=all if permissive else any)
-        if (not permissive) and (not check):
-            miss = self._get_samples_missing_file(attr=region_type)
-            msg = "Not all samples have '{}' files.".format(region_type)
-            hint = " Samples missing files: {}".format(", ".join([s.name for s in miss]))
-            _LOGGER.error(msg + hint)
-            raise IOError(msg)
-        if permissive:
-            # if permissive, work only with samples with file
-            samples = self._get_samples_have_file(attr=region_type)
+        # Check which samples to run (dependent on permissive)
+        samples = self._get_samples_with_input_file(region_type, permissive=permissive, samples=samples)
 
         # calculate support (number of samples overlaping each merged peak)
         for i, sample in tqdm(enumerate(samples), total=len(samples), desc="Sample"):
@@ -558,10 +540,12 @@ class ATACSeqAnalysis(Analysis):
 
     def measure_coverage(
             self, samples=None, sites=None, assign=True,
-            save=True, output_file=None, permissive=False):
+            save=True, output_file=None, permissive=False, distributed=False):
         """
         Measure read coverage (counts) of each sample in each region in consensus sites.
-        Will try to use parallel computing using the `parmap` library.
+        Uses parallel computing using the `parmap` library.
+        However, for many samples (hundreds), parallelization in a computing cluster is possible
+        with the `distributed` option. Only supports SLURM clusters fow now though.
 
         Attributes:
 
@@ -569,8 +553,11 @@ class ATACSeqAnalysis(Analysis):
             Iterable of peppy.Sample objects to restrict to. Must have a `filtered` attribute set.
             If not provided (`None` is passed) if will default to all samples in the analysis (`samples` attribute).
 
-        :param pybedtools.BedTool sites:
-            Sites in the genome to quantify. If `None` the object's `sites` attribute will be used.
+        :param pybedtools.BedTool,pd.DataFrame,str sites:
+            Sites in the genome to quantify, usually a pybedtools.BedTool from analysis.get_consensus_sites()
+            If a DataFrame, will try to convert to BED format assuming first three columns are chr,start,end.
+            If a string assumes a path to a BED file.
+            If `None` the object's `sites` attribute will be used.
 
         :param bool assign:
             Whether to assign the matrix to an attribute of self named `coverage`.
@@ -586,6 +573,11 @@ class ATACSeqAnalysis(Analysis):
             Whether Samples that which `region_type` attribute file does not exist
             should be simply skipped or an error thrown.
 
+        :param bool distributed:
+            Whether it should be run as jobs for each sample separately in parallel.
+            Currently only implemented for a SLURM cluster.
+            Default False.
+
         :raises IOError:
             If not `permissive` and the 'aligned_filtered_bam' file attribute of a sample is not readable.
             Or if `permissive` but none of the samples has an existing file.
@@ -596,57 +588,159 @@ class ATACSeqAnalysis(Analysis):
         :returns pd.DataFrame:
             Pandas DataFrame with read counts of shape (n_sites, m_samples).
         """
+        from pypiper.ngstk import NGSTk
         if samples is None:
             samples = self.samples
 
-        # Check whether all or any samples have input files (dependent on permissive)
-        attr = "aligned_filtered_bam"
-        check = self._check_samples_have_file(attr=attr, f=all)
-        if not check:
-            miss = self._get_samples_missing_file(attr=attr)
-            msg = "Not all samples have '{}' files.".format(attr)
-            hint = " Samples missing files: {}".format(", ".join([s.name for s in miss]))
-            _LOGGER.error(msg + hint)
-            raise IOError(msg)
-        if permissive:
-            # if permissive, work only with samples with file
-            samples = self._get_samples_have_file(attr=attr)
+        # Check which samples to run (dependent on permissive)
+        samples = self._get_samples_with_input_file("aligned_filtered_bam", permissive=permissive, samples=samples)
 
         if sites is None:
             sites = self.sites
 
-        # Count reads with pysam
-        # make strings with intervals
-        if isinstance(sites, pybedtools.BedTool):
-            sites_str = [
-                str(i.chrom) + ":" +
-                str(i.start) + "-" +
-                str(i.stop) for i in self.sites]
-        elif isinstance(sites, pd.core.frame.DataFrame):
-            sites_str = (
-                sites.iloc[:, 0] + ":" +
-                sites.iloc[:, 1].astype(str) + "-" +
-                sites.iloc[:, 2].astype(str)).astype(str).tolist()
-        elif isinstance(sites, str):
-            sites_str = [
-                str(i.chrom) + ":" +
-                str(i.start) + "-" +
-                str(i.stop) for i in pybedtools.BedTool(sites)]
+        if not distributed:
+            # Count reads with pysam
+            # make strings with intervals
+            if isinstance(sites, pybedtools.BedTool):
+                sites_str = [
+                    str(i.chrom) + ":" +
+                    str(i.start) + "-" +
+                    str(i.stop) for i in self.sites]
+            elif isinstance(sites, pd.core.frame.DataFrame):
+                sites_str = (
+                    sites.iloc[:, 0] + ":" +
+                    sites.iloc[:, 1].astype(str) + "-" +
+                    sites.iloc[:, 2].astype(str)).astype(str).tolist()
+            elif isinstance(sites, str):
+                sites_str = [
+                    str(i.chrom) + ":" +
+                    str(i.start) + "-" +
+                    str(i.stop) for i in pybedtools.BedTool(sites)]
 
-        # count, create dataframe
-        coverage = pd.DataFrame(
-            map(
-                lambda x:
-                    pd.Series(x),
-                    parmap.map(
-                        count_reads_in_intervals,
-                        [sample.aligned_filtered_bam for sample in samples],
-                        sites_str,
-                        parallel=True
-                    )
-            ),
-            index=[sample.name for sample in samples]
-        ).T
+            # count, create dataframe
+            coverage = pd.DataFrame(
+                map(
+                    lambda x:
+                        pd.Series(x),
+                        parmap.map(
+                            count_reads_in_intervals,
+                            [sample.aligned_filtered_bam for sample in samples],
+                            sites_str,
+                            parallel=True
+                        )
+                ),
+                index=[sample.name for sample in samples]
+            ).T
+
+            if assign:
+                self.coverage = coverage
+            if save:
+                if output_file is not None:
+                    coverage.to_csv(output_file, index=True)
+                else:
+                    self.coverage.to_csv(os.path.join(
+                        self.results_dir, self.name + "_peaks.raw_coverage.csv"), index=True)
+            return coverage
+
+        else:
+            import textwrap
+            tk = NGSTk()
+            for s in samples:
+                output_dir = os.path.join(s.paths.sample_root, "coverage")
+                if not os.path.exists(output_dir):
+                    os.makedirs(output_dir)
+
+                job_name = "peak_set_coverage.{}".format(s.name)
+                output_file = os.path.join(output_dir, s.name + ".peak_set_coverage.bed")
+                log_file = os.path.join(output_dir, s.name + ".peak_set_coverage.log")
+                job_file = os.path.join(output_dir, s.name + ".peak_set_coverage.sh")
+
+                cmd = tk.slurm_header(
+                    job_name=job_name, output=log_file,
+                    cpus_per_task=1, mem_per_cpu=8000)
+                cmd += "bedtools coverage -counts"
+                cmd += " -abam {}".format(s.aligned_filtered_bam)
+                cmd += " -b {}".format(sites.fn)
+                cmd += " > {}".format(output_file)
+                cmd += " \n"
+                cmd += tk.slurm_footer()
+
+                with open(job_file, "w") as handle:
+                    handle.write(textwrap.dedent(cmd).replace("\n ", "\n").replace("  ", ""))
+
+                tk.slurm_submit_job(job_file)
+
+    def collect_coverage(
+            self, samples=None, sites=None, assign=True,
+            save=True, output_file=None, permissive=False):
+        """
+        Collect read coverage (counts) of each sample in each region in consensus sites from existing files.
+        Useful after runnning analysis.measure_coverage() in distributed mode.
+
+        Importantly, it assumes all coverage files are ordered equally and that this order matches the order in `sites`!
+
+        Attributes:
+
+        :param list samples:
+            Iterable of peppy.Sample objects to restrict to.
+            If not provided (`None` is passed) if will default to all samples in the analysis (`samples` attribute).
+
+        :param pybedtools.BedTool,pd.DataFrame,str sites:
+            Sites in the genome to quantify, usually a pybedtools.BedTool from analysis.get_consensus_sites()
+            If a DataFrame, will try to convert to BED format assuming first three columns are chr,start,end.
+            If a string assumes a path to a BED file.
+            If `None` the object's `sites` attribute will be used.
+
+        :param bool assign:
+            Whether to assign the matrix to an attribute of self named `coverage`.
+
+        :param bool save:
+            Whether to save to disk the coverage matrix with filename `output_file`.
+
+        :param str output_file:
+            A path to a CSV file with coverage output.
+            Default is `self.results_dir/self.name + "_peaks.raw_coverage.csv"`.
+
+        :param bool permissive:
+            Whether Samples without an existing coverage file does not exist
+            should be simply skipped or an error thrown.
+
+        :raises IOError:
+            If not `permissive` and the coverage file of a sample is not readable.
+            Or if `permissive` but none of the samples has an existing file.
+
+        :var pd.DataFrame coverage:
+            Sets a `coverage` variable with DataFrame with read counts of shape (n_sites, m_samples).
+
+        :returns pd.DataFrame:
+            Pandas DataFrame with read counts of shape (n_sites, m_samples).
+        """
+        from ngs_toolkit.utils import bed_to_index
+        if samples is None:
+            samples = self.samples
+
+        for sample in samples:
+            setattr(
+                sample, "_coverage",
+                os.path.join(sample.paths.sample_root, "coverage", sample.name + ".peak_set_coverage.bed"))
+
+        # Check which samples to run (dependent on permissive)
+        samples = self._get_samples_with_input_file("_coverage", permissive=permissive, samples=samples)
+
+        # Read in counts
+        for i, sample in tqdm(enumerate(samples), total=len(samples)):
+            if i == 0:
+                cov = pd.read_csv(
+                    sample._coverage, sep="\t", header=None,
+                    names=['chrom', 'start', 'end', sample.name])
+                coverage = pd.DataFrame(
+                    index=bed_to_index(cov),
+                    columns=[s.name for s in samples])
+                coverage.loc[:, sample.name] = cov[sample.name].values
+            else:
+                coverage.loc[:, sample.name] = pd.read_csv(
+                    sample._coverage, sep="\t", header=None,
+                    names=['chrom', 'start', 'end', sample.name]).loc[:, sample.name].values
 
         if assign:
             self.coverage = coverage
@@ -656,7 +750,6 @@ class ATACSeqAnalysis(Analysis):
             else:
                 self.coverage.to_csv(os.path.join(
                     self.results_dir, self.name + "_peaks.raw_coverage.csv"), index=True)
-
         return coverage
 
     def normalize_coverage_rpm(
@@ -1835,15 +1928,22 @@ class ATACSeqAnalysis(Analysis):
             _LOGGER.error(msg)
             raise ValueError(msg)
 
+        #
+        tasks = list()
+        msg = "'{}' step selected, but analysis does not have '{}'."
+        for step, matrix in [
+            ("genomic_region", "region_annotation_mapping"),
+            ("chromatin_state", "chrom_state_annotation_mapping"),
+        ]:
+            if step in steps:
+                if hasattr(self, matrix):
+                    tasks.append(step, getattr(self, matrix))
+                else:
+                    _LOGGER.warning(msg.format(step, matrix))
+
         # compare genomic regions and chromatin_states
         enr = pd.DataFrame()
-        for var, annot in [
-                ('genomic_region', self.region_annotation_mapping),
-                ('chromatin_state', self.chrom_state_annotation_mapping)
-        ]:
-            if var not in steps:
-                continue
-
+        for var, annot in tasks:
             _LOGGER.debug("Getting enrichment of regions in '{}'.".format(var))
             res = annot.loc[set(regions), var].value_counts().to_frame('differential')
             res = res.join(annot.loc[:, var].value_counts().to_frame(name="universe").squeeze())

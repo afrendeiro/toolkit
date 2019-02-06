@@ -228,7 +228,7 @@ class Analysis(object):
                 raise ValueError(msg + hint)
         return data_type
 
-    def _check_samples_have_file(self, attr, f=all):
+    def _check_samples_have_file(self, attr, f=all, samples=None):
         """
         Checks that there are existing files for an attribute of the analysis samples.
         This requires a reducing function such as 'all' or 'any' to evaluate how to
@@ -239,9 +239,19 @@ class Analysis(object):
         :param str attr:
             An attribute of the analysis' samples to check existence of files.
 
+        :param function f:
+            Function to reduce output across samples.
+            Defaults to `all`.
+
+        :param list,optional samples:
+            Samples to consider.
+            Defaults to all in analysis
+
         :returns: Bool
         """
-        return f([os.path.exists(str(getattr(sample, attr))) for sample in self.samples])
+        if samples is None:
+            samples = self.samples
+        return f([os.path.exists(str(getattr(sample, attr))) for sample in samples])
 
     def _get_samples_have_file(self, attr, samples=None):
         """
@@ -250,7 +260,7 @@ class Analysis(object):
         :param str attr:
             Attribute to check
 
-        :param list,optional samplse:
+        :param list,optional samples:
             Samples to consider.
             Defaults to all in analysis
 
@@ -268,7 +278,7 @@ class Analysis(object):
         :param str attr:
             Attribute to check
 
-        :param list,optional samplse:
+        :param list,optional samples:
             Samples to consider.
             Defaults to all in analysis
 
@@ -292,7 +302,7 @@ class Analysis(object):
             Whether to allow returning a subset of samples if not all have file.
             Defaults to False
 
-        :param list,optional samplse:
+        :param list,optional samples:
             Samples to consider.
             Defaults to all in analysis
 
@@ -1215,7 +1225,7 @@ class Analysis(object):
             associations = list()
             for pc in pcs_order:
                 for attr in attributes_to_plot:
-                    _LOGGER.info("PC {}; Attribute {}.".format(pc + 1, attr))
+                    _LOGGER.debug("PC {}; Attribute {}.".format(pc + 1, attr))
 
                     # Get all values of samples for this attr
                     groups = x_new.index.get_level_values(attr)
@@ -2462,7 +2472,7 @@ class Analysis(object):
                 ("intersection", "intersection", "total in intersection", 0),
                 ("intersection_max_perc", "percentage_overlap", "max of intersection %", 0),
                 ("log_p_value", "significance", "p-value", 0)]:
-            _LOGGER.info(metric)
+            _LOGGER.debug(metric)
             # make pivot tables
             piv_up = pd.pivot_table(
                 intersections[(intersections["dir1"] == "up") & (intersections["dir2"] == "up")],
@@ -2498,7 +2508,9 @@ class Analysis(object):
             axis[1].set_xticklabels(axis[1].get_xticklabels(), rotation=90, ha="center")
             axis[0].set_yticklabels(axis[0].get_yticklabels(), rotation=0, ha="right")
             axis[1].set_yticklabels(axis[1].get_yticklabels(), rotation=0, ha="right")
-            savefig(fig, os.path.join(output_dir, output_prefix + ".differential_overlap.{}.up_down_split.svg".format(label)))
+            savefig(fig, os.path.join(
+                    output_dir, output_prefix + ".differential_overlap.{}.up_down_split.svg"
+                    .format(label)))
 
             # combined heatmap
             # with upregulated {}s in upper square matrix and downredulated in down square
@@ -2521,7 +2533,9 @@ class Analysis(object):
                 ax=axis, **extra)
             axis.set_xticklabels(axis.get_xticklabels(), rotation=90, ha="center")
             axis.set_yticklabels(axis.get_yticklabels(), rotation=0, ha="right")
-            savefig(fig, os.path.join(output_dir, output_prefix + ".differential_overlap.{}.up_down_together.svg".format(label)))
+            savefig(fig, os.path.join(
+                    output_dir, output_prefix + ".differential_overlap.{}.up_down_together.svg"
+                    .format(label)))
 
             # Rank plots
             if metric == "log_pvalue":
@@ -2551,7 +2565,9 @@ class Analysis(object):
                     ax.set_ylabel("Agreement (-log(p-value))")
                     ax.set_xlabel("Rank")
                 sns.despine(fig)
-                savefig(fig, os.path.join(output_dir, output_prefix + ".differential_overlap.{}.agreement.rank.svg".format(label)))
+                savefig(fig, os.path.join(
+                        output_dir, output_prefix + ".differential_overlap.{}.agreement.rank.svg"
+                        .format(label)))
 
             # Observe disagreement
             # (overlap of down-regulated with up-regulated and vice-versa)
@@ -2585,7 +2601,9 @@ class Analysis(object):
             axis[0].set_yticklabels(axis[0].get_yticklabels(), rotation=0, ha="right")
             axis[1].set_xlim((0, len(piv_disagree.index)))
             axis[1].set_ylim((0, len(piv_disagree.columns)))
-            savefig(fig, os.path.join(output_dir, output_prefix + ".differential_overlap.{}.disagreement.svg".format(label)))
+            savefig(fig, os.path.join(
+                    output_dir, output_prefix + ".differential_overlap.{}.disagreement.svg"
+                    .format(label)))
 
             # Rank plots
             if metric == "log_pvalue":
@@ -2608,7 +2626,9 @@ class Analysis(object):
                     ax.set_ylabel("Disagreement (-log(p-value))")
                     ax.set_xlabel("Rank")
                 sns.despine(fig)
-                savefig(fig, os.path.join(output_dir, output_prefix + ".differential_overlap.{}.disagreement.rank.svg".format(label)))
+                savefig(fig, os.path.join(
+                    output_dir, output_prefix + ".differential_overlap.{}.disagreement.rank.svg"
+                    .format(label)))
 
     def differential_enrichment(
             self,

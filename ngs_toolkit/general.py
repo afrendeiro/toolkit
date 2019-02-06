@@ -1161,39 +1161,18 @@ def lola(bed_files, universe_file, output_folder, output_prefixes=None, genome="
                 os.path.join(output_folder, "col_" + region_set + suffix + "tsv"), index=False, sep="\t")
 
 
-def bed_to_fasta(bed_file, fasta_file, genome="hg19", genome_2bit=None):
-    if genome_2bit is None:
-        # Get region databases from config
-        _LOGGER.info("Getting 2bit reference genome for genome '{}' from configuration.".format(genome))
-
-        msg = "Reference genome in 2bit format value in configuration could not be found or understood. "
-        msg += "Please add a list of value(s) to this section 'resources:genomes:2bit:{}'. ".format(genome)
-        msg += "For an example, see https://github.com/afrendeiro/toolkit/tree/master/ngs_toolkit/config/example.yaml"
-        try:
-            genome_2bit = _CONFIG['resources']['genomes']['2bit'][genome]
-        except KeyError:
-            _LOGGER.error(msg)
-            return
-
-        if not isinstance(genome_2bit, str):
-            _LOGGER.error(msg)
-            return
-
-    if not os.path.exists(genome_2bit):
-        _LOGGER.error("Reference genome in 2bit does not exist or can't be open: '{}'".format(genome_2bit))
-
+def bed_to_fasta(input_bed, output_fasta, genome_2bit):
+    tmp_bed = input_bed + ".tmp.bed"
     # write name column
-    bed = pd.read_csv(bed_file, sep='\t', header=None)
+    bed = pd.read_csv(input_bed, sep='\t', header=None)
     bed['name'] = bed[0] + ":" + bed[1].astype(str) + "-" + bed[2].astype(str)
     bed[1] = bed[1].astype(int)
     bed[2] = bed[2].astype(int)
-    bed.to_csv(bed_file + ".tmp.bed", sep='\t', header=None, index=False)
+    bed.to_csv(tmp_bed, sep='\t', header=None, index=False)
 
-    # do enrichment
-    cmd = "twoBitToFa {0} -bed={1} {2}".format(genome_2bit, bed_file + ".tmp.bed", fasta_file)
-
+    cmd = "twoBitToFa {0} -bed={1} {2}".format(genome_2bit, tmp_bed, output_fasta)
     subprocess.call(cmd.split(" "))
-    # subprocess.call("rm %s" % bed_file + ".tmp.bed")
+    os.remove(tmp_bed)
 
 
 def meme_ame(

@@ -291,8 +291,9 @@ class Analysis(object):
 
     def _get_samples_with_input_file(self, input_file, permissive=False, samples=None):
         """
-        Check whether amples have input_file files and return accordingly.
-        If permissive, return samples with an existing file for attribute `input_file`.
+        Get samples with existing files of attribute `input_file`.
+
+        If none has, raise error. Else, if permissive, return samples with existing file.
         Otherwise return only with all samples have it, otherwise throw IOError.
 
         :param str input_file:
@@ -315,6 +316,12 @@ class Analysis(object):
             samples = self.samples
         check = self._check_samples_have_file(attr=input_file, f=any if permissive else all, samples=samples)
         missing = self._get_samples_missing_file(attr=input_file, samples=samples)
+
+        msg = "None of the samples have '{}' files.".format(input_file)
+        if all([s in missing for s in samples]):
+            _LOGGER.error(msg)
+            raise IOError(msg)
+
         msg = "Not all samples have '{}' files.".format(input_file)
         hint = " Samples missing files: {}".format(", ".join([s.name for s in missing]))
         if not check:
@@ -322,6 +329,7 @@ class Analysis(object):
                 _LOGGER.warning(msg + hint)
                 return [s for s in samples if s not in missing]
             else:
+                _LOGGER.error(msg)
                 raise IOError(msg)
         else:
             return samples

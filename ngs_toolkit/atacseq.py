@@ -2016,6 +2016,7 @@ class ATACSeqAnalysis(Analysis):
             Default is all: ['region', 'lola', 'meme', 'homer', 'enrichr']
 
         """
+        from ngs_toolkit.general import get_genome_reference
         # use all sites as universe
         if universe_file is None:
             try:
@@ -2076,7 +2077,10 @@ class ATACSeqAnalysis(Analysis):
         # Motifs
         # de novo motif finding - enrichment
         fasta_file = os.path.join(output_dir, "{}_regions.fa".format(prefix))
-        bed_to_fasta(bed_file, fasta_file, genome=genome)
+
+        genome_2bit = get_genome_reference(
+            self.organism, file_format="2bit", overwrite=False)
+        bed_to_fasta(input_bed=bed_file, output_fasta=fasta_file, genome_2bit=genome_2bit)
 
         if not run:
             return

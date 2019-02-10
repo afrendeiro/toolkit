@@ -2957,6 +2957,7 @@ class Analysis(object):
                 genome=genome, background_bed=background, steps=steps)
 
     def collect_differential_enrichment(
+
             self,
             steps=["region", "lola", "motif", "homer", "homer_consensus", "enrichr"],
             directional=True,

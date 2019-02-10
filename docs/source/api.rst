@@ -44,12 +44,17 @@ ngs_toolkit.rnaseq
 .. automodule:: ngs_toolkit.rnaseq
     :members:
 
-ngs_toolkit.scrnaseq
------------------------
-.. automodule:: ngs_toolkit.scrnaseq
-    :members:
-
 ngs_toolkit.graphics
 -----------------------
 .. automodule:: ngs_toolkit.graphics
+    :members:
+
+ngs_toolkit.utils
+-----------------------
+.. automodule:: ngs_toolkit.utils
+    :members:
+
+ngs_toolkit.parsers
+-----------------------
+.. automodule:: ngs_toolkit.parsers
     :members:

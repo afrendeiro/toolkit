@@ -10,17 +10,17 @@ Contents
 ^^^^^^^^
 
 .. toctree::
-	:maxdepth: 1
+    :maxdepth: 1
 
-	intro.rst
-	examples.rst
-	concepts.rst
-	comparison_table.rst
-	log_config.rst
-	manager_programs.rst
-	recipes.rst
-	api.rst
-	changelog.rst
+    intro
+    examples
+    concepts
+    comparison_table
+    log_config
+    manager_programs
+    recipes
+    api
+    changelog
 
 
 Indices and tables

@@ -5,12 +5,22 @@ def setup_logger(level="INFO", logfile=None):
     """
     Set up a logger for the library.
 
-    :param level: Level of logging to display. Defaults to "INFO". See possible levels here: https://docs.python.org/2/library/logging.html#levels
-    :type level: str, optional
-    :param logfile: File to write log to. Defaults to ``~/ngs_toolkit.log.txt``
-    :type logfile: str, optional
-    :returns: The logger
-    :rtype: logging.Logger
+    Parameters
+    ----------
+
+    optional level : str, optional
+        Level of logging to display.
+        See possible levels here: https://docs.python.org/2/library/logging.html#levels
+        Defaults to "INFO".
+
+    optional logfile : str, optional
+        File to write log to.
+        Defaults to ``~/ngs_toolkit.log.txt``
+
+    Returns
+    -------
+    logging.Logger
+        The logger
     """
     import logging
     import os
@@ -52,14 +62,20 @@ def setup_config(custom_yaml_config=None):
     tries to update it by reading a file in ``~/.ngs_toolkit.config.yaml`` if present,
     and lastly, updates it by reading a possible passed yaml file ``custom_yaml_config``.
     Non-exisiting fields will maintain the previous values, so that the user needs only
-    to specify the section(s) (s)he needs.
+    to specify the section(s) as needed.
 
-    :param custom_yaml_config: Path to YAML file with configuration.
-                               To see the structure of the YAML file, see
-                               https://github.com/afrendeiro/toolkit/blob/master/ngs_toolkit/config/default.yaml
-    :type custom_yaml_config: str, optional
-    :returns: Dictionary with configurations
-    :rtype: dict
+    Parameters
+    ----------
+    optional custom_yaml_config : str, optional
+        Path to YAML file with configuration.
+        To see the structure of the YAML file, see
+        https://github.com/afrendeiro/toolkit/blob/master/ngs_toolkit/config/default.yaml
+        Defaults to None
+
+    Returns
+    -------
+    dict
+        Dictionary with configurations
     """
     import pkg_resources
     import os

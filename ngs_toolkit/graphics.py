@@ -24,15 +24,29 @@ def barmap(x, figsize=None, square=False, row_colors=None, z_score=None, ylims=N
     """
     Plot a heatmap-style grid with barplots.
 
-    :param pandas.DataFrame x: DataFrame with numerical values to plot. If DataFrame,
-                               indexes will be used as labels.
-    :param tuple figsize: Size in inches (width, height) of figure to produce.
-    :param bool square: Whether resulting figure should be square.
-    :param list row_colors: Iterable of colors to use for each row.
-    :param int z_score: Whether input matrix `x` should be Z-score transformed row-wise (0)
-                        or column-wise (1).
-    :raises AssertionError: if length of `row_colors` does not match size of provided Y axis
-                            from matrix `x`.
+    Parameters
+    ----------
+    x : pandas.DataFrame
+        DataFrame with numerical values to plot.
+        If DataFrame, indexes will be used as labels.
+    figsize : tuple
+        Size in inches (width, height) of figure to produce.
+    square : bool
+        Whether resulting figure should be square.
+    row_colors : list
+        Iterable of colors to use for each row.
+    z_score : int
+        Whether input matrix `x` should be Z-score transformed row-wise (0) or column-wise (1).
+
+    Returns
+    ----------
+    matplotlib.Figure
+        Figure object
+
+    Raises
+    ----------
+    AssertionError:
+        if length of `row_colors` does not match size of provided Y axis from matrix `x`.
     """
     y_size, x_size = x.shape
 
@@ -112,12 +126,14 @@ def radar_plot(
         cmap="inferno", scale_to_max=True):
     """
     
-    :param pandas.DataFrame data:
-    :param str subplot_var:
-    :param str group_var:
-    :param list radial_vars:
-    :param cmap str: Matplotlib colormap to use.
-    :param bool scale_to_max: Whether values will be scaled
+    data : pandas.DataFrame
+    subplot_var : str
+    group_var : str
+    radial_vars : list
+    str : cmap
+        Matplotlib colormap to use.
+    scale_to_max : bool
+        Whether values will be scaled
 
     Heavy inspiration from here: https://matplotlib.org/examples/api/radar_chart.html
     """
@@ -292,43 +308,54 @@ def plot_projection(
     """
     Plot a low dimentionality projection of samples.
 
-    :param df: Dataframe with sample projections
-    :type df: pandas.DataFrame
-    :param color_dataframe: Dataframe of RGB tuples for sample i in attribute j.
-    :type color_dataframe: pandas.DataFrame
-    :param dims: Number of dimentions to plot
-    :type dims: int
-    :param output_file: Path to figure output file
-    :type output_file: str
-    :param attributes_to_plot: List of levels in df.index to plot
-    :type attributes_to_plot: list
-    :param plot_max_dims: Maximum number of sample attributes to plot for each factor in plot legend.
-                          Defaults to 20.
-    :type plot_max_dims: int, optional
-    :param plot_max_dims: Maximum number of principal components to plot. This only affects plotting.
-                         All dims will be calculated.
-                         Defaults to 8.
-    :type plot_max_dims: number, optional
-    :param plot_group_centroids: Whether centroids of each sample group should be plotted alongside
-                                 samples. Will be square shaped.
-                                 Defaults to True.
-    :type plot_group_centroids: bool, optional
-    :param axis_ticklabels: Whether MDS and PCA axis ticks and ticklabels should be plotted.
-                            Defaults to False.
-    :type axis_ticklabels: bool, optional
-    :param axis_lines: Whether (0, 0) dashed lines should be plotted in MDS and PCA.
-                       Defaults to True.
-    :type axis_lines: bool, optional
-    :param legends: Whether legends for group colours should be plotted in MDS and PCA.
-                    Defaults to False.
-    :type legends: bool, optional
-    :param always_legend: Whether legends for group colours should be plotted in every figure
-                          panel in MDS and PCA.
-                          If False, will plot just on first/last figure panel.
-                          Defaults to False.
-    :type always_legend: bool, optional
-    """
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        Dataframe with sample projections
 
+    color_dataframe : pandas.DataFrame
+        Dataframe of RGB tuples for sample i in attribute j.
+
+    dims : int
+        Number of dimentions to plot
+
+    output_file : str
+        Path to figure output file
+
+    attributes_to_plot : list
+        List of levels in df.index to plot
+
+    plot_max_dims : int, optional
+        Maximum number of sample attributes to plot for each factor in plot legend.
+        Defaults to 20.
+
+    plot_max_dims : number, optional
+        Maximum number of principal components to plot. This only affects plotting.
+        All dims will be calculated.
+        Defaults to 8.
+
+    plot_group_centroids : bool, optional
+        Whether centroids of each sample group should be plotted alongside samples.
+        Will be square shaped.
+        Defaults to True.
+
+    axis_ticklabels : bool, optional
+        Whether MDS and PCA axis ticks and ticklabels should be plotted.
+        Defaults to False.
+
+    axis_lines : bool, optional
+        Whether (0, 0) dashed lines should be plotted in MDS and PCA.
+        Defaults to True.
+
+    legends : bool, optional
+        Whether legends for group colours should be plotted in MDS and PCA.
+        Defaults to False.
+
+    always_legend : bool, optional
+        Whether legends for group colours should be plotted in every figure panel in MDS and PCA.
+        If False, will plot just on first/last figure panel.
+        Defaults to False.
+    """
     n_attr = len(attributes_to_plot)
     fig, axis = plt.subplots(dims, n_attr, figsize=(4 * n_attr, 4 * dims))
     if n_attr == dims == 1:
@@ -394,39 +421,40 @@ def plot_projection(
     savefig(fig, output_file)
 
 
-def plot_region_structure_results(
+def plot_region_context_enrichment(
         enr,
-        output_dir, output_prefix="region_type_enrichment",
+        output_dir="results",
+        output_prefix="region_type_enrichment",
         across_attribute=None,
         pvalue=0.05, top_n=5):
     """
     Plot results of ATACSeqAnalysis.region_context_enrichment.
 
-    Attributes:
-
-    :param enr:
+    Parameters
+    ----------
+    enr : pandas.DataFrame
         Results of region_context_enrichment.
 
-    :param str output_dir:
+    output_dir : str, optional
         Directory to save plots to.
+        Defaults to "results".
 
-    :param str, optional output_prefix:
+    optional output_prefix : str, optional
         Prefix to use when saveing plots.
         Defaults to "region_type_enrichment"
 
-    :param str,optional across_attribute:
+    across_attribute : str, optional
         Column in enrichment matrix to plot results across e.g. "comparison_name"
         when results matrix contains the result of various comparisons.
         Defaults to None (not used).
 
-    :param float,optional pvalue:
+    pvalue : float, optional
         Value at which to plot a line marking the significant level.
         Defaults to 0.05.
 
-    :param optional top_n:
+    top_n : int, optional
         Number of features to label in volcano plot.
         Defaults to 5.
-
     """
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
@@ -495,19 +523,18 @@ def plot_comparison_correlations(
     Plot pairwise log fold changes for various comparisons.
 
 
-    Attributes:
-
-    :param pandas.DataFrame diff:
+    Parameters
+    ----------
+    diff : pandas.DataFrame
         Dataframe with differential results
 
-    :param str output_dir:
+    output_dir : str
         Output directory for plots.
 
-    :param str,optional output_prefix:
+    output_prefix : str, optional
         Prefix for plots.
         Defaults to "comparison_correlations"
     """
-
     comps = diff['comparison_name'].unique()
     n = len(comps)
     rows = cols = int(np.ceil(np.sqrt(n)))

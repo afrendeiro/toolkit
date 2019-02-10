@@ -194,21 +194,21 @@ class RNASeqAnalysis(Analysis):
         normalizes expression matrix (quantile normalization), and
         annotates samples with given attributes (generates pandas dataframe with MultiIndex columns).
 
-        Attributes:
-
-        :param peppy.Sample samples:
+        Parameters
+        ----------
+        samples : peppy.Sample
             Samples to get expression for. Default all in analysis.
 
-        :param list sample_attributes:
+        sample_attributes : list
             Sample attributes to annotate expression matrix with.
 
-        :param str expression_type:
+        expression_type : str
             Type of expression quantification to get. One of "counts" or "rpkm".
 
-        :param str genome_assembly:
+        genome_assembly : str
             Genome assembly to use (e.g. "grch38") or Ensembl prefix to archive ("aug2014.archive")
 
-        :param str species:
+        species : str
             Ensembl species name (e.g. "hsapiens", "mmusculus")
 
         # TODO: Rewrite to have loop perform same transformations on transcript and gene-level quantifications

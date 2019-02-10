@@ -4,15 +4,14 @@
 import os
 import re
 import subprocess
-import textwrap
 
 from ngs_toolkit import _LOGGER
 from ngs_toolkit.atacseq import ATACSeqAnalysis
-from ngs_toolkit.utils import homer_peaks_to_bed
+from ngs_toolkit.utils import (
+    homer_peaks_to_bed, macs2_call_chipseq_peak, homer_call_chipseq_peak_job)
 import numpy as np
 import pandas as pd
 import pybedtools
-from pypiper.ngstk import NGSTk
 from tqdm import tqdm
 
 
@@ -59,20 +58,22 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
         Call peaks for ChIP-seq samples using an annotation of which samples
         belong in each comparison and which samples represent signal or background.
 
-        Attributes:
-
-        :param pandas.DataFrame comparison_table:
+        Parameters
+        ----------
+        comparison_table : pandas.DataFrame
             Comparison table with the following required columns:
             "comparison_name", "sample_name", "comparison_side", "sample_group".
 
-        :param str output_dir:
+        output_dir : str
             Parent directory where peaks will be created.
             Will be created if does not exist.
 
-        :param bool permissive:
+        permissive : bool
             If incomplete/incoherent comparisons should be skipped or an error should be thrown.
 
-        :raises ValueError:
+        Raises
+        ----------
+        ValueError
             Will be raised if not `permissive` and incomplete/incoherent comparisons are detected.
         """
         req_columns = ["comparison_name", "sample_name", "comparison_side", "sample_group"]
@@ -155,15 +156,15 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
         """
         Filter BED file for entries that overlap another BED file.
 
-        Attributes:
-
-        :param str input_bed:
+        Parameters
+        ----------
+        input_bed : str
             BED file to filter.
 
-        :param str filter_bed:
+        filter_bed : str
             BED file with entries to filter from input_bed.
 
-        :param str output_bed:
+        output_bed : str
             Output BED file.
         """
         if filter_bed == "blacklist.mm10_liftOver.bed":
@@ -180,13 +181,15 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
             """
             Filter BED file for entries that overlap another BED file.
 
-            :param str input_bed:
+            Parameters
+            ----------
+            input_bed : str
                 BED file to filter.
 
-            :param str filter_bed:
+            filter_bed : str
                 BED file with entries to filter from input_bed.
 
-            :param str output_bed:
+            output_bed : str
                 Output BED file.
             """
             (
@@ -214,17 +217,21 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
         Call peaks for ChIP-seq samples using an annotation of which samples belong in each comparison and which
         samples represent signal or background.
 
-        :param pandas.DataFrame comparison_table:
+        Parameters
+        ----------
+        comparison_table : pandas.DataFrame
             Comparison table with the following required columns:
             "comparison_name", "sample_name", "comparison_side", "sample_group".
 
-        :param str output_dir:
+        output_dir : str
             Parent directory where peaks will be created. Will be created if does not exist.
 
-        :param bool permissive:
+        permissive : bool
             If incomplete/incoherent comparisons should be skipped or an error should be thrown.
 
-        :raises ValueError:
+        Raises
+        ----------
+        ValueError
             Will be raised if not `permissive` and incomplete/incoherent comparisons are detected.
         """
         req_columns = ["comparison_name", "sample_name", "comparison_side", "sample_group"]
@@ -409,115 +416,14 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
         Get mask of sites with 0 support in the given samples.
         Requires support matrix produced by `ngs_toolkit.atacseq.ATACSeqAnalysis.calculate_peak_support`.
 
-        Attributes:
-
-        :param list samples:
+        Parameters
+        ----------
+        samples : list
             Iterable of peppy.Sample objects to restrict to.
 
-        :returns pd.Series:
+        Returns
+        -------
+        pd.Series
             Boolean Pandas Series with sites with at least one of the given samples having a peak called.
         """
         return self.support[[c for c in comparisons]].sum(1) != 0
-
-
-def macs2_call_chipseq_peak(signal_samples, control_samples, output_dir, name, as_job=True):
-    """
-    Call ChIP-seq peaks with MACS2 in a slurm job.
-
-    Attributes:
-
-    :param list signal_samples:
-        Signal Sample objects.
-
-    :param list control_samples:
-        Background Sample objects.
-
-    :param list output_dir:
-        Parent directory where MACS2 outputs will be stored.
-
-    :param str name:
-        Name of the MACS2 comparison being performed.
-
-    :param bool as_job:
-        Whether to submit a SLURM job or to return a string with the runnable.
-    """
-    output_path = os.path.join(output_dir, name)
-    if not os.path.exists(output_path):
-        os.mkdir(output_path)
-
-    runnable = (
-        """macs2 callpeak -t {0} -c {1} -n {2} --outdir {3}"""
-        .format(
-            " ".join([s.filtered for s in signal_samples]),
-            " ".join([s.filtered for s in control_samples]), name, output_path))
-
-    if as_job:
-        tk = NGSTk()
-        job_name = "macs2_{}".format(name)
-        cmd = tk.slurm_header(
-            job_name,
-            os.path.join(output_path, job_name + ".log"),
-            cpus_per_task=4)
-        cmd += "\t\t" + runnable
-        cmd += "\t\t" + tk.slurm_footer() + "\n"
-        job_file = os.path.join(output_path, name + ".macs2.sh")
-        with open(job_file, "w") as handle:
-            handle.write(textwrap.dedent(cmd))
-        tk.slurm_submit_job(job_file)
-    else:
-        return runnable
-
-
-def homer_call_chipseq_peak_job(signal_samples, control_samples, output_dir, name, as_job=True):
-    """
-    Call ChIP-seq peaks with MACS2 in a slurm job.
-
-    Attributes:
-
-    :param list signal_samples:
-        Signal Sample objects.
-
-    :param list control_samples:
-        Background Sample objects.
-
-    :param list output_dir:
-        Parent directory where MACS2 outputs will be stored.
-
-    :param str name:
-        Name of the MACS2 comparison being performed.
-    """
-    output_path = os.path.join(output_dir, name)
-    if not os.path.exists(output_path):
-        os.mkdir(output_path)
-
-    # make tag directory for the signal and background samples separately
-    signal_tag_directory = os.path.join(output_dir, "homer_tag_dir_" + name + "_signal")
-    fs = " ".join([s.filtered for s in signal_samples])
-    runnable = """makeTagDirectory {0} {1}\n""".format(signal_tag_directory, fs)
-    background_tag_directory = os.path.join(output_dir, "homer_tag_dir_" + name + "_background")
-    fs = " ".join([s.filtered for s in control_samples])
-    runnable += """makeTagDirectory {0} {1}\n""".format(background_tag_directory, fs)
-
-    # call peaks
-    output_file = os.path.join(output_dir, name, name + "_homer_peaks.factor.narrowPeak")
-    runnable += """findPeaks {signal} -style factor -o {output_file} -i {background}\n""".format(
-        output_file=output_file, background=background_tag_directory, signal=signal_tag_directory)
-    output_file = os.path.join(output_dir, name, name + "_homer_peaks.histone.narrowPeak")
-    runnable += """findPeaks {signal} -style histone -o {output_file} -i {background}\n""".format(
-        output_file=output_file, background=background_tag_directory, signal=signal_tag_directory)
-
-    if as_job:
-        tk = NGSTk()
-        job_name = "homer_findPeaks_{}".format(name)
-        cmd = tk.slurm_header(
-            job_name,
-            os.path.join(output_path, job_name + ".log"),
-            cpus_per_task=4)
-        cmd += runnable.replace("\n", "\t\t\n")
-        cmd += "\t\t" + tk.slurm_footer() + "\n"
-        job_file = os.path.join(output_path, name + ".homer.sh")
-        with open(job_file, "w") as handle:
-            handle.write(textwrap.dedent(cmd))
-        tk.slurm_submit_job(job_file)
-    else:
-        return runnable

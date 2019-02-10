@@ -56,39 +56,39 @@ class Analysis(object):
     ``ngs_toolkit.general.Analysis.from_pickle`` and
     ``ngs_toolkit.general.Analysis.update`` functions for this.
 
-    Attributes:
-
-    :param str,optional name:
+    Parameters
+    ----------
+    name : str, optional
         Name of the analysis.
         Defaults to ``analysis``.
 
-    :param list,optional samples:
+    samples : list, optional
         List of ``peppy.Sample`` objects that this analysis is tied to.
         Defaults to ``None``.
 
-    :param peppy.Project,optional prj:
+    prj : peppy.Project, optional
         A ``peppy.Project`` object that this analysis is tied to.
         Defaults to ``None``.
 
-    :param str,optional data_dir:
+    data_dir : str, optional
         Directory containing processed data (e.g. by looper) that will
         be input to the analysis. This is in principle not required.
         Defaults to ``data``.
 
-    :param str,optional results_dir:
+    results_dir : str, optional
         Directory to contain outputs produced by the analysis.
         Defaults to ``results``.
 
-    :param str,optional pickle_file:
+    pickle_file : str, optional
         A pickle file to serialize the object.
         Defaults to "`name`.pickle".
 
-    :param bool,optional from_pickle:
+    from_pickle : bool, optional
         Whether the analysis should be loaded from an existing
         serialized analysis object in ``pickle_file``.
         Defaults to False.
 
-    :param dict,optional kwargs:
+    kwargs : dict, optional
         Additional keyword arguments will simply be stored as object attributes.
     """
     def __init__(
@@ -190,10 +190,15 @@ class Analysis(object):
         """
         Check if data type is allowed in ngs_toolkit configuration.
 
-        Attributes:
-
-        :param str data_type:
+        Parameters
+        ----------
+        data_type : str
             Data type to check.
+
+        Parameters
+        ----------
+        bool
+            Whether data_type is supported.
         """
         supported = _CONFIG["supported_data_types"]
         return data_type in supported
@@ -203,9 +208,9 @@ class Analysis(object):
         Get data type of current object, throwing an error if
         data_type is not allowed in ngs_toolkit configuration.
 
-        Attributes:
-
-        :param str,optional data_type:
+        Parameters
+        ----------
+        data_type : str, optional
             Data type to check.
         """
         # TODO: test
@@ -234,20 +239,23 @@ class Analysis(object):
         This requires a reducing function such as 'all' or 'any' to evaluate how to
         return a value across all samples.
 
-        Attributes:
-
-        :param str attr:
+        Parameters
+        ----------
+        attr : str
             An attribute of the analysis' samples to check existence of files.
 
-        :param function f:
+        f : function
             Function to reduce output across samples.
             Defaults to `all`.
 
-        :param list,optional samples:
+        samples : list, optional
             Samples to consider.
             Defaults to all in analysis
 
-        :returns: Bool
+        Returns
+        ----------
+        bool
+            Whether samples have file
         """
         if samples is None:
             samples = self.samples
@@ -257,14 +265,18 @@ class Analysis(object):
         """
         Get samples with an existing file under `attr`.
 
-        :param str attr:
+        Parameters
+        ----------
+        attr : str
             Attribute to check
 
-        :param list,optional samples:
+        samples : list, optional
             Samples to consider.
             Defaults to all in analysis
 
-        :returns list:
+        Returns
+        -------
+        list
             List of peppy.Sample objects
         """
         if samples is None:
@@ -275,15 +287,19 @@ class Analysis(object):
         """
         Get samples without an existing file under `attr`.
 
-        :param str attr:
+        Parameters
+        ----------
+        attr : str
             Attribute to check
 
-        :param list,optional samples:
+        samples : list, optional
             Samples to consider.
             Defaults to all in analysis
 
-        :returns list:
-            List of peppy.Sample objects
+        Returns
+        -------
+        list
+            List of peppy.Sample objects.
         """
         if samples is None:
             samples = self.samples
@@ -296,21 +312,28 @@ class Analysis(object):
         If none has, raise error. Else, if permissive, return samples with existing file.
         Otherwise return only with all samples have it, otherwise throw IOError.
 
-        :param str input_file:
+        Parameters
+        ----------
+        input_file : str
             Attribute to check
 
-        :param bool,optional permissive:
+        permissive : bool, optional
             Whether to allow returning a subset of samples if not all have file.
             Defaults to False
 
-        :param list,optional samples:
+        samples : list, optional
             Samples to consider.
             Defaults to all in analysis
 
-        :returns list:
+        Returns
+        -------
+        list
             List of peppy.Sample objects
 
-        :raises: IOError
+        Raises
+        -------
+        IOError
+            If not permissive and not all sample input files are found.
         """
         if samples is None:
             samples = self.samples
@@ -337,12 +360,18 @@ class Analysis(object):
     @staticmethod
     def _format_string_with_environment_variables(string):
         """
-        Given a string, containing curly braces, format it with the attributes from self.
+        Given a string, containing curly braces with dollar sign,
+        format it with the environment variables.
 
-        Attributes:
-
-        :param str string:
+        Parameters
+        ----------
+        string : str
             String to format.
+
+        Returns
+        ----------
+        str
+            Formated string.
         """
         if string is None:
             return string
@@ -360,10 +389,15 @@ class Analysis(object):
         """
         Given a string, containing curly braces, format it with the attributes from self.
 
-        Attributes:
-
-        :param str string:
+        Parameters
+        ----------
+        string : str
             String to format.
+
+        Returns
+        ----------
+        str
+            Formated string.
         """
         if string is None:
             return string
@@ -380,13 +414,15 @@ class Analysis(object):
         Create a peppy.Project from a PEP configuration file
         and associate is with the analysis.
 
-        Attributes:
-
-        :param str pep_config:
+        Parameters
+        ----------
+        pep_config : str
             PEP configuration file.
 
-        :attr peppy.Project prj:
-            Project
+        Attributes:
+        ----------
+        prj : peppy.Project
+            peppy.Project from given PEP configuration file.
         """
         self.prj = Project(pep_config)
         # msg = "Provided PEP configuration file could not be read."
@@ -402,9 +438,9 @@ class Analysis(object):
         Update all of the object"s attributes with the attributes from a serialized
         object (i.e. object stored in a file) object.
 
-        Attributes:
-
-        :param str,optional pickle_file:
+        Parameters
+        ----------
+        pickle_file : str, optional
             Pickle file to load. By default this is the object"s attribute `pickle_file`.
         """
         self.__dict__.update(self.from_pickle(pickle_file=pickle_file).__dict__)
@@ -413,6 +449,14 @@ class Analysis(object):
         """
         Attempt to derive the analysis' organism and genome assembly
         by inspecting the same attributes of its samples.
+
+
+        Attributes
+        ----------
+        organism, genome : str
+            Organism and genome assembly of the analysis
+            if all samples agree in these attributes.
+
         """
         if self.samples is None:
             _LOGGER.warning("Genome assembly for analysis was not set and cannot be derived from samples.")
@@ -437,11 +481,22 @@ class Analysis(object):
         Set Analysis object attributes ``samples``, ``sample_attributes`` and ``group_atrributes``
         to the values in the associated Project object if existing.
 
-        Attributes:
-
-        :param bool,optional overwrite:
+        Parameters
+        ----------
+        overwrite : bool, optional
             Whether to overwrite attribute values if existing.
             Defaults to True
+
+        Attributes
+        ----------
+        samples : list
+            List of peppy.Samples if contained in the PEP configuration
+
+        sample_attributes, group_attributes : list
+            Sample attributes if specified in the PEP configuration
+
+        comparison_table : pandas.DataFrame
+            Comparison table if specified in the PEP configuration
         """
         hint = " Adding a '{}' section to your project configuration file allows the analysis"
         hint += " object to use those attributes during the analysis."
@@ -482,9 +537,9 @@ class Analysis(object):
         These are specified in the `ngs_toolkit` configuration file
         under "sample_input_files:<data type>:<attribute>".
 
-        Attributes:
-
-        :param bool,optional overwrite:
+        Parameters
+        ----------
+        overwrite : bool, optional
             Whether to overwrite attribute values if existing.
             Defaults to True
         """
@@ -523,11 +578,11 @@ class Analysis(object):
 
     def to_pickle(self, timestamp=False):
         """
-        Serialize object (i.e. save to disk) to hickle format.
+        Serialize object (i.e. save to disk) to pickle format.
 
-        Attributes:
-
-        :param bool timestamp:
+        Parameters
+        ----------
+        timestamp : bool
             Whether to timestamp the file.
         """
         if timestamp:
@@ -541,7 +596,9 @@ class Analysis(object):
         """
         Load object from pickle file.
 
-        :param str,optional pickle_file:
+        Parameters
+        ----------
+        pickle_file : str, optional
             Pickle file to load.
             By default this is the object"s attribute `pickle_file`.
         """
@@ -557,23 +614,23 @@ class Analysis(object):
         """
         Get genome annotations and other resources for several ngs_toolkit analysis.
 
-        Attributes:
-
-        :param str,optional organism:
+        Parameters
+        ----------
+        organism : str, optional
             Organism to get for. Currently supported are "human" and "mouse".
             Defaults to analysis' own organism.
 
-        :param str,optional genome_assembly:
+        genome_assembly : str, optional
             Genome assembly to get for.
             Currently supported are "hg19", "hg38" and "mm10".
             Defaults to analysis' own genome assembly.
 
-        :param str,optional output_dir:
+        output_dir : str, optional
             Directory to save results to.
             Defaults to the value of "preferences:root_reference_dir" in the configuration,
             if that is not set, to a directory called "reference" in the analysis root directory.
 
-        :param list,optional steps:
+        steps : list, optional
             What kind of annotations to get.
             Options are:
                  - "genome": Genome sequence (2bit format)
@@ -582,12 +639,14 @@ class Analysis(object):
                  - "genomic_context": Genomic context of genome
             Defaults to ["blacklist", "tss", "genomic_context"]
 
-        :param bool,optional overwrite:
+        overwrite : bool, optional
             Whether existing files should be overwritten by new ones.
             Otherwise they will be kept and no action is made.
             Defaults to False.
 
-        :returns dict:
+        Returns
+        -------
+        dict
             Dictionary with keys same as the options as steps, containing paths to the requested files.
             The values of the 'genome' step are also a dictionary with keys "2bit" and "fasta" for
             each file type respectively.
@@ -634,20 +693,23 @@ class Analysis(object):
         """
         Return a matrix that is an attribute of self subsetted for the requested samples.
 
-        Attributes:
-
-        :param pandas.DataFrame matrix:
+        Parameters
+        ----------
+        matrix : pandas.DataFrame
             Pandas DataFrame.
 
-        :param list samples:
+        samples : list
             Iterable of peppy.Sample objects to restrict matrix to.
             If not provided (`None` is passed) the matrix will not be subsetted.
 
-        :param str matrix_name:
+        matrix_name : str
             Name of the matrix that is an attribute of the object
             with values for samples in `samples`.
 
-        :returns pandas.DataFrame: Requested DataFrame.
+        Returns
+        -------
+        pandas.DataFrame
+            Requested DataFrame.
         """
         if (matrix is None) & (matrix_name is None):
             msg = "Either arguments `matrix` or `matrix_name` must be provided."
@@ -678,37 +740,42 @@ class Analysis(object):
         (creates MultiIndex on columns). Numerical attributes can be pass as a iterable
         to ``numerical_attributes`` to be converted.
 
-        Attributes:
-
-        :param str quant_matrix:
+        Parameters
+        ----------
+        quant_matrix : str
             Attribute name of matrix to annotate.
             Default is  infered from the analysis data_type in the following way:
                 - ATAC-seq or ChIP-seq: ``coverage_annotated``;
                 - RNA-seq: ``expression_annotated``.
 
-        :param list attributes:
+        attributes : list
             Desired attributes to be annotated.
             Defaults to all attributes in the original sample annotation sheet of the analysis" Project.
 
-        :param list numerical_attributes:
+        numerical_attributes : list
             Attributes which are numeric even though they
             might be so in the samples" attributes. Will attempt
             to convert values to numeric.
 
-        :param bool save:
+        save : bool
             Whether to write normalized DataFrame to disk.
             Default is True.
 
-        :param bool assign:
+        assign : bool
             Whether to assign the normalized DataFrame to an attribute
              - ``accessibility`` if ``data_type`` is "ATAC-seq,
              - ``binding`` if ``data_type`` is "ChIP-seq, or
              - ``expression`` if ``data_type`` is "RNA-seq.
 
-        :var pd.DataFrame {accessibility,binding,expression}:
-            A pandas DataFrame with  MultiIndex column index containing the sample"s attributes specified.
+        Returns
+        -------
+        pandas.DataFrame
+            Annotated dataframe with requested sample attributes.
 
-        :returns pd.DataFrame: Annotated dataframe with requested sample attributes.
+        Attributes
+        ----------
+        {accessibility, binding, expression} : pandas.DataFrame
+            A pandas DataFrame with  MultiIndex column index containing the sample's attributes specified.
         """
         if (attributes is None) and hasattr(self, "sample_attributes"):
             _LOGGER.info("Using 'sample_attributes' from analysis to annotate matrix: {}"
@@ -808,40 +875,43 @@ class Analysis(object):
         from a colour ``pallete`` or a ``cmap``, respectively with null values set to ``nan_color``
         (a 4-value tuple of floats).
 
-        Atrributes:
+        Parameters
+        ----------
 
-        :param pandas.Index,optional index:
+        index : pandas.Index, optional
             Pandas Index to use.
             If not provided will use the column Index of the provided ``matrix``.
 
-        :param str,optional matrix:
+        matrix : str, optional
             Name of analysis attribute containing a dataframe with pandas.MultiIndex columns to use.
             If not provided will use the provided ``index``.
 
-        :param list,optional levels:
+        levels : list, optional
             Levels of multiindex to restrict to.
             Defaults to all in index under use.
 
-        :param str,optional pallete:
+        pallete : str, optional
             Name of matplotlib color palete to use with categorical levels.
             See matplotlib.org/examples/color/colormaps_reference.html.
             Defaults to "tab20".
 
-        :param str,optional cmap:
+        cmap : str, optional
             Name of matplotlib color palete to use with numerical levels.
             See matplotlib.org/examples/color/colormaps_reference.html.
             Defaults to "RdBu_r".
 
-        :param tuple,optional nan_color:
+        nan_color : tuple, optional
             Color for missing (i.e. NA) values.
             Defaults to ``(0.662745, 0.662745, 0.662745, 0.5)`` == ``grey``.
 
-        :param bool,optional as_dataframe:
+        as_dataframe : bool, optional
             Whether a dataframe should be return.
             Defaults to False.
             Not implemented yet.
 
-        :returns list|pandas.DataFrame:
+        Returns
+        -------
+        {list, pandas.DataFrame}
             Matrix of shape (level, sample) with rgb values of each of the variable.
             If as_dataframe, this will be a pandas.DataFrame otherwise, list of lists.
         """
@@ -951,74 +1021,73 @@ class Analysis(object):
                 the Pearson correlation will be computed and for categoriacal, a pairwise
                 Kruskal-Wallis H-test (ANOVA).
 
-        Attributes:
-
-        :param ngs_toolkit.general.Analysis analysis:
+        Parameters
+        ----------
+        analysis : ngs_toolkit.general.Analysis
             Analysis object to perform analysis for.
 
-        :param list,optional steps:
+        steps : list, optional
             List of step keywords to be performed as described above.
             Defaults to all available.
 
-        :param str,optional data_type:
+        data_type : str, optional
             Data type. One of "ATAC-seq" or "RNA-seq".
             Defaults to "ATAC-seq".
 
-        :param str,optional quant_matrix:
+        quant_matrix : str, optional
             Name of analysis attribute contatining the numeric dataframe to perform analysis on.
             Defaults to the value of "norm_matrix_name" which is data-type specific.
             Must have a pandas.MultiIndex as column index.
 
-        :param list,optional samples:
+        samples : list, optional
             List of sample objects to restrict analysis to.
             Defaults to all in analysis.
 
-        :param list,optional attributes_to_plot:
+        attributes_to_plot : list, optional
             List of attributes shared between sample groups should be plotted.
             Defaults to attributes in analysis.group_attributes.
 
-        :param str,optional plot_prefix:
+        plot_prefix : str, optional
             Prefix for output files.
             Defaults to "all_sites" if data_type is ATAC-seq and "all_genes" if data_type is RNA-seq.
 
-        :param bool,optional standardize_matrix:
+        standardize_matrix : bool, optional
             Whether to standardize variables in `quant_matrix` by removing the mean and scaling to unit variance.
 
-        :param list,optional manifold_algorithms:
+        manifold_algorithms : list, optional
             List of manifold algorithms to use. See available algorithms here:
             http://scikit-learn.org/stable/modules/classes.html#module-sklearn.manifold
 
-        :param bool,optional display_corr_values:
+        display_corr_values : bool, optional
             Whether values in heatmap of sample correlations should be
             displayed overlaid on top of colours. Defaults to False.
 
-        :param bool,optional prettier_sample_names:
+        prettier_sample_names : bool, optional
             Whether it should attempt to prettify sample names by removing the data type from plots.
             Defaults to True.
 
-        :param str pallete:
+        pallete : str
             Color pallete to use in levels of `attributes_to_plot`. Will be passed to
             `analysis.get_level_colors`.
 
-        :param str cmap:
+        cmap : str
             Color map to use in numerical levels of `attributes_to_plot`.
             Will be passed to `analysis.get_level_colors`.
 
-        :param bool,optional rasterized:
+        rasterized : bool, optional
             Whether elements with many objects should be rasterized.
             Defaults to False.
 
-        :param int,optional dpi:
+        dpi : int, optional
             Definition of rasterized image in dots per inch (dpi).
             Defaults to 300.
 
-        :param str,optional output_dir:
+        output_dir : str, optional
             Directory for generated files and plots.
             Defaults to "{results_dir}/unsupervised_analysis_{data_type}".
 
-        Additional kwargs are passed to ngs_toolkit.graphics.plot_projection
-
-        :returns: None
+        **kwargs: optional
+            kwargs are passed to ngs_toolkit.graphics.plot_projection
         """
         data_type = self._get_data_type(data_type)
 
@@ -1348,60 +1417,64 @@ class Analysis(object):
         For other implementations of differential analysis see `ngs_toolkit.general.least_squares_fit`
         and `ngs_toolkit.general.differential_from_bivariate_fit`.
 
-        Attributes:
-
-        :param pandas.DataFrame comparison_table:
+        Parameters
+        ----------
+        comparison_table : pandas.DataFrame
             A dataframe with "comparison_name", "comparison_side" and "sample_name", "sample_group" columns.
             Defaults to the analysis' own "comparison_table" attribute.
 
-        :param str,optional data_type:
+        data_type : str, optional
             Type of data under analysis. One of "ATAC-seq" or "RNA-seq".
             Defaults to analysis' own data_type.
 
-        :param list,optional samples:
+        samples : list, optional
             Samples to limit analysis to.
             Defaults to all samples in analysis object.
 
-        :param list,optional covariates:
+        covariates : list, optional
             Additional variables to take into account in the model fitting.
             Defaults to None.
 
-        :param str,optional output_dir:
+        output_dir : str, optional
             Output directory for analysis.
             Defaults to "{results_dir}/differential_analysis_{data_type}".
             If containing "{data_type}", will format string with variable.
 
-        :param str,optional output_prefix:
+        output_prefix : str, optional
             Prefix for output files.
             Defaults to "differential_analysis".
 
-        :param float,optional alpha:
+        alpha : float, optional
             Significance level to use in differential analysis.
             Results for all features will be returned nonetheless. Defaults to 0.05.
 
-        :param bool,optional overwrite:
+        overwrite : bool, optional
             Whether results should be overwritten in case they already exist.
             Defaults to True.
 
-        :param bool,optional distributed:
+        distributed : bool, optional
             Whether analysis should be distributed in a computing cluster for each comparison.
             Currently, only a SLURM implementation is available.
             If `True`, will not return results.
             Defaults to False.
 
-        :param int,optional cpus:
+        cpus : int, optional
             Number of CPUS to use when using distributed jobs.
             Default: 2.
 
-        :param int,optional memory:
+        memory : int, optional
             Memory to use when using distributed jobs. Default: 16000 (16Gb).
 
-        :var pandas.DataFrame differential_results:
-            Pandas dataframe with results.
-
-        :returns pandas.DataFrame:
+        Returns
+        -------
+        pandas.DataFrame
             Results for all comparisons.
             Will be `None` if `distributed` is `True`.
+
+        Attributes
+        ----------
+        differential_results : pandas.DataFrame
+            Pandas dataframe with results.
         """
         if comparison_table is None:
             msg = "`comparison_table` was not given and is not set in analysis object."
@@ -1549,50 +1622,53 @@ class Analysis(object):
         Collect results from DESeq2 differential analysis.
         Particularly useful when runing `differential_analysis` with in distributed mode.
 
-        Attributes:
-
-        :param pandas.DataFrame comparison_table:
+        Parameters
+        ----------
+        comparison_table : pandas.DataFrame
             A dataframe with "comparison_name", "comparison_side" and "sample_name", "sample_group" columns.
             Defaults to the analysis's own "comparison_table" attribute.
 
-        :param str,optional data_type:
+        data_type : str, optional
             Type of data under analysis. One of "ATAC-seq" or "RNA-seq".
             Defaults to analysis' own data_type.
 
-        :param str,optional output_dir:
+        output_dir : str, optional
             Output directory for analysis.
             Defaults to "{results_dir}/differential_analysis_{data_type}".
             If containing "{data_type}", will format string with variable.
 
-        :param str,optional output_prefix:
+        output_prefix : str, optional
             Prefix for output files.
             Defaults to "differential_analysis".
 
-        :param bool,optional permissive:
+        permissive : bool, optional
             Whether non-existing files should be skipped or an error be thrown.
             Defaults to True.
 
-        :param bool,optional assign:
+        assign : bool, optional
             Whether to add results to a `differential_results` attribute.
             Defaults to True.
 
-        :param bool,optional save:
+        save : bool, optional
             Whether to save results to disk.
             Defaults to True.
 
-        :param bool,optional overwrite:
+        overwrite : bool, optional
             Whether results should be overwritten in case they already exist.
             Defaults to False.
 
-        :var pandas.DataFrame differential_results:
-            Pandas dataframe with results.
-
-        :returns pandas.DataFrame:
+        Returns
+        -------
+        pandas.DataFrame
             Results for all comparisons.
             Will be `None` if `overwrite` is `False` and a results file already exists.
 
-        # TODO: Add "input_dir" and input_prefix"
+        Attributes
+        ----------
+        differential_results : pandas.DataFrame
+            Pandas dataframe with results.
         """
+        # TODO: Add "input_dir" and input_prefix"
         if comparison_table is None:
             msg = "`comparison_table` was not given and is not set in analysis object."
             hint = "Add a `comparison_table` attribute to the analysis object."
@@ -1645,7 +1721,7 @@ class Analysis(object):
         return results
 
     def plot_differential(
-            analysis,
+            self,
             results=None,
             comparison_table=None,
             samples=None,
@@ -1682,120 +1758,120 @@ class Analysis(object):
         plots for each comparison and joint heatmaps of log fold changes, normalized values
         or Z-scores of individual samples or groups in the differential features.
 
-        Attributes:
-
-        :param pandas.DataFrame results:
+        Parameters
+        ----------
+        results : pandas.DataFrame
             Data frame with differential analysis results.
             See ``ngs_toolkit.general.differential_analysis`` for more information.
 
-        :param pandas.DataFrame,optional comparison_table:
+        comparison_table : pandas.DataFrame, optional
             Comparison table. If provided, group-wise plots will be produced.
             Defaults to the analysis' "comparison_table" attribute.
 
-        :param list,optional samples:
+        samples : list, optional
             List of sample objects to restrict analysis to.
             Defaults to all samples in analysis.
 
-        :param str,optional matrix:
+        matrix : str, optional
             Matrix of quantification to use for plotting feature values across samples/groups.
            Defaults to either "accessibility" for ATAC-seq analysis or "expression" for RNA-seq.
 
-        :param bool,optional only_comparison_samples:
+        only_comparison_samples : bool, optional
             Whether to use only samples present in the `comparison_table`.
             Defaults to False.
 
-        :param str,optional data_type:
+        data_type : str, optional
             The data type being analyzed. Currently supported are "ATAC-seq" or "RNA-seq".
             Defaults to the analysis' own data_type.
 
-        :param float,optional alpha:
+        alpha : float, optional
             Significance level to consider a feature differential.
             Defaults to 0.05.
 
-        :param bool,optional corrected_p_value:
+        corrected_p_value : bool, optional
             Whether to use a corrected p-valueto consider a feature differential.
             Defaults to True.
 
-        :param float,optional fold_change:
+        fold_change : float, optional
             Effect size (log2 fold change) to consider a feature differential. Considers absolute values.
             Default is no log2 fold change threshold.
 
-        :param bool,optional diff_based_on_rank:
+        diff_based_on_rank : bool, optional
             Whether a feature should be considered differential based on its rank.
             Defaults to False.
 
-        :param int,optional max_rank:
+        max_rank : int, optional
             Rank to use when using `diff_based_on_rank`.
             Defaults to 1000.
 
-        :param str,optional ranking_variable:
+        ranking_variable : str, optional
             Which variable to use for ranking when using `diff_based_on_rank`.
             Defaults to "padj".
 
-        :param bool,optional respect_stat_thresholds:
+        respect_stat_thresholds : bool, optional
             Whether the statistical thresholds from `alpha` and `fold_change` should still be
             respected when using `diff_based_on_rank`.
             Defaults to True
 
-        :param str,optional output_dir:
+        output_dir : str, optional
             Directory to create output files.
             Defaults to "{results_dir}/differential_analysis_{data_type}"
 
-        :param str,optional output_prefix:
+        output_prefix : str, optional
             Prefix to use when creating output files.
             Defaults to "differential_analysis".
 
-        :param bool,optional plot_each_comparison:
+        plot_each_comparison : bool, optional
             Whether each comparison should be plotted in scatter, MA and volcano plots.
             Useful to turn off with many comparisons.
             Defaults to True.
 
-        :param str,optional mean_column:
+        mean_column : str, optional
             Column  in `results` data frame containing values for mean values across samples.
             Defaults to "baseMean".
 
-        :param str,optional log_fold_change_column:
+        log_fold_change_column : str, optional
             Column in `results` data frame containing values for log2FoldChange values across samples.
             Defaults to "log2FoldChange".
 
-        :param str,optional p_value_column:
+        p_value_column : str, optional
             Column  in `results` data frame containing values for p-values across samples.
             Defaults to "pvalue".
 
-        :param str,optional adjusted_p_value_column:
+        adjusted_p_value_column : str, optional
             Column  in `results` data frame containing values for adjusted p-values across samples.
             Defaults to "padj".
 
-        :param str,optional comparison_column:
+        comparison_column : str, optional
             Column  in `results` data frame containing the name of the comparison.
             Defaults to "comparison_name".
 
-        :param bool,optional rasterized:
+        rasterized : bool, optional
             Whether plots with many objects should be rasterized.
             Defaults to True.
 
-        :param bool,optional robust:
+        robust : bool, optional
             Whether heatmap color scale ranges should be robust (using quantiles) rather than extreme values.
             Useful for noisy/extreme data.
             Defaults to False.
 
-        :param bool,optional feature_labels:
+        feature_labels : bool, optional
             Whether features (regions/genes) should be labeled in heatmaps.
             Defaults to False.
 
-        :param bool,optional group_wise_colours:
+        group_wise_colours : bool, optional
             Whether groups of samples should be coloured in heatmaps.
             Defaults to False.
 
-        :param list,optional group_variables:
+        group_variables : list, optional
             Which variables to colour if `group_wise_colours` if True.
             Defaults to None (must be given).
 
-        :param str pallete:
+        pallete : str
             Color pallete to use in levels of `group_variables`.
             Will be passed to `analysis.get_level_colors`.
 
-        :param str cmap:
+        cmap : str
             Color map to use in numerical levels of `group_variables`.
             Will be passed to `analysis.get_level_colors`.
         """
@@ -1804,12 +1880,12 @@ class Analysis(object):
             msg += " have a `differential_results` attribute."
             hint = " Run differential_analysis to produce differential results."
             try:
-                results = analysis.differential_results
+                results = self.differential_results
             except AttributeError as e:
                 _LOGGER.error(msg + hint)
                 raise e
             if (results is None) or (not isinstance(results, pd.DataFrame)):
-                hint = " Run differential_analysis to produce differential results."
+                hint = " Run differential_self to produce differential results."
                 _LOGGER.error(msg)
                 raise ValueError
 
@@ -1820,7 +1896,7 @@ class Analysis(object):
         if data_type is None:
             msg = "Data type not defined and Analysis object does not have a `data_type` attribute."
             try:
-                data_type = analysis.data_type
+                data_type = self.data_type
             except AttributeError as e:
                 _LOGGER.error(msg)
                 raise e
@@ -1829,7 +1905,7 @@ class Analysis(object):
                 raise ValueError
 
         # Make output dir
-        output_dir = analysis._format_string_with_attributes(output_dir)
+        output_dir = self._format_string_with_attributes(output_dir)
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
 
@@ -1837,14 +1913,14 @@ class Analysis(object):
         results = results.copy()
         if data_type == "ATAC-seq":
             if matrix is None:
-                matrix = analysis.accessibility
+                matrix = self.accessibility
             results.index.name = "region"
             var_name = "region"
             quantity = "Accessibility"
             unit = "RPM"
         elif data_type == "RNA-seq":
             if matrix is None:
-                matrix = analysis.expression
+                matrix = self.expression
             results.index.name = "gene_name"
             var_name = "gene"
             quantity = "Expression"
@@ -1854,7 +1930,7 @@ class Analysis(object):
             raise AssertionError(msg)
 
         if samples is None:
-            samples = analysis.samples
+            samples = self.samples
         samples = [s for s in samples if s.name in matrix.columns]
 
         if comparison_table is None:
@@ -1862,7 +1938,7 @@ class Analysis(object):
             hint = "Will skip certain plots done at comparison level. "
             hint += "Add a `comparison_table` attribute to the analysis object."
             try:
-                comparison_table = analysis.comparison_table
+                comparison_table = self.comparison_table
             except AttributeError:
                 _LOGGER.warning(msg)
                 _LOGGER.info(hint)
@@ -1879,7 +1955,7 @@ class Analysis(object):
 
             # This will always be a matrix for all samples
             color_dataframe = pd.DataFrame(
-                analysis.get_level_colors(
+                self.get_level_colors(
                     index=matrix.columns, levels=group_variables,
                     pallete=pallete, cmap=cmap),
                 index=group_variables, columns=matrix.columns)
@@ -2390,23 +2466,22 @@ class Analysis(object):
         """
         Visualize intersection of sets of differential regions/genes.
 
-        Attributes:
-
-        :param pandas.DataFrame differential:
+        Parameters
+        ----------
+        differential : pandas.DataFrame
             DataFrame containing result of comparisons filtered for features considered as differential.
 
-        :param str,optional data_type:
+        data_type : str, optional
             Data type.
             Defaults to analysis' own data type.
 
-        :param str,optional output_dir:
+        output_dir : str, optional
             Directory to create output files.
             Defaults to "{results_dir}/differential_analysis_{data_type}".
 
-        :param str,optional output_prefix:
+        output_prefix : str, optional
             Prefix to use when creating output files.
             Defaults to "differential_analysis".
-
         """
         data_type = self._get_data_type(data_type)
         # Make output dir
@@ -2638,6 +2713,7 @@ class Analysis(object):
                     output_dir, output_prefix + ".differential_overlap.{}.disagreement.rank.svg"
                     .format(label)))
 
+    @check_organism_genome
     def differential_enrichment(
             self,
             differential=None,
@@ -2649,58 +2725,66 @@ class Analysis(object):
             directional=True,
             max_diff=1000,
             sort_var="pvalue",
-            as_jobs=False):
+            distributed=False):
         """
         Perform various types of enrichment analysis given a dataframe of the results from differential analysis.
         Performs enrichment of gene sets (RNA-seq and ATAC-seq), genomic regions, chromatin states
         Location Overlap Analysis (LOLA) and TF motif enrichment (over-representation and de-novo search)
         (ATAC-seq only).
 
-        Attributes:
-
-        :param pandas.DataFrame differential:
+        Parameters
+        ----------
+        differential : pandas.DataFrame
             Data frame with differential results as produced by ``differential_analysis``.
             Must contain a "comparison_name" column.
 
-        :param str,optional data_type:
+        data_type : str, optional
             Data type. One of "ATAC-seq" and "RNA-seq".
             Defaults to the analysis' data_type attributes.
 
-        :param str,optional output_dir:
+        output_dir : str, optional
             Directory to create output files.
             Defaults to "{results_dir}/differential_analysis_{data_type}".
 
-        :param str,optional output_prefix:
+        output_prefix : str, optional
             Prefix to use when creating output files.
             Defaults to "differential_analysis".
 
-        :param str,optional genome:
+        genome : str, optional
             Genome assembly of the analysis.
             Defaults to Analysis's `genome` attribute.
 
-        :param list,optional steps:
+        steps : list, optional
             Steps of the analysis to perform.
-            Defaults to ["region", lola", "meme", "homer", "enrichr"].
+            Defaults to all possible: ["region", lola", "meme", "homer", "enrichr"].
 
-        :param bool,optional directional:
+        directional : bool, optional
             Whether enrichments should be performed in a direction-dependent way
             (up-regulated and down-regulated features separately).
             This requires a column named "log2FoldChange" to exist.
             Defaults to True.
 
-        :param int,optional max_diff:
+        max_diff : int, optional
             Number of maximum features to perform enrichment for ranked by variable in `max_diff`.
             Defaults to 1000.
 
-        :param str,optional sort_var:
+        sort_var : str, optional
             Variable to sort for when setting `max_diff`.
             Defaults to "pvalue".
 
-        :param bool,optional as_jobs:
-            Whether work should be submitted as jobs.
+        distributed : bool, optional
+            Whether work should be submitted as jobs in a computing cluster.
             Defaults to False.
+
+        Attributes
+        ----------
+        enrichment_results : dict
+            Dictionary with keys as in `steps` and values with pandas.DataFrame
+            of enrichment results.
         """
-        serial = not as_jobs
+        # TODO: separate and fix mouse TF ids
+        # TODO: separate homer_consensus output processing
+        serial = not distributed
 
         if differential is None:
             msg = "Data frame with differential comparison results `differential` "
@@ -2729,16 +2813,13 @@ class Analysis(object):
                 _LOGGER.error(msg)
                 raise ValueError
 
+        if genome is None:
+            genome = self.genome
+
         if data_type == "ATAC-seq":
             matrix = self.coverage_annotated
-            region_enr = pd.DataFrame()
-            lola_enr = pd.DataFrame()
-            meme_enr = pd.DataFrame()
-            homer_enr = pd.DataFrame()
-            pathway_enr = pd.DataFrame()
         elif data_type == "RNA-seq":
             matrix = self.expression
-            pathway_enr = pd.DataFrame()
         else:
             msg = "Differential enrichment is only implemented for data types 'ATAC-seq' and 'RNA-seq'."
             raise ValueError(msg)
@@ -2751,8 +2832,20 @@ class Analysis(object):
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
 
+        region_enr = list()
+        lola_enr = list()
+        meme_enr = list()
+        homer_enr = list()
+        pathway_enr = list()
+        possible_steps = [
+            # name, df, function, kwargs, suffix, joint_output_suffix
+            ("region", region_enr, pd.read_csv, {}, "region_type_enrichment.csv", ".region_type_enrichment.csv"),
+            ("meme", meme_enr, parse_ame, {}, "ame.txt", ".meme_ame.csv"),
+            ("homer", homer_enr, parse_homer, {}, "homerResults", ".homer_motifs.csv"),
+            ("lola", lola_enr, pd.read_csv, {"sep", "\t"}, "allEnrichments.tsv", ".lola.csv"),
+            ("enrichr", pathway_enr, pd.read_csv, {"encoding": "utf-8"}, output_prefix + "_regions.enrichr.csv", ".enrichr.csv")]
+
         # Examine each region cluster
-        max_diff = max_diff
         comps = differential["comparison_name"].drop_duplicates()
         for comp in tqdm(comps, total=len(comps), desc="Comparison"):
             if directional:
@@ -2795,15 +2888,17 @@ class Analysis(object):
                 comparison_df = matrix.loc[diff, :]
                 if comparison_df.shape != comparison_df.dropna().shape:
                     _LOGGER.warning(
-                        "There are differential regions which are not in the set of annotated regions for comparison '{}'!".format(comp) +
+                        "There are differential regions which are not in the set" +
+                        " of annotated regions for comparison '{}'!".format(comp) +
                         " Continuing enrichment without those.")
                     comparison_df = comparison_df.dropna()
 
-                # Characterize
+                # Prepare output dir
                 comparison_dir = os.path.join(output_dir, "{}.{}".format(comp, direction))
                 if not os.path.exists(comparison_dir):
                     os.makedirs(comparison_dir)
 
+                # Prepare files and run (if not distributed)
                 if data_type == "RNA-seq":
                     _LOGGER.info("Doing genes of comparison '{}', direction '{}'.".format(comp, direction))
                     comparison_df.index.name = "gene_name"
@@ -2820,83 +2915,42 @@ class Analysis(object):
                                 enr.to_csv(
                                     os.path.join(comparison_dir, output_prefix + ".enrichr.csv"),
                                     index=False, encoding="utf-8")
-                            else:
-                                enr = pd.read_csv(
-                                    os.path.join(comparison_dir, output_prefix + ".enrichr.csv"),
-                                    encoding="utf-8")
-                                enr["comparison_name"] = comp
-                                pathway_enr = pathway_enr.append(enr, ignore_index=True)
                 else:
                     _LOGGER.info("Doing regions of comparison '{}', direction '{}'.".format(comp, direction))
-
-                    # do the suite of enrichment analysis
+                    # do the suite of region enrichment analysis
                     self.characterize_regions_function(
                         comparison_df,
                         output_dir=comparison_dir, prefix=output_prefix, run=serial,
                         genome=genome, steps=steps)
 
-                    # collect enrichments
-                    if serial:
-                        # read/parse, label and append
-                        if "region" in steps:
-                            region = pd.read_csv(os.path.join(comparison_dir, "region_type_enrichment.csv"))
-                            region["comparison_name"] = comp
-                            region["direction"] = direction
-                            region["label"] = "{}.{}".format(comp, direction)
-                            region_enr = region_enr.append(region, ignore_index=True)
-                        if "meme" in steps:
-                            meme_motifs = parse_ame(comparison_dir)
-                            meme_motifs["comparison_name"] = comp
-                            meme_motifs["direction"] = direction
-                            meme_motifs["label"] = "{}.{}".format(comp, direction)
-                            meme_enr = meme_enr.append(meme_motifs, ignore_index=True)
-                        if "homer" in steps:
-                            homer_motifs = parse_homer(os.path.join(comparison_dir, "homerResults"))
-                            homer_motifs["comparison_name"] = comp
-                            homer_motifs["direction"] = direction
-                            homer_motifs["label"] = "{}.{}".format(comp, direction)
-                            homer_enr = homer_enr.append(homer_motifs, ignore_index=True)
-                        if "lola" in steps:
-                            lola = pd.read_csv(os.path.join(comparison_dir, "allEnrichments.tsv"), sep="\t")
-                            lola["comparison_name"] = comp
-                            lola["direction"] = direction
-                            lola["label"] = "{}.{}".format(comp, direction)
-                            lola_enr = lola_enr.append(lola, ignore_index=True)
-                        if "enrichr" in steps:
-                            enr = pd.read_csv(
-                                os.path.join(comparison_dir, output_prefix + "_regions.enrichr.csv"),
-                                encoding="utf-8")
-                            enr["comparison_name"] = comp
-                            enr["direction"] = direction
-                            enr["label"] = "{}.{}".format(comp, direction)
-                            pathway_enr = pathway_enr.append(enr, ignore_index=True)
+                # collect enrichments
+                if serial:
+                    # read/parse, label and append
+                    for name, df, function, kwargs, suffix, _ in possible_steps:
+                        if name in steps:
+                            enr = function(os.path.join(comparison_dir, suffix), **kwargs)
+                            enr.loc[:, "comparison_name"] = comp
+                            enr.loc[:, "direction"] = direction
+                            enr.loc[:, "label"] = "{}.{}".format(comp, direction)
+                            df.append(enr)
 
         if serial:
             # write combined enrichments
             _LOGGER.info("Saving combined enrichments for all comparisons.")
-            if data_type == "ATAC-seq":
-                if "region" in steps:
-                    region_enr.to_csv(
-                        os.path.join(output_dir, output_prefix + ".region_type_enrichment.csv"), index=False)
-                if "meme" in steps:
-                    meme_enr.to_csv(
-                        os.path.join(output_dir, output_prefix + ".meme_ame.csv"), index=False)
-                if "homer" in steps:
-                    homer_enr.to_csv(
-                        os.path.join(output_dir, output_prefix + ".homer_motifs.csv"), index=False)
-                if "lola" in steps:
-                    lola_enr.to_csv(
-                        os.path.join(output_dir, output_prefix + ".lola.csv"), index=False)
-            if "enrichr" in steps:
-                pathway_enr.to_csv(
-                    os.path.join(output_dir, output_prefix + ".enrichr.csv"), index=False, encoding="utf-8")
+            self.enrichment_results = dict()
+
+            for name, df, function, kwargs, suffix, output_suffix in possible_steps:
+                if name in steps:
+                    self.enrichment_results[name] = pd.concat(df, axis=0)
+                    self.enrichment_results[name].to_csv(
+                        os.path.join(output_dir, output_prefix + output_suffix), index=False, encoding="utf-8")
         else:
             try:
+                _LOGGER.info("Using background region set from analysis.sites")
                 background = getattr(self, "sites").fn
-                _LOGGER.info("Using background region set '{}'.".format(background))
             except AttributeError:
-                background = ""
                 _LOGGER.warning("Using no background region set because 'analysis.sites' is not set!")
+                background = ""
             _LOGGER.info("Submitting enrichment jobs.")
             run_enrichment_jobs(
                 analysis_name=self.name, results_dir=output_dir,
@@ -2904,48 +2958,58 @@ class Analysis(object):
 
     def collect_differential_enrichment(
             self,
-            differential,
-            directional=True,
             steps=["region", "lola", "motif", "homer", "homer_consensus", "enrichr"],
-            data_type=None,
+            directional=True,
+            permissive=True,
             output_dir="{results_dir}/differential_analysis_{data_type}/enrichments",
             input_prefix="differential_analysis",
             output_prefix="differential_analysis",
-            permissive=True):
+            differential=None,
+            data_type=None):
         """
         Collect the results of enrichment analysis ran after a differential analysis.
 
-        Attributes:
+        Parameters
+        ----------
+        steps : list, optional
+            Steps of the enrichment analysis to collect results for.
+            Defaults to ["region", "lola", "meme", "homer", "enrichr"].
 
-        :param pandas.DataFrame differential:
-            Data frame with differential results as produced by ``ngs_toolkit.general.differential_analysis``.
-
-        :param bool,optional directional:
+        directional : bool, optional
             Whether enrichments were made in a direction-dependent way
             (up-regulated and down-regulated features separately).
             This implies a column named "direction" exists".
             Defaults to True.
 
-        :param list,optional steps:
-            Steps of the enrichment analysis to collect results for.
-            Defaults to ["region", "lola", "meme", "homer", "enrichr"].
+        differential : pandas.DataFrame, optional
+            Data frame with differential results to select which comparisons to collect
+            enrichments for. Usually produced by ``ngs_toolkit.general.differential_analysis``.
+            Defaults to analysis `differential_results`.
 
-        :param str,optional data_type:
+        data_type : str, optional
             Data type. One of "ATAC-seq" and "RNA-seq".
             Defaults to Analysis' data_type.
 
-        :param str,optional output_dir:
+        output_dir : str, optional
             Directory to create output files.
             Defaults to "{results_dir}/differential_analysis_{data_type}".
 
-        :param str,optional output_prefix:
+        output_prefix : str, optional
             Prefix to use when creating output files.
             Defaults to "differential_analysis".
 
-        :param bool,optional permissive:
+        permissive : bool, optional
             Whether to skip non-existing files, giving a warning.
             Defaults to True.
+
+        Attributes
+        ----------
+        enrichment_results : dict
+            Dictionary with keys as in `steps` and values with pandas.DataFrame
+            of enrichment results.
         """
+        # TODO: separate and fix mouse TF ids
+        # TODO: separate homer_consensus output processing
         data_type = self._get_data_type(data_type)
         if data_type not in ["ATAC-seq", "RNA-seq"]:
             raise ValueError("`data_type` must match one of 'ATAC-seq' or 'RNA-seq'.")
@@ -2958,22 +3022,37 @@ class Analysis(object):
             "ATAC-seq": ["region", "lola", "motif", "homer", "homer_consensus", "enrichr"],
             "ChIP-seq": ["region", "lola", "motif", "homer", "homer_consensus", "enrichr"],
             "RNA-seq": ["enrichr"]}
-        steps = [s for s in steps if s in data_type_steps[data_type]]
-
+        if steps is None:
+            steps = [s for s in steps if s in data_type_steps[data_type]]
+        for step in steps:
+            if step not in data_type_steps[data_type]:
+                steps.pop(step)
         if len(steps) == 0:
             msg = "No valid steps for the respective data type selected."
             _LOGGER.error(msg)
             raise ValueError(msg)
 
+        if differential is None:
+            differential = self.differential_results
+
         msg = "Collecting enrichments of comparison '{}', direction '{}'."
         error_msg = "{} results for comparison '{}', direction '{}' were not found!"
 
-        region_enr = pd.DataFrame()
-        lola_enr = pd.DataFrame()
-        meme_enr = pd.DataFrame()
-        homer_enr = pd.DataFrame()
-        homer_consensus = pd.DataFrame()
-        pathway_enr = pd.DataFrame()
+        region_enr = list()
+        lola_enr = list()
+        meme_enr = list()
+        homer_enr = list()
+        homer_consensus = list()
+        pathway_enr = list()
+        possible_steps = [
+            # name, df, function, kwargs, suffix, joint_output_suffix
+            ("region", region_enr, pd.read_csv, {}, "region_type_enrichment.csv", ".region_type_enrichment.csv"),
+            ("meme", meme_enr, parse_ame, {}, "ame.txt", ".meme_ame.csv"),
+            ("homer", homer_enr, parse_homer, {}, "homerResults", ".homer_motifs.csv"),
+            ("homer_consensus", homer_consensus, pd.read_csv, {"sep": "\t"}, "knownResults.txt", ".homer_consensus.csv"),
+            ("lola", lola_enr, pd.read_csv, {"sep", "\t"}, "allEnrichments.tsv", ".lola.csv"),
+            ("enrichr", pathway_enr, pd.read_csv, {"encoding": "utf-8"}, output_prefix + "_regions.enrichr.csv", ".enrichr.csv")]
+
         # Examine each region cluster
         comps = differential["comparison_name"].drop_duplicates()
         for comp in tqdm(comps, total=len(comps), desc="Comparison"):
@@ -2997,81 +3076,40 @@ class Analysis(object):
                 comparison_dir = os.path.join(output_dir, "{}.{}".format(comp, direction))
                 _LOGGER.debug(msg.format(comp, direction))
 
-                # For each data type, if in steps, read in, label and append to respective db.
-                for enr_type, enr_label, file, function, kwargs, db in [
-                        ("region", "Region type enrichment",
-                            os.path.join(comparison_dir, "region_type_enrichment.csv"),
-                            pd.read_csv, {}, region_enr),
-                        ("lola", "LOLA",
-                            os.path.join(comparison_dir, "allEnrichments.tsv"),
-                            pd.read_csv, {"sep": "\t"}, lola_enr),
-                        ("motif", "MEME/AME motif",
-                            comparison_dir,
-                            parse_ame, {}, meme_enr),
-                        ("homer", "HOMER motifs",
-                            os.path.join(comparison_dir, "homerResults"),
-                            parse_homer, {}, homer_enr),
-                        ("homer_consensus", "HOMER consensus",
-                            os.path.join(comparison_dir, "knownResults.txt"),
-                            pd.read_csv, {"sep": "\t"}, homer_consensus),
-                        ("enrichr", "Enrichr",
-                            os.path.join(comparison_dir, input_prefix + "_genes.enrichr.csv"),
-                            pd.read_csv, {}, pathway_enr)]:
-                    if enr_type in steps:
+                # read/parse, label and append
+                for name, df, function, kwargs, suffix, _ in possible_steps:
+                    if name in steps:
                         try:
-                            enr = function(file, **kwargs)
+                            enr = function(os.path.join(comparison_dir, suffix), **kwargs)
                         except IOError as e:
                             if permissive:
-                                _LOGGER.warn(error_msg.format(enr_label, comp, direction))
+                                _LOGGER.warn(error_msg.format(name, comp, direction))
                             else:
                                 raise e
                         else:
                             if not enr.empty:
                                 enr.loc[:, "comparison_name"] = comp
                                 enr.loc[:, "direction"] = direction
-                                db = db.append(enr, ignore_index=True)
+                                enr.loc[:, "label"] = "{}.{}".format(comp, direction)
+                                df.append(enr)
                             else:
-                                _LOGGER.warning("Comparison '{}' {} results are empty!".format(comp, enr_label))
+                                _LOGGER.warning("Comparison '{}' {} results are empty!".format(comp, name))
 
         # write combined enrichments
-        if "enrichr" in steps:
-            self.enrichment_results["enrichr"] = pathway_enr
-            pathway_enr.to_csv(
-                os.path.join(output_dir, output_prefix + ".enrichr.csv"), index=False, encoding="utf-8")
-        if "motif" in steps:
-            # fix mouse TF names
-            if (meme_enr["TF"].str.startswith("UP").sum() / float(meme_enr.shape[0])) >= 0.1:
-                id_mapping_file = "~/resources/motifs/motif_databases/MOUSE/uniprobe_mouse.id_mapping.tsv"
-                if os.path.exists(id_mapping_file):
-                    annot = pd.read_table(id_mapping_file, header=None, names=["TF", "TF_name"])
-                    annot.loc[:, "TF"] = annot["TF"].str.replace(r"_.*", "")
-                meme_enr = pd.merge(meme_enr, annot).drop("TF", axis=1).rename(columns={"TF_name": "TF"})
-            # save
-            self.enrichment_results["motif"] = meme_enr
-            meme_enr.to_csv(
-                os.path.join(output_dir, output_prefix + ".meme_ame.csv"), index=False)
-        if "homer" in steps:
-            self.enrichment_results["homer"] = homer_enr
-            homer_enr.to_csv(
-                os.path.join(output_dir, output_prefix + ".homer_motifs.csv"), index=False)
-        if "homer_consensus" in steps:
-            # fix some columns
-            homer_consensus.columns = homer_consensus.columns.str.replace(r"\(of .*", "")
-            # homer_consensus["# of Background Sequences with Motif"]
-            for col in homer_consensus.columns[homer_consensus.columns.str.contains("%")]:
-                homer_consensus[col] = homer_consensus[col].str.replace("%", "").astype(float)
-            self.enrichment_results["homer_consensus"] = homer_consensus
-            homer_consensus.to_csv(
-                os.path.join(output_dir, output_prefix + ".homer_consensus.csv"), index=False)
-        if "lola" in steps:
-            self.enrichment_results["lola"] = lola_enr
-            lola_enr.to_csv(
-                os.path.join(output_dir, output_prefix + ".lola.csv"), index=False)
+        _LOGGER.info("Saving combined enrichments for all comparisons.")
+        self.enrichment_results = dict()
+
+        for name, df, function, kwargs, suffix, output_suffix in possible_steps:
+            if name in steps:
+                self.enrichment_results[name] = pd.concat(df, axis=0)
+                self.enrichment_results[name].to_csv(
+                    os.path.join(output_dir, output_prefix + output_suffix), index=False, encoding="utf-8")
 
     def plot_differential_enrichment(
             self,
-            enrichment_table=None,
+            steps=None,
             enrichment_type=None,
+            enrichment_table=None,
             direction_dependent=True,
             output_dir="{results_dir}/differential_analysis_{data_type}/enrichments",
             comp_variable="comparison_name",
@@ -3086,66 +3124,77 @@ class Analysis(object):
         """
         Make plots illustrating enrichment of features for various comparisons.
 
-        Input can be a table of enrichment terms across several comparisons for a give type of enrichment
-        (both attributes enrichment_table and enrichment_type must be given),
-        or otherwise the dictionary of "enrichment_results" of the analysis object will be used.
+        Input can be the dictionary under `analysis.enrichment_results` or
+        a single dataframe of enrichment terms across several comparisons for a given type of enrichment.
+        In the later case both `enrichment_table` and `enrichment_type` must be given.
 
-        # TODO: split function in its smaller parts and call them appropriately.
+        Parameters
+        ----------
+        steps : list, optional
+            Types of the enrichment analysis to plot.
+            One of {"region", "lola", "motif", "great", "enrichr"}.
+            Defaults (None) to all keys present in analysis.enrichment_results.
 
-        :param pandas.DataFrame,optional enrichment_table:
+        enrichment_type : str, optional
+            Type of enrichment if run for a single type of enrichment.
+            In this case `enrichment_table` must be given.
+            One of {"region", "lola", "motif", "great", "enrichr"}.
+            Default (None) is to run all keys present in analysis.enrichment_results.
+
+        enrichment_table : pandas.DataFrame, optional
             Data frame with enrichment results as produced by
             ``differential_enrichment`` or ``collect_differential_enrichment``.
+            If given, `enrichment_type` must be given too.
+            Default (None) is the dataframes in all values present in analysis.enrichment_results.
 
-        :param str,optional enrichment_type:
-            One of "region", "lola", "enrichr", "motif", "plot_differential_enrichment", great".
-
-        :param bool,optional direction_dependent:
+        direction_dependent : bool, optional
             Whether enrichments were made in a direction-dependent way (up-regulated and down-regulated features separately).
             This implies a column named "direction" exists".
             Defaults to True.
 
-        :param str,optional output_dir:
+        output_dir : str, optional
             Directory to create output files.
             Defaults to "{results_dir}/differential_analysis_{data_type}/enrichments".
 
-        :param comp_variable:
+        comp_variable : str, optional
             Column defining which comparison enrichment terms belong to.
             Defaults to "comparison_name".
 
-        :param output_prefix:
+        output_prefix : str, optional
             Prefix to use when creating output files.
             Defaults to "differential_analysis".
 
-        :param rasterized:
+        rasterized : bool, optional
             Whether or not to rasterize heatmaps for efficient plotting.
             Defaults to True.
 
-        :param barplots:
+        barplots : bool, optional
             Whether barplots with top enriched terms per comparison should be produced.
             Defaults to True.
 
-        :param correlation_plots:
+        correlation_plots : bool, optional
             Whether correlation plots of comparisons across enriched terms should be produced.
             Defaults to True.
 
-        :param clustermap_metric:
+        clustermap_metric : str, optional
             Distance metric to use for clustermap clustering,
             Default to "correlation" (Pearson's).
 
-        :param top_n:
+        top_n : int, optional
             Top terms to be used to make barplots.
             Defaults to 5
 
-        :param z_score:
+        z_score : bool, optional
             Which dimention/axis to perform Z-score transformation for.
             Numpy/Pandas conventions are used:
             `0` is row-wise (in this case across comparisons) and `1` is column-wise (across terms).
             Defaults to 0.
 
-        :param cmap:
+        cmap : str, optional
             Colormap to use in heatmaps.
             Default None.
         """
+        # TODO: split function in its smaller parts and call them appropriately.
         def enrichment_barplot(
                 input_df,
                 x,
@@ -3219,6 +3268,9 @@ class Analysis(object):
                 msg = "Plotting of correlation matrix failed: {}".format(output_file)
                 _LOGGER.warn(msg)
 
+        if steps is None:
+            steps = ["region", "lola", "motif", "great", "enrichr"]
+
         if (enrichment_table is None) and (enrichment_type is None):
             if not hasattr(self, "enrichment_results"):
                 msg = "'enrichment_table' and 'enrichment_type' were not given"
@@ -3227,20 +3279,23 @@ class Analysis(object):
                 raise ValueError(msg)
             else:
                 for enrichment_name, enrichment_table in self.enrichment_results.items():
-                    self.plot_differential_enrichment(
-                        enrichment_table=enrichment_table,
-                        enrichment_type=enrichment_type,
-                        direction_dependent=direction_dependent,
-                        output_dir=output_dir,
-                        comp_variable=comp_variable,
-                        output_prefix=output_prefix,
-                        rasterized=rasterized,
-                        barplots=barplots,
-                        correlation_plots=correlation_plots,
-                        clustermap_metric=clustermap_metric,
-                        top_n=top_n if enrichment_name != "motif" else 300,
-                        z_score=z_score,
-                        cmap=cmap)
+                    if enrichment_name in steps:
+                        self.plot_differential_enrichment(
+                            steps=[enrichment_name],
+                            enrichment_table=enrichment_table,
+                            enrichment_type=enrichment_name,
+                            direction_dependent=direction_dependent,
+                            output_dir=output_dir,
+                            comp_variable=comp_variable,
+                            output_prefix=output_prefix,
+                            rasterized=rasterized,
+                            barplots=barplots,
+                            correlation_plots=correlation_plots,
+                            clustermap_metric=clustermap_metric,
+                            top_n=top_n if enrichment_name != "motif" else 300,
+                            z_score=z_score,
+                            cmap=cmap)
+                return
 
         if enrichment_type not in ["region", "lola", "enrichr", "motif", "homer_consensus", "great"]:
             raise AssertionError("`enrichment_type` must be one of 'lola', 'enrichr', 'motif', 'homer_consensus', 'great'.")
@@ -3264,13 +3319,13 @@ class Analysis(object):
                 str) + " " + enrichment_table["direction"].astype(str)
 
         if enrichment_type == "region":
-            from ngs_toolkit.graphics import plot_region_structure_results
+            from ngs_toolkit.graphics import plot_region_context_enrichment
             enrichment_table["-log10(p-value)"] = log_pvalues(enrichment_table["p_value"])
 
             if not enrichment_table.index.name == "region":
                 enrichment_table = enrichment_table.set_index("region")
             # Plot terms of each comparison in barplots and volcano plots
-            plot_region_structure_results(
+            plot_region_context_enrichment(
                     enrichment_table,
                     output_dir=output_dir,
                     output_prefix=output_prefix,

@@ -6,68 +6,66 @@ import os
 import yaml
 from peppy import Project
 from ngs_toolkit.atacseq import ATACSeqAnalysis
+from ngs_toolkit import _CONFIG
 
 
 @pytest.fixture
 def analysis(tmp_path):
     # import rpy2
-    tmp_path = str(tmp_path)  # for Python2
+    tmp_path = os.path.abspath(str(tmp_path))  # for Python2
 
-    # Let's make several "reallish" test projects
-    to_test = list()
+    # Let's make a "reallish" test project
     project_prefix_name = "test-project"
     data_type = "ATAC-seq"
-    genome_assemblies = [("human", "hg19"), ("human", "hg38"), ("mouse", "mm10")]
+    genome_assembly = "hg19"
 
     n_factors = 1
     n_variables = 10000
     n_replicates = 10
-    for organism, genome_assembly in [genome_assemblies[0]]:
-        project_name = "{}_{}_{}_{}_{}_{}".format(
-            project_prefix_name, data_type, genome_assembly,
-            n_factors, n_variables, n_replicates)
 
-        generate_project(
-            output_dir=tmp_path,
-            project_name=project_name, genome_assembly=genome_assembly, data_type=data_type,
-            n_factors=n_factors, n_replicates=n_replicates, n_variables=n_variables,
-            group_fold_differences=[20])
+    project_name = "{}_{}_{}_{}_{}_{}".format(
+        project_prefix_name, data_type, genome_assembly,
+        n_factors, n_variables, n_replicates)
 
-        # first edit the defaul path to the annotation sheet
-        config = os.path.join(
-            tmp_path, project_name, "metadata", "project_config.yaml")
-        c = yaml.safe_load(open(config, 'r'))
-        c['metadata']['sample_annotation'] = os.path.abspath(
-            os.path.join(tmp_path, project_name, "metadata", "annotation.csv"))
-        c['metadata']['comparison_table'] = os.path.abspath(
-            os.path.join(tmp_path, project_name, "metadata", "comparison_table.csv"))
-        yaml.safe_dump(c, open(config, "w"))
+    generate_project(
+        output_dir=tmp_path,
+        project_name=project_name, genome_assembly=genome_assembly, data_type=data_type,
+        n_factors=n_factors, n_replicates=n_replicates, n_variables=n_variables,
+        group_fold_differences=[20])
 
-        prj_path = os.path.join(tmp_path, project_name)
-        os.chdir(prj_path)
+    # first edit the defaul path to the annotation sheet
+    config = os.path.join(
+        tmp_path, project_name, "metadata", "project_config.yaml")
+    c = yaml.safe_load(open(config, 'r'))
+    c['metadata']['sample_annotation'] = os.path.abspath(
+        os.path.join(tmp_path, project_name, "metadata", "annotation.csv"))
+    c['metadata']['comparison_table'] = os.path.abspath(
+        os.path.join(tmp_path, project_name, "metadata", "comparison_table.csv"))
+    yaml.safe_dump(c, open(config, "w"))
 
-        # project and associated analysis
-        a = ATACSeqAnalysis(
-            name=project_name,
-            prj=Project(config),
-            results_dir=os.path.join(prj_path, "results"))
-        a.set_project_attributes()
-        a.load_data()
+    prj_path = os.path.join(tmp_path, project_name)
+    os.chdir(prj_path)
 
-        a.normalize(method="total")
-        a.normalize(method="quantile")
-        a.get_peak_gene_annotation()
-        a.annotate(quant_matrix="coverage_qnorm")
-        a.annotate_with_sample_metadata(quant_matrix="coverage_qnorm")
-        a.differential_analysis()
-        a.differential_enrichment(steps=['enrichr'])
-        to_test.append(a)
-    return to_test[0]
+    # project and associated analysis
+    a = ATACSeqAnalysis(
+        name=project_name,
+        prj=Project(config),
+        results_dir=os.path.join(prj_path, "results"))
+    a.set_project_attributes()
+    a.load_data()
+
+    a.get_peak_gene_annotation()
+    a.annotate(quant_matrix="coverage")
+    a.differential_analysis()
+
+    _CONFIG['resources']['enrichr']['gene_set_libraries'] = ["GO_Biological_Process_2015"]
+    a.differential_enrichment(steps=['enrichr'])
+
+    return a
 
 
 @pytest.fixture
 def outputs(analysis):
-    from ngs_toolkit import _CONFIG
     gene_set_libraries = _CONFIG['resources']['enrichr']['gene_set_libraries']
     prefix = os.path.join(analysis.results_dir,
                           "differential_analysis_ATAC-seq", "enrichments",
@@ -86,13 +84,7 @@ def outputs(analysis):
 # @pytest.mark.skip(reason="no way of currently testing this")
 class Test_plot_differential_enrichment:
     def test_no_arguments(self, analysis, outputs):
-        import pandas as pd
-        enr = pd.read_csv(
-            os.path.join(analysis.results_dir,
-                         "differential_analysis_ATAC-seq",
-                         "enrichments",
-                         "differential_analysis.enrichr.csv"))
-        analysis.plot_differential_enrichment(enr, "enrichr")
+        analysis.plot_differential_enrichment()
         for output in outputs:
             assert os.path.exists(output)
             assert os.stat(output).st_size > 0

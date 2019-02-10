@@ -19,12 +19,7 @@ import patsy
 from pybedtools import BedTool
 import pybedtools
 from pypiper.ngstk import NGSTk
-import pysam
 import requests
-import rpy2
-from rpy2.rinterface import RRuntimeError, RRuntimeWarning
-from rpy2.robjects import numpy2ri, pandas2ri
-import rpy2.robjects as robjects
 from scipy import stats
 from scipy.linalg import lstsq
 from scipy.stats import gaussian_kde
@@ -42,32 +37,40 @@ def get_genome_reference(
     Get genome FASTA/2bit file.
     Saves results to disk and returns path to file.
 
-    Attributes:
-
-    :param str organism:
+    Parameters
+    ----------
+    organism : str
         Organism to get annotation for. Currently supported: "human" and "mouse".
 
-    :param str,optional output_dir:
+    output_dir : str, optional
         Directory to write output to.
         Defaults to current directory
 
-    :param str,optional genome_provider:
+    genome_provider : str, optional
         Which genome provider to use. One of 'UCSC' or 'Ensembl'.
 
-    :param str,optional file_format:
+    file_format : str, optional
         File format to get. One of 'fasta' or '2bit'.
 
-    :param bool,optional dry_run:
+    dry_run : bool, optional
         Whether to not download and just return path to file.
 
-    :param bool,optional overwrite:
+    overwrite : bool, optional
         Whether existing files should be overwritten by new ones.
         Otherwise they will be kept and no action is made.
         Defaults to True.
 
-    :returns str|tuple:
-        If not ``dry_run``, path to genome FASTA/2bit file,
-        otherwise tuple of URL of reference genome and path to file.
+    Returns
+    -------
+    {str, tuple}
+        Path to genome FASTA/2bit file,
+        but if `dry_run` tuple of URL of reference genome and path to file.
+
+    Raises
+    --------
+    ValueError
+        If arguments are not in possible options or if desired combination
+        is not available.
     """
     def index_fasta(fasta):
         """
@@ -190,25 +193,27 @@ def get_blacklist_annotations(
     Get annotations of blacklisted genomic regions for a given organism/genome assembly.
     Saves results to disk and returns a path to a BED file.
 
-    Attributes:
-
-    :param str organism:
+    Parameters
+    ----------
+    organism : str
         Organism to get annotation for. Currently supported: "human" and "mouse".
 
-    :param str,optional genome_assembly:
+    genome_assembly : str, optional
         Ensembl assembly/version to use.
        Default for "human" is "hg19/grch37" and for "mouse" is "mm10/grcm38".
 
-    :param str,optional output_dir:
+    output_dir : str, optional
         Directory to write output to.
         Defaults to "reference" in current directory.
 
-    :param bool,optional overwrite:
+    overwrite : bool, optional
         Whether existing files should be overwritten by new ones.
         Otherwise they will be kept and no action is made.
         Defaults to True.
 
-    :returns str:
+    Returns
+    -------
+    str
         Path to blacklist BED file
     """
     if output_dir is None:
@@ -250,39 +255,41 @@ def get_tss_annotations(
     This is a simple approach using Biomart's API querying the Ensembl database.
     Saves results to disk and returns a dataframe.
 
-    Attributes:
-
-    :param str organism:
+    Parameters
+    ----------
+    organism : str
         Organism to get annotation for.
         Currently supported: "human" and "mouse".
 
-    :param str,optional genome_assembly:
+    genome_assembly : str, optional
         Ensembl assembly/version to use.
         Default for "human" is "grch37" and for "mouse" is "grcm38".
 
-    :param bool,optional save:
+    save : bool, optional
         Whether to save to disk under ``output_dir``.
         Defaults to True.
 
-    :param str,optional output_dir:
+    output_dir : str, optional
         Directory to write output to.
         Defaults to "reference" in current directory.
 
-    :param bool,optional chr_prefix:
+    chr_prefix : bool, optional
         Whether chromosome names should have the "chr" prefix.
         Defaults to True
 
-    :param list,optional gene_types:
+    gene_types : list, optional
         Subset of transcript biotypes to keep.
-      See here the available biotypes https://www.ensembl.org/Help/Faq?id=468
-      Defaults to 'protein_coding', 'processed_transcript', 'lincRNA', 'antisense'.
+        See here the available biotypes https://www.ensembl.org/Help/Faq?id=468
+        Defaults to 'protein_coding', 'processed_transcript', 'lincRNA', 'antisense'.
 
-    :param bool,optional overwrite:
+    overwrite : bool, optional
         Whether existing files should be overwritten by new ones.
         Otherwise they will be kept and no action is made.
         Defaults to True.
 
-    :returns pandas.DataFrame:
+    Returns
+    -------
+    pandas.DataFrame
         DataFrame with genome annotations
     """
     organisms = {
@@ -382,37 +389,39 @@ def get_genomic_context(
 
     The API call to BioMart can take a bit, so the function should take ~4 min for a human genome.
 
-    Attributes:
-
-    :param str organism:
+    Parameters
+    ----------
+    organism : str
         Organism to get annotation for. Currently supported: "human" and "mouse".
 
-    :param str,optional genome_assembly:
+    genome_assembly : str, optional
         Ensembl assembly/version to use.
         Default for "human" is "grch37" and for "mouse" is "grcm38".
 
-    :param bool,optional save:
+    save : bool, optional
         Whether to save to disk under ``output_dir``.
         Defaults to True.
 
-    :param str,optional output_dir:
+    output_dir : str, optional
         Directory to write output to.
         Defaults to "reference" in current directory.
 
-    :param bool,optional chr_prefix:
+    chr_prefix : bool, optional
         Whether chromosome names should have the "chr" prefix. Defaults to True
 
-    :param list,optional gene_types:
+    gene_types : list, optional
         Subset of transcript biotypes to keep.
         See here the available biotypes https://www.ensembl.org/Help/Faq?id=468
         Defaults to 'protein_coding', 'processed_transcript', 'lincRNA', 'antisense'.
 
-    :param bool,optional overwrite:
+    overwrite : bool, optional
         Whether existing files should be overwritten by new ones.
         Otherwise they will be kept and no action is made.
         Defaults to True.
 
-    :returns pandas.DataFrame:
+    Returns
+    -------
+    pandas.DataFrame
         DataFrame with genome annotations
     """
     organisms = {
@@ -565,90 +574,6 @@ def get_genomic_context(
     return annot
 
 
-def count_reads_in_intervals(bam, intervals):
-    """
-    Count total number of reads in a iterable holding strings
-    representing genomic intervals of the form ``"chrom:start-end"``.
-
-    Attributes:
-
-    :param str bam:
-        Path to BAM file.
-
-    :param list intervals:
-        List of strings with genomic coordinates in format
-        ``"chrom:start-end"``.
-
-    :returns dict:
-        Dict of read counts for each interval.
-    """
-    counts = dict()
-
-    bam = pysam.AlignmentFile(bam, mode='rb')
-
-    chroms = ["chr" + str(x) for x in range(1, 23)] + ["chrX", "chrY"]
-
-    for interval in intervals:
-        if interval.split(":")[0] not in chroms:
-            continue
-        counts[interval] = bam.count(region=interval.split("|")[0])
-    bam.close()
-
-    return counts
-
-
-def normalize_quantiles_r(array):
-    """
-    Quantile normalization with a R implementation.
-    Requires the "rpy2" library and the R library "preprocessCore".
-
-    Requires the R package "cqn" to be installed:
-        >>> source('http://bioconductor.org/biocLite.R')
-        >>> biocLite('preprocessCore')
-
-    Attributes:
-
-    :param numpy.array array:
-        Numeric array to normalize.
-
-    :returns numpy.array:
-        Normalized numeric array.
-    """
-    warnings.filterwarnings("ignore", category=RRuntimeWarning)
-    rpy2.robjects.numpy2ri.activate()
-
-    robjects.r('require("preprocessCore")')
-    normq = robjects.r('normalize.quantiles')
-    return np.array(normq(array))
-
-
-def normalize_quantiles_p(df_input):
-    """
-    Quantile normalization with a ure Python implementation.
-    Code from https://github.com/ShawnLYU/Quantile_Normalize.
-
-    Attributes:
-
-    :param pandas.DataFrame df_input:
-        Dataframe to normalize.
-
-    :returns numpy.array:
-        Normalized numeric array.
-    """
-    df = df_input.copy()
-    # compute rank
-    dic = {}
-    for col in df:
-        dic.update({col: sorted(df[col])})
-    sorted_df = pd.DataFrame(dic)
-    rank = sorted_df.mean(axis=1).tolist()
-    # sort
-    for col in df:
-        t = np.searchsorted(np.sort(df[col]), df[col])
-        df[col] = [rank[i] for i in t]
-    return df
-
-
 def deseq_analysis(
         count_matrix, experiment_matrix, comparison_table, formula,
         output_dir, output_prefix,
@@ -663,39 +588,47 @@ def deseq_analysis(
 
     # TODO: fix hyphens in names issue
 
-    Attributes:
-
-    :param pandas.DataFrame count_matrix:
+    Parameters
+    ----------
+    count_matrix : pandas.DataFrame
         Data frame of shape (samples, variables) with raw read counts.
 
-    :param pandas.DataFrame experiment_matrix:
+    experiment_matrix : pandas.DataFrame
         Data frame with columns "sample_name" and any other variables used in the `formula`.
 
-    :param pandas.DataFrame comparison_table:
+    comparison_table : pandas.DataFrame
         Data frame with columns "comparison_name", "sample_group" and sample_name".
 
-    :param str formula:
+    formula : str
         Formula to test in R/patsy notation. Usually something like "~ batch + group".
 
-    :param str output_dir:
+    output_dir : str
         Output directory for produced files.
 
-    :param str output_prefix:
+    output_prefix : str
         Prefix to add to produced files.
 
-    :param bool,optional overwrite:
+    overwrite : bool, optional
         Whether files existing should be overwritten. Defaults to True.
 
-    :param number,optional alpha:
+    alpha : number, optional
         Significance level to reject null hypothesis.
         This in practice has no effect as results for all features will be returned.
         Defaults to 0.05.
 
-    :param bool create_subdirectories:
+    create_subdirectories : bool
         Whether to create subdirectories for the result of each comparison.
 
-    :returns pandas.DataFrame: Data frame with results, statistics for each feature.
+    Returns
+    -------
+    pandas.DataFrame
+        Data frame with results, statistics for each feature.
     """
+    import rpy2
+    from rpy2.rinterface import RRuntimeError, RRuntimeWarning
+    from rpy2.robjects import numpy2ri, pandas2ri
+    import rpy2.robjects as robjects
+
     numpy2ri.activate()
     pandas2ri.activate()
     warnings.filterwarnings("ignore", category=RRuntimeWarning)
@@ -799,28 +732,30 @@ def least_squares_fit(
     Fit a least squares model with only categorical predictors.
     Computes p-values by comparing the log likelihood ratio of the chosen model to a `null_model`.
 
-    Attributes:
-
-    :param pandas.DataFrame quant_matrix:
+    Parameters
+    ----------
+    quant_matrix : pandas.DataFrame
         A Data frame of shape (samples, variables).
 
-    :param pandas.DataFrame design_matrix:
+    design_matrix : pandas.DataFrame
         A Data frame of shape (samples, variables) with all the variables in `test_model`.
 
-    :param str test_model:
+    test_model : str
         Model design to test in R/patsy notation.
 
-    :param str,optional null_model:
+    null_model : str, optional
         Null model design in R/patsy notation. Defaults to "~ 1".
 
-    :param bool,optional standardize_data:
+    standardize_data : bool, optional
         Whether data should be standardized prior to fitting. Defaults to True.
 
-    :param str,optional multiple_correction_method:
+    multiple_correction_method : str, optional
         Method to use for multiple test correction.
         See statsmodels.sandbox.stats.multicomp.multipletests. Defaults to "fdr_bh".
 
-    :returns pandas.DataFrame:
+    Returns
+    -------
+    pandas.DataFrame
         Statistics of model fitting and comparison between models for each feature.
 
     :Example:
@@ -878,36 +813,38 @@ def differential_from_bivariate_fit(
     Perform differential analysis using a bivariate gaussian fit
     on the relationship between mean and fold-change for each comparison.
 
-    Attributes:
-
-    :param pandas.DataFrame comparison_table:
+    Parameters
+    ----------
+    comparison_table : pandas.DataFrame
         Dataframe with 'comparison_name', 'comparison_side' and 'sample_name', 'sample_group' columns.
 
-    :param pandas.DataFrame matrix:
+    matrix : pandas.DataFrame
         Matrix of `n_features, n_samples` with normalized, log-transformed values to perform analysis on.
 
-    :param str output_dir:
+    output_dir : str
         Output directory
 
-    :param str output_prefix:
+    output_prefix : str
         Prefix for outputs.
 
-    :param int n_bins:
+    n_bins : int
         Number of bins of mean values along which to standardize fold-changes.
 
-    :param str multiple_correction_method:
+    multiple_correction_method : str
         Multiple correction method from `statsmodels.sandbox.stats.multicomp.multipletests`.
 
-    :param bool plot:
+    plot : bool
         Whether to generate plots.
 
-    :param str palette:
+    palette : str
         Color palette to use. This can be any matplotlib palette and is passed to `sns.color_palette`.
 
-    :param bool make_values_positive:
+    make_values_positive : bool
         Whether to transform `matrix` to have minimum value 0. Default False.
 
-    :returns pandas.DataFrame:
+    Returns
+    -------
+    pandas.DataFrame
         Results of fitting and comparison between groups for each feature.
     """
     comparisons = comparison_table['comparison_name'].drop_duplicates().sort_values()
@@ -1057,7 +994,7 @@ def differential_from_bivariate_fit(
 #     plt.show()
 
 
-def lola(bed_files, universe_file, output_folder, output_prefixes=None, genome="hg19", cpus=8):
+def lola(bed_files, universe_file, output_folder, genome, output_prefixes=None, cpus=8):
     """
     Perform location overlap analysis (LOLA).
 
@@ -1071,30 +1008,32 @@ def lola(bed_files, universe_file, output_folder, output_prefixes=None, genome="
         >>> source('http://bioconductor.org/biocLite.R')
         >>> biocLite('LOLA')
 
-    Attributes:
-
-    :param str,list bed_files:
+    Parameters
+    ----------
+    bed_files : str,list
         A string path to a BED file or a list of paths.
 
-    :param str universe_file:
+    universe_file : str
         A path to a BED file representing the universe from where the BED file(s) come from.
 
-    :param str output_folder:
+    output_folder : str
         Output folder for resulting files.
 
-    :param list,optional output_prefixes:
-        A list of strings with prefixes to be used in case ``bed_files`` is a list.
-        Defaults to None
-
-    :param str,optional genome:
+    genome : str, optional
         Genome assembly from which the BED files come from.
         This is used to get the LOLA databases from the ngs_toolkit._CONFIG parameters.
-        Defaults to "hg19".
 
-    :param int,optional cpus:
+    output_prefixes : list, optional
+        A list of strings with prefixes to be used in case ``bed_files`` is a list.
+
+    cpus : int, optional
         Number of CPUs/threads to use.
         Defaults to 8
     """
+    from rpy2.rinterface import RRuntimeWarning
+    from rpy2.robjects import numpy2ri, pandas2ri
+    import rpy2.robjects as robjects
+
     numpy2ri.activate()
     pandas2ri.activate()
     warnings.filterwarnings("ignore", category=RRuntimeWarning)
@@ -1116,18 +1055,18 @@ def lola(bed_files, universe_file, output_folder, output_prefixes=None, genome="
         databases = _CONFIG['resources']['lola']['region_databases'][genome]
     except KeyError:
         _LOGGER.error(msg)
-        return
+        raise
 
     if not isinstance(databases, list):
         if isinstance(databases, str):
             databases = list(databases)
         else:
             _LOGGER.error(msg)
-            return
+            raise KeyError(msg)
 
     if len(databases) < 1:
         _LOGGER.error(msg)
-        return
+        raise KeyError(msg)
 
     if isinstance(bed_files, str):
         bed_files = [bed_files]
@@ -1144,12 +1083,12 @@ def lola(bed_files, universe_file, output_folder, output_prefixes=None, genome="
     _LOGGER.info("Reading up universe file '{}'.".format(universe_file))
     universe = _readBed(universe_file)
     _LOGGER.info("Loading region set databases.")
-    regionDB = _loadRegionDB(np.array(databases))
+    _regionDB = _loadRegionDB(np.array(databases))
     for suffix, bed_file in zip(output_prefixes, bed_files):
         _LOGGER.info("Reading up BED file '{}'.".format(bed_file))
         user_set = _readBed(bed_file)
         _LOGGER.info("Running LOLA testing for file '{}'.".format(bed_file))
-        _lola_results = _runLOLA(user_set, universe, regionDB, cores=cpus)
+        _lola_results = _runLOLA(user_set, universe, _regionDB, cores=cpus)
         _LOGGER.info("Converting results from R to Python")
         lola_results = r2pandas_df(_lola_results)
         _LOGGER.info("Saving all results for file '{}'.".format(bed_file))
@@ -1159,20 +1098,6 @@ def lola(bed_files, universe_file, output_folder, output_prefixes=None, genome="
             _LOGGER.info("Saving results for collection '{}' only.".format(region_set))
             lola_results[lola_results['collection'] == region_set].to_csv(
                 os.path.join(output_folder, "col_" + region_set + suffix + "tsv"), index=False, sep="\t")
-
-
-def bed_to_fasta(input_bed, output_fasta, genome_2bit):
-    tmp_bed = input_bed + ".tmp.bed"
-    # write name column
-    bed = pd.read_csv(input_bed, sep='\t', header=None)
-    bed['name'] = bed[0] + ":" + bed[1].astype(str) + "-" + bed[2].astype(str)
-    bed[1] = bed[1].astype(int)
-    bed[2] = bed[2].astype(int)
-    bed.to_csv(tmp_bed, sep='\t', header=None, index=False)
-
-    cmd = "twoBitToFa {0} -bed={1} {2}".format(genome_2bit, tmp_bed, output_fasta)
-    subprocess.call(cmd.split(" "))
-    os.remove(tmp_bed)
 
 
 def meme_ame(
@@ -1233,42 +1158,44 @@ def homer_combine_motifs(
     """
     Create consensus of de novo discovered motifs from HOMER
 
-    Attributes:
-
-    :param list comparison_dirs:
+    Parameters
+    ----------
+    comparison_dirs : list
         Iterable of comparison directories where homer was run.
         Should contain a "homerMotifs.all.motifs" file.
 
-    :param str output_dir:
+    output_dir : str
         Output directory.
 
-    :param number,optional p_value_threshold:
+    p_value_threshold : number, optional
         Threshold for inclusion of a motif in the consensus set.
         Defaults to 1e-5
 
-    :param number,optional cpus:
+    cpus : number, optional
         Number of available CPUS/threads for multithread processing.
         Defaults to 8
 
-    :param bool,optional run:
+    run : bool, optional
         Whether to run enrichment of each comparison in the consensus motifs.
         Default is True
 
-    :param bool,optional as_jobs:
+    as_jobs : bool, optional
         Whether to run enrichment as a cluster job.
         Default is True
 
-    :param str genome:
+    genome : str
         Genome assembly of the data.
         Default is 'hg19'.
 
-    :param bool known_vertebrates_TFs_only:
+    known_vertebrates_TFs_only : bool
         Deprecated. Pass a given motif_database to `motif_database` directly.
 
-    :param str motif_database:
+    motif_database : str
         Motif database to restrict motif matching too.
 
-    :returns str:
+    Returns
+    -------
+    {str,None}
         If `run` is `False`, returns path to consensus motif file. Otherwise `None`.
     """
     if known_vertebrates_TFs_only:
@@ -1333,30 +1260,42 @@ def homer_combine_motifs(
                 subprocess.call(cmd.split(" "))
 
 
-def enrichr(dataframe, gene_set_libraries=None, kind="genes"):
+def enrichr(dataframe, gene_set_libraries=None, kind="genes", max_attempts=5):
     """
     Use Enrichr on a list of genes (currently only genes supported through the API).
 
-    :param str dataframe:
+    Parameters
+    ----------
+    dataframe : str
         DataFrame with column "gene_name".
 
-    :param list,optional gene_set_libraries:
+    gene_set_libraries : list, optional
         Gene set libraries to use.
         Defaults to values in initial configuration file.
         To see them, do: ``ngs_toolkit._CONFIG['resources']['enrichr']['gene_set_libraries']``
 
-    :param str,optional kind:
-        Kind of input. Right now, only "genes" is supported.
+    kind : str, optional
+        Type of input.
+        Right now, only "genes" is supported.
         Defaults to "genes"
 
-    :returns pandas.DataFrame:
+    max_attempts : int, optional
+        Number of times to try a call to Enrichr API.
+        Defaults to 5
+
+    Returns
+    -------
+    pandas.DataFrame
         Results of enrichment analysis
 
-    :raises: Exception
+    Raises
+    -------
+    Exception
+        If `max_attempts` is exceeded
     """
     ENRICHR_ADD = 'http://amp.pharm.mssm.edu/Enrichr/addList'
     ENRICHR_RETRIEVE = 'http://amp.pharm.mssm.edu/Enrichr/enrich'
-    query_string = '?userListId=%s&backgroundType=%s'
+    query_string = '?userListId={}&backgroundType={}'
 
     if gene_set_libraries is None:
         # Get region databases from config
@@ -1382,36 +1321,38 @@ def enrichr(dataframe, gene_set_libraries=None, kind="genes"):
             _LOGGER.error(msg)
             return
 
+    if kind == "genes":
+        # Build payload with bed file
+        attr = "\n".join(dataframe["gene_name"].dropna().tolist())
+    elif kind == "regions":
+        # Build payload with bed file
+        attr = "\n".join(dataframe[['chrom', 'start', 'end']].apply(
+            lambda x: "\t".join([str(i) for i in x]), axis=1).tolist())
+
+    payload = {
+        'list': (None, attr),
+        'description': (None, "")}
+    # Request adding gene set
+    response = requests.post(ENRICHR_ADD, files=payload)
+    if not response.ok:
+        raise Exception('Error analyzing gene list')
+
+    # Track gene set ID
+    user_list_id = json.loads(response.text)['userListId']
+
     results = pd.DataFrame()
     for gene_set_library in tqdm(gene_set_libraries, total=len(gene_set_libraries), desc="Gene set library"):
-        _LOGGER.info("Using enricher on %s gene set library." % gene_set_library)
-
-        if kind == "genes":
-            # Build payload with bed file
-            attr = "\n".join(dataframe["gene_name"].dropna().tolist())
-        elif kind == "regions":
-            # Build payload with bed file
-            attr = "\n".join(dataframe[['chrom', 'start', 'end']].apply(
-                lambda x: "\t".join([str(i) for i in x]), axis=1).tolist())
-
-        payload = {
-            'list': (None, attr),
-            'description': (None, gene_set_library)
-        }
-        # Request adding gene set
-        response = requests.post(ENRICHR_ADD, files=payload)
-        if not response.ok:
-            raise Exception('Error analyzing gene list')
-
-        # Track gene set ID
-        user_list_id = json.loads(response.text)['userListId']
+        _LOGGER.info("Using Enricher on %s gene set library.".format(gene_set_library))
 
         # Request enriched sets in gene set
-        response = requests.get(
-            ENRICHR_RETRIEVE + query_string % (user_list_id, gene_set_library)
-        )
-        if not response.ok:
-            raise Exception('Error fetching enrichment results')
+        i = 0
+        okay = False
+        while not okay:
+            if i == max_attempts:
+                raise Exception('Fetching enrichment results maxed `max_attempts`.')
+            response = requests.get(
+                ENRICHR_RETRIEVE + query_string.format(user_list_id, gene_set_library))
+            okay = response.ok
 
         # Get enriched sets in gene set
         res = json.loads(response.text)
@@ -1440,73 +1381,127 @@ def enrichr(dataframe, gene_set_libraries=None, kind="genes"):
 
 
 def run_enrichment_jobs(
-        analysis_name, results_dir, genome,
-        background_bed="results/{PROJECT_NAME}_peak_set.bed",
-        steps=['lola', 'meme', 'homer', 'enrichr']):
+        results_dir, genome,
+        background_bed,
+        steps=['lola', 'meme', 'homer', 'enrichr'],
+        overwrite=True):
     """
-    Submit enrichment jobs for a specifc analysis.
+    Submit parallel enrichment jobs for a specific analysis.
+
+    Parameters
+    ----------
+    :param results_dir:
+        Directory with files prepared by ngs_toolkit.general.run_enrichment_jobs
+
+    :param genome:
+        Genome assembly of the analysis.
+
+    background_bed : str
+        BED file to use as background for LOLA analysis.
+        Typically the analysis' own consensus region set.
+
+    steps : list, optional
+        Steps of the analysis to perform.
+        Defaults to ["region", lola", "meme", "homer", "enrichr"].
+
+    :param overwrite:
+        Whether output should be overwritten.
+        In this case no jobs will be submitted for jobs with existing output files.
+        Defaults to True
     """
-    cmds = list()
+    import textwrap
+    tk = NGSTk()
+
+    # TODO: replace with info from resources
+    dbs = {
+        "human": "~/resources/motifs/motif_databases/HUMAN/HOCOMOCOv10.meme",
+        "mouse": "~/resources/motifs/motif_databases/MOUSE/uniprobe_mouse.meme"}
+    omap = {"hg38": "human", "hg19": "human", "mm10": "mouse"}
+
+    jobs = list()
+    # list of tuples with: job_name, log, exec, requirements (partition, cpu, mem), cmd
 
     # LOLA
     if 'lola' in steps:
-        cmds += ["""for F in `find {results_dir} -name "*_regions.bed"`; do
-DIR=`dirname $F`
-if [ ! -f ${{DIR}}/allEnrichments.tsv ]; then
-echo $DIR $F
-sbatch -J lola.$F -o $F.lola.log -p shortq -c 8 --mem 24000 \
---wrap "Rscript ~/jobs/run_LOLA.R $F {background_bed} {GENOME}"
-fi
-done""".format(results_dir=results_dir, background_bed=background_bed, GENOME=genome)]
+        files = glob(results_dir + "/*/*_regions.bed")
+        for file in files:
+            dir_ = os.path.dirname(file)
+            name = os.path.basename(dir_)
+            output_ = os.path.join(dir_, "allEnrichments.tsv")
+            if os.path.exists(output_) and (not overwrite):
+                continue
+            jobs += [
+                name,
+                os.path.join(dir_, name + ".lola.log"),
+                os.path.join(dir_, name + ".lola.sh"),
+                ("shortq", 8, 24000),
+                "Rscript ~/jobs/run_LOLA.R $F {} {}"
+                .format(background_bed, genome)]
 
     # AME
     if 'meme' in steps:
-        dbs = {
-            "human": "~/resources/motifs/motif_databases/HUMAN/HOCOMOCOv10.meme",
-            "mouse": "~/resources/motifs/motif_databases/MOUSE/uniprobe_mouse.meme"}
-        omap = {"hg38": "human", "hg19": "human", "mm10": "mouse"}
-
-        cmds += ["""for F in `find {results_dir} -name "*_regions.fa"`; do
-DIR=`dirname $F`
-if [ ! -f ${{DIR}}/ame.html ]; then
-echo $DIR $F
-sbatch -J "meme_ame.${{F}}" -o "${{F}}.meme_ame.log" -p shortq -c 1 --mem 4000 \
---wrap "fasta-dinucleotide-shuffle -c 1 -f "${{F}}" > "${{F}}".shuffled.fa; \
-ame --bgformat 1 --scoring avg --method ranksum --pvalue-report-threshold 0.05 \
---control "${{F}}".shuffled.fa -o "${{DIR}}" "${{F}}" {motifs}"
-fi
-done""".format(results_dir=results_dir, motifs=dbs[omap[genome]])]
+        files = glob(results_dir + "/*/*_regions.fa")
+        for file in files:
+            dir_ = os.path.dirname(file)
+            name = os.path.basename(dir_)
+            output_ = os.path.join(dir_, "ame.html")
+            if os.path.exists(output_) and (not overwrite):
+                continue
+            jobs += [
+                name,
+                os.path.join(dir_, name + ".meme_ame.log"),
+                os.path.join(dir_, name + ".meme_ame.sh"),
+                ("shortq", 1, 4000),
+                "fasta-dinucleotide-shuffle -c 1 -f {f} > {f}.shuffled.fa\n" +
+                "ame --bgformat 1 --scoring avg --method ranksum --pvalue-report-threshold 0.05" +
+                " --control {f}.shuffled.fa -o {d} {f} {motifs}"
+                .format(f=file, d=dir_, motifs=dbs[omap[genome]])]
 
     # HOMER
     if 'homer' in steps:
-        cmds += ["""for F in `find {results_dir} -name "*_regions.bed"`; do
-DIR=`dirname $F`
-if [ ! -f ${{DIR}}/homerResults.html ]; then
-echo $DIR $F
-sbatch -J "homer.${{F}}" -o "${{F}}.homer.log" -p shortq -c 8 --mem 20000 \
---wrap "findMotifsGenome.pl ${{F}} {GENOME}r ${{DIR}} -size 1000 -h -p 2 -len 8,10,12,14 -noknown"
-fi
-done""".format(results_dir=results_dir, GENOME=genome)]
+        files = glob(results_dir + "/*/*_regions.bed")
+        for file in files:
+            dir_ = os.path.dirname(file)
+            name = os.path.basename(dir_)
+            output_ = os.path.join(dir_, "homerResults.html")
+            if os.path.exists(output_) and (not overwrite):
+                continue
+            jobs += [
+                name,
+                os.path.join(dir_, name + ".homer.log"),
+                os.path.join(dir_, name + ".homer.sh"),
+                ("shortq", 8, 20000),
+                "findMotifsGenome.pl {f} {genome}r {d} -size 1000 -h -p 2 -len 8,10,12,14 -noknown"
+                .format(f=file, d=dir_, genome=genome)]
 
     # Enrichr
     if 'enrichr' in steps:
-        cmds += ["""for F in `find {results_dir} -name "*.gene_symbols.txt"`; do
-if [ ! -f ${{F/gene_symbols.txt/enrichr.csv}} ]; then
-echo $F
-sbatch -J enrichr.$F -o $F.enrichr.log -p shortq -c 1 --mem 4000 \
---wrap "python -u ~/jobs/run_Enrichr.py --input-file "$F" --output-file "${{F/gene_symbols.txt/enrichr.csv}}" "
-fi
-done""".format(results_dir=results_dir)]
-        cmds += ["""for F in `find {results_dir} -name "*_genes.symbols.txt"`; do
-if [ ! -f ${{F/symbols.txt/enrichr.csv}} ]; then
-echo $F
-sbatch -J enrichr.$F -o $F.enrichr.log -p shortq -c 1 --mem 4000 \
---wrap "python -u ~/jobs/run_Enrichr.py --input-file "$F" --output-file "${{F/symbols.txt/enrichr.csv}}" "
-fi
-done""".format(results_dir=results_dir)]
+        files = glob(results_dir + "/*/*_genes.symbols.txt")
+        for file in files:
+            dir_ = os.path.dirname(file)
+            name = os.path.basename(dir_)
+            output_ = file.replace("symbols.txt", "enrichr.csv")
+            if os.path.exists(output_) and (not overwrite):
+                continue
+            jobs += [
+                name,
+                os.path.join(dir_, name + ".enrichr.log"),
+                os.path.join(dir_, name + ".enrichr.sh"),
+                ("shortq", 1, 4000),
+                "python -u ~/jobs/run_Enrichr.py --input-file {f} --output-file {o}"
+                .format(f=file, o=output_)]
 
-    for cmd in cmds:
-        subprocess.call(cmd.split(" "))
+    for job_name, log_file, job_file, (cpu, mem), cmd in jobs:
+        cmd = tk.slurm_header(
+            job_name=job_name, output=log_file,
+            cpus_per_task=cpu, mem_per_cpu=mem)
+        cmd += cmd
+        cmd += " \n"
+        cmd += tk.slurm_footer()
+        with open(job_file, "w") as handle:
+            handle.write(textwrap.dedent(cmd).replace("\n ", "\n").replace("  ", ""))
+
+        tk.slurm_submit_job(job_file)
 
 
 def project_to_geo(
@@ -1524,27 +1519,29 @@ def project_to_geo(
 
     A pandas DataFrame with info on the sample's files and md5sums will be returned.
 
-    :param peppy.Project project:
+    project : peppy.Project
         A peppy Project object to process.
 
-    :param str,optional output_dir:
+    output_dir : str, optional
         Directory to create output. Will be created/overwriten if existing.
         Defaults to "geo_submission".
 
-    :param list,optional samples:
+    samples : list, optional
         List of peppy.Sample objects in project to restrict to.
         Defaults to all samples in project.
 
-    :param bool,optional distributed:
+    distributed : bool, optional
         Whether processing should be distributed as jobs in a computing cluster for each sample.
         Currently available implementation supports a SLURM cluster only.
         Defaults to False.
 
-    :param bool,optional dry_run:
+    dry_run : bool, optional
         Whether copy/execution/submisison commands should be not be run to test.
         Default is False.
 
-    :returns pandas.DataFrame:
+    Returns
+    -------
+    pandas.DataFrame
         Annotation of samples and their BAM, BigWig, narrowPeak files and respective md5sums.
     """
     output_dir = os.path.abspath(output_dir)
@@ -1662,30 +1659,29 @@ def rename_sample_files(
 
     NEEDS TESTING!
 
-    :param pandas.DataFrame annotation_mapping:
+    annotation_mapping : pandas.DataFrame
         DataFrame with mapping of old (column "previous_sample_name") vs new ("new_sample_name") sample names.
 
-    :param str,optional old_sample_name_column:
+    old_sample_name_column : str, optional
         Name of column with old sample names.
         Defaults to "old_sample_name"
 
-    :param str,optional new_sample_name_column:
+    new_sample_name_column : str, optional
         Name of column with new sample names.
         Defaults to "new_sample_name"
 
-    :param str,optional tmp_prefix:
+    tmp_prefix : str, optional
         Prefix for temporary files to avoid overlap between old and new names.
         Defaults to "rename_sample_files"
 
-    :param str,optional results_dir:
+    results_dir : str, optional
         Pipeline output directory containing sample output directories.
         Defaults to "results_pipeline"
 
-    :param bool,optional dry_run:
+    dry_run : bool, optional
         Whether to print commands instead of running them. Defaults to False
-
-    :returns: None
     """
+    # TODO: test
     cmds = list()
     # 1) move to tmp name
     for i, series in annotation_mapping.iterrows():
@@ -1745,19 +1741,21 @@ def query_biomart(
     Query Biomart for gene attributes. Returns pandas dataframe with query results.
     If a certain field contains commas, it will attemp to return dataframe but it might fail.
 
-    :param list,optional attributes:
+    attributes : list, optional
         List of ensembl atrributes to query.
         Defaults to ["ensembl_gene_id", "external_gene_name", "hgnc_id", "hgnc_symbol"].
 
-    :param str,optional species:
+    species : str, optional
         Ensembl string of species to query. Must be vertebrate.
         Defaults to "hsapiens".
 
-    :param str,optional ensembl_version:
+    ensembl_version : str, optional
         Ensembl version to query. Currently "grch37", "grch38" and "grcm38" are tested.
         Defaults to "grch37".
 
-    :returns pandas.DataFrame:
+    Returns
+    -------
+    pandas.DataFrame
         Dataframe with required attributes for each entry.
     """
     supported = ['grch37', 'grch38', 'grcm38']
@@ -1897,13 +1895,24 @@ def fix_batch_effect_limma(matrix, batch_variable="batch", covariates=None):
         >>> source('http://bioconductor.org/biocLite.R')
         >>> biocLite('limma')
 
-    :param matrix: DataFrame with multiindex for potential covariate annotations
-    :type matrix: [type]
-    :param formula: [description], defaults to "~knockout"
-    :type formula: str,optional
-    :returns: [description]
-    :rtype: {[type]}
+    Parameters
+    ----------
+    matrix : pandas.DataFrame
+        DataFrame with MultiIndex for potential covariate annotations
+
+    formula : str, optional
+        Model formula to regress out
+        Defaults to "~batch"
+
+    Returns
+    -------
+    pandas.DataFrame
+        Regressed out matrix
     """
+    from rpy2.rinterface import RRuntimeWarning
+    from rpy2.robjects import numpy2ri, pandas2ri
+    import rpy2.robjects as robjects
+
     warnings.filterwarnings("ignore", category=RRuntimeWarning)
     numpy2ri.activate()
     pandas2ri.activate()

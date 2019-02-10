@@ -10,7 +10,9 @@ import time
 from ngs_toolkit import _LOGGER
 import numpy as np
 import pandas as pd
+import pybedtools
 from pypiper import NGSTk
+import pysam
 import requests
 from sklearn.preprocessing import MinMaxScaler
 
@@ -19,12 +21,12 @@ def chunks(l, n):
     """
     Partition iterable in chunks of size `n`.
 
-    Attributes:
-
-    :param iterable l:
+    Parameters
+    ----------
+    l : iterable
         Iterable (e.g. list or numpy array).
 
-    :param int n:
+    n : int
         Size of chunks to generate.
     """
     n = max(1, n)
@@ -35,12 +37,14 @@ def sorted_nicely(l):
     """
     Sort an iterable in the way that humans expect.
 
-    Attributes:
-
-    :param iterable l:
+    Parameters
+    ----------
+    l : iterable
         Iterable to be sorted
 
-    :returns iterable:
+    Returns
+    -------
+    iterable
         Sorted interable
     """
     def convert(text): return int(text) if text.isdigit() else text
@@ -53,7 +57,9 @@ def standard_score(x):
     """
     Compute a standard score, defined as (x - min(x)) / (max(x) - min(x)).
 
-    :param numpy.array x: Numeric array.
+    Parameters
+    ----------
+    x : numpy.array Numeric array.
     """
     return (x - x.min()) / (x.max() - x.min())
 
@@ -62,7 +68,9 @@ def z_score(x):
     """
     Compute a Z-score, defined as (x - mean(x)) / std(x).
 
-    :param numpy.array x: Numeric array.
+    Parameters
+    ----------
+    x : numpy.array Numeric array.
     """
     return (x - x.mean()) / x.std()
 
@@ -71,6 +79,8 @@ def count_dataframe_values(x):
     """
     Count number of non-null values in a dataframe.
 
+    Parameters
+    ----------
     :param x: Pandas DataFrame
     :type x: pandas.DataFrame
     :returns: Number of non-null values.
@@ -94,8 +104,10 @@ def bed_to_index(df):
     Get an index of the form chrom:start-end
     from a a dataframe with such columns.
 
-    :param pandas.DataFrame df: DataFrame with columns
-                                 'chr', 'start' and 'end'.
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        DataFrame with columns 'chr', 'start' and 'end'.
     """
     cols = ['chrom', 'start', 'end']
     if not all([x in df.columns for x in cols]):
@@ -130,9 +142,9 @@ def signed_max(x, f=0.66, axis=0):
     or across columns (row-wise, axis=1).
     Will return NaN for non-numeric values.
 
-    :param numpy.array x: Numeric array or pandas Dataframe or Series.
-    :param float f: Threshold fraction of majority agreement.
-    :param int axis: Whether to apply across rows (0, columns-wise) or across columns (1, row-wise).
+    x : numpy.array Numeric array or pandas Dataframe or Series.
+    f : float Threshold fraction of majority agreement.
+    axis : int Whether to apply across rows (0, columns-wise) or across columns (1, row-wise).
     :returns: Pandas Series with values reduced to the signed maximum.
     :rtype: pandas.Series
     """
@@ -179,12 +191,14 @@ def log_pvalues(x, f=0.1):
     Calculate -log10(p-value) replacing infinite values with:
         ``max(x) + max(x) * f``
 
-    Attributes:
-
-    :param pandas.Series x:
+    Parameters
+    ----------
+    x : pandas.Series
         Series with numeric values
 
-    :returns pandas.Series:
+    Returns
+    -------
+    pandas.Series
         Transformed values
     """
     ll = (-np.log10(x))
@@ -350,10 +364,14 @@ def collect_md5_sums(df):
 
     Useful to use in combination with ``project_to_geo``.
 
-    :param pandas.DataFrame df:
+    Parameters
+    ----------
+    df : pandas.DataFrame
         A dataframe with columns ending in '_md5sum'.
 
-    :returns pandas.DataFrame:
+    Returns
+    -------
+    pandas.DataFrame
         DataFrame with md5sum columns replaced with the actual md5sums.
     """
     cols = df.columns[df.columns.str.endswith("_md5sum")]
@@ -644,9 +662,9 @@ def homer_peaks_to_bed(homer_peaks, output_bed):
     Convert HOMER peak calls to BED format.
     The fifth column (score) is the -log10(p-value) of the peak.
 
-    :param str homer_peaks:
+    homer_peaks : str
         HOMER output with peak calls.
-    :param str output_bed:
+    output_bed : str
         Output BED file.
     """
     df = pd.read_csv(homer_peaks, sep="\t", comment="#", header=None)
@@ -657,3 +675,289 @@ def homer_peaks_to_bed(homer_peaks, output_bed):
         df[[1, 2, 3, 'name', '-log_pvalue']]
         .sort_values([1, 2, 3], ascending=True)
         .to_csv(output_bed, header=False, index=False, sep="\t"))
+
+
+def macs2_call_chipseq_peak(signal_samples, control_samples, output_dir, name, as_job=True):
+    """
+    Call ChIP-seq peaks with MACS2 in a slurm job.
+
+    Parameters
+    ----------
+    signal_samples : list
+        Signal Sample objects.
+
+    control_samples : list
+        Background Sample objects.
+
+    output_dir : list
+        Parent directory where MACS2 outputs will be stored.
+
+    name : str
+        Name of the MACS2 comparison being performed.
+
+    as_job : bool
+        Whether to submit a SLURM job or to return a string with the runnable.
+    """
+    output_path = os.path.join(output_dir, name)
+    if not os.path.exists(output_path):
+        os.mkdir(output_path)
+
+    runnable = (
+        """macs2 callpeak -t {0} -c {1} -n {2} --outdir {3}"""
+        .format(
+            " ".join([s.filtered for s in signal_samples]),
+            " ".join([s.filtered for s in control_samples]), name, output_path))
+
+    if as_job:
+        tk = NGSTk()
+        job_name = "macs2_{}".format(name)
+        cmd = tk.slurm_header(
+            job_name,
+            os.path.join(output_path, job_name + ".log"),
+            cpus_per_task=4)
+        cmd += "\t\t" + runnable
+        cmd += "\t\t" + tk.slurm_footer() + "\n"
+        job_file = os.path.join(output_path, name + ".macs2.sh")
+        with open(job_file, "w") as handle:
+            handle.write(textwrap.dedent(cmd))
+        tk.slurm_submit_job(job_file)
+    else:
+        return runnable
+
+
+def homer_call_chipseq_peak_job(signal_samples, control_samples, output_dir, name, as_job=True):
+    """
+    Call ChIP-seq peaks with MACS2 in a slurm job.
+
+    Parameters
+    ----------
+    signal_samples : list
+        Signal Sample objects.
+
+    control_samples : list
+        Background Sample objects.
+
+    output_dir : list
+        Parent directory where MACS2 outputs will be stored.
+
+    name : str
+        Name of the MACS2 comparison being performed.
+    """
+    output_path = os.path.join(output_dir, name)
+    if not os.path.exists(output_path):
+        os.mkdir(output_path)
+
+    # make tag directory for the signal and background samples separately
+    signal_tag_directory = os.path.join(output_dir, "homer_tag_dir_" + name + "_signal")
+    fs = " ".join([s.filtered for s in signal_samples])
+    runnable = """makeTagDirectory {0} {1}\n""".format(signal_tag_directory, fs)
+    background_tag_directory = os.path.join(output_dir, "homer_tag_dir_" + name + "_background")
+    fs = " ".join([s.filtered for s in control_samples])
+    runnable += """makeTagDirectory {0} {1}\n""".format(background_tag_directory, fs)
+
+    # call peaks
+    output_file = os.path.join(output_dir, name, name + "_homer_peaks.factor.narrowPeak")
+    runnable += """findPeaks {signal} -style factor -o {output_file} -i {background}\n""".format(
+        output_file=output_file, background=background_tag_directory, signal=signal_tag_directory)
+    output_file = os.path.join(output_dir, name, name + "_homer_peaks.histone.narrowPeak")
+    runnable += """findPeaks {signal} -style histone -o {output_file} -i {background}\n""".format(
+        output_file=output_file, background=background_tag_directory, signal=signal_tag_directory)
+
+    if as_job:
+        tk = NGSTk()
+        job_name = "homer_findPeaks_{}".format(name)
+        cmd = tk.slurm_header(
+            job_name,
+            os.path.join(output_path, job_name + ".log"),
+            cpus_per_task=4)
+        cmd += runnable.replace("\n", "\t\t\n")
+        cmd += "\t\t" + tk.slurm_footer() + "\n"
+        job_file = os.path.join(output_path, name + ".homer.sh")
+        with open(job_file, "w") as handle:
+            handle.write(textwrap.dedent(cmd))
+        tk.slurm_submit_job(job_file)
+    else:
+        return runnable
+
+
+def bed_to_fasta(input_bed, output_fasta, genome_file):
+    """
+    Retrieves DNA sequence underlying specific region.
+    Names of FASTA entries will be of form "chr:start-end".
+
+    Parameters
+    ----------
+    input_bed : str
+        Path to input BED file.
+
+    output_fasta : str
+        Path to resulting FASTA file.
+
+    genome_file : str
+        Path to genome file in either 2bit or FASTA format.
+        Will be guessed based on file ending.
+
+    Raises
+    ----------
+    ValueError
+        If `genome_file` format cannot be guessed or is not supported.
+    """
+
+    if genome_file.endswith(".2bit"):
+        bed_to_fasta_through_2bit(input_bed, output_fasta, genome_file)
+    elif (genome_file.endswith(".fa") or genome_file.endswith(".fasta")):
+        bed_to_fasta_through_fasta(input_bed, output_fasta, genome_file)
+    else:
+        msg = "Format of `genome_file` must be one of FASTA or 2bit, "
+        msg += "with file ending in either '.fa', '.fasta' or '.2bit'"
+        raise ValueError(msg)
+
+
+def bed_to_fasta_through_2bit(input_bed, output_fasta, genome_2bit):
+    """
+    Retrieves DNA sequence underlying specific region.
+    Requires the `twoBitToFa` command from UCSC kent tools.
+    Names of FASTA entries will be of form "chr:start-end".
+
+    Parameters
+    ----------
+    input_bed : str
+        Path to input BED file.
+
+    output_fasta : str
+        Path to resulting FASTA file.
+
+    genome_2bit : str
+        Path to genome 2bit file.
+    """
+    tmp_bed = input_bed + ".tmp.bed"
+    # write name column
+    bed = pd.read_csv(input_bed, sep='\t', header=None)
+    bed['name'] = bed[0] + ":" + bed[1].astype(str) + "-" + bed[2].astype(str)
+    bed[1] = bed[1].astype(int)
+    bed[2] = bed[2].astype(int)
+    bed.to_csv(tmp_bed, sep='\t', header=None, index=False)
+
+    cmd = "twoBitToFa {0} -bed={1} {2}".format(genome_2bit, tmp_bed, output_fasta)
+    subprocess.call(cmd.split(" "))
+    os.remove(tmp_bed)
+
+
+def bed_to_fasta_through_fasta(input_bed, output_fasta, genome_fasta):
+    """
+    Retrieves DNA sequence underlying specific region.
+    Uses bedtools getfasta (internally through pybedtools.BedTool.sequence).
+    Names of FASTA entries will be of form "chr:start-end".
+
+    Parameters
+    ----------
+    input_bed : str
+        Path to input BED file.
+
+    output_fasta : str
+        Path to resulting FASTA file.
+
+    genome_fasta : str
+        Path to genome FASTA file.
+    """
+    bed = pd.read_csv(input_bed, sep='\t', header=None)
+    bed['name'] = bed[0] + ":" + bed[1].astype(str) + "-" + bed[2].astype(str)
+    bed[1] = bed[1].astype(int)
+    bed[2] = bed[2].astype(int)
+    bed = pybedtools.BedTool.from_dataframe(bed.iloc[:, [0, 1, 2]])
+    bed.sequence(fi=genome_fasta, fo=output_fasta, name=True)
+
+
+def count_reads_in_intervals(bam, intervals):
+    """
+    Count total number of reads in a iterable holding strings
+    representing genomic intervals of the form ``"chrom:start-end"``.
+
+    Parameters
+    ----------
+    bam : str
+        Path to BAM file.
+
+    intervals : list
+        List of strings with genomic coordinates in format
+        ``"chrom:start-end"``.
+
+    Returns
+    -------
+    dict
+        Dict of read counts for each interval.
+    """
+    counts = dict()
+
+    bam = pysam.AlignmentFile(bam, mode='rb')
+
+    chroms = ["chr" + str(x) for x in range(1, 23)] + ["chrX", "chrY"]
+
+    for interval in intervals:
+        if interval.split(":")[0] not in chroms:
+            continue
+        counts[interval] = bam.count(region=interval.split("|")[0])
+    bam.close()
+
+    return counts
+
+
+def normalize_quantiles_r(array):
+    """
+    Quantile normalization with a R implementation.
+    Requires the "rpy2" library and the R library "preprocessCore".
+
+    Requires the R package "cqn" to be installed:
+        >>> source('http://bioconductor.org/biocLite.R')
+        >>> biocLite('preprocessCore')
+
+    Parameters
+    ----------
+    array : numpy.array
+        Numeric array to normalize.
+
+    Returns
+    -------
+    numpy.array
+        Normalized numeric array.
+    """
+    import numpy as np
+    import rpy2.robjects as robjects
+    import rpy2.robjects.numpy2ri
+    import warnings
+    from rpy2.rinterface import RRuntimeWarning
+    warnings.filterwarnings("ignore", category=RRuntimeWarning)
+    rpy2.robjects.numpy2ri.activate()
+
+    robjects.r('require("preprocessCore")')
+    normq = robjects.r('normalize.quantiles')
+    return np.array(normq(array))
+
+
+def normalize_quantiles_p(df_input):
+    """
+    Quantile normalization with a ure Python implementation.
+    Code from https://github.com/ShawnLYU/Quantile_Normalize.
+
+    Parameters
+    ----------
+    df_input : pandas.DataFrame
+        Dataframe to normalize.
+
+    Returns
+    -------
+    numpy.array
+        Normalized numeric array.
+    """
+    df = df_input.copy()
+    # compute rank
+    dic = {}
+    for col in df:
+        dic.update({col: sorted(df[col])})
+    sorted_df = pd.DataFrame(dic)
+    rank = sorted_df.mean(axis=1).tolist()
+    # sort
+    for col in df:
+        t = np.searchsorted(np.sort(df[col]), df[col])
+        df[col] = [rank[i] for i in t]
+    return df

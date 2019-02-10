@@ -13,3 +13,4 @@ patsy>=0.4.1
 tqdm>=4.19.5
 peppy>=0.18.2
 piper
+numpydoc

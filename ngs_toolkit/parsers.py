@@ -7,18 +7,26 @@ import re
 import pandas as pd
 
 
-def parse_ame(ame_dir):
+def parse_ame(ame_output):
     """
     Parse results of MEME-AME motif enrichment.
 
-    :param ame_dir: Directory with MEME-AME results.
-    :type ame_dir: str
-    :returns: Data frame with enrichment statistics for each found TF motif.
-    :rtype: pandas.DataFrame
-    :raises: IOError
-    """
+    Parameters
+    ----------
+    ame_output : str
+        MEME-AME results file.
 
-    with open(os.path.join(ame_dir, "ame.txt"), 'r') as handle:
+    Returns
+    ----------
+    pandas.DataFrame
+        Data frame with enrichment statistics for each found TF motif.
+
+    Raises
+    -------
+    IOError
+        If directory contain
+    """
+    with open(ame_output, 'r') as handle:
         lines = handle.readlines()
 
     output = list()
@@ -43,11 +51,19 @@ def parse_homer(homer_dir):
     """
     Parse results of HOMER findMotifs.pl de novo motif enrichment.
 
-    :param homer_dir: Directory with HOMER results.
-    :type homer_dir: str
-    :returns: Data frame with enrichment statistics for each found TF motif.
-    :rtype: pandas.DataFrame
-    :raises: IOError
+    Parameters
+    ----------
+    homer_dir : str
+        Directory with HOMER results.
+
+    Returns
+    ----------
+    pandas.DataFrame
+        Data frame with enrichment statistics for each found TF motif.
+
+    Raises
+    -------
+    IOError
     """
     motif_htmls = sorted(glob.glob(os.path.join(homer_dir, "motif*.info.html")))
 
@@ -87,10 +103,15 @@ def parse_great_enrichment(input_tsv):
     """
     Parse output from GREAT enrichment (http://great.stanford.edu).
 
-    :param input_tsv: TSV file exported from GREAT through the option "All data as .tsv" in "Global Controls".
-    :type input_tsv: str
-    :returns: Pandas dataframe with enrichment results.
-    :rtype: pandas.DataFrame
+    Parameters
+    ----------
+    input_tsv : str
+        TSV file exported from GREAT through the option "All data as .tsv" in "Global Controls".
+
+    Returns
+    ----------
+    pandas.DataFrame
+        Pandas dataframe with enrichment results.
     """
     df = pd.read_csv(input_tsv, sep="\t", skiprows=3)
     df.columns = df.columns.str.replace("# ", "")

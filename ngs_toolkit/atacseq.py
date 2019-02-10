@@ -1,37 +1,33 @@
 #!/usr/bin/env python
 
 
+import multiprocessing
 import os
-import pickle
-import re
 
 import matplotlib.pyplot as plt
 from ngs_toolkit import _LOGGER
 from ngs_toolkit.analysis import Analysis
-from ngs_toolkit.decorators import check_organism_genome, check_has_sites
+from ngs_toolkit.decorators import (
+    check_organism_genome, check_has_sites)
 from ngs_toolkit.general import (
     get_blacklist_annotations,
+    meme_ame, homer_motifs, lola, enrichr)
+from ngs_toolkit.utils import (
+    bed_to_index, bed_to_fasta,
+    log_pvalues, standard_score,
     count_reads_in_intervals,
     normalize_quantiles_r,
-    normalize_quantiles_p,
-    bed_to_fasta, meme_ame,
-    homer_motifs, lola, enrichr)
-from ngs_toolkit.utils import bed_to_index, log_pvalues, standard_score
-
-from tqdm import tqdm
-
+    normalize_quantiles_p)
+import numpy as np
+import pandas as pd
+import parmap
+import pybedtools
+import pysam
 from rpy2 import robjects
 from rpy2.rinterface import RRuntimeWarning
 from scipy.stats import fisher_exact
-import multiprocessing
-import parmap
-import pysam
-import numpy as np
-import pandas as pd
-import pybedtools
-from scipy.stats import mannwhitneyu
 import seaborn as sns
-from statsmodels.sandbox.stats.multicomp import multipletests
+from tqdm import tqdm
 
 
 class ATACSeqAnalysis(Analysis):
@@ -39,32 +35,32 @@ class ATACSeqAnalysis(Analysis):
     Class to model analysis of ATAC-seq data.
     Inherits from the `ngs_toolkit.general.Analysis` class.
 
-    Attributes:
-
-    :param str name:
+    Parameters
+    ----------
+    name : str
         Name to give analysis object.
         Default is ``atacseq_analysis``.
 
-    :param list samples:
+    samples : list
         Iterable of peppy.Sample objects use in analysis.
         If not provided (`None` is passed) and `prj` is.
         Defaults to all samples in the `prj` object (`samples` attribute).
 
-    :param peppy.Project prj:
+    prj : peppy.Project
         Project to tie analysis to.
 
-    :param str data_dir:
+    data_dir : str
         Directory containing relevant data for analysis.
         Default is `data`.
 
-    :param str results_dir:
+    results_dir : str
         Directory to output relevant analysis results.
         Default is `results`.
 
-    :param str pickle_file:
+    pickle_file : str
         File path to use to save serialized object in `pickle` format.
 
-    :param bool from_pickle:
+    from_pickle : bool
         If the analysis should be loaded from an existing pickle object.
         Default is `False.
 
@@ -146,12 +142,12 @@ class ATACSeqAnalysis(Analysis):
         """
         Load the output files of the major functions of the Analysis.
 
-        Attributes:
-
-        :param dict output_mapping:
+        Parameters
+        ----------
+        output_mapping : dict
             Dictionary with "attribute name": "path prefix" to load the files.
 
-        :param list,optional only_these_keys:
+        only_these_keys : list, optional
             Iterable of analysis attributes to load up.
             Possible attributes:
                 "sites", "support", "coverage", "coverage_qnorm",
@@ -160,26 +156,22 @@ class ATACSeqAnalysis(Analysis):
                 "chrom_state_annotation", "chrom_state_annotation_b",
                 "coverage_annotated", "accessibility", "differential_results".
 
-        :param permissive bool:
+        bool : permissive
             Whether an error should be thrown if reading a file causes IOError.
 
-        :raises IOError: If not `permissive` and any of the files are not readable.
+        Attributes
+        ----------
+        sites : pybedtools.BedTool
+            Sets a `sites` variable.
 
-        :var pybedtools.BedTool sites: Sets a `sites` variable.
-        :var pandas.DataFrame support: Sets a `support` variable.
-        :var pandas.DataFrame coverage: Sets a `coverage` variable.
-        :var pandas.DataFrame coverage_qnorm: Sets a `coverage_qnorm` variable.
-        :var pandas.DataFrame nuc: Sets a `nuc` variable.
-        :var pandas.DataFrame coverage_gc_corrected: Sets a `coverage_gc_corrected` variable.
-        :var pandas.DataFrame gene_annotation: Sets a `gene_annotation` variable.
-        :var pandas.DataFrame region_annotation: Sets a `region_annotation` variable.
-        :var pandas.DataFrame region_annotation_b: Sets a `region_annotation_b` variable.
-        :var pandas.DataFrame chrom_state_annotation: Sets a `chrom_state_annotation` variable.
-        :var pandas.DataFrame chrom_state_annotation_b: Sets a `chrom_state_annotation_b` variable.
-        :var pandas.DataFrame coverage_annotated: Sets a `coverage_annotated` variable.
-        :var pandas.DataFrame accessibility: Sets a `accessibility` variable.
-        :var pandas.DataFrame differential_results: Sets a `differential_results` variable.
-        :returns: `None`
+        pandas.DataFrame
+            Dataframes holding the respective data, available as attributes described
+            in the `only_these_keys` parameter.
+
+        Raises
+        ----------
+        IOError
+            If not permissive and a file is not found
         """
         if only_these_keys is None:
             only_these_keys = [
@@ -204,7 +196,10 @@ class ATACSeqAnalysis(Analysis):
                 hint = " Other attributes loaded though."
                 if permissive:
                     _LOGGER.warn(msg + hint)
-                    only_these_keys.pop(only_these_keys.index("accessibility"))
+                    try:
+                        only_these_keys.pop(only_these_keys.index("accessibility"))
+                    except ValueError:
+                        pass
                 else:
                     _LOGGER.error(msg + hint)
                     raise ValueError(msg)
@@ -238,9 +233,9 @@ class ATACSeqAnalysis(Analysis):
                 "region_annotation_b_mapping":
                     (prefix + "_peaks.region_annotation_background_mapping.csv", kwargs),
                 "chrom_state_annotation":
-                    (prefix + "_peaks.chromatin_state.csv", kwargs),
+                    (prefix + "_peaks.chrom_state_annotation.csv", kwargs),
                 "chrom_state_annotation_b":
-                    (prefix + "_peaks.chromatin_state_background.csv", kwargs),
+                    (prefix + "_peaks.chrom_state_annotation_background.csv", kwargs),
                 "chrom_state_annotation_mapping":
                     (prefix + "_peaks.chrom_state_annotation_mapping.csv", kwargs),
                 "chrom_state_annotation_b_mapping":
@@ -314,39 +309,42 @@ class ATACSeqAnalysis(Analysis):
          - peaks: simple union of all sites
          - summits: peak summits are extended by ``extension`` and a union is made,
 
-        Attributes:
-
-        :param list samples:
+        Parameters
+        ----------
+        samples : list
             Iterable of peppy.Sample objects to restrict to.
             Must have a `peaks` attribute set.
             Defaults to all samples in the analysis (`samples` attribute).
 
-        :param str region_type:
+        region_type : str
             The type of region to use to create the consensus region set - one of `summits` or `peaks`.
             If `summits`, peak summits will be extended by `extension` before union.
             Otherwise sample peaks will be used with no modification.
 
-        :param int extension:
+        extension : int
             Amount to extend peaks summits by in both directions.
 
-        :param str blacklist_bed:
+        blacklist_bed : str
             A (3 column) BED file with genomic positions to exclude from consensus peak set.
 
-        :param bool filter_chrM:
+        filter_chrM : bool
             Whether to exclude 'chrM' from peak set.
 
-        :param bool permissive:
+        permissive : bool
             Whether Samples that which `region_type` attribute file does not exist
             should be simply skipped or an error thrown.
 
-        :raises IOError:
+        Raises
+        ----------
+        IOError
             If not `permissive` and either the `peaks` or `summits` file
-            of a sample is not readable.
-            Or if `permissive` but none of the samples has an existing file.
+            of a sample is not readable, or if `permissive`
+            but none of the samples has an existing file.
 
-        :var pybedtools.BedTool sites:
+        Attributes
+        ----------
+        sites : pybedtools.BedTool
             Sets a `sites` variable with consensus peak set.
-        :returns: `None`
         """
         if region_type not in ['summits', 'peaks']:
             msg = "`region_type` attribute must be one of 'summits' or 'peaks'!"
@@ -426,16 +424,18 @@ class ATACSeqAnalysis(Analysis):
         """
         Set consensus (union) sites across samples given a BED file.
 
-        Attributes:
-
-        :param str bed_file:
+        Parameters
+        ----------
+        bed_file : str
             BED file to use as consensus sites.
 
-        :param book overwrite:
+        overwrite : book
             Whether a possibly existing file with a consensus peak set
             for this analysis should be overwritten in disk.
 
-        :var pybedtools.BedTool sites:
+        Attributes
+        ----------
+        sites : pybedtools.BedTool
             Sets a `sites` variable with consensus peak set.
         """
         self.sites = pybedtools.BedTool(bed_file)
@@ -456,28 +456,32 @@ class ATACSeqAnalysis(Analysis):
         In addition calculate a measure of peak support (or ubiquitouness) by
         observing the ratio of samples containing a peak overlapping each region.
 
-        Attributes:
-
-        :param list samples:
+        Parameters
+        ----------
+        samples : list
             Iterable of peppy.Sample objects to restrict to.
             Must have a `peaks` attribute set.
             If not provided (`None` is passed) if will default to all samples in the analysis (`samples` attribute).
 
-        :param str region_type:
+        region_type : str
             The type of region to use to create the consensus region set.
             One of `summits` or `peaks`.
             If `summits`, peak summits will be extended by `extension` before union.
             Otherwise sample peaks will be used with no modification.
 
-        :param bool permissive:
+        permissive : bool
             Whether Samples that which `region_type` attribute file does
             not exist should be simply skipped or an error thrown.
 
-        :raises IOError:
+        Raises
+        ----------
+        IOError
             If not `permissive` and either the `peaks` or `summits` file of a sample is not readable.
             Or if `permissive` but none of the samples has an existing file.
 
-        :var pandas.DataFrame support:
+        Attributes
+        ----------
+        support : pandas.DataFrame
             Sets a `support` variable with peak set overlap.
         """
         if samples is None:
@@ -526,12 +530,14 @@ class ATACSeqAnalysis(Analysis):
         Get mask of sites with 0 support in the given samples.
         Requires support matrix produced by `ngs_toolkit.atacseq.ATACSeqAnalysis.calculate_peak_support`.
 
-        Attributes:
-
-        :param list samples:
+        Parameters
+        ----------
+        samples : list
             Iterable of peppy.Sample objects to restrict to.
 
-        :returns pd.Series:
+        Returns
+        -------
+        pd.Series
             Boolean Pandas Series with sites with at least one of the given samples having a peak called.
         """
         if samples is None:
@@ -547,45 +553,51 @@ class ATACSeqAnalysis(Analysis):
         However, for many samples (hundreds), parallelization in a computing cluster is possible
         with the `distributed` option. Only supports SLURM clusters fow now though.
 
-        Attributes:
-
-        :param list samples:
+        Parameters
+        ----------
+        samples : list
             Iterable of peppy.Sample objects to restrict to. Must have a `filtered` attribute set.
             If not provided (`None` is passed) if will default to all samples in the analysis (`samples` attribute).
 
-        :param pybedtools.BedTool,pd.DataFrame,str sites:
+        sites : pybedtools.BedTool,pd.DataFrame,str
             Sites in the genome to quantify, usually a pybedtools.BedTool from analysis.get_consensus_sites()
             If a DataFrame, will try to convert to BED format assuming first three columns are chr,start,end.
             If a string assumes a path to a BED file.
             If `None` the object's `sites` attribute will be used.
 
-        :param bool assign:
+        assign : bool
             Whether to assign the matrix to an attribute of self named `coverage`.
 
-        :param bool save:
+        save : bool
             Whether to save to disk the coverage matrix with filename `output_file`.
 
-        :param str output_file:
+        output_file : str
             A path to a CSV file with coverage output.
             Default is `self.results_dir/self.name + "_peaks.raw_coverage.csv"`.
 
-        :param bool permissive:
+        permissive : bool
             Whether Samples that which `region_type` attribute file does not exist
             should be simply skipped or an error thrown.
 
-        :param bool distributed:
+        distributed : bool
             Whether it should be run as jobs for each sample separately in parallel.
             Currently only implemented for a SLURM cluster.
             Default False.
 
-        :raises IOError:
+        Raises
+        ----------
+        IOError
             If not `permissive` and the 'aligned_filtered_bam' file attribute of a sample is not readable.
             Or if `permissive` but none of the samples has an existing file.
 
-        :var pd.DataFrame coverage:
+        Attributes
+        ----------
+        coverage : pd.DataFrame
             Sets a `coverage` variable with DataFrame with read counts of shape (n_sites, m_samples).
 
-        :returns pd.DataFrame:
+        Returns
+        -------
+        pd.DataFrame
             Pandas DataFrame with read counts of shape (n_sites, m_samples).
         """
         from pypiper.ngstk import NGSTk
@@ -679,43 +691,48 @@ class ATACSeqAnalysis(Analysis):
 
         Importantly, it assumes all coverage files are ordered equally and that this order matches the order in `sites`!
 
-        Attributes:
-
-        :param list samples:
+        Parameters
+        ----------
+        samples : list
             Iterable of peppy.Sample objects to restrict to.
             If not provided (`None` is passed) if will default to all samples in the analysis (`samples` attribute).
 
-        :param pybedtools.BedTool,pd.DataFrame,str sites:
+        sites : pybedtools.BedTool,pd.DataFrame,str
             Sites in the genome to quantify, usually a pybedtools.BedTool from analysis.get_consensus_sites()
             If a DataFrame, will try to convert to BED format assuming first three columns are chr,start,end.
             If a string assumes a path to a BED file.
             If `None` the object's `sites` attribute will be used.
 
-        :param bool assign:
+        assign : bool
             Whether to assign the matrix to an attribute of self named `coverage`.
 
-        :param bool save:
+        save : bool
             Whether to save to disk the coverage matrix with filename `output_file`.
 
-        :param str output_file:
+        output_file : str
             A path to a CSV file with coverage output.
             Default is `self.results_dir/self.name + "_peaks.raw_coverage.csv"`.
 
-        :param bool permissive:
+        permissive : bool
             Whether Samples without an existing coverage file does not exist
             should be simply skipped or an error thrown.
 
-        :raises IOError:
+        Raises
+        ----------
+        IOError
             If not `permissive` and the coverage file of a sample is not readable.
             Or if `permissive` but none of the samples has an existing file.
 
-        :var pd.DataFrame coverage:
+        Attributes
+        ----------
+        coverage : pd.DataFrame
             Sets a `coverage` variable with DataFrame with read counts of shape (n_sites, m_samples).
 
-        :returns pd.DataFrame:
+        Returns
+        -------
+        pd.DataFrame
             Pandas DataFrame with read counts of shape (n_sites, m_samples).
         """
-        from ngs_toolkit.utils import bed_to_index
         if samples is None:
             samples = self.samples
 
@@ -759,28 +776,28 @@ class ATACSeqAnalysis(Analysis):
         """
         Normalization of matrix of (n_features, n_samples) by total in each sample.
 
-        Attributes:
-
-        :param str matrix:
+        Parameters
+        ----------
+        matrix : str
             Attribute name of matrix to normalize. Defaults to 'coverage'.
 
-        :param list samples:
+        samples : list
             Iterable of peppy.Sample objects to restrict matrix to.
             If not provided (`None` is passed) the matrix will not be subsetted.
 
-        :param float mult_factor:
+        mult_factor : float
             A constant to multiply values for.
 
-        :param bool log_transform:
+        log_transform : bool
             Whether to log transform values or not.
 
-        :param int|float pseudocount:
+        pseudocount : int|float
             A constant to add to values.
 
-        :param bool save:
+        save : bool
             Whether to write normalized DataFrame to disk.
 
-        :param bool assign:
+        assign : bool
             Whether to assign the normalized DataFrame to an attribute ``.
         """
         to_norm = self.get_matrix(matrix=matrix, samples=samples, matrix_name="coverage")
@@ -805,30 +822,30 @@ class ATACSeqAnalysis(Analysis):
         """
         Quantile normalization of matrix of (n_features, n_samples).
 
-        Attributes:
-
-        :param str matrix:
+        Parameters
+        ----------
+        matrix : str
             Attribute name of matrix to normalize. Defaults to 'coverage'.
 
-        :param list samples:
+        samples : list
             Iterable of peppy.Sample objects to restrict matrix to.
             If not provided (`None` is passed) the matrix will not be subsetted.
 
-        :param str implementation:
+        implementation : str
             One of `"R"` or `"Python"`. Dictates which implementation is to be used.
             The R implementation comes from the `preprocessCore` package,
             and the Python one is from https://github.com/ShawnLYU/Quantile_Normalize.
 
-        :param bool log_transform:
+        log_transform : bool
             Whether to log transform values or not.
 
-        :param float pseudocount:
+        pseudocount : float
             A constant to add before log transformation.
 
-        :param bool save:
+        save : bool
             Whether to write normalized DataFrame to disk.
 
-        :param bool assign:
+        assign : bool
             Whether to assign the normalized DataFrame to an attribute `coverage_qnorm`.
         """
         if matrix is None:
@@ -871,20 +888,22 @@ class ATACSeqAnalysis(Analysis):
         """
         Get length and GC content of features in region set.
 
-        :param str bed_file:
+        bed_file : str
             A BED file with regions to calculate GC content on. Must be a 3-column BED!
             If not provided the calculation will be for the analysis `sites` attribute.
 
-        :param str genome:
+        genome : str
             Genome assembly.
 
-        :param str fasta_file:
+        fasta_file : str
             Fasta file of `genome`. Preferably indexed. If not given, will try to download.
 
         :var nuc:
             DataFrame with nucleotide content and length of each region.
 
-        :returns pandas.DataFrame:
+        Returns
+        -------
+        pandas.DataFrame
             DataFrame with nucleotide content and length of each region.
         """
         if bed_file is None:
@@ -919,19 +938,19 @@ class ATACSeqAnalysis(Analysis):
             >>> source('http://bioconductor.org/biocLite.R')
             >>> biocLite('cqn')
 
-        Attributes:
-
-        :param str matrix:
+        Parameters
+        ----------
+        matrix : str
             Attribute name of matrix to normalize. Defaults to 'coverage'.
 
-        :param list samples:
+        samples : list
             Iterable of peppy.Sample objects to restrict matrix to.
             If not provided (`None` is passed) the matrix will not be subsetted.
 
-        :param bool save:
+        save : bool
             Whether to write normalized DataFrame to disk.
 
-        :param bool assign:
+        assign : bool
             Whether to assign the normalized DataFrame to an attribute ``.
         """
         def cqn(cov, gc_content, lengths):
@@ -988,9 +1007,9 @@ class ATACSeqAnalysis(Analysis):
         """
         Normalization of matrix of (n_features, n_samples).
 
-        Attributes:
-
-        :param str method:
+        Parameters
+        ----------
+        method : str
             Normalization method to apply. One of:
              - `total`: Reads per total normalization (RPM).
              - `quantile`: Quantile normalization and log2 transformation.
@@ -998,32 +1017,28 @@ class ATACSeqAnalysis(Analysis):
                              correction by regression (cqn R package)
                              and log2 transformation.
 
-        :param str matrix:
+        matrix : str
             Attribute name of matrix to normalize.
 
-        :param list samples:
+        samples : list
             Iterable of peppy.Sample objects to restrict matrix to.
             If not provided (`None` is passed) the matrix will not be subsetted.
 
-        :param bool save:
+        save : bool
             Whether to write normalized DataFrame to disk.
 
-        :param bool assign:
+        assign : bool
             Whether to assign the normalized DataFrame to an attribute
             (see variables below for each respective normalization type).
 
-        :var pd.DataFrame coverage_rpm:
-            If `assign` is True, `coverage_rpm` is a pandas DataFrame normalized with RPM.
+        Attributes
+        ----------
+        {coverage_rpm, coverage_qnorm, coverage_gc_corrected} : pd.DataFrame
+            If `assign` is True, a pandas DataFrame normalized with respective method.
 
-        :var pd.DataFrame coverage_qnorm:
-            If `assign` is True, `coverage_qnorm` is a pandas DataFrame normalized
-            with quantile normalization.
-
-        :var pd.DataFrame coverage_gc_corrected:
-            If `assign` is True, `coverage_gc_corrected` is a pandas DataFrame normalized
-            with GC correction and quantile normalization.
-
-        :returns pd.DataFrame:
+        Returns
+        -------
+        pd.DataFrame
             Normalized pandas DataFrame.
         """
         if method == "total":
@@ -1049,25 +1064,29 @@ class ATACSeqAnalysis(Analysis):
         attributes.
         A dataframe with each feature's distance to the nearest gene is also saved.
 
-        Attributes:
-
-        :param str tss_file:
+        Parameters
+        ----------
+        tss_file : str
             A valid BED file where the name field (4th column) identifies the gene
             and the strand column (6th column). Other fields will not be used.
 
-        :param int max_dist:
+        max_dist : int
             Maximum absolute distance allowed to perform associations.
             Regions with no genes within the range will have NaN values.
 
-        :var pd.DataFrame gene_annotation:
+        Attributes
+        ----------
+        gene_annotation : pd.DataFrame
             A pandas DataFrame containing the genome annotations of the region features.
             If a feature overlaps more than one gene, the two gene values will be concatenated with a comma.
 
-        :var pd.DataFrame closest_tss_distances:
+        closest_tss_distances : pd.DataFrame
             A pandas DataFrame containing unique region->gene associations.
             In contrast to gene_annotation dataframe, this contains one row per region->gene assignment.
 
-        :returns pandas.DataFrame:
+        Returns
+        -------
+        pandas.DataFrame
             A dataframe with genes annotated for the peak set.
         """
         cols = [6, 8, 9]
@@ -1140,26 +1159,24 @@ class ATACSeqAnalysis(Analysis):
         such data. For more customization of the annotations, use that function directly and pass
         the output file to this function.
 
-        Attributes:
-
-        :param str genomic_context_file:
+        Parameters
+        ----------
+        genomic_context_file : str
             A 4 column BED file (chrom, start, end, feature), where feature is a string with the type of region.
             If not provided will be get with the get_genomic_context function.
 
-        :var pd.DataFrame region_annotation:
-            A DataFrame with the genome annotations of the region features.
+        Attributes
+        ----------
+        region_annotation, region_annotation_b : pd.DataFrame
+            A DataFrame with the genome annotations of the region features or genome background.
 
-        :var pd.DataFrame region_annotation_b:
-            A DataFrame with the genome annotations of the genome background.
+        region_annotation_mapping, region_annotation_b_mapping : pd.DataFrame
+            A DataFrame with one row for each chromatin state-region mapping or genome background.
 
-        :var pd.DataFrame region_annotation_mapping:
-            A DataFrame with one row for each chromatin state-region mapping.
-
-        :var pd.DataFrame region_annotation_b_mapping:
-            A DataFrame with one row for each chromatin state-region mapping of the genome background.
-
-        :returns:
-            A dataframe with genomic context annotation for the peak set.
+        Returns
+        -------
+        pandas.DataFrame
+            The genomic context annotation for the peak set.
         """
 
         if genomic_context_file is None:
@@ -1221,29 +1238,29 @@ class ATACSeqAnalysis(Analysis):
         https://egg2.wustl.edu/roadmap/data/byFileType/chromhmmSegmentations/ChmmModels/coreMarks/jointModel/final/
         (the *_dense.bed.gz files are optimal).
 
-        Attributes:
-
-        :param str chrom_state_file:
+        Parameters
+        ----------
+        chrom_state_file : str
             A 4 column BED file (chrom, start, end, feature), where feature is a string with the type of region.
 
-        :param float frac:
+        frac : float
             Minimal fraction of region to overlap with a feature.
 
-        :var pd.DataFrame chrom_state_annotation:
-            A DataFrame with the chromatin state annotations of the region features.
+        Returns
+        ----------
+        pandas.DataFrame
+            The chromatin state annotation for the peak set.
 
-        :var pd.DataFrame chrom_state_annotation_b:
-            A DataFrame with the chromatin state annotations of the genome background.
+        Attributes
+        ----------
+        chrom_state_annotation, chrom_state_annotation_b : pd.DataFrame
+            A DataFrame with the chromatin state annotations of
+            the region features or of the genome background.
 
-        :var pd.DataFrame chrom_state_annotation_mapping:
-            A DataFrame with one row for each chromatin state-region mapping.
-
-        :var pd.DataFrame chrom_state_annotation_b_mapping:
-            A DataFrame with one row for each chromatin state-region mapping of the genome background.
-
-        :returns: A dataframe with chromatin state annotation for the peak set.
+        chrom_state_annotation_mapping, chrom_state_annotation_b_mapping : pd.DataFrame
+            A DataFrame with one row for each chromatin state-region mapping
+            or for the genome background.
         """
-
         states = pybedtools.BedTool(chrom_state_file)
 
         if isinstance(self.sites, str):
@@ -1288,15 +1305,19 @@ class ATACSeqAnalysis(Analysis):
         Gets a matrix of feature-wise (i.e. for every reg. element) statistics such
         across samples such as mean, variance, deviation, dispersion and amplitude.
 
-        Attributes:
-
-        :param str matrix:
+        Parameters
+        ----------
+        matrix : str
             Attribute name of matrix to normalize. Defaults to 'coverage'.
 
-        :var pd.DataFrame stats:
-            A DataFrame with statistics for each feature.
+        Returns
+        -------
+        pandas.DataFrame
+            Statistics for each feature.
 
-        :returns:
+        Attributes
+        ----------
+        stats : pd.DataFrame
             A DataFrame with statistics for each feature.
         """
         if samples is None:
@@ -1339,26 +1360,28 @@ class ATACSeqAnalysis(Analysis):
         If two annotation dataframes have equally named columns (e.g. chrom, start, end),
         the value of the first is kept.
 
-        Attributes:
-
-        :param list samples:
+        Parameters
+        ----------
+        samples : list
             Iterable of peppy.Sample objects to restrict matrix to.
             If not provided (`None` is passed) the matrix will not be subsetted.
             Calculated metrics will be restricted to these samples.
 
-        :param str quant_matrix:
+        quant_matrix : str
             Attribute name of matrix to annotate.
 
-        :param bool permissive:
+        permissive : bool
             Whether DataFrames that do not exist should be simply skipped or an error will be thrown.
 
-        :raises AttributeError:
+        Raises
+        ----------
+        AttributeError
             If not `permissive` a required DataFrame does not exist as an object attribute.
 
-        :var pd.DataFrame coverage_annotated:
+        Attributes
+        ----------
+        coverage_annotated : pd.DataFrame
             A pandas DataFrame containing annotations of the region features.
-
-        :returns: None
         """
         if samples is None:
             samples = self.samples
@@ -1386,7 +1409,7 @@ class ATACSeqAnalysis(Analysis):
                     _LOGGER.error(msg.format(matrix_name))
                     raise AttributeError(msg.format(matrix_name))
                 else:
-                    _LOGGER.info(msg.format(matrix_name) + " Proceeding anyway.")
+                    _LOGGER.debug(msg.format(matrix_name) + " Proceeding anyway.")
 
         if not hasattr(self, "coverage_annotated"):
             self.coverage_annotated = next_matrix
@@ -1410,8 +1433,19 @@ class ATACSeqAnalysis(Analysis):
         Requires a 'gene_annotation' attribute to be set containing a mapping between the
         index of `matrix` and genes (produced from `get_peak_gene_annotation`).
 
-        :param str matrix: Quantification matrix to be used (e.g. 'coverage' or 'accessibility')
-        :param func reduce_func: Function to apply to reduce values. Default is mean
+        Parameters
+        ----------
+        matrix : str
+            Quantification matrix to be used (e.g. 'coverage' or 'accessibility')
+
+        reduce_func : func
+            Function to apply to reduce values.
+            Default is mean.
+
+        Returns
+        ---------
+        pandas.DataFrame
+            Chromatin accessibility values reduced per gene.
         """
         msg = "Analysis object lacks 'gene_annotation' dataframe."
         hint = " Call 'analysis.get_peak_gene_annotation' to have region-gene associations."
@@ -1441,9 +1475,19 @@ class ATACSeqAnalysis(Analysis):
         Requires a 'gene_annotation' attribute to be set containing a mapping between
         the index of `matrix` and genes (produced from `get_peak_gene_annotation`).
 
-        :param pandas.DataFrame differential_results: Matrix with differential results to use.
+        Parameters
+        ----------
+        differential_results : pandas.DataFrame
+            Matrix with differential results to use.
             Default is a 'differential_results' attribute of self.
-        :param func reduce_func: Function to apply to reduce values. Default is mean
+
+        reduce_func : func
+            Function to apply to reduce values. Default is mean
+
+        Returns
+        ---------
+        pandas.DataFrame
+            Changes in chromatin accessibility (log2FoldChanges) reduced per gene.
         """
         msg = "Analysis object lacks 'gene_annotation' dataframe."
         hint = " Call 'analysis.get_peak_gene_annotation' to have region-gene associations."
@@ -1471,25 +1515,20 @@ class ATACSeqAnalysis(Analysis):
 
         Provides plots with Samples grouped `by_attribute` if given (a string or a list of strings).
         """
-        @staticmethod
         def get_sample_reads(bam_file):
             return pysam.AlignmentFile(bam_file).count()
 
-        @staticmethod
         def get_peak_number(bed_file):
             return len(open(bed_file, "r").read().split("\n"))
 
-        @staticmethod
         def get_total_open_chromatin(bed_file):
             peaks = pd.read_csv(bed_file, sep="\t", header=None)
             return (peaks.iloc[:, 2] - peaks.iloc[:, 1]).sum()
 
-        @staticmethod
         def get_peak_lengths(bed_file):
             peaks = pd.read_csv(bed_file, sep="\t", header=None)
             return (peaks.iloc[:, 2] - peaks.iloc[:, 1])
 
-        @staticmethod
         def get_peak_chroms(bed_file):
             peaks = pd.read_csv(bed_file, sep="\t", header=None)
             return peaks.iloc[:, 0].value_counts()
@@ -1717,17 +1756,16 @@ class ATACSeqAnalysis(Analysis):
         Diagnostic plots on the Sample's signal.
         Provides plots with Samples grouped `by_attribute` if given (a string or a list of strings).
 
-        # TODO: get matrix as input, move to graphics
-
-        Attributes:
-
-        :param list samples:
+        Parameters
+        ----------
+        samples : list
             List of peppy.Samples objects to use for plotting.
 
-        :param str,optional by_attribute:
+        by_attribute : str, optional
             Attribute of samples to group by.
             Values will be aggregated across samples by that attribute.
         """
+        # TODO: get matrix as input, move to graphics
         if samples is None:
             samples = self.samples
 
@@ -1874,44 +1912,41 @@ class ATACSeqAnalysis(Analysis):
         sns.jointplot('mean', "qv2", data=filtered)
         plt.savefig(os.path.join(self.results_dir, self.name + ".norm_counts_per_sample.support_vs_qv2.filtered.svg"), bbox_inches="tight")
 
-    def unsupervised(
-            self, args, **kwargs):
-        """
-        ATACSeqAnalysis.unsupervised is provided for backward compatibility only and will be removed in the future.
-        Please use ngs_toolkit.general.unsupervised_analysis(ATACSeqAnalysis) in the future.
-        """
-        _LOGGER.warning(PendingDeprecationWarning(
-            "ATACSeqAnalysis.unsupervised is provided for backward compatibility "
-            "only and will be removed. Please use "
-            "ngs_toolkit.general.unsupervised_analysis(ATACSeqAnalysis) "
-            "in the future."))
-
-        self.unsupervised_analysis(args, **kwargs)
-
     def region_context_enrichment(
             self, regions,
-            prefix="region_type_enrichment", output_dir="{results_dir}",
-            steps=['genomic_region', 'chromatin_state']):
+            steps=['genomic_region', 'chromatin_state'],
+            background="region_set",
+            prefix="region_type_enrichment", output_dir="{results_dir}"):
         """
         Characterize a subset of the regions (e.g. differential regions) in terms of their genomic context.
 
-        Attributes:
-
-        :param list|pandas.DataFrame|pandas.Index regions:
+        Parameters
+        ----------
+        regions : {list, pandas.DataFrame, pandas.Index}
             Subset of regions of interest to analysis.
             Must be a subset of the universe (i.e. `sites` attribute).
 
-        :param str,optional prefix:
-            Prefix for saved files.
-            Default is `region_type_enrichment`.
-
-        :param str,optional output_dir:
-            Directory to write results to.
-
-        :param list,optional steps:
+        steps : list, optional
             Steps of enrichment to perform.
             Defaults to all available: ['genomic_region', 'chromatin_state']
 
+        background : str, optional
+            Which set to consider as backgroud.
+            Options are:
+                region_set: the consensus region_set of the analysis
+                genome: a randomized set of size as region_set across the genome
+
+        prefix : str, optional
+            Prefix for saved files.
+            Default is `region_type_enrichment`.
+
+        output_dir : str, optional
+            Directory to write results to.
+
+        Returns
+        ---------
+        pandas.DataFrame
+            Enrichment results
         """
         output_dir = self._format_string_with_attributes(output_dir)
         if not os.path.exists(output_dir):
@@ -1928,45 +1963,62 @@ class ATACSeqAnalysis(Analysis):
             _LOGGER.error(msg)
             raise ValueError(msg)
 
-        #
-        tasks = list()
-        msg = "'{}' step selected, but analysis does not have '{}'."
-        for step, matrix in [
-            ("genomic_region", "region_annotation_mapping"),
-            ("chromatin_state", "chrom_state_annotation_mapping"),
-        ]:
-            if step in steps:
-                if hasattr(self, matrix):
-                    tasks.append(step, getattr(self, matrix))
-                else:
-                    _LOGGER.warning(msg.format(step, matrix))
+        options = ['region_set', "genome"]
+        if background not in options:
+            msg = "Option `background` must be one of {}.".format(", ".join(options))
+            raise ValueError(msg)
 
         # compare genomic regions and chromatin_states
-        enr = pd.DataFrame()
-        for var, annot in tasks:
-            _LOGGER.debug("Getting enrichment of regions in '{}'.".format(var))
-            res = annot.loc[set(regions), var].value_counts().to_frame('differential')
-            res = res.join(annot.loc[:, var].value_counts().to_frame(name="universe").squeeze())
+        enr = list()
+        msg = "'{}' step selected, but analysis does not have '{}'."
+        msg2 = "'genome' selected, but analysis does not have '{}'."
+        for step, matrix, matrix_b in [
+            ("genomic_region", "region_annotation_mapping", "region_annotation_b_mapping"),
+            ("chromatin_state", "chrom_state_annotation_mapping", "chrom_state_annotation_b_mapping"),
+        ]:
+            if step not in steps:
+                continue
+            if not hasattr(self, matrix):
+                _LOGGER.warning(msg.format(step, matrix))
+                continue
+
+            _LOGGER.debug("Getting enrichment of regions in '{}'.".format(step))
+
+            # Count foreground occurences
+            annot = getattr(self, matrix)
+            res = annot.loc[set(regions), step].value_counts().to_frame('foreground')
+
+            # Count background occurences
+            # # in case of background == 'genome', we simply replace the dataframes
+            if background == "genome":
+                try:
+                    annot = getattr(self, matrix_b)
+                except AttributeError:
+                    _LOGGER.warning(msg2.format(matrix_b))
+                    continue
+            res = res.join(annot.loc[:, step].value_counts().to_frame(name="universe").squeeze(), how="outer")
+
             # Calculate log fold enrichment:
             # # normalize to total:
-            res.loc[:, 'differential_fraction'] = res['differential'] / res['differential'].sum()
+            res.loc[:, 'foreground_fraction'] = res['foreground'] / res['foreground'].sum()
             res.loc[:, 'universe_fraction'] = res['universe'] / res['universe'].sum()
-            res.loc[:, 'log2_fold_change'] = np.log2(res['differential_fraction'] / res['universe_fraction'])
+            res.loc[:, 'log2_fold_change'] = np.log2(res['foreground_fraction'] / res['universe_fraction'])
             # Calculate overlap p-value:
-            for feature in res['differential'].index:
-                a = res['differential'][feature]
-                b = res['differential'].drop(feature).sum()
-                c = annot.loc[(~annot.index.isin(regions)), var].value_counts()[feature]
-                d = annot.loc[(~annot.index.isin(regions)), var].value_counts().drop(feature).sum()
+            for feature in res['foreground'].index:
+                a = res.loc[feature, 'foreground']
+                b = res.loc[:, 'foreground'].drop(feature).sum()
+                c = annot.loc[(~annot.index.isin(regions)), step].value_counts()[feature]
+                d = annot.loc[(~annot.index.isin(regions)), step].value_counts().drop(feature).sum()
                 res.loc[feature, 'odds_ratio'], res.loc[feature, 'p_value'] = fisher_exact(
                     [[a, c], [b, d]], alternative="two-sided")
             res.loc[:, 'log2_odds_ratio'] = np.log2(res['odds_ratio'])
             res.loc[:, '-log10(p-value)'] = log_pvalues(res['p_value'])
-            res.loc[:, 'region_type'] = var
+            res.loc[:, 'region_type'] = step
             # Append
-            enr = enr.append(res)
+            enr.append(res)
 
         # save
+        enr = pd.concat(enr)
         enr.index.name = "region"
         enr.to_csv(os.path.join(output_dir, prefix + ".csv"), index=True)
         return enr
@@ -1988,33 +2040,32 @@ class ATACSeqAnalysis(Analysis):
             - LOLA (R library)
         Additionally, some genome-specific databases are needed to run these programs.
 
-        Attributes:
-
-        :param differential:
+        Parameters
+        ----------
+        differential : pandas.DataFrame
             Results of differential analysis for a given comparison of interest.
 
-        :param output_dir:
-            Directory to output results
+        output_dir : str
+            Directory to output results to.
 
-        :param prefix:
+        prefix : str
             Prefix to use for output files.
 
-        :param universe_file:
+        universe_file : str, optional
             Path to BED file with set of universe regions where differential were selected from.
             Default is analysis.sites.
 
-        :param run:
+        run : bool, optional
             Whether to run enrichment commands now or to simply prepare the input files for it.
-            Default is True
+            Default is True.
 
-        :param genome:
+        genome : str, optional
             Genome assembly of analysis.
             Default is analysis' genome assembly.
 
-        :param steps:
+        steps : list, optional
             Which steps of the analysis to perform.
             Default is all: ['region', 'lola', 'meme', 'homer', 'enrichr']
-
         """
         from ngs_toolkit.general import get_genome_reference
         # use all sites as universe
@@ -2074,13 +2125,26 @@ class ATACSeqAnalysis(Analysis):
                 os.path.join(output_dir, "{}_genes.symbols.score.csv".format(prefix)),
                 index=False)
 
-        # Motifs
-        # de novo motif finding - enrichment
-        fasta_file = os.path.join(output_dir, "{}_regions.fa".format(prefix))
-
-        genome_2bit = get_genome_reference(
-            self.organism, file_format="2bit", overwrite=False)
-        bed_to_fasta(input_bed=bed_file, output_fasta=fasta_file, genome_2bit=genome_2bit)
+        # get fasta file with sequence underlying region
+        if ('meme' in steps) or ('homer' in steps):
+            hint = " Will not do motif enrichment analysis."
+            fasta_file = os.path.join(output_dir, "{}_regions.fa".format(prefix))
+            okay = False
+            for f in ['fasta', '2bit']:
+                try:
+                    genome_file = get_genome_reference(self.organism, file_format=f, overwrite=False)
+                    okay = True
+                except ValueError:
+                    pass
+            if not okay:
+                reason = "Could not get genome sequence file in either FASTA or 2bit format."
+                _LOGGER.warning(reason + hint)
+            else:
+                try:
+                    bed_to_fasta(input_bed=bed_file, output_fasta=fasta_file, genome_file=genome_file)
+                except EnvironmentError:
+                    reason = "Could not get FASTA sequence."
+                    _LOGGER.warning(reason + hint)
 
         if not run:
             return
@@ -2089,15 +2153,18 @@ class ATACSeqAnalysis(Analysis):
             self.region_context_enrichment(
                 differential, output_dir=output_dir)
 
+        # MEME
         if "meme" in steps:
             _LOGGER.info("Running MEME-AME for '{}'".format(prefix))
             omap = {"hg38": "human", "hg19": "human", "mm10": "mouse"}
             meme_ame(fasta_file, output_dir, organism=omap[genome])
+
+        # HOMER
         if "homer" in steps:
             _LOGGER.info("Running HOMER for '{}'".format(prefix))
             homer_motifs(bed_file, output_dir, genome=genome)
 
-        # Lola
+        # LOLA
         if 'lola' in steps:
             _LOGGER.info("Running LOLA for '{}'".format(prefix))
             try:
@@ -2112,1204 +2179,3 @@ class ATACSeqAnalysis(Analysis):
             results.to_csv(
                 os.path.join(output_dir, "{}_regions.enrichr.csv".format(prefix)),
                 index=False, encoding='utf-8')
-
-
-def nucleosome_changes(analysis, samples):
-    # select only ATAC-seq samples
-    df = analysis.prj.sheet.df[analysis.prj.sheet.df["library"] == "ATAC-seq"]
-
-    groups = list()
-    for attrs, _ in df.groupby(["library", "cell_line", "knockout", "clone"]).groups.items():
-        name = "_".join([a for a in attrs if not pd.isnull(a)])
-        groups.append(name)
-    groups = sorted(groups)
-
-    # nucleosomes per sample
-    nucpos_metrics = {
-        "z-score": 4,
-        "nucleosome_occupancy_estimate": 5,
-        "lower_bound_for_nucleosome_occupancy_estimate": 6,
-        "upper_bound_for_nucleosome_occupancy_estimat": 7,
-        "log_likelihood_ratio": 8,
-        "normalized_nucleoatac_signal": 9,
-        "cross-correlation_signal_value_before_normalization": 10,
-        "number_of_potentially_nucleosome-sized_fragments": 11,
-        "number_of_fragments_smaller_than_nucleosome_sized": 12,
-        "fuzziness": 13
-    }
-    # nucleosome-free regions per sample
-    nfrpos_metrics = {
-        "mean_occupancy": 4,
-        "minimum_upper_bound_occupancy": 5,
-        "insertion_density": 6,
-        "bias_density": 7,
-    }
-    for data_type, metrics in [("nucpos", nucpos_metrics), ("nfrpos", nfrpos_metrics)]:
-        figs = list()
-        axizes = list()
-        for metric in metrics:
-            fig, axis = plt.subplots(5, 6, figsize=(6 * 4, 5 * 4), sharex=True, sharey=True)
-            figs.append(fig)
-            axizes.append(axis.flatten())
-
-        counts = pd.Series()
-        for i, group in enumerate(groups):
-            _LOGGER.info("{}, {}".format(data_type, group))
-            s = pd.read_csv(
-                os.path.join("results", "nucleoatac", group, group + ".{}.bed.gz".format(data_type)),
-                sep="\t", header=None)
-            counts[group] = s.shape[0]
-
-            for j, (metric, col) in enumerate(metrics.items()):
-                _LOGGER.info(data_type, group, metric, col)
-                sns.distplot(s[col - 1].dropna(), hist=False, ax=axizes[j][i])
-                axizes[j][i].set_title(group)
-
-        for i, metric in enumerate(metrics):
-            sns.despine(figs[i])
-            figs[i].savefig(os.path.join("results", "nucleoatac", "plots", "{}.{}.svg".format(data_type, metric)), bbox_inches="tight")
-
-        fig, axis = plt.subplots(1, 1, figsize=(1 * 4, 1 * 4))
-        sns.barplot(counts, counts.index, orient="horizontal", ax=axis, color=sns.color_palette("colorblind")[0])
-        axis.set_yticklabels(axis.get_yticklabels(), rotation=0)
-        axis.set_xlabel("Calls")
-        sns.despine(fig)
-        fig.savefig(os.path.join("results", "nucleoatac", "plots", "{}.count_per_sample.svg".format(data_type)), bbox_inches="tight")
-
-    # fragment distribution
-    for data_type in ["InsertionProfile", "InsertSizes", "fragmentsizes"]:
-        fig, axis = plt.subplots(5, 6, figsize=(6 * 4, 5 * 4))
-        axis = axis.flatten()
-
-        data = pd.DataFrame()
-        for i, group in enumerate(groups):
-            _LOGGER.info("{}, {}".format(data_type, group))
-            s = pd.read_csv(
-                os.path.join("results", "nucleoatac", group, group + ".{}.txt".format(data_type)),
-                sep="\t", header=None, squeeze=True, skiprows=5 if data_type == "fragmentsizes" else 0)
-            if data_type == "InsertionProfile":
-                a = (len(s.index) - 1) / 2.
-                s.index = np.arange(-a, a + 1)
-            if data_type == "fragmentsizes":
-                s = s.squeeze()
-            data[group] = s
-
-            axis[i].plot(s)
-            axis[i].set_title(group)
-        sns.despine(fig)
-        fig.savefig(os.path.join("results", "nucleoatac", "plots", "{}.svg".format(data_type)), bbox_inches="tight")
-
-        norm_data = data.apply(lambda x: x / data['ATAC-seq_HAP1_WT_C631'])
-        if data_type == "fragmentsizes":
-            norm_data = norm_data.loc[50:, :]
-        fig, axis = plt.subplots(5, 6, figsize=(6 * 4, 5 * 4), sharey=True)
-        axis = axis.flatten()
-        for i, group in enumerate(groups):
-            _LOGGER.info("{}, {}".format(data_type, group))
-            axis[i].plot(norm_data[group])
-            axis[i].set_title(group)
-        sns.despine(fig)
-        fig.savefig(os.path.join("results", "nucleoatac", "plots", "{}.WT_norm.svg".format(data_type)), bbox_inches="tight")
-
-    # Vplots and
-    v_min, v_max = (105, 251)
-    # Vplots over WT
-    for data_type in ["VMat"]:
-        fig, axis = plt.subplots(5, 6, figsize=(6 * 4, 5 * 4))
-        fig2, axis2 = plt.subplots(5, 6, figsize=(6 * 4, 5 * 4), sharey=True)
-        axis = axis.flatten()
-        axis2 = axis2.flatten()
-
-        group = 'ATAC-seq_HAP1_WT_C631'
-        wt = pd.read_csv(
-            os.path.join("results", "nucleoatac", group, group + ".{}".format(data_type)),
-            sep="\t", header=None, skiprows=7)
-        wt.index = np.arange(v_min, v_max)
-        a = (len(wt.columns) - 1) / 2.
-        wt.columns = np.arange(-a, a + 1)
-        wt = wt.loc[0:300, :]
-
-        for i, group in enumerate(groups):
-            _LOGGER.info("{}, {}".format(data_type, group))
-            m = pd.read_csv(
-                os.path.join("results", "nucleoatac", group, group + ".{}".format(data_type)),
-                sep="\t", header=None, skiprows=7)
-            m.index = np.arange(v_min, v_max)
-            a = (len(m.columns) - 1) / 2.
-            m.columns = np.arange(-a, a + 1)
-            m = m.loc[0:300, :]
-
-            n = m / wt
-
-            axis[i].imshow(m.sort_index(ascending=False))
-            axis[i].set_title(group)
-            axis2[i].imshow(n.sort_index(ascending=False))
-            axis2[i].set_title(group)
-        sns.despine(fig)
-        sns.despine(fig2)
-        fig.savefig(os.path.join("results", "nucleoatac", "plots", "{}.svg".format(data_type)), bbox_inches="tight")
-        fig2.savefig(os.path.join("results", "nucleoatac", "plots", "{}.WT_norm.svg".format(data_type)), bbox_inches="tight")
-
-
-def investigate_nucleosome_positions(self, samples, cluster=True):
-    df = self.prj.sheet.df[self.prj.sheet.df["library"] == "ATAC-seq"]
-    groups = list()
-    for attrs, index in df.groupby(["library", "cell_line", "knockout", "clone"]).groups.items():
-        name = "_".join([a for a in attrs if not pd.isnull(a)])
-        groups.append(name)
-    groups = sorted(groups)
-
-    def get_differential(diff, conditions_for, directions_for):
-        # filter conditions
-        d = diff[diff['comparison'].isin(conditions_for)]
-
-        # filter directions
-        d = pd.concat([d[f(d['log2FoldChange'], x)] for f, x in directions_for])
-
-        # make bed format
-        df = pd.Series(d.index.str.split(":")).apply(lambda x: pd.Series([x[0]] + x[1].split("-"))).drop_duplicates().reset_index(drop=True)
-        df[0] = df[0].astype(str)
-        df[1] = df[1].astype(np.int64)
-        df[2] = df[2].astype(np.int64)
-        return df
-
-    def center_window(bedtool, width=1000):
-        chroms = ["chr" + str(x) for x in range(1, 23)] + ["chrX", "chrY"]
-
-        sites = list()
-        for site in bedtool:
-            if site.chrom in chroms:
-                mid = site.start + ((site.end - site.start) / 2)
-                sites.append(pybedtools.Interval(site.chrom, mid - (width / 2), (mid + 1) + (width / 2)))
-        return pybedtools.BedTool(sites)
-
-    def center_series(series, width=1000):
-        mid = series[1] + ((series[2] - series[1]) / 2)
-        return pd.Series([series[0], mid - (width / 2), (mid + 1) + (width / 2)])
-
-    # Regions to look at
-    regions_pickle = os.path.join(self.results_dir, "nucleoatac", "all_types_of_regions.pickle")
-    if os.path.exists(regions_pickle):
-        regions = pickle.load(open(regions_pickle, "rb"))
-    else:
-        regions = dict()
-        # All accessible sites
-        out = os.path.join(self.results_dir, "nucleoatac", "all_sites.bed")
-        center_window(self.sites).to_dataframe()[['chrom', 'start', 'end']].to_csv(out, index=False, header=None, sep="\t")
-        regions["all_sites"] = out
-
-        # get bed file of promoter proximal sites
-        promoter_sites = os.path.join(self.results_dir, "nucleoatac", "promoter_proximal.bed")
-        self.coverage_annotated[self.coverage_annotated['distance'].astype(int) < 5000][['chrom', 'start', 'end']].to_csv(
-            promoter_sites, index=False, header=None, sep="\t")
-        regions["promoter"] = promoter_sites
-
-        # All accessible sites - that are distal
-        out = os.path.join(self.results_dir, "nucleoatac", "distal_sites.bed")
-        (
-            center_window(
-                self.sites.intersect(pybedtools.BedTool(promoter_sites), v=True, wa=True))
-            .to_dataframe()[['chrom', 'start', 'end']].to_csv(out, index=False, header=None, sep="\t"))
-        regions["distal_sites"] = out
-
-        # Differential sites
-        diff = pd.read_csv(os.path.join("results", "deseq_knockout", "deseq_knockout.knockout.csv"), index_col=0)
-        diff = diff[(diff["padj"] < 0.01) & (abs(diff["log2FoldChange"]) > 1.)]
-
-        # Loosing accessibility with ARID1A/SMARCA4 KO
-        less_ARID1ASMARCA4 = get_differential(
-            diff,
-            ['ARID1A-WT', 'SMARCA4-WT'],
-            [(np.less_equal, -1), (np.less_equal, -1)]).apply(center_series, axis=1)
-        out = os.path.join(self.results_dir, "nucleoatac", "diff_sites.less_ARID1ASMARCA4.bed")
-        less_ARID1ASMARCA4.to_csv(out, index=False, header=None, sep="\t")
-        regions["diff_sites.less_ARID1ASMARCA4"] = out
-
-        # Gaining accessibility with ARID1A/SMARCA4 KO
-        more_ARID1ASMARCA4 = get_differential(
-            diff,
-            ['ARID1A-WT', 'SMARCA4-WT'],
-            [(np.greater_equal, 1), (np.greater_equal, 1)]).apply(center_series, axis=1)
-        out = os.path.join(self.results_dir, "nucleoatac", "diff_sites.more_ARID1ASMARCA4.bed")
-        more_ARID1ASMARCA4.to_csv(out, index=False, header=None, sep="\t")
-        regions["diff_sites.more_ARID1ASMARCA4"] = out
-
-        # TFBSs
-        tfs = ["CTCF", "BCL", "SMARC", "POU5F1", "SOX2", "NANOG", "TEAD4"]
-        for tf in tfs:
-            tf_bed = pybedtools.BedTool("/home/arendeiro/resources/genomes/hg19/motifs/TFs/{}.true.bed".format(tf))
-            out = os.path.join(self.results_dir, "nucleoatac", "tfbs.%s.bed" % tf)
-            center_window(tf_bed.intersect(self.sites, wa=True)).to_dataframe()[['chrom', 'start', 'end']].to_csv(out, index=False, header=None, sep="\t")
-            regions["tfbs.%s" % tf] = out
-
-        pickle.dump(regions, open(regions_pickle, "wb"))
-
-    # Launch jobs
-    for group in groups:
-        output_dir = os.path.join(self.results_dir, "nucleoatac", group)
-
-        # Signals to measure in regions
-        signal_files = [
-            ("signal", os.path.join(self.data_dir, "merged", group + ".merged.sorted.bam")),
-            ("nucleosome", os.path.join(self.data_dir, "merged", group + ".nucleosome_reads.bam")),
-            ("nucleosome_free", os.path.join(self.data_dir, "merged", group + ".nucleosome_free_reads.bam")),
-            ("nucleoatac", os.path.join("results", "nucleoatac", group, group + ".nucleoatac_signal.smooth.bedgraph.gz")),
-            ("dyads", os.path.join("results", "nucleoatac", group, group + ".nucpos.bed.gz"))
-        ]
-        for region_name, bed_file in regions.items():
-            for label, signal_file in signal_files:
-                _LOGGER.info(group, region_name, label)
-                # run job
-                run_coverage_job(bed_file, signal_file, label, ".".join([group, region_name, label]), output_dir, window_size=2001)
-                # run vplot
-                if label == "signal":
-                    run_vplot_job(bed_file, signal_file, ".".join([group, region_name, label]), output_dir)
-
-    # Collect signals
-    signals = pd.DataFrame(columns=['group', 'region', 'label'])
-    # signals = pd.read_csv(os.path.join(self.results_dir, "nucleoatac", "collected_coverage.csv"))
-
-    for group in [g for g in groups if any([re.match(".*%s.*" % x, g) for x in ["C631", "HAP1_ARID1", "HAP1_SMARCA"]])]:
-        output_dir = os.path.join(self.results_dir, "nucleoatac", group)
-        signal_files = [
-            # ("signal", os.path.join(self.data_dir, "merged", group + ".merged.sorted.bam")),
-            # ("nucleosome", os.path.join(self.data_dir, "merged", group + ".nucleosome_reads.bam")),
-            # ("nucleosome_free", os.path.join(self.data_dir, "merged", group + ".nucleosome_free_reads.bam")),
-            ("nucleoatac", os.path.join("results", "nucleoatac", group, group + ".nucleoatac_signal.smooth.bedgraph.gz")),
-            # ("dyads", os.path.join("results", "nucleoatac", group, group + ".nucpos.bed.gz"))
-        ]
-        for region_name, bed_file in [regions.items()[-1]]:
-            for label, signal_file in signal_files:
-                # Skip already done
-                if len(signals[
-                        (signals["group"] == group) &
-                        (signals["region"] == region_name) &
-                        (signals["label"] == label)
-                ]) > 0:
-                    print("Continuing", group, region_name, label)
-                    continue
-
-                _LOGGER.info(group, region_name, label)
-                df = pd.read_csv(os.path.join(output_dir, "{}.coverage_matrix.csv".format(".".join([group, region_name, label, label]))), index_col=0)
-                df = df.mean(0).reset_index(name="value").rename(columns={"index": "distance"})
-                df["group"] = group
-                df["region"] = region_name
-                df["label"] = label
-                signals = signals.append(df, ignore_index=True)
-    signals.to_csv(os.path.join(self.results_dir, "nucleoatac", "collected_coverage.csv"), index=False)
-
-    signals = pd.read_csv(os.path.join(self.results_dir, "nucleoatac", "collected_coverage.csv"))
-
-    signals = signals[(signals["distance"] > -400) & (signals["distance"] < 400)]
-
-    # plot together
-    region_order = sorted(signals["region"].unique(), reverse=True)
-    group_order = sorted(signals["group"].unique(), reverse=True)
-    label_order = sorted(signals["label"].unique(), reverse=True)
-
-    # raw
-    g = sns.FacetGrid(signals, hue="group", col="region", row="label", hue_order=group_order, row_order=label_order, col_order=region_order, sharex=False, sharey=False)
-    g.map(plt.plot, "distance", "value")
-    g.add_legend()
-    g.savefig(os.path.join(self.results_dir, "nucleoatac", "plots", "collected_coverage.raw_mean_coverage.svg"), bbox_inches="tight")
-
-    # normalized
-    signals["norm_values"] = signals.groupby(["region", "label", "group"])["value"].apply(lambda x: (x - x.mean()) / x.std())
-
-    g = sns.FacetGrid(signals, hue="group", col="region", row="label", hue_order=group_order, row_order=label_order, col_order=region_order, sharex=False, sharey=False)
-    g.map(plt.plot, "distance", "norm_values")
-    g.add_legend()
-    g.savefig(os.path.join(self.results_dir, "nucleoatac", "plots", "collected_coverage.norm_mean_coverage.svg"), bbox_inches="tight")
-
-    # normalized smoothed
-    signals["norm_smooth_values"] = signals.groupby(["region", "label", "group"])["value"].apply(lambda x: pd.rolling_window(((x - x.mean()) / x.std()), 10))
-
-    g = sns.FacetGrid(signals, hue="group", col="region", row="label", hue_order=group_order, row_order=label_order, col_order=region_order, sharex=False, sharey=False)
-    g.map(plt.plot, "distance", "norm_smooth_values")
-    g.add_legend()
-    g.savefig(os.path.join(self.results_dir, "nucleoatac", "plots", "collected_coverage.norm_mean_coverage.smooth.svg"), bbox_inches="tight")
-
-    #
-    # specific regions/samples
-    specific_signals = signals[
-        (signals["group"].str.contains("ARID1|SMARCA|C631")) &
-        (~signals["group"].str.contains("OV90|GFP")) &
-
-        # (signals["region"].str.contains("diff_sites")) &
-
-        (signals["label"] == "nucleoatac")
-    ]
-
-    region_order = sorted(specific_signals["region"].unique(), reverse=True)
-    group_order = sorted(specific_signals["group"].unique(), reverse=True)
-    label_order = sorted(specific_signals["label"].unique(), reverse=True)
-
-    g = sns.FacetGrid(specific_signals, hue="group", col="region", col_wrap=4, hue_order=group_order, row_order=label_order, col_order=region_order, sharex=False, sharey=False)
-    g.map(plt.plot, "distance", "value")
-    g.add_legend()
-    g.savefig(os.path.join(self.results_dir, "nucleoatac", "plots", "collected_coverage.specific.extended.svg"), bbox_inches="tight")
-
-    # normalized (centered), zoom in center
-    specific_signals["norm_values"] = specific_signals.groupby(["region", "label", "group"])["value"].apply(lambda x: (x - x.mean()) / x.std())
-    specific_signals = specific_signals[
-        (specific_signals["distance"] < 200) &
-        (specific_signals["distance"] > -200)]
-    g = sns.FacetGrid(specific_signals, hue="group", col="region", row="label", hue_order=group_order, row_order=label_order, col_order=region_order, sharex=False, sharey=False)
-    g.map(plt.plot, "distance", "norm_values")
-    g.add_legend()
-    g.savefig(os.path.join(self.results_dir, "nucleoatac", "plots", "collected_coverage.specific.norm.svg"), bbox_inches="tight")
-
-    #
-
-    # Violinplots of nucleosome occupancies
-
-    # Heatmap of nucleosome occupancies
-    # Collect signals
-    sel_groups = [x for x in groups if "OV90" not in x and "GFP" not in x and ("ARID1" in x or "SMARCA" in x or "WT" in x)]
-    regions = pickle.load(open(regions_pickle, "rb"))
-    sel_regions = {k: v for k, v in regions.items() if "diff" in k}
-
-    # get parameters based on WT accessibility
-    region_order = dict()
-    region_vmax = dict()
-    region_norm_vmax = dict()
-    output_dir = os.path.join(self.results_dir, "nucleoatac", "ATAC-seq_HAP1_WT_C631")
-    for region_name in sel_regions.keys():
-        df = pd.read_csv(os.path.join(output_dir, "{}.coverage_matrix.csv".format(".".join(["ATAC-seq_HAP1_WT_C631", region_name, "nucleoatac", "nucleoatac"]))), index_col=0)
-        # vmax
-        region_vmax[region_name] = np.percentile(df, 95)
-        region_norm_vmax[region_name] = np.percentile((df - df.mean(0)) / df.std(0), 95)
-        # region order
-        region_order[region_name] = df.sum(axis=1).sort_values().index  # sorted by mean
-        # region_order[region_name] = g.dendrogram_row.dendrogram
-
-    # plot all
-    fig, axis = plt.subplots(len(sel_regions), len(sel_groups), figsize=(len(sel_groups) * 4, len(sel_regions) * 4))
-    fig2, axis2 = plt.subplots(len(sel_regions), len(sel_groups), figsize=(len(sel_groups) * 4, len(sel_regions) * 4))
-    for j, group in enumerate(sorted(sel_groups, reverse=True)):
-        output_dir = os.path.join(self.results_dir, "nucleoatac", group)
-        signal_files = [
-            ("nucleoatac", os.path.join("results", "nucleoatac", group, group + ".nucleoatac_signal.smooth.bedgraph.gz"))
-        ]
-        for i, (region_name, bed_file) in enumerate(sel_regions.items()):
-            for label, signal_file in signal_files:
-                _LOGGER.info("{}, {}, {}".format(group, region_name, label))
-                df = pd.read_csv(os.path.join(output_dir, "{}.coverage_matrix.csv".format(".".join([group, region_name, label, label]))), index_col=0)
-
-                d = df.ix[region_order[region_name]]
-                axis[i, j].imshow(
-                    d,
-                    norm=None, cmap="inferno", vmax=region_vmax[region_name], extent=[-500, 500, 0, 10], aspect="auto")  # aspect=100
-                d_norm = (d - d.mean(0)) / d.std(0)
-                axis2[i, j].imshow(
-                    d_norm,
-                    norm=None, cmap="inferno", vmax=region_norm_vmax[region_name], extent=[-500, 500, 0, 10], aspect="auto")  # aspect=100
-                for ax in [axis, axis2]:
-                    ax[i, j].set_title(group)
-                    ax[i, j].set_xlabel("distance")
-                    ax[i, j].set_ylabel(region_name)
-    sns.despine(fig, top=True, right=True, left=True, bottom=True)
-    sns.despine(fig2, top=True, right=True, left=True, bottom=True)
-    fig.savefig(os.path.join(self.results_dir, "nucleoatac", "plots", "collected_coverage.specific.heatmap.png"), bbox_inches="tight", dpi=300)
-    fig.savefig(os.path.join(self.results_dir, "nucleoatac", "plots", "collected_coverage.specific.heatmap.svg"), bbox_inches="tight")
-    fig2.savefig(os.path.join(self.results_dir, "nucleoatac", "plots", "collected_coverage.specific.heatmap.centered.png"), bbox_inches="tight", dpi=300)
-    fig2.savefig(os.path.join(self.results_dir, "nucleoatac", "plots", "collected_coverage.specific.heatmap.centered.svg"), bbox_inches="tight")
-
-
-def phasograms(self, samples, max_dist=10000, rolling_window=50, plotting_window=(0, 500)):
-    from ngs_toolkit.general import detect_peaks
-    from scipy.ndimage.filters import gaussian_filter1d
-
-    df = self.prj.sheet.df[self.prj.sheet.df["library"] == "ATAC-seq"]
-    groups = list()
-    for attrs, index in df.groupby(["library", "cell_line", "knockout", "clone"]).groups.items():
-        name = "_".join([a for a in attrs if not pd.isnull(a)])
-        groups.append(name)
-    groups = sorted(groups)
-
-    def difference_matrix(a):
-        x = np.reshape(a, (len(a), 1))
-        return x - x.transpose()
-
-    distances = dict()
-
-    for group in groups:
-        _LOGGER.info(group)
-        # Get dyad calls from nucleoatac
-        df = pd.read_csv(os.path.join(self.results_dir, "nucleoatac", group, group + ".nucpos.bed.gz"), sep="\t", header=None)
-
-        # separate by chromosome (groupby?)
-        # count pairwise distance
-        dists = list()
-        for chrom in df[0].unique():
-            d = abs(difference_matrix(df[df[0] == chrom][1]))
-            dd = d[(d < max_dist) & (d != 0)]
-            dists += dd.tolist()
-        distances[group] = dists
-
-    pickle.dump(distances, open(os.path.join(self.results_dir, "nucleoatac", "phasogram.distances.pickle"), "wb"), protocol=pickle.HIGHEST_PROTOCOL)
-    distances = pickle.load(open(os.path.join(self.results_dir, "nucleoatac", "phasogram.distances.pickle"), "rb"))
-
-    # Plot distances between dyads
-    n_rows = n_cols = int(np.ceil(np.sqrt(len(groups))))
-    n_rows -= 1
-    fig, axis = plt.subplots(n_rows, n_cols, sharex=True, sharey=True, figsize=(n_cols * 3, n_rows * 2))
-    fig2, axis2 = plt.subplots(n_rows, n_cols, sharex=True, sharey=True, figsize=(n_cols * 3, n_rows * 2))
-    axis = axis.flatten()
-    axis2 = axis2.flatten()
-    for i, group in enumerate(groups):
-        # Count frequency of dyad distances
-        x = pd.Series(distances[group])
-        y = x.value_counts().sort_index()
-        y = y.ix[range(plotting_window[0], plotting_window[1])]
-        y /= y.sum()
-
-        # Find peaks
-        y2 = pd.Series(gaussian_filter1d(y, 5), index=y.index)
-        peak_indices = detect_peaks(y2.values, mpd=73.5)[:3]
-        _LOGGER.info("{}, {}".format(group, y2.iloc[peak_indices].index))
-
-        # Plot distribution and peaks
-        axis[i].plot(y.index, y, color="black", alpha=0.6, linewidth=0.5)
-        axis[i].plot(y2.index, y2, color=sns.color_palette("colorblind")[0], linewidth=1)
-        axis[i].scatter(y2.iloc[peak_indices].index, y2.iloc[peak_indices], s=25, color="orange")
-        for peak in y2.iloc[peak_indices].index:
-            axis[i].axvline(peak, color="black", linestyle="--")
-        axis[i].set_title(group)
-
-        # Transform into distances between nucleosomes
-        # Plot distribution and peaks
-        axis2[i].plot(y.index - 147, y, color="black", alpha=0.6, linewidth=0.5)
-        axis2[i].plot(y2.index - 147, y2, color=sns.color_palette("colorblind")[0], linewidth=1)
-        axis2[i].scatter(y2.iloc[peak_indices].index - 147, y2.iloc[peak_indices], s=25, color="orange")
-        for peak in y2.iloc[peak_indices].index:
-            axis2[i].axvline(peak - 147, color="black", linestyle="--")
-        axis2[i].set_title(group)
-    sns.despine(fig)
-    sns.despine(fig2)
-    fig.savefig(os.path.join(self.results_dir, "nucleoatac", "plots", "phasograms.dyad_distances.peaks.svg"), bbox_inches="tight")
-    fig2.savefig(os.path.join(self.results_dir, "nucleoatac", "plots", "phasograms.nucleosome_distances.peaks.svg"), bbox_inches="tight")
-
-    # Get NFR per knockout
-    lengths = dict()
-
-    for group in groups:
-        _LOGGER.info(group)
-        # Get NFR calls from nucleoatac
-        df = pd.read_csv(os.path.join(self.results_dir, "nucleoatac", group, group + ".nfrpos.bed.gz"), sep="\t", header=None)
-        # Get lengths
-        lengths[group] = (df[2] - df[1]).tolist()
-
-    pickle.dump(lengths, open(os.path.join(self.results_dir, "nucleoatac", "nfr.lengths.pickle"), "wb"), protocol=pickle.HIGHEST_PROTOCOL)
-    lengths = pickle.load(open(os.path.join(self.results_dir, "nucleoatac", "nfr.lengths.pickle"), "rb"))
-
-    # plot NFR lengths
-    n_rows = n_cols = int(np.ceil(np.sqrt(len(groups))))
-    n_rows -= 1
-    fig, axis = plt.subplots(n_rows, n_cols, sharex=True, sharey=True, figsize=(n_cols * 3, n_rows * 2))
-    axis = axis.flatten()
-    for i, group in enumerate(groups):
-        # Count NFR lengths
-        x = pd.Series(lengths[group])
-        y = x.value_counts().sort_index()
-        y = y.ix[range(plotting_window[0], 300)]
-        y /= y.sum()
-
-        # Find peaks
-        y2 = pd.Series(gaussian_filter1d(y, 5), index=y.index)
-        peak_indices = [detect_peaks(y2.values, mpd=73.5)[0]]
-        _LOGGER.info("{}, {}".format(group, y2.iloc[peak_indices].index))
-
-        # Plot distribution and peaks
-        axis[i].plot(y.index, y, color="black", alpha=0.6, linewidth=0.5)
-        axis[i].plot(y2.index, y2, color=sns.color_palette("colorblind")[0], linewidth=1)
-        axis[i].scatter(y2.iloc[peak_indices].index, y2.iloc[peak_indices], s=25, color="orange")
-        for peak in y2.iloc[peak_indices].index:
-            axis[i].axvline(peak, color="black", linestyle="--")
-        axis[i].set_title(group)
-
-    sns.despine(fig)
-    fig.savefig(os.path.join(self.results_dir, "nucleoatac", "plots", "phasograms.nfr_lengths.peaks.svg"), bbox_inches="tight")
-
-
-def run_coverage_job(bed_file, bam_file, coverage_type, name, output_dir, window_size=1001):
-    from pypiper import NGSTk
-    tk = NGSTk()
-    job_file = os.path.join(output_dir, "%s.run_enrichment.sh" % name)
-    log_file = os.path.join(output_dir, "%s.run_enrichment.log" % name)
-
-    cmd = """#!/bin/bash
-#SBATCH --partition=shortq
-#SBATCH --ntasks=1
-#SBATCH --time=12:00:00
-
-#SBATCH --cpus-per-task=2
-#SBATCH --mem=8000
-#SBATCH --nodes=1
-
-#SBATCH --job-name=baf-kubicek-run_enrichment_{}
-#SBATCH --output={}
-
-#SBATCH --mail-type=end
-#SBATCH --mail-user=
-
-# Start running the job
-hostname
-date
-
-cd /home/arendeiro/baf-kubicek/
-
-python /home/arendeiro/jobs/run_profiles.py \
---bed-file {} \
---bam-file {} \
---coverage-type {} \
---window-size {} \
---name {} \
---output-dir {}
-
-date
-""".format(
-        name,
-        log_file,
-        bed_file,
-        bam_file,
-        coverage_type,
-        window_size,
-        name,
-        output_dir
-    )
-
-    # write job to file
-    with open(job_file, 'w') as handle:
-        handle.writelines(cmd)
-
-    tk.slurm_submit_job(job_file)
-
-
-def run_vplot_job(bed_file, bam_file, name, output_dir):
-    from pypiper import NGSTk
-    tk = NGSTk()
-    job_file = os.path.join(output_dir, "%s.run_enrichment.sh" % name)
-    log_file = os.path.join(output_dir, "%s.run_enrichment.log" % name)
-
-    cmd = """#!/bin/bash
-#SBATCH --partition=mediumq
-#SBATCH --ntasks=1
-#SBATCH --time=1-12:00:00
-
-#SBATCH --cpus-per-task=8
-#SBATCH --mem=24000
-#SBATCH --nodes=1
-
-#SBATCH --job-name=baf-kubicek-run_enrichment_{name}
-#SBATCH --output={log}
-
-#SBATCH --mail-type=end
-#SBATCH --mail-user=
-
-# Start running the job
-hostname
-date
-
-\t\t# Remove everything to do with your python and env.  Even reset your home dir
-\t\tunset PYTHONPATH
-\t\tunset PYTHON_HOME
-\t\tmodule purge
-\t\tmodule load python/2.7.6
-\t\tmodule load slurm
-\t\tmodule load gcc/4.8.2
-
-\t\tENV_DIR=/scratch/users/arendeiro/nucleoenv
-\t\texport HOME=$ENV_DIR/home
-
-\t\t# Activate your virtual env
-\t\texport VIRTUALENVWRAPPER_PYTHON=/cm/shared/apps/python/2.7.6/bin/python
-\t\tsource $ENV_DIR/bin/activate
-
-\t\t# Prepare to install new python packages
-\t\texport PATH=$ENV_DIR/install/bin:$PATH
-\t\texport PYTHONPATH=$ENV_DIR/install/lib/python2.7/site-packages
-
-
-cd /home/arendeiro/baf-kubicek/
-
-pyatac vplot \
---bed {peaks} \
---bam {bam} \
---out {output_prefix}.vplot \
---cores 8 \
---lower 30 \
---upper 1000 \
---flank 500 \
---scale \
---plot_extra
-
-pyatac sizes \
---bam {bam} \
---bed {peaks} \
---out {output_prefix}.sizes  \
---lower 30 \
---upper 1000
-
-pyatac bias \
---fasta ~/resources/genomes/hg19/hg19.fa \
---bed {peaks} \
---out {output_prefix}.bias \
---cores 8
-
-pyatac bias_vplot \
---bed {peaks} \
---bg {output_prefix}.bias.Scores.bedgraph.gz \
---fasta ~/resources/genomes/hg19/hg19.fa \
---sizes {output_prefix}.sizes.fragmentsizes.txt \
---out {output_prefix}.bias_vplot \
---cores 8 \
---lower 30 \
---upper 1000 \
---flank 500 \
---scale \
---plot_extra
-
-date
-""".format(
-        name=name,
-        log=log_file,
-        peaks=bed_file,
-        bam=bam_file,
-        output_prefix=os.path.join(output_dir, name))
-
-    # write job to file
-    with open(job_file, 'w') as handle:
-        handle.writelines(cmd)
-
-    tk.slurm_submit_job(job_file)
-
-
-def piq_prepare_motifs(
-        motifs_file="data/external/jaspar_human_motifs.txt",
-        output_dir="footprinting",
-        piq_source_dir="/home/arendeiro/workspace/piq-single/",
-        motif_numbers=None):
-    """
-    Prepare motifs for footprinting with PIQ.
-    This is typically done only once per genome.
-
-    `motifs_file` is a JASPAR-format file with PWMs of motifs.
-    `output_dir` is a root directory to use for the output of a footprint analysis.
-    `piq_source_dir` is the root directory of the PIQ code.
-    `motif_numbers` is a range of integers enumerating the TF motifs from
-    the `motifs_file` to prepare. This is by default, all in the file.
-    """
-    import textwrap
-    from pypiper import NGSTk
-    tk = NGSTk()
-
-    output_dir = os.path.abspath(output_dir)
-    motifs_dir = os.path.join(output_dir, "motifs")
-    jobs_dir = os.path.join(motifs_dir, "jobs")
-
-    for path in [output_dir, motifs_dir, jobs_dir]:
-        if not os.path.exists(path):
-            os.makedirs(path)
-
-    if motif_numbers is None:
-        n_motifs = open(motifs_file, "r").read().count(">")
-        motif_numbers = range(1, n_motifs + 1)
-
-    for motif in motif_numbers:
-        # skip if exists
-        a = os.path.exists(os.path.join(motifs_dir, "{}.pwmout.RData".format(motif)))
-        b = os.path.exists(os.path.join(motifs_dir, "{}.pwmout.rc.RData".format(motif)))
-        if a and b:
-            continue
-
-        # prepare job
-        log_file = os.path.join(jobs_dir, "piq_preparemotifs.motif{}.slurm.log".format(motif))
-        job_file = os.path.join(jobs_dir, "piq_preparemotifs.motif{}.slurm.sh".format(motif))
-        cmd = tk.slurm_header(
-            "piq_preparemotifs.{}".format(motif), log_file,
-            cpus_per_task=1, queue="shortq", mem_per_cpu=8000)
-
-        # change to PIQ dir (required in PIQ because of hard-coded links in code)
-        cmd += """cd {}\n\t\t""".format(piq_source_dir)
-
-        # Actual PIQ command
-        cmd += """Rscript {}/pwmmatch.exact.r""".format(piq_source_dir)
-        cmd += " {}/common.r".format(piq_source_dir)
-        cmd += " {}".format(os.path.abspath(motifs_file))
-        cmd += " " + str(motif)
-        cmd += """ {}\n""".format(motifs_dir)
-
-        # write job to file
-        with open(job_file, 'w') as handle:
-            handle.writelines(textwrap.dedent(cmd))
-
-        tk.slurm_submit_job(job_file)
-
-
-def piq_prepare_bams(
-        bam_files,
-        group_name,
-        output_dir="footprinting",
-        piq_source_dir="/home/arendeiro/workspace/piq-single/"):
-    """
-    Prepare single or group of BAM files for footprinting.
-
-    `bam_files` is a string path to a BAM file or a list of the same.
-    `group_name` is a label matching the one given to `piq_prepare_bams`.
-    `output_dir` is a root directory to use for the output of a footprint analysis.
-    `piq_source_dir` is the root directory of the PIQ code.
-
-    This will launch jobs for each motif.
-    """
-    import textwrap
-    from pypiper import NGSTk
-    tk = NGSTk()
-
-    if isinstance(bam_files, str):
-        bam_files = [bam_files]
-
-    output_dir = os.path.abspath(output_dir)
-    cache_dir = os.path.join(output_dir, "piq_cache")
-    jobs_dir = os.path.join(cache_dir, "jobs")
-
-    for path in [output_dir, cache_dir, jobs_dir]:
-        if not os.path.exists(path):
-            os.makedirs(path)
-
-    merged_bam = os.path.join(cache_dir, "{}.merged.bam".format(group_name))
-    merged_cache = os.path.join(cache_dir, "{}.merged.RData".format(group_name))
-    log_file = os.path.join(jobs_dir, "piq_preparebams.{}.slurm.log".format(group_name))
-    job_file = os.path.join(jobs_dir, "piq_preparebams.{}.slurm.sh".format(group_name))
-
-    # Build job
-    cmd = tk.slurm_header(
-        "piq_preparebams.{}".format(group_name), log_file,
-        cpus_per_task=4, queue="mediumq", time="11:00:00", mem_per_cpu=8000
-    )
-
-    # merge all bam files
-    if not os.path.exists(merged_bam):
-        cmd += """sambamba merge -t 12 {0} {1}\n\t\t""".format(merged_bam, " ".join(bam_files))
-
-    # change to PIQ dir (required in PIQ because of hard-coded links in code)
-    cmd += """cd {}\n""".format(piq_source_dir)
-
-    # Actual PIQ command
-    cmd += """\t\tRscript {0}/bam2rdata.r {0}/common.r {1} {2}\n""".format(
-        piq_source_dir, merged_cache, merged_bam)
-
-    # slurm footer
-    cmd += tk.slurm_footer()
-
-    # write job to file
-    with open(job_file, 'w') as handle:
-        handle.writelines(textwrap.dedent(cmd))
-
-    tk.slurm_submit_job(job_file)
-
-
-def footprint(
-        group_name, motif_numbers,
-        output_dir="footprinting",
-        piq_source_dir="/home/arendeiro/workspace/piq-single/",
-        total_job_limit=250,
-        min_time_between_jobs=5,
-        refresh_time=10):
-    """
-    Perform TF footprinting with PIQ.
-
-    `group_name` is a label matching the one given to `piq_prepare_bams`.
-    `motif_numbers` is a range of integers enumerating the TF motifs from
-    the motif file given to `piq_prepare_motifs` to footprint.
-    `output_dir` is a root directory to use for the input/output of a footprint analysis.
-    `piq_source_dir` is the root directory of the PIQ code.
-
-    This will launch jobs in `min_time_between_jobs` (seconds) intervals
-    until the whole job queue has `total_job_limit` jobs
-    and retry after `refresh_time` (seconds).
-    """
-    import subprocess
-    import time
-    import textwrap
-    from pypiper import NGSTk
-
-    tk = NGSTk()
-
-    output_dir = os.path.abspath(output_dir)
-    motifs_dir = os.path.join(output_dir, "motifs/")  # slash is important - PIQ reasons
-    cache_dir = os.path.join(output_dir, "piq_cache")
-    foots_dir = os.path.join(output_dir, "footprint_calls")
-    tmp_dir = os.path.join(foots_dir, "tmp_output")
-    jobs_dir = os.path.join(foots_dir, "jobs")
-    merged_cache = os.path.join(cache_dir, "{}.merged.RData".format(group_name))
-
-    for path in [output_dir, motifs_dir, cache_dir, foots_dir, tmp_dir, jobs_dir]:
-        if not os.path.exists(path):
-            os.makedirs(path)
-
-    for motif_number in motif_numbers:
-        if not os.path.exists(os.path.join(motifs_dir, "{}.pwmout.RData".format(motif_number))):
-            _LOGGER.warning("PIQ file for motif {} does not exist".format(motif_number))
-            continue
-
-        t_dir = os.path.join(tmp_dir, group_name)
-        o_dir = os.path.join(foots_dir, group_name)
-        for path in [t_dir, o_dir]:
-            if not os.path.exists(path):
-                os.mkdir(path)
-        log_file = os.path.join(jobs_dir, "piq_footprinting.{}.motif{}.slurm.log".format(group_name, motif_number))
-        job_file = os.path.join(jobs_dir, "piq_footprinting.{}.motif{}.slurm.sh".format(group_name, motif_number))
-
-        # prepare slurm job header
-        cmd = tk.slurm_header(
-            "piq_footprinting.{}.motif{}".format(group_name, motif_number),
-            log_file, cpus_per_task=1, queue="shortq", mem_per_cpu=8000)
-
-        # change to PIQ dir (required in PIQ because of hard-coded links in code)
-        cmd += """cd {}\n""".format(piq_source_dir)
-
-        # Actual PIQ command
-        # footprint
-        cmd += """\t\tRscript {0}/pertf.r {0}/common.r {1} {2} {3} {4} {5}\n""".format(
-            piq_source_dir, motifs_dir, t_dir, o_dir, merged_cache, motif_number)
-
-        # slurm footer
-        cmd += tk.slurm_footer()
-
-        # write job to file
-        with open(job_file, 'w') as handle:
-            handle.writelines(textwrap.dedent(cmd))
-
-        # submit jobs slowly and keeping total numbe of jobs below a certain ammount
-        submit = (len(subprocess.check_output("squeue").split("\n")) - 1) < total_job_limit
-        while not submit:
-            time.sleep(refresh_time)
-            _LOGGER.info("Waited {}. Checking again...".format(refresh_time))
-            submit = (len(subprocess.check_output("squeue").split("\n")) - 1) < total_job_limit
-
-        tk.slurm_submit_job(job_file)
-        _LOGGER.info("Submitted job of group {}, motif {}.".format(group_name, motif_number))
-        time.sleep(min_time_between_jobs)
-
-
-def tfbs_to_gene(
-        bed_file,
-        tss_file="data/external/ensembl.tss.bed",
-        promoter_and_genesbody_file="data/external/ensembl.promoter_and_genesbody.bed"
-        ):
-    """
-    Assign a TF binding site (output of PIQ footprinting) to a gene.
-    TFBS are assigned to a gene if they overlap with their promoter or genebody,
-    else to the nearest TSS (regardless of the distance).
-    This distance can be used later to weight the interaction e.g. in combination
-    with the confidence measures of the footprint (binding).
-
-    `bed_file` is a PIQ output 8-column BED file:
-    chrom, start, end, pwm, shape, strand, score, purity.
-
-    `tss_file` and `promoter_and_genesbody_file` are 6-column BED files:
-    chrom, start, end, gene_id, transcript_id, strand.
-
-    Returns TFBS-gene assignment matrix.
-    """
-    # read in gene body + promoter info
-    promoter_and_genesbody = pybedtools.BedTool(promoter_and_genesbody_file)
-    # read in TSS info
-    tss = pybedtools.BedTool(tss_file)
-    # columns
-    columns = ["chrom", "start", "end", "pwm", "shape", "strand", "score", "purity",
-               "chrom_gene", "start_gene", "end_gene", "gene", "transcript", "strand_gene"]
-
-    # Assign TFBS to gene if they overlap with gene body or promoter (5kb around TSS -> 2.5kb upstream)
-    gene_assignments = (
-        pybedtools.BedTool(os.path.join(bed_file))
-        .intersect(promoter_and_genesbody, wa=True, wb=True)
-        .to_dataframe(names=columns))
-
-    # For the remaining TFBSs, assign TFBS to closest TSS regardless of distance
-    # (distance is not so important for assignment because distance is a penalyzing effect during TF-gene interaction score calculation)
-    # 1. get genes not assigned previously
-    all_ = (
-        pybedtools.BedTool(os.path.join(bed_file))
-        .to_dataframe(names=columns[:8]))
-
-    merged = pd.merge(all_, gene_assignments, how="left")
-    remaining = merged[merged['gene'].isnull()]
-
-    # 2. assign to nearest
-    closest_tss = (
-        pybedtools.BedTool(
-            remaining.iloc[:, range(all_.shape[1])]
-            .to_string(index=False, header=False)
-            .replace(" ", "\t"),
-            from_string=True,
-        )
-        .closest(tss, d=True)
-        .to_dataframe(names=columns + ['distance']))
-
-    # put the two together
-    gene_assignments = pd.concat([gene_assignments, closest_tss])
-
-    # set overlapping distance to 0
-    gene_assignments.loc[gene_assignments['distance'].isnull(), 'distance'] = 0
-
-    return gene_assignments
-
-
-def piq_to_network(
-        group_name,
-        motif_numbers,
-        peak_universe_file,
-        output_dir="footprinting"):
-    """
-    Parse PIQ output, filter footprints and score TF-gene interactions.
-    Returns matrix with score of each TF regulating each gene.
-
-    `group_name` is a label matching the one given to `piq_prepare_bams`.
-    `motif_numbers` is a range of integers enumerating the TF motifs from
-    the motif file given to `piq_prepare_motifs` to footprint.
-    `peak_universe_file` is a 3-column BED file with high confidence genomic locations
-    to filter interactions for (generally a peak set).
-    `output_dir` is a root directory to use for the input/output of a footprint analysis.
-
-    Records in `peak_universe_file` are recommended to be enlarged (e.g. up to 500bp in each direction).
-    """
-    output_dir = os.path.abspath(output_dir)
-    foots_dir = os.path.join(output_dir, "footprint_calls")
-    group_foot_dir = os.path.join(foots_dir, group_name)
-
-    for path in [output_dir, foots_dir, group_foot_dir]:
-        if not os.path.exists(path):
-            os.makedirs(path)
-
-    # list results_dir
-    files = os.listdir(group_foot_dir)
-
-    if len(files) == 0:
-        _LOGGER.warning("There are not footprint calls for group '{}' in '{}'".format(group_name, group_foot_dir))
-
-    # use universe set of ATAC-seq peaks to filter data
-    all_peaks = pybedtools.BedTool(peak_universe_file)
-
-    # dataframe to store TFBS assignment to genes
-    assignments = pd.DataFrame()
-
-    # dataframe to store TF->gene interactions
-    interactions = pd.DataFrame()
-
-    # dataframe to store stats about the TFBS and the interactions
-    stats = pd.DataFrame()
-
-    # loop through motifs/TFs, filter and establish relationship between TF and gene
-    for motif in motif_numbers:
-        _LOGGER.info("Gathering footprint calls of motif '{}' for group '{}'".format(motif, group_name))
-        # get both forward and reverse complement PIQ output files
-        result_files = list()
-        for f in files:
-            m = re.match(r'%i-.*-calls\.csv$' % motif, f)
-            if hasattr(m, "string"):
-                result_files.append(m.string)
-
-        # make bed file from it
-        # concatenate files (forward and reverse complement are treated differently by PIQ)
-        for i, result_file in enumerate(result_files):
-            df = pd.read_csv(os.path.join(group_foot_dir, result_file), index_col=0)
-            df.rename(columns={"coord": "start"}, inplace=True)
-            # fix coordinates
-            if "RC-calls.csv" not in result_file:
-                df["end"] = df["start"] + 1
-                df['strand'] = "+"
-            else:
-                df["end"] = df["start"]
-                df["start"] = df["start"] - 1
-                df['strand'] = "-"
-            # concatenate
-            if i == 0:
-                df2 = df
-            else:
-                df2 = pd.concat([df, df2])
-
-        # add total TFBS to stats
-        stats.loc[motif, "TFBS"] = len(df2)
-        stats.loc[motif, "TFBS_+"] = len(df2[df2['strand'] == "+"])
-        stats.loc[motif, "TFBS_-"] = len(df2[df2['strand'] == "-"])
-
-        # Filter for purity
-        footprints = df2[df2["purity"] > 0.7]
-        stats.loc[motif, "pur0.7"] = len(footprints)
-
-        # If less than 500 significant interactions, ignore TF
-        if footprints.shape[0] < 500:
-            continue
-
-        # filter for motifs overlapping CLL peaks
-        footprints = (
-            pybedtools.BedTool(
-                (
-                    footprints[['chr', 'start', 'end', 'pwm', 'shape', 'strand', 'score', 'purity']]
-                    .to_string(header=None, index=False)
-                    .replace(' ', '\t')
-                ),
-                from_string=True)
-            .intersect(all_peaks, wa=True)
-            .to_dataframe()
-        )
-        footprints.columns = ['chr', 'start', 'end', 'pwm', 'shape', 'strand', 'score', 'purity']
-        footprints.to_csv(os.path.join("tmp.bed"), sep="\t", index=False, header=False)
-        stats.loc[motif, "overlap_universe"] = footprints.shape[0]
-
-        # assign TFBS to gene
-        gene_assignments = tfbs_to_gene(os.path.join("tmp.bed"))
-        gene_assignments.loc[:, "TF"] = motif
-        stats.loc[motif, "gene_overlap_count"] = len(gene_assignments[gene_assignments['distance'] == 0])
-        stats.loc[motif, "dist_gene_mean"] = gene_assignments['distance'].mean()
-        stats.loc[motif, "dist_gene_median"] = gene_assignments['distance'].median()
-        stats.loc[motif, "dist_gene_std"] = gene_assignments['distance'].std()
-
-        # Get weighted values
-        # weigh with footprint purity and distance to tss
-        gene_assignments['interaction_score'] = gene_assignments.apply(lambda x: 2 * (x['purity'] - 0.5) * 10 ** -(x['distance'] / 1000000.), axis=1)
-        # sum scores for each gene
-        scores = gene_assignments.groupby(['gene'])['interaction_score'].apply(sum).reset_index()
-        scores.loc[:, "TF"] = motif
-
-        # filter out potentially not assigned bindings
-        scores = scores[scores["gene"] != "."]
-
-        # add mean score for each gene
-        stats.loc[motif, "score_gene_mean"] = scores['interaction_score'].mean()
-        stats.loc[motif, "score_gene_std"] = scores['interaction_score'].std()
-        stats.loc[motif, "TF"] = motif
-
-        # save
-        scores.to_csv(os.path.join(group_foot_dir, "scores.motif{}.csv".format(motif)), index=False)
-        gene_assignments.to_csv(os.path.join(group_foot_dir, "gene_assignments.motif{}.csv".format(motif)), index=False)
-
-        # add to dataframe with all TF-gene interactions
-        interactions = interactions.append(scores, ignore_index=True)
-        assignments = assignments.append(gene_assignments, ignore_index=True)
-
-    # save
-    assignments.to_csv(os.path.join(group_foot_dir, "assignments.all_motifs.csv"), index=False)
-    interactions.to_csv(os.path.join(group_foot_dir, "interactions.all_motifs.csv"), index=False)
-    stats.to_csv(os.path.join(group_foot_dir, "stats.all_motifs.csv"), index=False)
-
-    return (assignments, interactions, stats)
-
-
-def differential_interactions(
-        group_name1, group_name2,
-        output_dir="footprinting",
-        motifs_mapping="data/external/jaspar_human_motifs.id_mapping.txt"):
-    """
-    Compare TF-gene interactions between two sets of groups (e.g. KO and WT)
-    and visualize differences.
-    """
-    def add_xy_line(axis):
-        lims = [np.min([axis.get_xlim(), axis.get_ylim()]), np.max([axis.get_xlim(), axis.get_ylim()])]
-        axis.plot(lims, lims, '--', alpha=0.5, zorder=0)
-        axis.set_aspect('equal')
-        axis.set_xlim(lims)
-        axis.set_ylim(lims)
-
-    if group_name1 == group_name2:
-        _LOGGER.warning("The two groups are the same! Skipping...")
-        return
-
-    comparison_name = "{}-{}".format(group_name1, group_name2)
-
-    output_dir = os.path.abspath(output_dir)
-    foots_dir = os.path.join(output_dir, "footprint_calls")
-    diff_dir = os.path.join(output_dir, "differential_calls")
-
-    for path in [output_dir, foots_dir, diff_dir]:
-        if not os.path.exists(path):
-            os.makedirs(path)
-
-    f1 = pd.read_csv(os.path.join(foots_dir, group_name1, "interactions.all_motifs.csv"))
-    f2 = pd.read_csv(os.path.join(foots_dir, group_name2, "interactions.all_motifs.csv"))
-
-    # Global changes in TFs
-    # are the TFs binding differently globally on average?
-    tf_stats = f1.groupby("TF")['interaction_score'].mean().to_frame(name=group_name1)
-    tf_stats = tf_stats.join(
-        f2.groupby("TF")['interaction_score'].mean().to_frame(name=group_name2).squeeze(),
-        how="outer")
-
-    # calculate some tf_stats
-    for tf in tf_stats.index:
-        a = f1.loc[f1['TF'] == tf, "interaction_score"]
-        b = f2.loc[f2['TF'] == tf, "interaction_score"]
-        tf_stats.loc[tf, "group1_log_interactions"] = np.log((a.shape[0] / float(f1.shape[0])) * 1e3)
-        tf_stats.loc[tf, "group2_log_interactions"] = np.log((b.shape[0] / float(f2.shape[0])) * 1e3)
-        tf_stats.loc[tf, "p_value"] = mannwhitneyu(a, b)[1]
-    tf_stats.loc[:, "q_value"] = multipletests(tf_stats.loc[:, "p_value"], method="fdr_bh")[1]
-    tf_stats.loc[:, "log_fold_change"] = np.log2(tf_stats.loc[:, group_name1] / tf_stats.loc[:, group_name2])
-    tf_stats.loc[:, "a"] = (1 / 2.) * np.log2(tf_stats.loc[:, group_name1] * tf_stats.loc[:, group_name2])
-
-    # annotate TF ids with names
-    annot = pd.read_table(motifs_mapping, header=None, names=['tf', "jaspar_id", "tf_name"]).set_index('tf')
-    tf_stats = tf_stats.join(annot).set_index("tf_name")
-
-    # save summary
-    tf_stats.to_csv(os.path.join(diff_dir, "tf_differential_binding.{}.csv".format(comparison_name)))
-
-    # Scatter
-    fig, axis = plt.subplots(1, figsize=(4, 4))
-    axis.scatter(
-        tf_stats.loc[:, "group1_log_interactions"],
-        tf_stats.loc[:, "group2_log_interactions"],
-        alpha=0.5,
-        rasterized=True)
-    add_xy_line(axis)
-    axis.set_xlabel("{} interactions (log)".format(group_name1))
-    axis.set_ylabel("{} interactions (log)".format(group_name2))
-    sns.despine(fig)
-    fig.savefig(
-        os.path.join(diff_dir, "tf_differential_binding.{}.scatter.log_interactions.svg".format(comparison_name)),
-        bbox_inches="tight", dpi=300)
-
-    fig, axis = plt.subplots(1, figsize=(4, 4))
-    axis.scatter(
-        tf_stats.loc[:, group_name1],
-        tf_stats.loc[:, group_name2],
-        alpha=0.5,
-        rasterized=True)
-    add_xy_line(axis)
-    axis.set_xlabel("{} interactions mean".format(group_name1))
-    axis.set_ylabel("{} interactions mean".format(group_name2))
-    sns.despine(fig)
-    fig.savefig(
-        os.path.join(diff_dir, "tf_differential_binding.{}.scatter.mean_interactions.svg".format(comparison_name)),
-        bbox_inches="tight", dpi=300)
-
-    # MA
-    fig, axis = plt.subplots(1, figsize=(4, 4))
-    axis.scatter(
-        tf_stats.loc[:, "a"],
-        tf_stats.loc[:, "log_fold_change"],
-        alpha=0.5,
-        rasterized=True)
-    axis.axhline(0, linestyle="--", alpha=0.5, zorder=0)
-    axis.set_xlabel("Intensity (A)")
-    axis.set_ylabel("Log2 fold change ({} / {})".format(group_name1, group_name2))
-    sns.despine(fig)
-    fig.savefig(
-        os.path.join(diff_dir, "tf_differential_binding.{}.ma.svg".format(comparison_name)),
-        bbox_inches="tight", dpi=300)
-
-    # Volcano
-    fig, axis = plt.subplots(1, figsize=(4, 4))
-    axis.scatter(
-        tf_stats.loc[:, "log_fold_change"],
-        -np.log(tf_stats.loc[:, "p_value"]),
-        alpha=0.5,
-        rasterized=True)
-    axis.axvline(0, linestyle="--", alpha=0.5, zorder=0)
-    axis.set_xlabel("Log2 fold change ({} / {})".format(group_name1, group_name2))
-    axis.set_ylabel("-log p-value")
-    sns.despine(fig)
-    fig.savefig(
-        os.path.join(diff_dir, "tf_differential_binding.{}.volcano.svg".format(comparison_name)),
-        bbox_inches="tight", dpi=300)

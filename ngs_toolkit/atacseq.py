@@ -301,8 +301,9 @@ class ATACSeqAnalysis(Analysis):
     def get_consensus_sites(
             self, samples=None, region_type="summits", extension=250,
             blacklist_bed=None,
-            filter_chrM=True,
-            permissive=False):
+            filter_mito_chr=True,
+            permissive=False,
+            **kwargs):
         """
         Get consensus (union) of enriched sites (peaks) across samples.
         There are two modes possible, defined by the value of ``region_type``:
@@ -327,12 +328,15 @@ class ATACSeqAnalysis(Analysis):
         blacklist_bed : str
             A (3 column) BED file with genomic positions to exclude from consensus peak set.
 
-        filter_chrM : bool
+        filter_mito_chr : bool
             Whether to exclude 'chrM' from peak set.
 
         permissive : bool
             Whether Samples that which `region_type` attribute file does not exist
             should be simply skipped or an error thrown.
+
+        **kwargs
+            Not used. Provided for compatibility with ChIPSeqAnalysis class.
 
         Raises
         ----------
@@ -411,7 +415,7 @@ class ATACSeqAnalysis(Analysis):
                 blacklist = pybedtools.BedTool(blacklist_bed)
                 sites = sites.intersect(v=True, b=blacklist)
         # # remove chrM peaks
-        if filter_chrM:
+        if filter_mito_chr:
             sites = sites.filter(lambda x: x.chrom != 'chrM')
 
         # Save
@@ -450,7 +454,12 @@ class ATACSeqAnalysis(Analysis):
         # TODO: warn if not overwrite and file exists already
 
     @check_has_sites
-    def calculate_peak_support(self, samples=None, region_type="summits", permissive=False):
+    def calculate_peak_support(
+            self,
+            samples=None,
+            region_type="summits",
+            permissive=False,
+            **kwargs):
         """
         Count number of called peaks per sample in the consensus region set.
         In addition calculate a measure of peak support (or ubiquitouness) by
@@ -472,6 +481,9 @@ class ATACSeqAnalysis(Analysis):
         permissive : bool
             Whether Samples that which `region_type` attribute file does
             not exist should be simply skipped or an error thrown.
+
+        **kwargs
+            Not used. Provided for compatibility with ChIPSeqAnalysis class.
 
         Raises
         ----------
@@ -525,7 +537,9 @@ class ATACSeqAnalysis(Analysis):
         setattr(self, 'support', support)
         return self.support
 
-    def get_supported_peaks(self, samples=None):
+    def get_supported_peaks(
+            self, samples=None,
+            **kwargs):
         """
         Get mask of sites with 0 support in the given samples.
         Requires support matrix produced by `ngs_toolkit.atacseq.ATACSeqAnalysis.calculate_peak_support`.
@@ -534,6 +548,9 @@ class ATACSeqAnalysis(Analysis):
         ----------
         samples : list
             Iterable of peppy.Sample objects to restrict to.
+
+        **kwargs
+            Not used. Provided for compatibility with ChIPSeqAnalysis class.
 
         Returns
         -------

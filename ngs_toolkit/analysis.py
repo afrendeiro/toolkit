@@ -1984,7 +1984,7 @@ class Analysis(object):
                 results.loc[(results[comparison_column] == comparison) & results.index.isin(i), "diff_rank"] = True
             results.loc[:, "diff_rank"] = results.loc[:, "diff_rank"].fillna(False)
             if respect_stat_thresholds:
-                results.loc[:, "diff"] = (results.loc[:, "diff"] == True) & (results.loc[:, "diff_rank"] == True)
+                results.loc[:, "diff"] = (results.loc[:, "diff"].isin([True])) & (results.loc[:, "diff_rank"].isin([True]))
             else:
                 results.loc[:, "diff"] = results.loc[:, "diff_rank"]
 
@@ -2100,12 +2100,12 @@ class Analysis(object):
                     # Scatter for significant features
                     diff_vars = results.loc[
                         (results[comparison_column] == comparison) &
-                        (results["diff"] == True), :]
+                        (results["diff"].isin([True])), :]
                     if diff_vars.shape[0] > 0:
                         # get color vector based on p-value
                         col = -np.log10(results.loc[
                             (results[comparison_column] == comparison) &
-                            (results["diff"] == True), p_value_column].squeeze())
+                            (results["diff"].isin([True])), p_value_column].squeeze())
                         _LOGGER.debug("Shapes: {} {} {}".format(a.shape, b.shape, diff_vars.shape))
                         # in case there's just one significant feature:
                         if isinstance(col, np.float_):
@@ -2160,7 +2160,7 @@ class Analysis(object):
                     linewidths=0, bins="log", mincnt=1, rasterized=True)
 
                 # Scatter for significant
-                diff_vars = t.loc[t["diff"] == True, :]
+                diff_vars = t.loc[t["diff"].isin([True]), :]
                 if diff_vars.shape[0] > 0:
                     collection = ax.scatter(
                         t.loc[diff_vars.index, log_fold_change_column],
@@ -2177,7 +2177,7 @@ class Analysis(object):
 
                 # Add lines of significance
                 ax.axhline(
-                    -np.log10(t.loc[t["diff"] == True, p_value_column].max()),
+                    -np.log10(t.loc[t["diff"].isin([True]), p_value_column].max()),
                     linestyle="--", alpha=0.5, zorder=0, color="black")
                 if fold_change is not None:
                     ax.axvline(-fold_change, linestyle="--", alpha=0.5, zorder=0, color="black")
@@ -2206,7 +2206,7 @@ class Analysis(object):
                     linewidths=0, bins="log", mincnt=1, rasterized=True)
 
                 # Scatter for significant
-                diff_vars = t.loc[t["diff"] == True, :]
+                diff_vars = t.loc[t["diff"].isin([True]), :]
                 if diff_vars.shape[0] > 0:
                     collection = ax.scatter(
                         np.log10(t.loc[diff_vars.index, mean_column]),
@@ -2237,7 +2237,7 @@ class Analysis(object):
             return
 
         # Observe values of variables across all comparisons
-        all_diff = results[results["diff"] == True].index.drop_duplicates()
+        all_diff = results[results["diff"].isin([True])].index.drop_duplicates()
         if isinstance(matrix.columns, pd.MultiIndex):
             sample_cols = matrix.columns.get_level_values("sample_name").tolist()
         else:
@@ -2953,7 +2953,7 @@ class Analysis(object):
                 background = ""
             _LOGGER.info("Submitting enrichment jobs.")
             run_enrichment_jobs(
-                analysis_name=self.name, results_dir=output_dir,
+                results_dir=output_dir,
                 genome=genome, background_bed=background, steps=steps)
 
     def collect_differential_enrichment(

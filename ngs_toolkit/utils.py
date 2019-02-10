@@ -921,7 +921,6 @@ def normalize_quantiles_r(array):
     numpy.array
         Normalized numeric array.
     """
-    import numpy as np
     import rpy2.robjects as robjects
     import rpy2.robjects.numpy2ri
     import warnings

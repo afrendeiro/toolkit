@@ -73,7 +73,7 @@ class CNVAnalysis(Analysis):
         Raises
         -------
         ValueError
-            If normalization method is not recognized. 
+            If normalization method is not recognized.
         """
         if resolutions is None:
             resolutions = self.resolutions
@@ -917,7 +917,7 @@ def all_to_igv(coverage, output_prefix, **kwargs):
     return igvs
 
 
-def to_igv(matrix, output_file=None, save=True, viewLimits=(-2, 2)):
+def to_igv(matrix, output_file=None, save=True, view_limits=(-2, 2)):
     """
     Convert DataFrame with CNV data to IGV format.
 
@@ -934,7 +934,7 @@ def to_igv(matrix, output_file=None, save=True, viewLimits=(-2, 2)):
         Whether results should be saved to disc.
         Defaults to True
 
-    optional viewLimits : tuple,
+    optional view_limits : tuple,
         Extreme values (min, max) of color scale used to visualize in IGV.
         Defaults to (-2, 2).
 
@@ -964,7 +964,7 @@ def to_igv(matrix, output_file=None, save=True, viewLimits=(-2, 2)):
         open(output_file, 'w')
         output_handle = open(output_file, 'a')
         output_handle.write('#track viewLimits=-{}:{} graphType=heatmap color=255,0,0\n'
-                            .format(*viewLimits))
+                            .format(*view_limits))
         igv.to_csv(output_handle, sep="\t", index=False)
         output_handle.close()
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 
-import glob
+from glob import glob
 import json
 import os
 import subprocess
@@ -1226,7 +1226,7 @@ def homer_combine_motifs(
                             extra, p_value_threshold, info_value, fold_enrichment, cpus).split(" "))
 
     # concatenate consensus motif files
-    files = glob.glob(os.path.join(output_dir, "homerResults/*motif"))
+    files = glob(os.path.join(output_dir, "homerResults/*motif"))
     combined_motifs = os.path.join(output_dir, "homerMotifs.filtered.motifs")
     with open(combined_motifs, 'w') as outfile:
         for f in files:
@@ -1342,7 +1342,7 @@ def enrichr(dataframe, gene_set_libraries=None, kind="genes", max_attempts=5):
 
     results = pd.DataFrame()
     for gene_set_library in tqdm(gene_set_libraries, total=len(gene_set_libraries), desc="Gene set library"):
-        _LOGGER.info("Using Enricher on %s gene set library.".format(gene_set_library))
+        _LOGGER.info("Using Enricher on {} gene set library.".format(gene_set_library))
 
         # Request enriched sets in gene set
         i = 0
@@ -1409,10 +1409,9 @@ def run_enrichment_jobs(
         In this case no jobs will be submitted for jobs with existing output files.
         Defaults to True
     """
-    import textwrap
-    tk = NGSTk()
-
     # TODO: replace with info from resources
+
+    tk = NGSTk()
     dbs = {
         "human": "~/resources/motifs/motif_databases/HUMAN/HOCOMOCOv10.meme",
         "mouse": "~/resources/motifs/motif_databases/MOUSE/uniprobe_mouse.meme"}

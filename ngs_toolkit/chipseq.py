@@ -7,6 +7,7 @@ import subprocess
 
 from ngs_toolkit import _LOGGER
 from ngs_toolkit.atacseq import ATACSeqAnalysis
+from ngs_toolkit.general import get_blacklist_annotations
 from ngs_toolkit.utils import (
     homer_peaks_to_bed, macs2_call_chipseq_peak, homer_call_chipseq_peak_job)
 import numpy as np
@@ -291,19 +292,71 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
         return peak_counts  # .fillna(0)
 
     def get_consensus_sites(
-            self, comparison_table, peak_dir="{results_dir}/chipseq_peaks",
-            region_type="peaks", extension=250,
-            blacklist_bed="wgEncodeDacMapabilityConsensusExcludable.bed"):
+            self, **kwargs):
         """
         Get consensus (union) of enriched sites (peaks) across all comparisons.
-        If `region_type` --> "summits, regions used will be peak summits which will be extended by `extension`
+        If `region_type` is "summits, regions used will be peak summits which will be extended by `extension`
         before union. Otherwise sample peaks will be used with no modification.
 
-        `blacklist_bed` is a 3 column BED file with genomic positions to exclude from consensus peak set.
+        Parameters
+        ----------
+        comparison_table : pandas.DataFrame
+            DataFrame with signal/background combinations used to call peaks
+
+        peak_dir : str, optional
+            Path to peaks output directory.
+            Defaults to {analysis.results_dir}/chipseq_peaks
+
+        region_type : str, optional
+            Type of region to use.
+            One of "summits" or "peaks".
+            Default is "summits".
+
+        extension : int, optional
+            Width to extend peak summits is `region_type` is "summits".
+            Default is 250.
+
+        blacklist_bed : str, optional
+            A BED file with genomic positions to exclude from consensus peak set.
+            Will try to download if not given.
+
+        Attributes
+        ----------
+        sites : pybedtools.BedTool
+            Bedtool with consensus sites
         """
-        # Complement default `peak_dir`
-        if "{results_dir}" in peak_dir:
-            peak_dir = os.path.abspath(peak_dir.format(results_dir=self.results_dir))
+        msg = "Function needs a `comparison_table` keyword argument."
+        if "comparison_table" not in kwargs:
+            _LOGGER(msg)
+            raise ValueError(msg)
+        else:
+            comparison_table = kwargs["comparison_table"]
+
+        if "peak_dir" not in kwargs:
+            peak_dir = os.path.join(self.results_dir, "chipseq_peaks")
+
+        if "region_type" not in kwargs:
+            region_type = "summits"
+        if region_type not in ['summits', 'peaks']:
+            msg = "`region_type` attribute must be one of 'summits' or 'peaks'!"
+            _LOGGER.error(msg)
+            raise ValueError(msg)
+
+        if "extension" not in kwargs:
+            extension = 250
+
+        if "permissive" not in kwargs:
+            permissive = False
+
+        if "blacklist_bed" not in kwargs:
+            _LOGGER.info("Blacklist file not provided. Downloading...")
+            try:
+                blacklist_bed = get_blacklist_annotations(self.organism, self.genome)
+            except AttributeError:
+                msg = "Blacklist file was not provided and cannot"
+                msg += " get one without analysis having `organism` and `genome` set."
+                _LOGGER.error(msg)
+                raise AttributeError(msg)
 
         first = True
         comps = comparison_table["comparison_name"].drop_duplicates()
@@ -327,13 +380,15 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
                         peaks = pybedtools.BedTool(f).slop(b=extension, genome=genome)
                     except ValueError:
                         _LOGGER.warning("Summits for comparison {} ({}) not found!".format(comparison, f))
-                        continue
+                        if not permissive:
+                            raise
                 else:
                     try:
                         peaks = pybedtools.BedTool(peak_file)
                     except ValueError:
                         _LOGGER.warning("Peaks for comparison {} ({}) not found!".format(comparison, peak_file))
-                        continue
+                        if not permissive:
+                            raise
                 # Merge overlaping peaks within a comparison
                 peaks = peaks.merge()
                 if first:
@@ -364,11 +419,34 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
         if overwrite:
             self.sites.saveas(os.path.join(self.results_dir, self.name + "_peak_set.bed"))
 
-    def calculate_peak_support(self, comparison_table, peak_dir="{results_dir}/chipseq_peaks"):
+    def calculate_peak_support(self, **kwargs):
         """
         Calculate a measure of support for each region in peak set
         (i.e. ratio of samples containing a peak overlapping region in union set of peaks).
+
+        Parameters
+        ----------
+        comparison_table : pandas.DataFrame
+            DataFrame with signal/background combinations used to call peaks
+
+        peak_dir : str, optional
+            Path to peaks output directory.
+            Defaults to {analysis.results_dir}/chipseq_peaks
+
+        Attributes
+        ----------
+        support : pandas.DataFrame
+            DataFrame with signal/background combinations used to call peaks
         """
+        msg = "Function needs a `comparison_table` keyword argument."
+        if "comparison_table" not in kwargs:
+            _LOGGER(msg)
+            raise ValueError(msg)
+        else:
+            comparison_table = kwargs["comparison_table"]
+        if "peak_dir" not in kwargs:
+            peak_dir = "{results_dir}/chipseq_peaks"
+
         if "{results_dir}" in peak_dir:
             peak_dir = os.path.abspath(peak_dir.format(results_dir=self.results_dir))
 
@@ -397,12 +475,6 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
         support.columns = pd.MultiIndex.from_tuples(support.columns, names=["comparison", "peak_type"])
         support.to_csv(os.path.join(self.results_dir, self.name + "_peaks.binary_overlap_support.csv"), index=True)
 
-        # get % of total consensus regions found per sample
-        # m = (
-        #     pd.melt(support, ["chrom", "start", "end"], var_name="sample_name")
-        #     .groupby("sample_name")
-        #     .apply(lambda x: len(x[x["value"] == 1])))
-
         # divide sum (of unique overlaps) by total to get support value between 0 and 1
         support["support"] = support.astype(bool).astype(int).sum(axis=1) / float(support.shape[1])
 
@@ -411,19 +483,24 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
 
         self.support = support
 
-    def get_supported_peaks(self, comparisons):
+    def get_supported_peaks(self, **kwargs):
         """
         Get mask of sites with 0 support in the given samples.
         Requires support matrix produced by `ngs_toolkit.atacseq.ATACSeqAnalysis.calculate_peak_support`.
 
         Parameters
         ----------
-        samples : list
-            Iterable of peppy.Sample objects to restrict to.
+        comparisons : list
+            Iterable of comparison names to restrict to.
+            Must match name of comparisons used in comparison_table.
 
         Returns
         -------
         pd.Series
             Boolean Pandas Series with sites with at least one of the given samples having a peak called.
         """
-        return self.support[[c for c in comparisons]].sum(1) != 0
+        if "comparisons" not in kwargs:
+            msg = "Requires a keyword argument `comparisons`."
+            _LOGGER.error(msg)
+            raise ValueError(msg)
+        return self.support[[c for c in kwargs["comparisons"]]].sum(1) != 0

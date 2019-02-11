@@ -1154,7 +1154,7 @@ def homer_combine_motifs(
         reduce_threshold=0.6, match_threshold=10, info_value=0.6,
         p_value_threshold=1e-25, fold_enrichment=None,
         cpus=8, run=True, as_jobs=True, genome="hg19",
-        motif_database=None, known_vertebrates_TFs_only=False):
+        motif_database=None):
     """
     Create consensus of de novo discovered motifs from HOMER
 
@@ -1187,9 +1187,6 @@ def homer_combine_motifs(
         Genome assembly of the data.
         Default is 'hg19'.
 
-    known_vertebrates_TFs_only : bool
-        Deprecated. Pass a given motif_database to `motif_database` directly.
-
     motif_database : str
         Motif database to restrict motif matching too.
 
@@ -1198,10 +1195,6 @@ def homer_combine_motifs(
     {str,None}
         If `run` is `False`, returns path to consensus motif file. Otherwise `None`.
     """
-    if known_vertebrates_TFs_only:
-        _LOGGER.warning("WARNING! `known_vertebrates_TFs_only` option is deprecated!" +
-                        "Pass a given motif_database to `motif_database` directly.")
-
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
@@ -1384,7 +1377,7 @@ def run_enrichment_jobs(
         results_dir, genome,
         background_bed,
         steps=['lola', 'meme', 'homer', 'enrichr'],
-        overwrite=True):
+        overwrite=True, pickle_file=None):
     """
     Submit parallel enrichment jobs for a specific analysis.
 
@@ -1420,6 +1413,23 @@ def run_enrichment_jobs(
     jobs = list()
     # list of tuples with: job_name, log, exec, requirements (partition, cpu, mem), cmd
 
+    # REGION
+    if 'region' in steps:
+        files = glob(results_dir + "/*/*_regions.bed")
+        for file in files:
+            dir_ = os.path.dirname(file)
+            name = os.path.basename(dir_)
+            output_ = file.replace("symbols.txt", "region_type_enrichment.csv")
+            if os.path.exists(output_) and (not overwrite):
+                continue
+            jobs.append([
+                name + "_region",
+                os.path.join(dir_, name + ".region.log"),
+                os.path.join(dir_, name + ".region.sh"),
+                ("shortq", 8, 24000),
+                "python ~/region_enrichment.py {} {} {}"
+                .format(file, pickle_file, output_)])
+
     # LOLA
     if 'lola' in steps:
         files = glob(results_dir + "/*/*_regions.bed")
@@ -1429,13 +1439,13 @@ def run_enrichment_jobs(
             output_ = os.path.join(dir_, "allEnrichments.tsv")
             if os.path.exists(output_) and (not overwrite):
                 continue
-            jobs += [
-                name,
+            jobs.append([
+                name + "_lola",
                 os.path.join(dir_, name + ".lola.log"),
                 os.path.join(dir_, name + ".lola.sh"),
                 ("shortq", 8, 24000),
-                "Rscript ~/jobs/run_LOLA.R $F {} {}"
-                .format(background_bed, genome)]
+                "Rscript ~/jobs/run_LOLA.R {} {} {}"
+                .format(file, background_bed, genome)])
 
     # AME
     if 'meme' in steps:
@@ -1446,15 +1456,16 @@ def run_enrichment_jobs(
             output_ = os.path.join(dir_, "ame.html")
             if os.path.exists(output_) and (not overwrite):
                 continue
-            jobs += [
-                name,
+            jobs.append([
+                name + "_meme",
                 os.path.join(dir_, name + ".meme_ame.log"),
                 os.path.join(dir_, name + ".meme_ame.sh"),
                 ("shortq", 1, 4000),
-                "fasta-dinucleotide-shuffle -c 1 -f {f} > {f}.shuffled.fa\n" +
-                "ame --bgformat 1 --scoring avg --method ranksum --pvalue-report-threshold 0.05" +
+                "fasta-dinucleotide-shuffle -c 1 -f {f} > {f}.shuffled.fa\n"
+                .format(f=file) +
+                " ame --bgformat 1 --scoring avg --method ranksum --pvalue-report-threshold 0.05" +
                 " --control {f}.shuffled.fa -o {d} {f} {motifs}"
-                .format(f=file, d=dir_, motifs=dbs[omap[genome]])]
+                .format(f=file, d=dir_, motifs=dbs[omap[genome]])])
 
     # HOMER
     if 'homer' in steps:
@@ -1465,13 +1476,13 @@ def run_enrichment_jobs(
             output_ = os.path.join(dir_, "homerResults.html")
             if os.path.exists(output_) and (not overwrite):
                 continue
-            jobs += [
-                name,
+            jobs.append([
+                name + "_homer",
                 os.path.join(dir_, name + ".homer.log"),
                 os.path.join(dir_, name + ".homer.sh"),
                 ("shortq", 8, 20000),
                 "findMotifsGenome.pl {f} {genome}r {d} -size 1000 -h -p 2 -len 8,10,12,14 -noknown"
-                .format(f=file, d=dir_, genome=genome)]
+                .format(f=file, d=dir_, genome=genome)])
 
     # Enrichr
     if 'enrichr' in steps:
@@ -1482,21 +1493,21 @@ def run_enrichment_jobs(
             output_ = file.replace("symbols.txt", "enrichr.csv")
             if os.path.exists(output_) and (not overwrite):
                 continue
-            jobs += [
-                name,
+            jobs.append([
+                name + "_enrichr",
                 os.path.join(dir_, name + ".enrichr.log"),
                 os.path.join(dir_, name + ".enrichr.sh"),
                 ("shortq", 1, 4000),
                 "python -u ~/jobs/run_Enrichr.py --input-file {f} --output-file {o}"
-                .format(f=file, o=output_)]
+                .format(f=file, o=output_)])
 
-    for job_name, log_file, job_file, (cpu, mem), cmd in jobs:
+    for job_name, log_file, job_file, (queue, cpu, mem), task in jobs:
         cmd = tk.slurm_header(
             job_name=job_name, output=log_file,
-            cpus_per_task=cpu, mem_per_cpu=mem)
-        cmd += cmd
+            queue=queue, cpus_per_task=cpu, mem_per_cpu=mem)
+        cmd += task
         cmd += " \n"
-        cmd += tk.slurm_footer()
+        cmd += tk.slurm_footer() + "\n"
         with open(job_file, "w") as handle:
             handle.write(textwrap.dedent(cmd).replace("\n ", "\n").replace("  ", ""))
 

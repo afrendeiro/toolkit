@@ -1985,7 +1985,7 @@ class ATACSeqAnalysis(Analysis):
 
         options = ['region_set', "genome"]
         if background not in options:
-            msg = "Option `background` must be one of {}.".format(", ".join(options))
+            msg = "Option `background` must be one of '{}'.".format("', '".join(options))
             raise ValueError(msg)
 
         # compare genomic regions and chromatin_states
@@ -2027,7 +2027,7 @@ class ATACSeqAnalysis(Analysis):
             res = res.reindex(res_b.index)
 
             # # join
-            res = res.join(res_b, how="outer")
+            res = res.join(res_b, how="outer").fillna(0).astype(int)
 
             # Calculate log fold enrichment:
             # # normalize to total:
@@ -2099,6 +2099,7 @@ class ATACSeqAnalysis(Analysis):
             Default is all: ['region', 'lola', 'meme', 'homer', 'enrichr']
         """
         from ngs_toolkit.general import get_genome_reference
+        import warnings
         # use all sites as universe
         if universe_file is None:
             try:
@@ -2130,13 +2131,13 @@ class ATACSeqAnalysis(Analysis):
         clean_gene = clean_gene[~clean_gene.isin(['.', 'nan', ''])]
         clean_gene.to_csv(
                 os.path.join(output_dir, "{}_genes.symbols.txt".format(prefix)),
-                index=False)
+                header=False, index=False)
         if "ensembl_gene_id" in differential.columns:
             # export ensembl gene names
             clean = differential['ensembl_gene_id'].str.split(",").apply(pd.Series, 1).stack().drop_duplicates()
             clean.to_csv(
                 os.path.join(output_dir, "{}_genes.ensembl.txt".format(prefix)),
-                index=False)
+                header=False, index=False)
 
         # export gene symbols with scaled absolute fold change
         if "log2FoldChange" in differential.columns:
@@ -2162,11 +2163,12 @@ class ATACSeqAnalysis(Analysis):
             fasta_file = os.path.join(output_dir, "{}_regions.fa".format(prefix))
             okay = False
             for f in ['fasta', '2bit']:
-                try:
-                    genome_file = get_genome_reference(self.organism, file_format=f, overwrite=False)
-                    okay = True
-                except ValueError:
-                    pass
+                with warnings.catch_warnings():
+                    try:
+                        genome_file = get_genome_reference(self.organism, file_format=f, overwrite=False)
+                        okay = True
+                    except ValueError:
+                        pass
             if not okay:
                 reason = "Could not get genome sequence file in either FASTA or 2bit format."
                 _LOGGER.warning(reason + hint)

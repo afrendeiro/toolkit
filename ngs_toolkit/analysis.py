@@ -2725,7 +2725,8 @@ class Analysis(object):
             directional=True,
             max_diff=1000,
             sort_var="pvalue",
-            distributed=False):
+            distributed=False,
+            overwrite=False):
         """
         Perform various types of enrichment analysis given a dataframe of the results from differential analysis.
         Performs enrichment of gene sets (RNA-seq and ATAC-seq), genomic regions, chromatin states
@@ -2737,6 +2738,7 @@ class Analysis(object):
         differential : pandas.DataFrame
             Data frame with differential results as produced by ``differential_analysis``.
             Must contain a "comparison_name" column.
+            Defaults to `analysis.differential_results`.
 
         data_type : str, optional
             Data type. One of "ATAC-seq" and "RNA-seq".
@@ -2776,6 +2778,10 @@ class Analysis(object):
             Whether work should be submitted as jobs in a computing cluster.
             Defaults to False.
 
+        overwrite : bool, optional
+            Whether output files should be overwritten when `distributed` is True.
+            Defaults to False.
+
         Attributes
         ----------
         enrichment_results : dict
@@ -2784,6 +2790,7 @@ class Analysis(object):
         """
         # TODO: separate and fix mouse TF ids
         # TODO: separate homer_consensus output processing
+        # TODO: add overwrite function when distributed==False
         serial = not distributed
 
         if differential is None:
@@ -2954,10 +2961,11 @@ class Analysis(object):
             _LOGGER.info("Submitting enrichment jobs.")
             run_enrichment_jobs(
                 results_dir=output_dir,
-                genome=genome, background_bed=background, steps=steps)
+                genome=genome, background_bed=background,
+                steps=steps, overwrite=overwrite,
+                pickle_file=self.pickle_file)
 
     def collect_differential_enrichment(
-
             self,
             steps=["region", "lola", "motif", "homer", "homer_consensus", "enrichr"],
             directional=True,
@@ -3051,8 +3059,8 @@ class Analysis(object):
             ("meme", meme_enr, parse_ame, {}, "ame.txt", ".meme_ame.csv"),
             ("homer", homer_enr, parse_homer, {}, "homerResults", ".homer_motifs.csv"),
             ("homer_consensus", homer_consensus, pd.read_csv, {"sep": "\t"}, "knownResults.txt", ".homer_consensus.csv"),
-            ("lola", lola_enr, pd.read_csv, {"sep", "\t"}, "allEnrichments.tsv", ".lola.csv"),
-            ("enrichr", pathway_enr, pd.read_csv, {"encoding": "utf-8"}, output_prefix + "_regions.enrichr.csv", ".enrichr.csv")]
+            ("lola", lola_enr, pd.read_csv, {"sep": "\t"}, "allEnrichments.tsv", ".lola.csv"),
+            ("enrichr", pathway_enr, pd.read_csv, {"encoding": "utf-8"}, output_prefix + "_genes.enrichr.csv", ".enrichr.csv")]
 
         # Examine each region cluster
         comps = differential["comparison_name"].drop_duplicates()
@@ -3102,7 +3110,12 @@ class Analysis(object):
 
         for name, df, function, kwargs, suffix, output_suffix in possible_steps:
             if name in steps:
-                self.enrichment_results[name] = pd.concat(df, axis=0)
+                if len(df) == 0:
+                    msg = "No comparison has {} results. Saving empty dataframe!".format(name)
+                    _LOGGER.warning(msg)
+                    self.enrichment_results[name] = pd.DataFrame()
+                else:
+                    self.enrichment_results[name] = pd.concat(df, axis=0)
                 self.enrichment_results[name].to_csv(
                     os.path.join(output_dir, output_prefix + output_suffix), index=False, encoding="utf-8")
 

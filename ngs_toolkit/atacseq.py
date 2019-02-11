@@ -1531,120 +1531,205 @@ class ATACSeqAnalysis(Analysis):
 
     def plot_peak_characteristics(self, samples=None, by_attribute=None, genome_space=3e9):
         """
-        Several diagnostic plots on the peak set and the Sample's signal on them.
+        Several diagnostic plots on the analysis' consensus peak set
+        and the sample's signal on them.
 
-        Provides plots with Samples grouped `by_attribute` if given (a string or a list of strings).
+        Provides plots with samples grouped `by_attribute` if given (a string or a list of strings).
+
+        Parameters
+        ----------
+        samples : list, optional
+            List of samples to restrict analysis to.
+
+        by_attribute : {str, list}, optional
+            Attribute or list of sample attributes to groupby samples by when plotting.
+            This is done in addition to the plots with individual values per sample.
+
+        genome_space : int
+            Length of genome.
         """
-        def get_sample_reads(bam_file):
-            return pysam.AlignmentFile(bam_file).count()
-
-        def get_peak_number(bed_file):
-            return len(open(bed_file, "r").read().split("\n"))
-
-        def get_total_open_chromatin(bed_file):
-            peaks = pd.read_csv(bed_file, sep="\t", header=None)
-            return (peaks.iloc[:, 2] - peaks.iloc[:, 1]).sum()
-
-        def get_peak_lengths(bed_file):
-            peaks = pd.read_csv(bed_file, sep="\t", header=None)
-            return (peaks.iloc[:, 2] - peaks.iloc[:, 1])
-
-        def get_peak_chroms(bed_file):
-            peaks = pd.read_csv(bed_file, sep="\t", header=None)
-            return peaks.iloc[:, 0].value_counts()
+        from ngs_toolkit.utils import (
+            count_bam_file_length,
+            count_lines,
+            get_total_region_area,
+            get_region_lengths,
+            get_regions_per_chromosomes)
+        from ngs_toolkit.graphics import savefig
 
         if samples is None:
             samples = self.samples
 
-        # TODO: add parallelization with parmap
-        stats = pd.DataFrame([
-            map(get_sample_reads, [s.aligned_filtered_bam for s in samples]),
-            map(get_peak_number, [s.peaks for s in samples]),
-            map(get_total_open_chromatin, [s.peaks for s in samples])],
+        reads = parmap.map(count_bam_file_length, [s.aligned_filtered_bam for s in samples])
+        peaks = list(map(count_lines, [s.peaks for s in samples]))
+        open_chrom = list(map(get_total_region_area, [s.peaks for s in samples]))
+
+        stats = pd.DataFrame(
+            [reads, peaks, open_chrom],
             index=["reads_used", "peak_number", "open_chromatin"],
             columns=[s.name for s in samples]).T
 
         stats["peaks_norm"] = (stats["peak_number"] / stats["reads_used"]) * 1e3
         stats["open_chromatin_norm"] = (stats["open_chromatin"] / stats["reads_used"])
-        stats.to_csv(os.path.join(self.results_dir, "{}.open_chromatin_space.csv".format(self.name)), index=True)
-        stats = pd.read_csv(os.path.join(self.results_dir, "{}.open_chromatin_space.csv".format(self.name)), index_col=0)
+        stats.to_csv(
+            os.path.join(
+                self.results_dir,
+                "{}.open_chromatin_space.csv".format(self.name)),
+            index=True)
+        # stats = pd.read_csv(os.path.join(
+        #         self.results_dir,
+        #         "{}.open_chromatin_space.csv"
+        #         .format(self.name)),
+        #     index_col=0)
 
         # median lengths per sample (split-apply-combine)
         if by_attribute is not None:
-            stats = pd.merge(stats, stats.groupby(by_attribute)['open_chromatin'].median().to_frame(name='group_open_chromatin').reset_index())
-            stats = pd.merge(stats, stats.groupby(by_attribute)['open_chromatin_norm'].median().to_frame(name='group_open_chromatin_norm').reset_index())
+            stats = pd.merge(
+                stats,
+                stats.groupby(by_attribute)
+                ['open_chromatin'].median()
+                .to_frame(name='group_open_chromatin').reset_index())
+            stats = pd.merge(
+                stats,
+                stats.groupby(by_attribute)
+                ['open_chromatin_norm'].median()
+                .to_frame(name='group_open_chromatin_norm')
+                .reset_index())
 
         # plot
         stats = stats.sort_values("open_chromatin_norm")
-        fig, axis = plt.subplots(2, 1, figsize=(4 * 2, 6 * 1))
-        sns.barplot(x="index", y="open_chromatin", data=stats.reset_index(), palette="summer", ax=axis[0])
-        sns.barplot(x="index", y="open_chromatin_norm", data=stats.reset_index(), palette="summer", ax=axis[1])
-        axis[0].set_ylabel("Total open chromatin space (bp)")
-        axis[1].set_ylabel("Total open chromatin space (normalized)")
-        axis[0].set_xticklabels(axis[0].get_xticklabels(), rotation=45, ha="right")
-        axis[1].set_xticklabels(axis[1].get_xticklabels(), rotation=45, ha="right")
+        fig, axis = plt.subplots(2, 1, figsize=(1 * 3, 2 * 3))
+        sns.barplot(
+            y="index", x="open_chromatin",
+            orient="horiz", data=stats.reset_index(), palette="summer",
+            ax=axis[0])
+        sns.barplot(
+            y="index", x="open_chromatin_norm",
+            orient="horiz", data=stats.reset_index(), palette="summer",
+            ax=axis[1])
+        axis[0].set_xlabel("Total open chromatin space (bp)")
+        axis[1].set_xlabel("Total open chromatin space (normalized)")
         sns.despine(fig)
-        fig.savefig(os.path.join(self.results_dir, "{}.total_open_chromatin_space.per_sample.svg".format(self.name)), bbox_inches="tight")
+        savefig(fig, os.path.join(
+            self.results_dir,
+            "{}.total_open_chromatin_space.per_sample.svg"
+            .format(self.name)))
 
         if by_attribute is not None:
             # median lengths per group (split-apply-combine)
-            stats = pd.merge(stats, stats.groupby(by_attribute)['open_chromatin'].median().to_frame(name='group_open_chromatin').reset_index())
-            stats = stats.sort_values("group_open_chromatin")
+            stats = pd.merge(
+                stats,
+                stats.groupby(by_attribute)
+                ['open_chromatin'].median()
+                .to_frame(name='group_open_chromatin')
+                .reset_index()
+                .sort_values("group_open_chromatin"))
 
             fig, axis = plt.subplots(2, 1, figsize=(4 * 2, 6 * 1))
             stats = stats.sort_values("group_open_chromatin")
-            sns.barplot(x=by_attribute, y="open_chromatin", data=stats.reset_index(), palette="summer", ax=axis[0])
-            sns.stripplot(x=by_attribute, y="open_chromatin", data=stats.reset_index(), palette="summer", ax=axis[0])
+            sns.barplot(
+                y=by_attribute, x="open_chromatin", orient="horiz",
+                data=stats.reset_index(), palette="summer", ax=axis[0])
+            sns.stripplot(
+                y=by_attribute, x="open_chromatin", orient="horiz",
+                data=stats.reset_index(), palette="summer", ax=axis[0])
             stats = stats.sort_values("group_open_chromatin_norm")
-            sns.barplot(x=by_attribute, y="open_chromatin_norm", data=stats.reset_index(), palette="summer", ax=axis[1])
-            sns.stripplot(x=by_attribute, y="open_chromatin_norm", data=stats.reset_index(), palette="summer", ax=axis[1])
-            axis[0].axhline(stats.groupby(by_attribute)['open_chromatin'].median()["WT"], color="black", linestyle="--")
-            axis[1].axhline(stats.groupby(by_attribute)['open_chromatin_norm'].median()["WT"], color="black", linestyle="--")
-            axis[0].set_ylabel("Total open chromatin space (bp)")
-            axis[1].set_ylabel("Total open chromatin space (normalized)")
-            axis[0].set_xticklabels(axis[0].get_xticklabels(), rotation=45, ha="right")
-            axis[1].set_xticklabels(axis[1].get_xticklabels(), rotation=45, ha="right")
+            sns.barplot(
+                y=by_attribute, x="open_chromatin_norm", orient="horiz",
+                data=stats.reset_index(), palette="summer", ax=axis[1])
+            sns.stripplot(
+                y=by_attribute, x="open_chromatin_norm", orient="horiz",
+                data=stats.reset_index(), palette="summer", ax=axis[1])
+            axis[0].axhline(
+                stats.groupby(by_attribute)
+                ['open_chromatin'].median()["WT"],
+                color="black", linestyle="--")
+            axis[1].axhline(
+                stats.groupby(by_attribute)
+                ['open_chromatin_norm'].median()["WT"],
+                color="black", linestyle="--")
+            axis[0].set_xlabel("Total open chromatin space (bp)")
+            axis[1].set_xlabel("Total open chromatin space (normalized)")
             sns.despine(fig)
-            fig.savefig(os.path.join(self.results_dir, "{}.total_open_chromatin_space.per_{}.svg".format(self.name, by_attribute)), bbox_inches="tight")
+            savefig(fig, os.path.join(
+                self.results_dir,
+                "{}.total_open_chromatin_space.per_{}.svg"
+                .format(self.name, by_attribute)))
 
         # plot distribution of peak lengths
-        sample_peak_lengths = map(get_peak_lengths, [s.peaks for s in samples])
-        lengths = pd.melt(pd.DataFrame(sample_peak_lengths, index=[s.name for s in samples]).T, value_name='peak_length', var_name="sample_name").dropna()
+        sample_peak_lengths = map(get_region_lengths, [s.peaks for s in samples])
+        lengths = pd.melt(pd.DataFrame(
+                sample_peak_lengths,
+                index=[s.name for s in samples]).T,
+            value_name='peak_length', var_name="sample_name").dropna()
 
         # median lengths per sample (split-apply-combine)
-        lengths = pd.merge(lengths, lengths.groupby('sample_name')['peak_length'].median().to_frame(name='mean_peak_length').reset_index())
+        lengths = pd.merge(
+            lengths,
+            lengths.groupby('sample_name')
+            ['peak_length'].median()
+            .to_frame(name='mean_peak_length')
+            .reset_index()
+            .sort_values("mean_peak_length"))
 
-        lengths = lengths.sort_values("mean_peak_length")
-        fig, axis = plt.subplots(2, 1, figsize=(8 * 1, 4 * 2))
-        sns.boxplot(x="sample_name", y="peak_length", data=lengths, palette="summer", ax=axis[0], showfliers=False)
+        fig, axis = plt.subplots(2, 1, figsize=(3 * 1, 3 * 2))
+        sns.boxplot(
+            y="sample_name", x="peak_length", orient="horiz",
+            data=lengths, palette="summer", ax=axis[0],
+            showfliers=False)
         axis[0].set_ylabel("Peak length (bp)")
         axis[0].set_xticklabels(axis[0].get_xticklabels(), visible=False)
-        sns.boxplot(x="sample_name", y="peak_length", data=lengths, palette="summer", ax=axis[1], showfliers=False)
-        axis[1].set_yscale("log")
-        axis[1].set_ylabel("Peak length (bp)")
-        axis[1].set_xticklabels(axis[1].get_xticklabels(), rotation=45, ha="right")
+        sns.boxplot(
+            y="sample_name", x="peak_length", orient="horiz",
+            data=lengths, palette="summer", ax=axis[1],
+            showfliers=False)
+        axis[1].set_xscale("log")
+        axis[1].set_xlabel("Peak length (bp)")
         sns.despine(fig)
-        fig.savefig(os.path.join(self.results_dir, "{}.peak_lengths.per_sample.svg".format(self.name)), bbox_inches="tight")
+        savefig(fig, os.path.join(
+            self.results_dir,
+            "{}.peak_lengths.per_sample.svg"
+            .format(self.name)))
 
         if by_attribute is not None:
             # median lengths per group (split-apply-combine)
-            lengths = pd.merge(lengths, lengths.groupby(by_attribute)['peak_length'].median().to_frame(name='group_mean_peak_length').reset_index())
-            lengths = lengths.sort_values("group_mean_peak_length")
-            fig, axis = plt.subplots(2, 1, figsize=(8 * 1, 4 * 2))
-            sns.boxplot(x=by_attribute, y="peak_length", data=lengths, palette="summer", ax=axis[0], showfliers=False)
-            axis[0].set_ylabel("Peak length (bp)")
-            axis[0].set_xticklabels(axis[0].get_xticklabels(), visible=False)
-            sns.boxplot(x=by_attribute, y="peak_length", data=lengths, palette="summer", ax=axis[1], showfliers=False)
-            axis[1].set_yscale("log")
-            axis[1].set_ylabel("Peak length (bp)")
-            axis[1].set_xticklabels(axis[1].get_xticklabels(), rotation=45, ha="right")
+            lengths = pd.merge(
+                lengths,
+                lengths.groupby(by_attribute)
+                ['peak_length'].median()
+                .to_frame(name='group_mean_peak_length')
+                .reset_index()
+                .sort_values("group_mean_peak_length"))
+
+            fig, axis = plt.subplots(2, 1, figsize=(3 * 1, 3 * 2))
+            sns.boxplot(
+                y=by_attribute, x="peak_length", orient="horiz",
+                data=lengths, palette="summer", ax=axis[0], showfliers=False)
+            axis[0].set_xlabel("Peak length (bp)")
+            sns.boxplot(
+                y=by_attribute, x="peak_length", orient="horiz",
+                data=lengths, palette="summer", ax=axis[1], showfliers=False)
+            axis[1].set_xscale("log")
+            axis[1].set_xlabel("Peak length (bp)")
+            axis[1].set_yticklabels(axis[1].get_yticklabels(), visible=False)
             sns.despine(fig)
-            fig.savefig(os.path.join(self.results_dir, "{}.peak_lengths.per_{}.svg".format(self.name, by_attribute)), bbox_inches="tight")
+            savefig(fig, os.path.join(
+                self.results_dir,
+                "{}.peak_lengths.per_{}.svg"
+                .format(self.name, by_attribute)))
 
         # peaks per chromosome per sample
-        chroms = pd.DataFrame(map(get_peak_chroms, [s.peaks for s in samples]), index=[s.name for s in samples]).fillna(0).T
+        chroms = pd.DataFrame(
+            map(get_regions_per_chromosomes, [s.peaks for s in samples]),
+            index=[s.name for s in samples]).fillna(0).T
         chroms_norm = (chroms / chroms.sum(axis=0)) * 100
-        chroms_norm = chroms_norm.ix[["chr{}".format(i) for i in range(1, 23) + ['X', 'Y', 'M']]]
+
+        if hasattr(self, "organim"):
+            if self.organism == "human":
+                chroms_norm = chroms_norm.loc[
+                    ["chr{}".format(i) for i in list(range(1, 23)) + ['X', 'Y', 'M']], :]
+            elif self.organism == "mouse":
+                chroms_norm = chroms_norm.loc[
+                    ["chr{}".format(i) for i in list(range(1, 19)) + ['X', 'Y', 'M']], :]
 
         fig, axis = plt.subplots(1, 1, figsize=(8 * 1, 8 * 1))
         sns.heatmap(
@@ -1652,124 +1737,130 @@ class ATACSeqAnalysis(Analysis):
             xticklabels=True, yticklabels=True, ax=axis)
         axis.set_xticklabels(axis.get_xticklabels(), rotation=90, ha="right")
         axis.set_yticklabels(axis.get_yticklabels(), rotation=0, ha="right")
-        fig.savefig(os.path.join(self.results_dir, "{}.peak_location.per_sample.svg".format(self.name)), bbox_inches="tight")
+        savefig(fig, os.path.join(self.results_dir, "{}.peak_location.per_sample.svg".format(self.name)))
 
         # Peak set across samples:
         # interval lengths
-        fig, axis = plt.subplots()
-        sns.distplot([interval.length for interval in self.sites if interval.length < 2000], bins=300, kde=False, ax=axis)
-        axis.set_xlabel("peak width (bp)")
-        axis.set_ylabel("frequency")
+        fig, axis = plt.subplots(1, 1, figsize=(3, 3))
+        sns.distplot(
+            [interval.length for interval in self.sites if interval.length < 2000],
+            hist=False, kde=True, ax=axis)
+        axis.set_xlabel("Peak width (bp)")
+        axis.set_ylabel("Density")
         sns.despine(fig)
-        fig.savefig(os.path.join(self.results_dir, "{}.lengths.svg".format(self.name)), bbox_inches="tight")
+        savefig(fig, os.path.join(
+            self.results_dir, "{}.lengths.svg".format(self.name)))
 
         # plot support
-        fig, axis = plt.subplots()
-        sns.distplot(self.support["support"], bins=40, ax=axis)
-        axis.set_ylabel("frequency")
-        sns.despine(fig)
-        fig.savefig(os.path.join(self.results_dir, "{}.support.svg".format(self.name)), bbox_inches="tight")
+        if hasattr(self, "support"):
+            fig, axis = plt.subplots()
+            sns.distplot(self.support["support"], bins=40, ax=axis)
+            axis.set_ylabel("frequency")
+            sns.despine(fig)
+            savefig(fig, os.path.join(
+                self.results_dir, "{}.support.svg".format(self.name)))
 
         # Plot distance to nearest TSS
-        fig, axis = plt.subplots(2, 2, figsize=(4 * 2, 4 * 2), sharex=False, sharey=False)
-        sns.distplot([x for x in self.closest_tss_distances if x < 1e5], bins=1000, kde=False, hist=True, ax=axis[0][0])
-        sns.distplot([x for x in self.closest_tss_distances if x < 1e5], bins=1000, kde=False, hist=True, ax=axis[0][1])
-        sns.distplot([x for x in self.closest_tss_distances if x < 1e6], bins=1000, kde=True, hist=False, ax=axis[1][0])
-        sns.distplot([x for x in self.closest_tss_distances if x < 1e6], bins=1000, kde=True, hist=False, ax=axis[1][1])
-        for ax in axis.flat:
-            ax.set_xlabel("distance to nearest TSS (bp)")
-            ax.set_ylabel("frequency")
-        axis[0][1].set_yscale("log")
-        axis[1][1].set_yscale("log")
-        sns.despine(fig)
-        fig.savefig(os.path.join(self.results_dir, "{}.tss_distance.svg".format(self.name)), bbox_inches="tight")
+        if hasattr(self, "closest_tss_distances"):
+            fig, axis = plt.subplots(
+                2, 2, figsize=(4 * 2, 4 * 2),
+                sharex=False, sharey=False)
+            sns.distplot(
+                self.closest_tss_distances['distance'],
+                bins=1000, kde=True, hist=False, ax=axis[0][0])
+            sns.distplot(
+                self.closest_tss_distances['distance'],
+                bins=1000, kde=True, hist=False, ax=axis[0][1])
+            sns.distplot(
+                self.closest_tss_distances['distance'],
+                bins=1000, kde=True, hist=False, ax=axis[1][0])
+            sns.distplot(
+                self.closest_tss_distances['distance'],
+                bins=1000, kde=True, hist=False, ax=axis[1][1])
+            for ax in axis.flat:
+                ax.set_xlabel("Distance to nearest TSS (bp)")
+                ax.set_ylabel("Density")
+            axis[0][1].set_yscale("log")
+            axis[1][1].set_yscale("log")
+            sns.despine(fig)
+            savefig(fig, os.path.join(
+                self.results_dir, "{}.tss_distance.svg"
+                .format(self.name)))
 
         # Plot genomic regions
-        # these are just long lists with genomic regions
-        all_region_annotation = self.region_annotation['genomic_region'].apply(lambda x: pd.Series(x.split(","))).stack().reset_index(level=[1], drop=True)
-        all_region_annotation.name = "foreground"
-        all_region_annotation_b = self.region_annotation_b['genomic_region'].apply(lambda x: pd.Series(x.split(","))).stack().reset_index(level=[1], drop=True)
-        all_region_annotation_b.name = "background"
+        datas = list()
+        for name, attr, attr_b in [
+                ('genomic_region', 'region_annotation_mapping', 'region_annotation_b_mapping'),
+                ('chromatin_state', 'chrom_state_annotation_mapping', 'chrom_state_annotation_b_mapping')]:
+            if hasattr(self, attr):
+                f = getattr(self, attr)
+                b = getattr(self, attr_b)
+                # count region frequency
+                data = f[name].value_counts().sort_values(ascending=False)
+                background = b[name].value_counts().sort_values(ascending=False)
+                data = data.to_frame(name="foreground").join(background.to_frame(name="background"))
+                data["fold_change"] = np.log2(data['foreground'] / data['background'])
+                data.index.name = "region"
 
-        # count region frequency
-        data = all_region_annotation.value_counts().sort_values(ascending=False)
-        background = all_region_annotation_b.value_counts().sort_values(ascending=False)
-        data = data.to_frame().join(background)
-        data["fold_change"] = np.log2(data['foreground'] / data['background'])
-        data.index.name = "region"
+                # plot also % of genome space "used"
+                f["length"] = f["end"] - f["start"]
+                b["length"] = b["end"] - b["start"]
 
-        # plot also % of genome space "used"
-        self.region_annotation["length"] = self.region_annotation["end"] - self.region_annotation["start"]
+                s = f.groupby(name)["length"].sum()
+                data.loc[:, "percent_genome_space"] = (s / genome_space).dropna() * 100
+                datas.append(data)
 
-        s = self.region_annotation.join(all_region_annotation).groupby("foreground")["length"].sum()
-        s.name = "size"
-        s = (s / pd.Series(genome_space)).dropna() * 100
-        s.name = "percent_space"
-        data = data.join(s)
-
-        # plot together
-        g = sns.FacetGrid(data=pd.melt(data.reset_index(), id_vars='region'), col="variable", col_wrap=2, sharex=True, sharey=False, size=4)
-        g.map(sns.barplot, "region", "value")
-        sns.despine(fig)
-        g.savefig(os.path.join(self.results_dir, "{}.genomic_regions.svg".format(self.name)), bbox_inches="tight")
-
-        # # Plot chromatin states
-        all_chrom_state_annotation = self.chrom_state_annotation['chromatin_state'].apply(lambda x: pd.Series(x.split(","))).stack().reset_index(level=[1], drop=True)
-        all_chrom_state_annotation.name = "foreground"
-        all_chrom_state_annotation_b = self.chrom_state_annotation_b['chromatin_state'].apply(lambda x: pd.Series(x.split(","))).stack().reset_index(level=[1], drop=True)
-        all_chrom_state_annotation_b.name = "background"
-
-        # count region frequency
-        data = all_chrom_state_annotation.value_counts().sort_values(ascending=False)
-        background = all_chrom_state_annotation_b.value_counts().sort_values(ascending=False)
-        data = data.to_frame().join(background)
-        data["fold_change"] = np.log2(data['foreground'] / data['background'])
-        data.index.name = "region"
-
-        # plot also % of genome space "used"
-        self.chrom_state_annotation["length"] = self.chrom_state_annotation["end"] - self.chrom_state_annotation["start"]
-
-        s = self.chrom_state_annotation.join(all_chrom_state_annotation).groupby("foreground")["length"].sum()
-        s.name = "size"
-        s = (s / pd.Series(genome_space)).dropna() * 100
-        s.name = "percent_space"
-        data = data.join(s)
+                # plot together
+                g = sns.FacetGrid(
+                    data=pd.melt(data.reset_index(), id_vars='region'),
+                    col="variable", col_wrap=2, sharex=False, sharey=True, size=2, aspect=1.2)
+                g.map(sns.barplot, "value", "region", orient="horiz")
+                sns.despine(fig)
+                savefig(g, os.path.join(
+                    self.results_dir, "{}.{}s.svg"
+                    .format(self.name, name)))
 
         # plot together
-        g = sns.FacetGrid(data=pd.melt(data.reset_index(), id_vars='region'), col="variable", col_wrap=2, sharex=True, sharey=False, size=4)
-        g.map(sns.barplot, "region", "value")
-        sns.despine(fig)
-        g.savefig(os.path.join(self.results_dir, "{}.chromatin_states.svg".format(self.name)), bbox_inches="tight")
+        if len(datas) > 1:
+            data = pd.concat(datas)
+            g = sns.FacetGrid(
+                data=pd.melt(data.reset_index(), id_vars='region'),
+                col="variable", col_wrap=2, sharex=False, sharey=True, size=2, aspect=1.2)
+            g.map(sns.barplot, "value", "region", orient="horiz")
+            sns.despine(fig)
+            savefig(g, os.path.join(
+                self.results_dir, "{}.genomic_region_and_chromatin_states.svg"
+                .format(self.name)))
 
-        # distribution of count attributes
-        data = self.coverage_annotated.copy()
+        # distribution of count statistics
+        if hasattr(self, "stats"):
+            for attr in self.stats.columns:
+                fig, axis = plt.subplots(1, 1, figsize=(3, 3))
+                sns.distplot(self.stats.loc[:, attr], hist=False, kde=True, ax=axis)
+                sns.despine(fig)
+                savefig(fig, os.path.join(
+                    self.results_dir, "{}.{}.distplot.svg"
+                    .format(self.name, attr)))
+        if hasattr(self, "support"):
+            attr = "support"
+            fig, axis = plt.subplots(1, 1, figsize=(3, 3))
+            sns.distplot(self.support.loc[:, attr], hist=False, kde=True, ax=axis)
+            sns.despine(fig)
+            savefig(fig, os.path.join(
+                self.results_dir, "{}.{}.distplot.svg"
+                .format(self.name, attr)))
 
-        fig, axis = plt.subplots(1)
-        sns.distplot(data["mean"], rug=False, ax=axis)
-        sns.despine(fig)
-        fig.savefig(os.path.join(self.results_dir, "{}.mean.distplot.svg".format(self.name)), bbox_inches="tight")
-
-        fig, axis = plt.subplots(1)
-        sns.distplot(data["qv2"], rug=False, ax=axis)
-        sns.despine(fig)
-        fig.savefig(os.path.join(self.results_dir, "{}.qv2.distplot.svg".format(self.name)), bbox_inches="tight")
-
-        fig, axis = plt.subplots(1)
-        sns.distplot(data["dispersion"], rug=False, ax=axis)
-        sns.despine(fig)
-        fig.savefig(os.path.join(self.results_dir, "{}.dispersion.distplot.svg".format(self.name)), bbox_inches="tight")
-
-        fig, axis = plt.subplots(1)
-        sns.distplot(data["support"], rug=False, ax=axis)
-        sns.despine(fig)
-        fig.savefig(os.path.join(self.results_dir, "{}.support.distplot.svg".format(self.name)), bbox_inches="tight")
-
-        # joint
-        for metric in ["support", "variance", "std_deviation", "dispersion", "qv2", "amplitude"]:
-            p = data[(data["mean"] > 0) & (data[metric] < np.percentile(data[metric], 99) * 3)]
-            g = sns.jointplot(p["mean"], p[metric], s=2, alpha=0.2, rasterized=True)
-            sns.despine(g.fig)
-            g.fig.savefig(os.path.join(self.results_dir, "{}.mean_{}.svg".format(self.name, metric)), bbox_inches="tight", dpi=300)
+        # Pairwise against mean
+        if hasattr(self, "stats"):
+            if hasattr(self, "support"):
+                self.stats.loc[:, "support"] = self.support.loc[:, "support"]
+            for attr in self.stats.columns:
+                if attr == "mean":
+                    continue
+                p = self.stats[(self.stats["mean"] > 0) & (self.stats[attr] < np.percentile(self.stats[attr], 99) * 3)]
+                g = sns.jointplot(p["mean"], p[attr], s=1, alpha=0.1, rasterized=True, height=3)
+                savefig(g.fig, os.path.join(
+                    self.results_dir, "{}.mean_vs_{}.svg".format(self.name, attr)))
 
     def plot_raw_coverage(self, samples=None, by_attribute=None):
         """

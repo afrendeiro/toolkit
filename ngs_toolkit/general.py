@@ -1397,12 +1397,18 @@ def run_enrichment_jobs(
         Steps of the analysis to perform.
         Defaults to ["region", lola", "meme", "homer", "enrichr"].
 
-    :param overwrite:
+    :param overwrite: bool, optional
         Whether output should be overwritten.
         In this case no jobs will be submitted for jobs with existing output files.
         Defaults to True
+
+    :param pickle_file: str, optional
+        Pickle file of the analysis.
+        Only required for "region" enrichment.
     """
     # TODO: replace with info from resources
+    # TODO: make required scripts into recipes or scripts distributed with package
+    # TODO: remove pickle_file requirement to "region" enrichment
 
     tk = NGSTk()
     dbs = {
@@ -1419,15 +1425,15 @@ def run_enrichment_jobs(
         for file in files:
             dir_ = os.path.dirname(file)
             name = os.path.basename(dir_)
-            output_ = file.replace("symbols.txt", "region_type_enrichment.csv")
+            output_ = os.path.join(dir_, "region_type_enrichment.csv")
             if os.path.exists(output_) and (not overwrite):
                 continue
             jobs.append([
                 name + "_region",
                 os.path.join(dir_, name + ".region.log"),
                 os.path.join(dir_, name + ".region.sh"),
-                ("shortq", 8, 24000),
-                "python ~/region_enrichment.py {} {} {}"
+                ("shortq", 1, 8000),
+                "python ~/region_enrichment.py {} {} --output-file {}"
                 .format(file, pickle_file, output_)])
 
     # LOLA
@@ -1443,7 +1449,7 @@ def run_enrichment_jobs(
                 name + "_lola",
                 os.path.join(dir_, name + ".lola.log"),
                 os.path.join(dir_, name + ".lola.sh"),
-                ("shortq", 8, 24000),
+                ("shortq", 2, 12000),
                 "Rscript ~/jobs/run_LOLA.R {} {} {}"
                 .format(file, background_bed, genome)])
 
@@ -1480,7 +1486,7 @@ def run_enrichment_jobs(
                 name + "_homer",
                 os.path.join(dir_, name + ".homer.log"),
                 os.path.join(dir_, name + ".homer.sh"),
-                ("shortq", 8, 20000),
+                ("shortq", 8, 12000),
                 "findMotifsGenome.pl {f} {genome}r {d} -size 1000 -h -p 2 -len 8,10,12,14 -noknown"
                 .format(f=file, d=dir_, genome=genome)])
 

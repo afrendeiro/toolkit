@@ -742,26 +742,26 @@ class Analysis(object):
 
         Parameters
         ----------
-        quant_matrix : str
+        quant_matrix : str, optional
             Attribute name of matrix to annotate.
             Default is  infered from the analysis data_type in the following way:
                 - ATAC-seq or ChIP-seq: ``coverage_annotated``;
                 - RNA-seq: ``expression_annotated``.
 
-        attributes : list
+        attributes : list, optional
             Desired attributes to be annotated.
             Defaults to all attributes in the original sample annotation sheet of the analysis" Project.
 
-        numerical_attributes : list
+        numerical_attributes : list, optional
             Attributes which are numeric even though they
             might be so in the samples" attributes. Will attempt
             to convert values to numeric.
 
-        save : bool
+        save : bool, optional
             Whether to write normalized DataFrame to disk.
             Default is True.
 
-        assign : bool
+        assign : bool, optional
             Whether to assign the normalized DataFrame to an attribute
              - ``accessibility`` if ``data_type`` is "ATAC-seq,
              - ``binding`` if ``data_type`` is "ChIP-seq, or
@@ -1023,9 +1023,6 @@ class Analysis(object):
 
         Parameters
         ----------
-        analysis : ngs_toolkit.general.Analysis
-            Analysis object to perform analysis for.
-
         steps : list, optional
             List of step keywords to be performed as described above.
             Defaults to all available.
@@ -3261,7 +3258,9 @@ class Analysis(object):
                 input_df,
                 output_file,
                 label="Enrichment\nof differential regions",
-                z_score=None, params={}):
+                z_score=None, params=None):
+            if params is None:
+                params = dict()
             # plot clustered heatmap
             shape = input_df.shape
             if z_score is not None:
@@ -3531,7 +3530,7 @@ class Analysis(object):
             enrichment_table["log_p_value"] = log_pvalues(enrichment_table["p_value"])
 
             for gene_set_library in enrichment_table["gene_set_library"].unique():
-                _LOGGER.info(gene_set_library)
+                _LOGGER.debug(gene_set_library)
 
                 # Plot top_n terms of each comparison in barplots
                 n = len(enrichment_table[comp_variable].drop_duplicates())

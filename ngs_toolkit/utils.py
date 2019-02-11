@@ -982,3 +982,29 @@ def normalize_quantiles_p(df_input):
         t = np.searchsorted(np.sort(df[col]), df[col])
         df[col] = [rank[i] for i in t]
     return df
+
+
+def count_bam_file_length(bam_file):
+    return pysam.AlignmentFile(bam_file).count()
+
+
+def count_lines(file):
+    with open(file) as f:
+        for i, l in enumerate(f):
+            pass
+    return i + 1
+
+
+def get_total_region_area(bed_file):
+    peaks = pd.read_csv(bed_file, sep="\t", header=None)
+    return (peaks.iloc[:, 2] - peaks.iloc[:, 1]).sum()
+
+
+def get_region_lengths(bed_file):
+    peaks = pd.read_csv(bed_file, sep="\t", header=None)
+    return (peaks.iloc[:, 2] - peaks.iloc[:, 1])
+
+
+def get_regions_per_chromosomes(bed_file):
+    peaks = pd.read_csv(bed_file, sep="\t", header=None)
+    return peaks.iloc[:, 0].value_counts()

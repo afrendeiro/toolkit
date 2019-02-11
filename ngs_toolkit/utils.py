@@ -421,22 +421,44 @@ def fastq2bam(input_fastq, output_bam, sample_name, input_fastq2=None):
 
 def decompress_file(file, output_file=None):
     """
-    Decompress a gzip-compressed file in chunks (not in memory).
+    Decompress a gzip-compressed file out-of-memory.
     """
     """
     # test:
     file = "file.bed.gz"
     """
+    import shutil
     if output_file is None:
         if not file.endswith(".gz"):
             msg = "`output_file` not given and input_file does not end in '.gz'."
             _LOGGER.error(msg)
             raise ValueError(msg)
         output_file = file.replace(".gz", "")
+    # decompress
     with gzip.open(file, 'rb') as _in:
-        with open(output_file, 'w') as _out:
-            for line in _in.readlines():
-                _out.write(line.decode('utf-8'))
+        with open(output_file, 'wb') as _out:
+            shutil.copyfileobj(_in, _out)
+            # for line in _in.readlines():
+            # _out.write(line.decode('utf-8'))
+
+
+def compress_file(file, output_file=None):
+    """
+    Compress a gzip-compressed file out-of-memory.
+    """
+    """
+    # test:
+    file = "file.bed.gz"
+    """
+    import shutil
+    if output_file is None:
+        output_file = file + ".gz"
+    # compress
+    with open(file, 'rb') as _in:
+        with gzip.open(output_file, 'wb') as _out:
+            shutil.copyfileobj(_in, _out)
+            # for line in _in.readlines():
+            # _out.write(line.decode('utf-8'))
 
 
 def download_file(url, output_file, chunk_size=1024):

@@ -1290,9 +1290,12 @@ class ATACSeqAnalysis(Analysis):
         for label, attr, bed in [
                 ("real", "chrom_state_annotation", self.sites),
                 ("background", "chrom_state_annotation_b", background)]:
+            _LOGGER.debug("Getting chromatinn state annotation for {} regions."
+                          .format(label))
             annot = (
                 bed.intersect(states, wa=True, wb=True, f=frac, loj=True)
-                .sort().to_dataframe(usecols=[0, 1, 2, 6]))
+                .to_dataframe(usecols=[0, 1, 2, 6]))
+            annot.iloc[:, 3] = annot.iloc[:, 3].astype(str)
 
             # remove duplicates (there shouldn't be anyway)
             annot = annot.drop_duplicates()
@@ -2013,7 +2016,18 @@ class ATACSeqAnalysis(Analysis):
                 except AttributeError:
                     _LOGGER.warning(msg2.format(matrix_b))
                     continue
-            res = res.join(annot.loc[:, step].value_counts().to_frame(name="universe").squeeze(), how="outer")
+            # # account for foreground regions not annotated
+            res_b = annot.loc[:, step].value_counts().to_frame(name="universe")
+            if not all([x in res_b.index for x in res.index]):
+                m = res.index[~res.index.isin(res_b.index)]
+                msg3 = ("Foreground regions contains type of {} not in background: {}"
+                        .format(step, "', '".join(m)))
+                msg3 += " Continuing without those."
+                _LOGGER.warning(msg3)
+            res = res.reindex(res_b.index)
+
+            # # join
+            res = res.join(res_b, how="outer")
 
             # Calculate log fold enrichment:
             # # normalize to total:

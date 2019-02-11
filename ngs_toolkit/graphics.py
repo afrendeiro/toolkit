@@ -506,8 +506,8 @@ def plot_region_context_enrichment(
             data=spec.reset_index(),
             x=x, y=y, hue=z, ax=axis[i])
         # label top points
-        for s in spec.sort_values(y).tail(top_n).index:
-            axis[i].text(spec.loc[s, x], spec.loc[s, y], s=s)
+        for n, s in spec.nlargest(top_n, y).iterrows():
+            axis[i].text(s[x], s[y], s=n)
         # equal x axis
         ll = spec.loc[:, x].abs().max()
         ll += ll * 0.1

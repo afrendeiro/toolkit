@@ -56,7 +56,7 @@ def analysis(tmp_path):
 
     a.get_peak_gene_annotation()
     a.annotate(quant_matrix="coverage")
-    a.differential_analysis()
+    a.differential_analysis(filter_support=False)
 
     _CONFIG['resources']['enrichr']['gene_set_libraries'] = ["GO_Biological_Process_2015"]
     a.differential_enrichment(steps=['enrichr'])

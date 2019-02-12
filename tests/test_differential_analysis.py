@@ -89,7 +89,7 @@ class Test_differential_analysis:
     def test_no_arguments(self, analysis, outputs):
         import pandas as pd
 
-        analysis.differential_analysis()
+        analysis.differential_analysis(filter_support=False)
         assert os.path.exists(
             os.path.join(analysis.results_dir, "differential_analysis_ATAC-seq"))
         assert os.path.exists(outputs[0])

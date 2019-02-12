@@ -1397,11 +1397,11 @@ class Analysis(object):
             covariates=None,
             output_dir="{results_dir}/differential_analysis_{data_type}",
             output_prefix="differential_analysis",
-            alpha=0.05,
             overwrite=True,
             distributed=False,
             cpus=2,
-            memory=16000):
+            memory=16000,
+            filter_support=True):
         """
         Perform differential regions/genes across samples that are associated with a certain trait.
         Currently the only implementation is with DESeq2.
@@ -1441,10 +1441,6 @@ class Analysis(object):
             Prefix for output files.
             Defaults to "differential_analysis".
 
-        alpha : float, optional
-            Significance level to use in differential analysis.
-            Results for all features will be returned nonetheless. Defaults to 0.05.
-
         overwrite : bool, optional
             Whether results should be overwritten in case they already exist.
             Defaults to True.
@@ -1460,7 +1456,14 @@ class Analysis(object):
             Default: 2.
 
         memory : int, optional
-            Memory to use when using distributed jobs. Default: 16000 (16Gb).
+            Memory to use when using distributed jobs.
+            Default: 16000 (16Gb).
+
+        filter_support : bool, optional
+            Whether features not supported in a given comparison should be removed
+            (i.e. regions with no peaks in any sample in a comparison are not tested)
+            Applies only to ATAC-/ChIP-seq data.
+            Default is True.
 
         Returns
         -------
@@ -1473,6 +1476,7 @@ class Analysis(object):
         differential_results : pandas.DataFrame
             Pandas dataframe with results.
         """
+        # TODO: for complex designs (one sample is in multiple groups/comparisons) implement running one comparison after the other
         if comparison_table is None:
             msg = "`comparison_table` was not given and is not set in analysis object."
             hint = "Add a `comparison_table` attribute to the analysis object."
@@ -1540,11 +1544,15 @@ class Analysis(object):
                 raise AssertionError(msg)
 
             # add covariates to comparison table
-            comparison_table = comparison_table.set_index("sample_name").join(sample_table.set_index("sample_name")[covariates]).reset_index()
+            comparison_table = (
+                comparison_table
+                .set_index("sample_name")
+                .join(sample_table.set_index("sample_name")[covariates])
+                .reset_index())
 
         # Make table for DESeq2
-        experiment_matrix = comparison_table[
-            ["sample_name", "sample_group"] + (covariates if covariates is not None else [])
+        experiment_matrix = comparison_table.loc[
+            :, ["sample_name", "sample_group"] + (covariates if covariates is not None else [])
         ].drop_duplicates()
 
         # Make formula for DESeq2
@@ -1552,11 +1560,21 @@ class Analysis(object):
 
         # Run DESeq2 analysis
         if not distributed:
-            # TODO: for complex designs (one sample is in multiple groups/comparisons)
-            #       implement running one comparison after the other
+            # filter features without support for given comparison
+            if data_type in ["ATAC-seq", "ChIP-seq"] and filter_support:
+                if not hasattr(self, "support"):
+                    msg = "`filter_support` enabled by analysis has no `support` attribute!"
+                    _LOGGER.error(msg)
+                    raise ValueError(msg)
+                _LOGGER.debug("Filtering out unsupported regions.")
+                sup = self.support.loc[:, [
+                    s.name
+                    for s in self.samples
+                    if s.name in comparison_table['sample_name'].tolist()]]
+                count_matrix = count_matrix.loc[(sup > 0).any(axis=1), :]
             results = deseq_analysis(
                 count_matrix, experiment_matrix, comparison_table,
-                formula, output_dir, output_prefix, alpha=alpha, overwrite=overwrite)
+                formula, output_dir, output_prefix, overwrite=overwrite)
             try:
                 results = results.set_index("index")
             except KeyError:
@@ -1573,15 +1591,27 @@ class Analysis(object):
                 if not os.path.exists(out):
                     os.makedirs(out)
 
-                comp = comparison_table[comparison_table["comparison_name"] == comparison_name]
+                comp = comparison_table.loc[comparison_table["comparison_name"] == comparison_name, :]
                 comp.to_csv(os.path.join(out, "comparison_table.csv"), index=False)
 
-                exp = experiment_matrix[
+                exp = experiment_matrix.loc[
                     experiment_matrix["sample_name"].isin(comp["sample_name"].tolist()) &
-                    experiment_matrix["sample_group"].isin(comp["sample_group"].tolist())]
+                    experiment_matrix["sample_group"].isin(comp["sample_group"].tolist()), :]
                 exp.to_csv(os.path.join(out, "experiment_matrix.csv"), index=False)
 
-                count = count_matrix[comp["sample_name"].drop_duplicates()]
+                count = count_matrix.loc[:, comp["sample_name"].drop_duplicates()]
+                # filter features without support for given comparison
+                if data_type in ["ATAC-seq", "ChIP-seq"] and filter_support:
+                    if not hasattr(self, "support"):
+                        msg = "`filter_support` enabled by analysis has no `support` attribute!"
+                        _LOGGER.error(msg)
+                        raise ValueError(msg)
+                    _LOGGER.debug("Filtering out unsupported regions for comparison '{}'.".format(comparison_name))
+                    sup = self.support.loc[:, [
+                        s.name
+                        for s in self.samples
+                        if s.name in comp['sample_name'].tolist()]]
+                    count = count.loc[(sup > 0).any(axis=1), :]
                 count.to_csv(os.path.join(out, "count_matrix.csv"), index=True)
 
                 job_name = "deseq_job.{}".format(comparison_name)
@@ -1595,7 +1625,6 @@ class Analysis(object):
                 cmd += "python -u ~/deseq_parallel.py"
                 cmd += " --output_prefix {}".format(output_prefix)
                 cmd += " --formula '{}'".format(formula)
-                cmd += " --alpha {}".format(alpha)
                 if overwrite:
                     cmd += " --overwrite"
                 cmd += " {}\n".format(out)

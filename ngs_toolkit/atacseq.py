@@ -2003,26 +2003,6 @@ class ATACSeqAnalysis(Analysis):
         g.fig.savefig(os.path.join(self.results_dir, self.name + ".norm_counts.support.chromatin_state.distplot.svg"), bbox_inches="tight")
         plt.close("all")
 
-    def plot_variance(self, samples):
-
-        g = sns.jointplot('mean', "dispersion", data=self.accessibility, kind="kde")
-        g.fig.savefig(os.path.join(self.results_dir, self.name + ".norm_counts_per_sample.dispersion.svg"), bbox_inches="tight")
-
-        g = sns.jointplot('mean', "qv2", data=self.accessibility)
-        g.fig.savefig(os.path.join(self.results_dir, self.name + ".norm_counts_per_sample.qv2_vs_mean.svg"), bbox_inches="tight")
-
-        g = sns.jointplot('support', "qv2", data=self.accessibility)
-        g.fig.savefig(os.path.join(self.results_dir, self.name + ".norm_counts_per_sample.support_vs_qv2.svg"), bbox_inches="tight")
-
-        # Filter out regions which the maximum across all samples is below a treshold
-        filtered = self.accessibility[self.accessibility[[sample.name for sample in samples]].max(axis=1) > 3]
-
-        sns.jointplot('mean', "dispersion", data=filtered)
-        plt.savefig(os.path.join(self.results_dir, self.name + ".norm_counts_per_sample.dispersion.filtered.svg"), bbox_inches="tight")
-        plt.close('all')
-        sns.jointplot('mean', "qv2", data=filtered)
-        plt.savefig(os.path.join(self.results_dir, self.name + ".norm_counts_per_sample.support_vs_qv2.filtered.svg"), bbox_inches="tight")
-
     def region_context_enrichment(
             self, regions,
             steps=['genomic_region', 'chromatin_state'],

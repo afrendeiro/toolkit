@@ -3230,21 +3230,13 @@ class Analysis(object):
             Whether or not to rasterize heatmaps for efficient plotting.
             Defaults to True.
 
-        barplots : bool, optional
-            Whether barplots with top enriched terms per comparison should be produced.
-            Defaults to True.
-
-        correlation_plots : bool, optional
-            Whether correlation plots of comparisons across enriched terms should be produced.
-            Defaults to True.
-
         clustermap_metric : str, optional
             Distance metric to use for clustermap clustering,
             See https://docs.scipy.org/doc/scipy/reference/spatial.distance.html for valid values.
             Default to "correlation" (Pearson's).
 
         top_n : int, optional
-            Top terms to be used to make barplots.
+            Top terms to use to display in plots.
             Defaults to 5
 
         z_score : bool, optional
@@ -3444,7 +3436,7 @@ class Analysis(object):
             enrichment_table.loc[:, "pValueLog"] = enrichment_table["pValueLog"].replace(np.inf, r)
 
             # Plot top_n terms of each comparison in barplots
-            if "barplot" in plot_types:
+            if "barplots" in plot_types:
                 enrichment_barplot(
                     enrichment_table, x="label", y="pValueLog",
                     group_variable=comp_variable, top_n=top_n,
@@ -3516,11 +3508,11 @@ class Analysis(object):
             enrichment_table.loc[:, "log_p_value"] = log_pvalues(enrichment_table["p_value"])
 
             # Plot top_n terms of each comparison in barplots
-            if "barplot" in plot_types:
+            if "barplots" in plot_types:
                 enrichment_barplot(
                     enrichment_table, x="TF", y="log_p_value",
                     group_variable=comp_variable, top_n=top_n,
-                    output_file=os.path.join(output_dir, output_prefix + ".lola.barplot.top_{}.svg".format(top_n)))
+                    output_file=os.path.join(output_dir, output_prefix + ".motifs.barplot.top_{}.svg".format(top_n)))
 
             if len(enrichment_table[comp_variable].drop_duplicates()) < 2:
                 return
@@ -3558,11 +3550,11 @@ class Analysis(object):
 
             # Plot top_n terms of each comparison in barplots
             top_n = min(top_n, enrichment_table.set_index("Motif Name").groupby(comp_variable)["log_p_value"].count().min() - 1)
-            if "barplot" in plot_types:
+            if "barplots" in plot_types:
                 enrichment_barplot(
                     enrichment_table, x="Motif Name", y="log_p_value",
                     group_variable=comp_variable, top_n=top_n,
-                    output_file=os.path.join(output_dir, output_prefix + ".lola.barplot.top_{}.svg".format(top_n)))
+                    output_file=os.path.join(output_dir, output_prefix + ".homer_consensus.barplot.top_{}.svg".format(top_n)))
 
             # Significance vs fold enrichment over background
             if "scatter" in plot_types:
@@ -3643,7 +3635,7 @@ class Analysis(object):
                 n = len(enrichment_table[comp_variable].drop_duplicates())
                 n_side = int(np.ceil(np.sqrt(n)))
 
-                if "barplot" in plot_types:
+                if "barplots" in plot_types:
                     enrichment_barplot(
                         enrichment_table.loc[enrichment_table['gene_set_library'] == gene_set_library],
                         x="description", y="log_p_value",
@@ -3741,7 +3733,7 @@ class Analysis(object):
 
             for gene_set_library in enrichment_table["Ontology"].unique():
                 _LOGGER.info(gene_set_library)
-                if "barplot" in plot_types:
+                if "barplots" in plot_types:
                     # Plot top_n terms of each comparison in barplots
                     enrichment_barplot(
                         enrichment_table.loc[enrichment_table['Ontology'] == gene_set_library],

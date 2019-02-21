@@ -48,6 +48,8 @@ sample_input_files:
     summits:
   ChIP-seq:
     aligned_filtered_bam:
+  ChIPmentation:
+    aligned_filtered_bam:
   CNV:
     aligned_filtered_bam:
   RNA-seq:

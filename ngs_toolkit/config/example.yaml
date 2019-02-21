@@ -48,6 +48,8 @@ sample_input_files:
     summits: "{data_dir}/{sample_name}/peaks/{sample_name}_summits.bed"
   ChIP-seq:
     aligned_filtered_bam: "{data_dir}/{sample_name}/mapped/{sample_name}.trimmed.bowtie2.filtered.bam"
+  ChIPmentation:
+    aligned_filtered_bam: "{data_dir}/{sample_name}/mapped/{sample_name}.trimmed.bowtie2.filtered.bam"
   CNV:
     aligned_filtered_bam: "{data_dir}/{sample_name}/mapped/{sample_name}.trimmed.bowtie2.filtered.bam"
   RNA-seq:

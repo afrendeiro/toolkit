@@ -58,7 +58,8 @@ def analysis(tmp_path):
     a.annotate(quant_matrix="coverage")
     a.differential_analysis(filter_support=False)
 
-    _CONFIG['resources']['enrichr']['gene_set_libraries'] = ["GO_Biological_Process_2015"]
+    _CONFIG['resources']['enrichr']['gene_set_libraries'] = [
+        "GO_Biological_Process_2015", "NCI-Nature_2016"]
     a.differential_enrichment(steps=['enrichr'])
 
     return a
@@ -66,7 +67,9 @@ def analysis(tmp_path):
 
 @pytest.fixture
 def outputs(analysis):
-    gene_set_libraries = _CONFIG['resources']['enrichr']['gene_set_libraries']
+    # gene_set_libraries = _CONFIG['resources']['enrichr']['gene_set_libraries']
+    gene_set_libraries = [
+        "GO_Biological_Process_2015", "NCI-Nature_2016"]
     prefix = os.path.join(analysis.results_dir,
                           "differential_analysis_ATAC-seq", "enrichments",
                           "differential_analysis.enrichr.")

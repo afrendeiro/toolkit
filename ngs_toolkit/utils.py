@@ -990,7 +990,7 @@ def count_bam_file_length(bam_file):
 
 def count_lines(file):
     with open(file) as f:
-        for i, l in enumerate(f):
+        for i, _ in enumerate(f):
             pass
     return i + 1
 

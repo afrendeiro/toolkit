@@ -498,6 +498,7 @@ class Analysis(object):
         comparison_table : pandas.DataFrame
             Comparison table if specified in the PEP configuration
         """
+        # TODO: Restrict comparison_table comparisons of same type as analysis
         hint = " Adding a '{}' section to your project configuration file allows the analysis"
         hint += " object to use those attributes during the analysis."
         if self.prj is not None:
@@ -1697,6 +1698,7 @@ class Analysis(object):
             Pandas dataframe with results.
         """
         # TODO: Add "input_dir" and input_prefix"
+        # TODO: Restrict to comparisons of same type as analysis
         if comparison_table is None:
             msg = "`comparison_table` was not given and is not set in analysis object."
             hint = "Add a `comparison_table` attribute to the analysis object."

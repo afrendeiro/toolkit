@@ -22,9 +22,6 @@ import numpy as np
 import pandas as pd
 import parmap
 import pybedtools
-import pysam
-from rpy2 import robjects
-from rpy2.rinterface import RRuntimeWarning
 from scipy.stats import fisher_exact
 import seaborn as sns
 from tqdm import tqdm
@@ -975,6 +972,8 @@ class ATACSeqAnalysis(Analysis):
             # install R package
             # source('http://bioconductor.org/biocLite.R')
             # biocLite('cqn')
+            from rpy2 import robjects
+            from rpy2.rinterface import RRuntimeWarning
             import rpy2.robjects.pandas2ri
             import warnings
             warnings.filterwarnings("ignore", category=RRuntimeWarning)

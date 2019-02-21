@@ -303,7 +303,8 @@ def plot_projection(
         attributes_to_plot,
         plot_max_dims=8,
         rasterized=False, plot_group_centroids=True,
-        axis_ticklabels=True, axis_lines=True,
+        axis_ticklabels=True, axis_ticklabels_name="PC",
+        axis_lines=True,
         legends=False, always_legend=False):
     """
     Plot a low dimentionality projection of samples.
@@ -311,7 +312,7 @@ def plot_projection(
     Parameters
     ----------
     df : pandas.DataFrame
-        Dataframe with sample projections
+        Dataframe with sample projections.
 
     color_dataframe : pandas.DataFrame
         Dataframe of RGB tuples for sample i in attribute j.
@@ -325,13 +326,8 @@ def plot_projection(
     attributes_to_plot : list
         List of levels in df.index to plot
 
-    plot_max_dims : int, optional
-        Maximum number of sample attributes to plot for each factor in plot legend.
-        Defaults to 20.
-
     plot_max_dims : number, optional
-        Maximum number of principal components to plot. This only affects plotting.
-        All dims will be calculated.
+        Maximum number of dimentions to plot.
         Defaults to 8.
 
     plot_group_centroids : bool, optional
@@ -340,19 +336,19 @@ def plot_projection(
         Defaults to True.
 
     axis_ticklabels : bool, optional
-        Whether MDS and PCA axis ticks and ticklabels should be plotted.
+        Whether axis ticks and tick labels should be plotted.
         Defaults to False.
 
     axis_lines : bool, optional
-        Whether (0, 0) dashed lines should be plotted in MDS and PCA.
+        Whether (0, 0) dashed lines should be plotted.
         Defaults to True.
 
     legends : bool, optional
-        Whether legends for group colours should be plotted in MDS and PCA.
+        Whether legends for group colours should be plotted.
         Defaults to False.
 
     always_legend : bool, optional
-        Whether legends for group colours should be plotted in every figure panel in MDS and PCA.
+        Whether legends for group colours should be plotted in every figure panel.
         If False, will plot just on first/last figure panel.
         Defaults to False.
     """
@@ -397,8 +393,8 @@ def plot_projection(
 
             # Graphics
             axis[pc, i].set_title(attr)
-            axis[pc, i].set_xlabel("PC {}".format(pc + 1))
-            axis[pc, i].set_ylabel("PC {}".format(pc + 2))
+            axis[pc, i].set_xlabel("{} {}".format(axis_ticklabels_name, pc + 1))
+            axis[pc, i].set_ylabel("{} {}".format(axis_ticklabels_name, pc + 2))
             if not axis_ticklabels:
                 axis[pc, i].set_xticklabels(axis[pc, i].get_xticklabels(), visible=False)
                 axis[pc, i].set_yticklabels(axis[pc, i].get_yticklabels(), visible=False)

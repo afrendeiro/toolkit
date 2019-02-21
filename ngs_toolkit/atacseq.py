@@ -246,7 +246,8 @@ class ATACSeqAnalysis(Analysis):
                     (prefix + "_peaks.coverage_qnorm.annotated.csv", kwargs),
                 "accessibility":
                     (prefix + ".accessibility.annotated_metadata.csv",
-                        {"index_col": 0, "header": list(range(n_header_vars))}),
+                        {"index_col": 0, "header": list(range(n_header_vars))
+                         if n_header_vars is not None else 'infer'}),
                 "differential_results":
                     (os.path.join(self.results_dir, "differential_analysis_{}".format(self.data_type),
                                   "differential_analysis.deseq_result.all_comparisons.csv"), kwargs)}

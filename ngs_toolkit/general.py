@@ -1342,10 +1342,13 @@ def enrichr(dataframe, gene_set_libraries=None, kind="genes", max_attempts=5):
         okay = False
         while not okay:
             if i == max_attempts:
+                _LOGGER.error("API request failed {} times, exceeding `max_attempts`.".format(i))
                 raise Exception('Fetching enrichment results maxed `max_attempts`.')
             response = requests.get(
                 ENRICHR_RETRIEVE + query_string.format(user_list_id, gene_set_library))
             okay = response.ok
+            if not okay:
+                _LOGGER.debug("API request failed. Retrying.")
 
         # Get enriched sets in gene set
         res = json.loads(response.text)
@@ -1433,7 +1436,7 @@ def run_enrichment_jobs(
                 os.path.join(dir_, name + ".region.log"),
                 os.path.join(dir_, name + ".region.sh"),
                 ("shortq", 1, 8000),
-                "python ~/region_enrichment.py {} {} --output-file {}"
+                "python ~/region_enrichment.py --output-file {} {} {}"
                 .format(file, pickle_file, output_)])
 
     # LOLA

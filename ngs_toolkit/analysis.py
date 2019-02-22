@@ -41,6 +41,9 @@ from statsmodels.sandbox.stats.multicomp import multipletests
 from tqdm import tqdm
 
 
+# TODO: Rename kwargs "quant_matrix" to "matrix", accept either dataframe or string
+
+
 class Analysis(object):
     """
     Generic class holding functions and data from a typical NGS analysis.
@@ -610,13 +613,23 @@ class Analysis(object):
     @check_organism_genome
     def get_annotations(
             self,
-            organism=None, genome_assembly=None, output_dir=None,
-            steps=["blacklist", "tss", "genomic_context"], overwrite=False):
+            steps=["blacklist", "tss", "genomic_context"],
+            organism=None, genome_assembly=None,
+            output_dir=None, overwrite=False):
         """
         Get genome annotations and other resources for several ngs_toolkit analysis.
 
         Parameters
         ----------
+        steps : list, optional
+            What kind of annotations to get.
+            Options are:
+                 - "genome": Genome sequence (2bit format)
+                 - "blacklist": Locations of blacklisted regions for genome
+                 - "tss": Locations of gene"s TSSs
+                 - "genomic_context": Genomic context of genome
+            Defaults to ["blacklist", "tss", "genomic_context"]
+
         organism : str, optional
             Organism to get for. Currently supported are "human" and "mouse".
             Defaults to analysis' own organism.
@@ -630,15 +643,6 @@ class Analysis(object):
             Directory to save results to.
             Defaults to the value of "preferences:root_reference_dir" in the configuration,
             if that is not set, to a directory called "reference" in the analysis root directory.
-
-        steps : list, optional
-            What kind of annotations to get.
-            Options are:
-                 - "genome": Genome sequence (2bit format)
-                 - "blacklist": Locations of blacklisted regions for genome
-                 - "tss": Locations of gene"s TSSs
-                 - "genomic_context": Genomic context of genome
-            Defaults to ["blacklist", "tss", "genomic_context"]
 
         overwrite : bool, optional
             Whether existing files should be overwritten by new ones.
@@ -671,10 +675,12 @@ class Analysis(object):
 
         if "genome" in steps:
             output["genome_file"] = dict()
-            output["genome_file"]["2bit"] = get_genome_reference(**args)
+            output["genome_file"]["2bit"] = get_genome_reference(file_format="2bit", **args)
             fasta = output["genome_file"]["2bit"].replace(".2bit", ".fa")
             if os.path.exists(fasta):
                 output["genome_file"]["fasta"] = fasta
+            else:
+                output["genome_file"]["fasta"] = get_genome_reference(file_format="fasta", **args)
         if "blacklist" in steps:
             output["blacklist_file"] = get_blacklist_annotations(**args)
         if "tss" in steps:
@@ -1566,7 +1572,7 @@ class Analysis(object):
             # filter features without support for given comparison
             if data_type in ["ATAC-seq", "ChIP-seq"] and filter_support:
                 if not hasattr(self, "support"):
-                    msg = "`filter_support` enabled by analysis has no `support` attribute!"
+                    msg = "`filter_support` enabled but analysis has no `support` attribute!"
                     _LOGGER.error(msg)
                     raise ValueError(msg)
                 _LOGGER.debug("Filtering out unsupported regions.")
@@ -1642,6 +1648,8 @@ class Analysis(object):
             self,
             comparison_table=None,
             data_type="ATAC-seq",
+            input_dir="{results_dir}/differential_analysis_{data_type}",
+            input_prefix="differential_analysis",
             output_dir="{results_dir}/differential_analysis_{data_type}",
             output_prefix="differential_analysis",
             permissive=True,
@@ -1661,14 +1669,14 @@ class Analysis(object):
             Type of data under analysis. One of "ATAC-seq" or "RNA-seq".
             Defaults to analysis' own data_type.
 
-        output_dir : str, optional
-            Output directory for analysis.
+        input_dir, output_dir : str, optional
+            In-/Output directory of files.
+            Values within curly brackets "{data_type}", will be formated with attributes from analysis.
             Defaults to "{results_dir}/differential_analysis_{data_type}".
-            If containing "{data_type}", will format string with variable.
 
-        output_prefix : str, optional
-            Prefix for output files.
-            Defaults to "differential_analysis".
+        input_prefix, output_prefix : str, optional
+            Prefix of the in-/output files.
+            Defaults for both is "differential_analysis".
 
         permissive : bool, optional
             Whether non-existing files should be skipped or an error be thrown.
@@ -1709,6 +1717,7 @@ class Analysis(object):
                 _LOGGER.info(hint)
                 raise e
 
+        input_dir = self._format_string_with_attributes(input_dir)
         # Make output dir
         output_dir = self._format_string_with_attributes(output_dir)
         if not os.path.exists(output_dir):
@@ -1722,22 +1731,30 @@ class Analysis(object):
             return
 
         comps = comparison_table["comparison_name"].drop_duplicates().sort_values()
-        results = pd.DataFrame()
+        results = list()
         for comp in tqdm(comps, total=len(comps), desc="Comparison"):
-            out_file = os.path.join(output_dir, comp, output_prefix + ".deseq_result.{}.csv".format(comp))
-            # print("Collecting comparison '{}'".format(comp))
-            # read
+            res_file = os.path.join(input_dir, comp, input_prefix + ".deseq_result.{}.csv".format(comp))
+            _LOGGER.debug("Collecting comparison '{}'".format(comp))
             try:
-                res2 = pd.read_csv(out_file, index_col=0)
+                res2 = pd.read_csv(res_file, index_col=0)
             except IOError as e:
                 if permissive:
                     _LOGGER.warning("Results file for comparison '{}' do not exist. Skipping.".format(comp))
                     continue
                 else:
                     raise e
-            # append
-            results = results.append(res2.reset_index(), ignore_index=True)
+            results.append(res2)
 
+        if len(results) == 0:
+            msg = "No comparison had a valid results file!"
+            if permissive:
+                _LOGGER.warning(msg)
+                return
+            else:
+                _LOGGER.error(msg)
+                raise IOError(msg)
+
+        results = pd.concat(results)
         if save:
             # save all
             results.to_csv(results_file, index=False)
@@ -1794,7 +1811,19 @@ class Analysis(object):
 
         Parameters
         ----------
-        results : pandas.DataFrame
+        steps : list, optional
+            Types of plots to make:
+                - "distributions": Distribution of p-values and fold-changes
+                - "counts" - Count of differential features per comparison given certain thresholds.
+                - "scatter" - Scatter plots (group 1 vs group 2).
+                - "volcano" - Volcano plots (log fold change vs -log p-value)
+                - "ma" - MA plots (log mean vs log fold change)
+                - "stats_heatmap" - Heatmap of p-values and fold-changes for comparisons.
+                - "correlation" - Correlation of samples or sample groups in differential features.
+                - "heatmap" - Heatmaps of samples or sample groups in differential features.
+            Defaults to all of the above.
+
+        results : pandas.DataFrame, optional
             Data frame with differential analysis results.
             See ``ngs_toolkit.general.differential_analysis`` for more information.
 
@@ -1808,7 +1837,7 @@ class Analysis(object):
 
         matrix : str, optional
             Matrix of quantification to use for plotting feature values across samples/groups.
-           Defaults to either "accessibility" for ATAC-seq analysis or "expression" for RNA-seq.
+            Defaults to either "accessibility" for ATAC-seq analysis or "expression" for RNA-seq.
 
         only_comparison_samples : bool, optional
             Whether to use only samples present in the `comparison_table`.
@@ -1910,7 +1939,6 @@ class Analysis(object):
             Color map to use in numerical levels of `group_variables`.
             Will be passed to `analysis.get_level_colors`.
         """
-        # TODO: add steps
         # TODO: split plotting into smaller parts
         if results is None:
             msg = "Differential results dataframe not given and Analysis object does not"
@@ -3050,8 +3078,8 @@ class Analysis(object):
             Directory to create output files.
             Defaults to "{results_dir}/differential_analysis_{data_type}".
 
-        output_prefix : str, optional
-            Prefix to use when creating output files.
+        input_prefix, output_prefix : str, optional
+            File prefix of input/output files.
             Defaults to "differential_analysis".
 
         permissive : bool, optional
@@ -3107,7 +3135,7 @@ class Analysis(object):
             ("homer", homer_enr, parse_homer, {}, "homerResults", ".homer_motifs.csv"),
             ("homer_consensus", homer_consensus, pd.read_csv, {"sep": "\t"}, "knownResults.txt", ".homer_consensus.csv"),
             ("lola", lola_enr, pd.read_csv, {"sep": "\t"}, "allEnrichments.tsv", ".lola.csv"),
-            ("enrichr", pathway_enr, pd.read_csv, {"encoding": "utf-8"}, output_prefix + "_genes.enrichr.csv", ".enrichr.csv")]
+            ("enrichr", pathway_enr, pd.read_csv, {"encoding": "utf-8"}, input_prefix + "_genes.enrichr.csv", ".enrichr.csv")]
 
         # Examine each region cluster
         comps = differential["comparison_name"].drop_duplicates()
@@ -3162,8 +3190,8 @@ class Analysis(object):
                     _LOGGER.warning(msg)
                 else:
                     self.enrichment_results[name] = pd.concat(df, axis=0)
-                self.enrichment_results[name].to_csv(
-                    os.path.join(output_dir, output_prefix + output_suffix), index=False, encoding="utf-8")
+                    self.enrichment_results[name].to_csv(
+                        os.path.join(output_dir, output_prefix + output_suffix), index=False, encoding="utf-8")
 
     def plot_differential_enrichment(
             self,
@@ -3332,7 +3360,7 @@ class Analysis(object):
 
         if (enrichment_table is None) and (enrichment_type is None):
             if not hasattr(self, "enrichment_results"):
-                msg = "'enrichment_table' and 'enrichment_type' were not given"
+                msg = "'enrichment_table' and 'enrichment_type' were not given "
                 msg += "but analysis also does not have a 'enrichment_results' attribute."
                 _LOGGER.error(msg)
                 raise ValueError(msg)

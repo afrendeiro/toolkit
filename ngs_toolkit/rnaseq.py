@@ -6,8 +6,8 @@ import os
 import matplotlib.pyplot as plt
 from ngs_toolkit import _LOGGER
 from ngs_toolkit.analysis import Analysis
-from ngs_toolkit.general import normalize_quantiles_p
 from ngs_toolkit.general import query_biomart
+from ngs_toolkit.utils import normalize_quantiles_p
 import numpy as np
 import pandas as pd
 import scipy

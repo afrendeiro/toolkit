@@ -165,7 +165,7 @@ def get_genome_reference(
     if os.path.exists(genome_file) and (not overwrite):
         msg = "Genome file already exists and 'overwrite' is set to False."
         hint = " Returning existing file: {}".format(genome_file)
-        _LOGGER.warn(msg + hint)
+        _LOGGER.warning(msg + hint)
         # even so, if 2bit and FASTA not there try to get fasta
         if file_format == "2bit":
             if not os.path.exists(genome_file.replace(".2bit", ".fa")):
@@ -225,7 +225,7 @@ def get_blacklist_annotations(
         "mouse": "mm10"}
     if genome_assembly is None:
         genome_assembly = organisms[organism]
-        _LOGGER.warn("Genome assembly not selected. Using assembly '{}' for '{}'."
+        _LOGGER.warning("Genome assembly not selected. Using assembly '{}' for '{}'."
                      .format(genome_assembly, organism))
 
     output_file = os.path.join(output_dir, "{}.{}.blacklist.bed"
@@ -233,7 +233,7 @@ def get_blacklist_annotations(
     if os.path.exists(output_file) and (not overwrite):
         msg = "Annotation file already exists and 'overwrite' is set to False."
         hint = " Returning existing annotation file: {}".format(output_file)
-        _LOGGER.warn(msg + hint)
+        _LOGGER.warning(msg + hint)
         return output_file
 
     url = "http://mitra.stanford.edu/kundaje/akundaje/release/blacklists/"
@@ -314,7 +314,7 @@ def get_tss_annotations(
     if os.path.exists(output_file) and (not overwrite):
         msg = "Annotation file already exists and 'overwrite' is set to False."
         hint = " Returning existing annotation from file: {}".format(output_file)
-        _LOGGER.warn(msg + hint)
+        _LOGGER.warning(msg + hint)
         annot = pd.read_csv(output_file, header=None, sep="\t")
         return annot
 
@@ -450,7 +450,7 @@ def get_genomic_context(
     if os.path.exists(output_file) and (not overwrite):
         msg = "Annotation file already exists and 'overwrite' is set to False."
         hint = " Returning existing annotation from file: {}".format(output_file)
-        _LOGGER.warn(msg + hint)
+        _LOGGER.warning(msg + hint)
         annot = pd.read_csv(output_file, header=None, sep="\t")
         return annot
 

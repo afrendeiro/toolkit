@@ -27,6 +27,12 @@ import seaborn as sns
 from tqdm import tqdm
 
 
+# TODO: rename annotate() to annotate_regions()
+# TODO: make this new annotate_regions() call get_peak_gene_annotation() and get_peak_genomic_location()
+# TODO: rename_with_sample_metadata() to annotate_samples()
+# TODO: make new annotate() in Analysis that calls both annotate_regions() and annotate_samples() with `steps`
+
+
 class ATACSeqAnalysis(Analysis):
     """
     Class to model analysis of ATAC-seq data.
@@ -494,6 +500,7 @@ class ATACSeqAnalysis(Analysis):
         support : pandas.DataFrame
             Sets a `support` variable with peak set overlap.
         """
+        # TODO: Implement distributed
         if samples is None:
             samples = self.samples
 
@@ -561,7 +568,8 @@ class ATACSeqAnalysis(Analysis):
 
     def measure_coverage(
             self, samples=None, sites=None, assign=True,
-            save=True, output_file=None, permissive=False, distributed=False):
+            save=True, output_file=None, permissive=False,
+            distributed=False, peak_set_name="peak_set"):
         """
         Measure read coverage (counts) of each sample in each region in consensus sites.
         Uses parallel computing using the `parmap` library.
@@ -598,6 +606,10 @@ class ATACSeqAnalysis(Analysis):
             Whether it should be run as jobs for each sample separately in parallel.
             Currently only implemented for a SLURM cluster.
             Default False.
+
+        peak_set_name : bool
+            Suffix to files containing coverage of `distributed` is True.
+            Defaults to "peak_set".
 
         Raises
         ----------
@@ -677,10 +689,10 @@ class ATACSeqAnalysis(Analysis):
                 if not os.path.exists(output_dir):
                     os.makedirs(output_dir)
 
-                job_name = "peak_set_coverage.{}".format(s.name)
-                output_file = os.path.join(output_dir, s.name + ".peak_set_coverage.bed")
-                log_file = os.path.join(output_dir, s.name + ".peak_set_coverage.log")
-                job_file = os.path.join(output_dir, s.name + ".peak_set_coverage.sh")
+                job_name = "{}.{}_coverage".format(peak_set_name, s.name)
+                output_file = os.path.join(output_dir, s.name + ".{}_coverage.bed".format(peak_set_name))
+                log_file = os.path.join(output_dir, s.name + ".{}_coverage.log".format(peak_set_name))
+                job_file = os.path.join(output_dir, s.name + ".{}_coverage.sh".format(peak_set_name))
 
                 cmd = tk.slurm_header(
                     job_name=job_name, output=log_file,
@@ -698,25 +710,17 @@ class ATACSeqAnalysis(Analysis):
                 tk.slurm_submit_job(job_file)
 
     def collect_coverage(
-            self, samples=None, sites=None, assign=True,
-            save=True, output_file=None, permissive=False):
+            self, samples=None, assign=True,
+            save=True, output_file=None, permissive=False, peak_set_name="peak_set"):
         """
         Collect read coverage (counts) of each sample in each region in consensus sites from existing files.
         Useful after runnning analysis.measure_coverage() in distributed mode.
-
-        Importantly, it assumes all coverage files are ordered equally and that this order matches the order in `sites`!
 
         Parameters
         ----------
         samples : list
             Iterable of peppy.Sample objects to restrict to.
             If not provided (`None` is passed) if will default to all samples in the analysis (`samples` attribute).
-
-        sites : pybedtools.BedTool,pd.DataFrame,str
-            Sites in the genome to quantify, usually a pybedtools.BedTool from analysis.get_consensus_sites()
-            If a DataFrame, will try to convert to BED format assuming first three columns are chr,start,end.
-            If a string assumes a path to a BED file.
-            If `None` the object's `sites` attribute will be used.
 
         assign : bool
             Whether to assign the matrix to an attribute of self named `coverage`.
@@ -732,11 +736,15 @@ class ATACSeqAnalysis(Analysis):
             Whether Samples without an existing coverage file does not exist
             should be simply skipped or an error thrown.
 
+        peak_set_name : bool
+            Suffix to files containing coverage of `distributed` is True.
+            Defaults to "peak_set".
+
         Raises
         ----------
         IOError
-            If not `permissive` and the coverage file of a sample is not readable.
-            Or if `permissive` but none of the samples has an existing file.
+            If not `permissive` and the coverage file of a sample is not readable or is empty.
+            Or if `permissive` but none of the samples has an existing file or are empty.
 
         Attributes
         ----------
@@ -754,25 +762,44 @@ class ATACSeqAnalysis(Analysis):
         for sample in samples:
             setattr(
                 sample, "_coverage",
-                os.path.join(sample.paths.sample_root, "coverage", sample.name + ".peak_set_coverage.bed"))
+                os.path.join(sample.paths.sample_root, "coverage",
+                             sample.name + ".{}_coverage.bed".format(peak_set_name)))
 
         # Check which samples to run (dependent on permissive)
         samples = self._get_samples_with_input_file("_coverage", permissive=permissive, samples=samples)
 
         # Read in counts
+        coverage = list()
         for i, sample in tqdm(enumerate(samples), total=len(samples)):
-            if i == 0:
-                cov = pd.read_csv(
-                    sample._coverage, sep="\t", header=None,
-                    names=['chrom', 'start', 'end', sample.name])
-                coverage = pd.DataFrame(
-                    index=bed_to_index(cov),
-                    columns=[s.name for s in samples])
-                coverage.loc[:, sample.name] = cov[sample.name].values
+            cov = pd.read_csv(
+                sample._coverage, sep="\t", header=None,
+                names=['chrom', 'start', 'end', sample.name])
+
+            if cov.empty:
+                msg = "Coverage file for sample '{}' is empty!".format(sample.name)
+                if not permissive:
+                    _LOGGER.error(msg)
+                    raise IOError(msg)
+                else:
+                    _LOGGER.warning(msg)
+                    continue
+            coverage.append(cov)
+
+        if len(coverage) == 0:
+            msg = "No sample had a valid coverage file!"
+            if permissive:
+                _LOGGER.warning(msg)
+                return
             else:
-                coverage.loc[:, sample.name] = pd.read_csv(
-                    sample._coverage, sep="\t", header=None,
-                    names=['chrom', 'start', 'end', sample.name]).loc[:, sample.name].values
+                _LOGGER.error(msg)
+                raise IOError(msg)
+
+        coverage = (
+            pd.concat(coverage, axis=0, sort=False)
+            .melt(id_vars=['chrom', 'start', 'end'])
+            .pivot_table(index=['chrom', 'start', 'end'], columns="variable", values="value")
+            .astype(int, downcast=True))
+        coverage.index = bed_to_index(coverage.index.to_frame())
 
         if assign:
             self.coverage = coverage
@@ -880,12 +907,12 @@ class ATACSeqAnalysis(Analysis):
             _LOGGER.error(msg)
             raise ValueError(msg)
 
+        if coverage_qnorm.min().min() <= 0:
+            coverage_qnorm += coverage_qnorm.abs().min().min()
+
         # Log2 transform
         if log_transform:
             coverage_qnorm = np.log2(pseudocount + coverage_qnorm)
-
-        if coverage_qnorm.min().min() <= 0:
-            coverage_qnorm += coverage_qnorm.abs().min().min()
 
         # # Add back postition columns
         # coverage_qnorm = coverage_qnorm.join(self.coverage[['chrom', 'start', 'end']])
@@ -1110,7 +1137,7 @@ class ATACSeqAnalysis(Analysis):
 
         if tss_file is None:
             _LOGGER.info("Reference TSS file was not given, will try to get TSS annotations.")
-            _LOGGER.info("Getting TSS annotations for organism '{}', genome '{}'. "
+            _LOGGER.info("Getting TSS annotations for organism '{}', genome '{}'."
                          .format(self.organism, self.genome))
             tss_file = self.get_annotations(steps=['tss'])['tss_file']
 
@@ -2232,22 +2259,16 @@ class ATACSeqAnalysis(Analysis):
         if ('meme' in steps) or ('homer' in steps):
             hint = " Will not do motif enrichment analysis."
             fasta_file = os.path.join(output_dir, "{}_regions.fa".format(prefix))
-            okay = False
-            for f in ['fasta', '2bit']:
-                with warnings.catch_warnings():
-                    try:
-                        genome_file = get_genome_reference(self.organism, file_format=f, overwrite=False)
-                        okay = True
-                    except ValueError:
-                        pass
-            if not okay:
+
+            resources = self.get_annotations(steps=['genome'])['genome_file']
+            if "fasta" not in resources:
                 reason = "Could not get genome sequence file in either FASTA or 2bit format."
                 _LOGGER.warning(reason + hint)
             else:
                 try:
-                    bed_to_fasta(input_bed=bed_file, output_fasta=fasta_file, genome_file=genome_file)
+                    bed_to_fasta(input_bed=bed_file, output_fasta=fasta_file, genome_file=resources['fasta'])
                 except EnvironmentError:
-                    reason = "Could not get FASTA sequence."
+                    reason = "Could not get FASTA sequence for regions."
                     _LOGGER.warning(reason + hint)
 
         if not run:

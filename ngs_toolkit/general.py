@@ -1495,11 +1495,11 @@ def run_enrichment_jobs(
 
     # Enrichr
     if 'enrichr' in steps:
-        files = glob(results_dir + "/*/*_genes.symbols.txt")
+        files = glob(results_dir + "/*/*.gene_symbols.txt")
         for file in files:
             dir_ = os.path.dirname(file)
             name = os.path.basename(dir_)
-            output_ = file.replace("symbols.txt", "enrichr.csv")
+            output_ = file.replace(".gene_symbols.txt", ".enrichr.csv")
             if os.path.exists(output_) and (not overwrite):
                 continue
             jobs.append([

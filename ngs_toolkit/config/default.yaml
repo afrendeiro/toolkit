@@ -54,6 +54,7 @@ sample_input_files:
     aligned_filtered_bam:
   RNA-seq:
     aligned_filtered_bam:
+    bitseq_counts:
 
 resources:
   lola:

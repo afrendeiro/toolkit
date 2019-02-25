@@ -908,7 +908,7 @@ class ATACSeqAnalysis(Analysis):
             raise ValueError(msg)
 
         if coverage_qnorm.min().min() <= 0:
-            coverage_qnorm += coverage_qnorm.abs().min().min()
+            coverage_qnorm += np.absolute(coverage_qnorm.min().min())
 
         # Log2 transform
         if log_transform:
@@ -2196,8 +2196,6 @@ class ATACSeqAnalysis(Analysis):
             Which steps of the analysis to perform.
             Default is all: ['region', 'lola', 'meme', 'homer', 'enrichr']
         """
-        from ngs_toolkit.general import get_genome_reference
-        import warnings
         # use all sites as universe
         if universe_file is None:
             try:
@@ -2228,7 +2226,7 @@ class ATACSeqAnalysis(Analysis):
         clean_gene = differential['gene_name'].str.split(",").apply(pd.Series, 1).stack().drop_duplicates()
         clean_gene = clean_gene[~clean_gene.isin(['.', 'nan', ''])]
         clean_gene.to_csv(
-                os.path.join(output_dir, "{}_genes.symbols.txt".format(prefix)),
+                os.path.join(output_dir, "{}.gene_symbols.txt".format(prefix)),
                 header=False, index=False)
         if "ensembl_gene_id" in differential.columns:
             # export ensembl gene names
@@ -2252,7 +2250,7 @@ class ATACSeqAnalysis(Analysis):
             # reduce various ranks to mean per gene
             d = d.groupby('gene_name').mean().reset_index()
             d.to_csv(
-                os.path.join(output_dir, "{}_genes.symbols.score.csv".format(prefix)),
+                os.path.join(output_dir, "{}.gene_symbols.score.csv".format(prefix)),
                 index=False)
 
         # get fasta file with sequence underlying region

@@ -42,6 +42,9 @@ from tqdm import tqdm
 
 
 # TODO: Rename kwargs "quant_matrix" to "matrix", accept either dataframe or string
+# TODO: Select for data type in samples and comparison_table when loading from PEP
+
+# TODO: Idea: merging analysis. If same type, merge matrices, otherwise use dicts?
 
 
 class Analysis(object):
@@ -547,6 +550,23 @@ class Analysis(object):
             Whether to overwrite attribute values if existing.
             Defaults to True
         """
+        def _format_string_with_sample_attributes(sample, string):
+            """
+            Given a string, containing curly braces, format it with the
+            attributes from the sample object or the analysis.
+            """
+            if string is None:
+                return string
+            to_format = pd.Series(string).str.extractall(r"{(.*?)}")[0].values
+            attrs = sample.__dict__.keys()
+
+            if not all([x in attrs for x in to_format]):
+                d = sample.__dict__.copy()
+                d.update(self.__dict__)
+                return string.format(**d)
+            else:
+                return string.format(**sample.__dict__)
+
         if self.samples is None:
             _LOGGER.error("Analysis object does not have attached Samples. " +
                           "Will not add special attributes to samples such as " +
@@ -557,14 +577,7 @@ class Analysis(object):
         for data_type in _CONFIG["sample_input_files"]:
             for sample in [s for s in self.samples if s.protocol == data_type]:
                 for attr, value in _CONFIG["sample_input_files"][data_type].items():
-                    if value is None:
-                        pass
-                    elif ("{data_dir}" in value) and ("{sample_name}" in value):
-                        value = value.format(data_dir=self.data_dir, sample_name=sample.name)
-                    elif "{data_dir}" in value:
-                        value = value.format(data_dir=self.data_dir)
-                    elif "{sample_name}" in value:
-                        value = value.format(sample_name=sample.name)
+                    value = _format_string_with_sample_attributes(sample, value)
                     if overwrite:
                         _LOGGER.debug(msg.format(attr, sample.name, value))
                         setattr(sample, attr, value)
@@ -789,7 +802,7 @@ class Analysis(object):
                          .format(",".join(self.sample_attributes)))
             attributes = self.sample_attributes
         if (attributes is None) and hasattr(self, "prj"):
-            _LOGGER.warn(
+            _LOGGER.warning(
                 "Analysis has no 'sample_attributes' set. " +
                 "Will use all columns from project annotation sheet: {}"
                 .format(",".join(self.prj.sheet.columns)))
@@ -1118,7 +1131,7 @@ class Analysis(object):
             if quant_matrix is None:
                 quant_matrix = "expression"
         else:
-            raise ValueError("Data types can only be 'ATAC-seq', 'RNA-seq' or 'CNV'.")
+            raise ValueError("Data types can only be 'ATAC-seq', 'ChIP-seq', RNA-seq' or 'CNV'.")
 
         if ("{results_dir}" in output_dir) and ("{data_type}" in output_dir):
             output_dir = output_dir.format(results_dir=self.results_dir, data_type=data_type)
@@ -1784,7 +1797,7 @@ class Analysis(object):
             fold_change=None,
             diff_based_on_rank=False,
             max_rank=1000,
-            ranking_variable="padj",
+            ranking_variable="pvalue",
             respect_stat_thresholds=True,
             output_dir="{results_dir}/differential_analysis_{data_type}",
             output_prefix="differential_analysis",
@@ -1840,7 +1853,7 @@ class Analysis(object):
             Defaults to either "accessibility" for ATAC-seq analysis or "expression" for RNA-seq.
 
         only_comparison_samples : bool, optional
-            Whether to use only samples present in the `comparison_table`.
+            Whether to use only samples present in the `comparison_table` and `results` table.
             Defaults to False.
 
         data_type : str, optional
@@ -1870,7 +1883,7 @@ class Analysis(object):
 
         ranking_variable : str, optional
             Which variable to use for ranking when using `diff_based_on_rank`.
-            Defaults to "padj".
+            Defaults to "pvalue".
 
         respect_stat_thresholds : bool, optional
             Whether the statistical thresholds from `alpha` and `fold_change` should still be
@@ -2009,6 +2022,9 @@ class Analysis(object):
                 _LOGGER.info(hint)
 
         if only_comparison_samples and comparison_table is not None:
+            # select only comparisons from results table
+            comparison_table = comparison_table.loc[
+                comparison_table['comparison_name'].isin(results['comparison_name'].unique().tolist())]
             samples = [s for s in samples if s.name in comparison_table["sample_name"].tolist()]
         matrix = matrix[[s.name for s in samples]]
 
@@ -2072,7 +2088,7 @@ class Analysis(object):
 
                 # log fold-changes distributions
                 fig, axis = plt.subplots(1, 1, figsize=(4, 4))
-                sns.distplot(results[variable].dropna(), kde=False, ax=axis)
+                sns.distplot(results[variable].dropna(), kde=True, hist=True, ax=axis)
                 if axvline:
                     axis.axvline(0, color="black", alpha=0.5)
                 axis.set_xlabel(label)
@@ -2084,7 +2100,7 @@ class Analysis(object):
                     # per comparison
                     g = sns.FacetGrid(
                         data=results, col=comparison_column, col_wrap=n_side, height=3, aspect=1)
-                    g.map(sns.distplot, variable, kde=False)
+                    g.map(sns.distplot, variable, kde=True, hist=False)
                     for ax in g.axes:
                         ax.set_yscale("log")
                         if axvline:
@@ -2130,7 +2146,7 @@ class Analysis(object):
             savefig(fig, os.path.join(output_dir, output_prefix + ".number_differential.directional.svg"))
 
         if plot_each_comparison:
-            _LOGGER.info("Doing detailed plotting per comparison:")
+            _LOGGER.debug("Doing detailed plotting per comparison:")
 
             # Add same colour scale to all plots/comparisons
             smallest_p_value = -np.log10(np.nanpercentile(results[p_value_column], 1e-5))
@@ -2863,6 +2879,7 @@ class Analysis(object):
             Dictionary with keys as in `steps` and values with pandas.DataFrame
             of enrichment results.
         """
+        # TODO: inspect given matrix and warn if matrix hasn't been subset for 'significant' features
         # TODO: separate and fix mouse TF ids
         # TODO: separate homer_consensus output processing
         # TODO: add overwrite function when distributed==False
@@ -2927,6 +2944,9 @@ class Analysis(object):
             ("lola", lola_enr, pd.read_csv, {"sep", "\t"}, "allEnrichments.tsv", ".lola.csv"),
             ("enrichr", pathway_enr, pd.read_csv, {"encoding": "utf-8"}, output_prefix + "_regions.enrichr.csv", ".enrichr.csv")]
 
+        if data_type == "RNA-seq":
+            possible_steps = [x for x in possible_steps if x[0] == "enrichr"]
+
         # Examine each region cluster
         comps = differential["comparison_name"].drop_duplicates()
         for comp in tqdm(comps, total=len(comps), desc="Comparison"):
@@ -2982,13 +3002,13 @@ class Analysis(object):
 
                 # Prepare files and run (if not distributed)
                 if data_type == "RNA-seq":
-                    _LOGGER.info("Doing genes of comparison '{}', direction '{}'.".format(comp, direction))
+                    _LOGGER.debug("Doing genes of comparison '{}', direction '{}'.".format(comp, direction))
                     comparison_df.index.name = "gene_name"
                     # write gene names to file
                     clean = comparison_df.reset_index()["gene_name"].drop_duplicates().sort_values()
                     clean.to_csv(
                         os.path.join(comparison_dir, output_prefix + ".gene_symbols.txt"),
-                        header=None, index=False)
+                        header=False, index=False)
 
                     if "enrichr" in steps:
                         if serial:
@@ -2998,7 +3018,7 @@ class Analysis(object):
                                     os.path.join(comparison_dir, output_prefix + ".enrichr.csv"),
                                     index=False, encoding="utf-8")
                 else:
-                    _LOGGER.info("Doing regions of comparison '{}', direction '{}'.".format(comp, direction))
+                    _LOGGER.debug("Doing regions of comparison '{}', direction '{}'.".format(comp, direction))
                     # do the suite of region enrichment analysis
                     self.characterize_regions_function(
                         comparison_df,
@@ -3027,12 +3047,13 @@ class Analysis(object):
                     self.enrichment_results[name].to_csv(
                         os.path.join(output_dir, output_prefix + output_suffix), index=False, encoding="utf-8")
         else:
-            try:
-                _LOGGER.info("Using background region set from analysis.sites")
-                background = getattr(self, "sites").fn
-            except AttributeError:
-                _LOGGER.warning("Using no background region set because 'analysis.sites' is not set!")
-                background = ""
+            background = ""
+            if data_type != "RNA-seq":
+                try:
+                    _LOGGER.info("Using background region set from analysis.sites")
+                    background = getattr(self, "sites").fn
+                except AttributeError:
+                    _LOGGER.warning("Using no background region set because 'analysis.sites' is not set!")
             _LOGGER.info("Submitting enrichment jobs.")
             run_enrichment_jobs(
                 results_dir=output_dir,
@@ -3110,7 +3131,7 @@ class Analysis(object):
             steps = [s for s in steps if s in data_type_steps[data_type]]
         for step in steps:
             if step not in data_type_steps[data_type]:
-                steps.pop(step)
+                steps.pop(steps.index(step))
         if len(steps) == 0:
             msg = "No valid steps for the respective data type selected."
             _LOGGER.error(msg)
@@ -3135,7 +3156,10 @@ class Analysis(object):
             ("homer", homer_enr, parse_homer, {}, "homerResults", ".homer_motifs.csv"),
             ("homer_consensus", homer_consensus, pd.read_csv, {"sep": "\t"}, "knownResults.txt", ".homer_consensus.csv"),
             ("lola", lola_enr, pd.read_csv, {"sep": "\t"}, "allEnrichments.tsv", ".lola.csv"),
-            ("enrichr", pathway_enr, pd.read_csv, {"encoding": "utf-8"}, input_prefix + "_genes.enrichr.csv", ".enrichr.csv")]
+            ("enrichr", pathway_enr, pd.read_csv, {"encoding": "utf-8"}, input_prefix + ".enrichr.csv", ".enrichr.csv")]
+
+        if data_type == "RNA-seq":
+            possible_steps = [x for x in possible_steps if x[0] == "enrichr"]
 
         # Examine each region cluster
         comps = differential["comparison_name"].drop_duplicates()
@@ -3167,7 +3191,7 @@ class Analysis(object):
                             enr = function(os.path.join(comparison_dir, suffix), **kwargs)
                         except IOError as e:
                             if permissive:
-                                _LOGGER.warn(error_msg.format(name, comp, direction))
+                                _LOGGER.warning(error_msg.format(name, comp, direction))
                             else:
                                 raise e
                         else:
@@ -3326,7 +3350,7 @@ class Analysis(object):
                 savefig(g.fig, output_file)
             except FloatingPointError:
                 msg = "Plotting of correlation matrix failed: {}".format(output_file)
-                _LOGGER.warn(msg)
+                _LOGGER.warning(msg)
 
         def enrichment_clustermap(
                 input_df,
@@ -3353,7 +3377,7 @@ class Analysis(object):
                 savefig(g.fig, output_file)
             except FloatingPointError:
                 msg = "Plotting of correlation matrix failed: {}".format(output_file)
-                _LOGGER.warn(msg)
+                _LOGGER.warning(msg)
 
         if steps is None:
             steps = ["region", "lola", "motif", "great", "enrichr"]

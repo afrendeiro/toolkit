@@ -69,11 +69,11 @@ def outputs(analysis):
     prefix = os.path.join(analysis.results_dir,
                           "differential_analysis_ATAC-seq", "enrichments")
     outputs = [
-        os.path.join(prefix, "Factor_a_2vs1.down/differential_analysis_genes.symbols.txt"),
+        os.path.join(prefix, "Factor_a_2vs1.down/differential_analysis.gene_symbols.txt"),
         os.path.join(prefix, "Factor_a_2vs1.down/differential_analysis_regions.bed"),
         os.path.join(prefix, "Factor_a_2vs1.down/differential_analysis_regions.tsv"),
         os.path.join(prefix, "Factor_a_2vs1.down/differential_analysis_regions.enrichr.csv"),
-        os.path.join(prefix, "Factor_a_2vs1.up/differential_analysis_genes.symbols.txt"),
+        os.path.join(prefix, "Factor_a_2vs1.up/differential_analysis.gene_symbols.txt"),
         os.path.join(prefix, "Factor_a_2vs1.up/differential_analysis_regions.bed"),
         os.path.join(prefix, "Factor_a_2vs1.up/differential_analysis_regions.tsv"),
         os.path.join(prefix, "Factor_a_2vs1.up/differential_analysis_regions.enrichr.csv"),

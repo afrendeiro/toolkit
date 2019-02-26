@@ -57,8 +57,8 @@ def analysis(tmp_path):
         a.normalize(method="total")
         a.normalize(method="quantile")
         a.get_peak_gene_annotation()
-        a.annotate(quant_matrix="coverage_qnorm")
-        a.annotate_with_sample_metadata(quant_matrix="coverage_qnorm")
+        a.annotate(matrix="coverage_qnorm")
+        a.annotate_with_sample_metadata(matrix="coverage_qnorm")
         a.differential_analysis(filter_support=False)
         to_test.append(a)
     return to_test[0]

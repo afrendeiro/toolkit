@@ -41,9 +41,6 @@ from statsmodels.sandbox.stats.multicomp import multipletests
 from tqdm import tqdm
 
 
-# TODO: Rename kwargs "quant_matrix" to "matrix", accept either dataframe or string
-# TODO: Select for data type in samples and comparison_table when loading from PEP
-
 # TODO: Move normalization methods from ATAC-seq here
 # TODO: Make method to retrieve matrix based on either a dataframe or a string
 
@@ -151,10 +148,9 @@ class Analysis(object):
             self.from_pep(from_pep)
             if name is None:
                 if hasattr(getattr(self, "prj"), "name"):
-                    if getattr(self, "prj").name is not None:
-                        name = getattr(getattr(self, "prj"), "name")
-                        _LOGGER.info("Setting Project's name as the analysis's name: '{}'.".format(name))
-                        self.name = name
+                    if getattr(getattr(self, "prj"), "name") is not None:
+                        self.name = getattr(getattr(self, "prj"), "name")
+                        _LOGGER.info("Setting Project's name as the analysis's name: '{}'.".format(self.name))
         self.name = "analysis" if name is None else name
 
         # Set default location for the pickle
@@ -475,22 +471,31 @@ class Analysis(object):
         if self.samples is None:
             _LOGGER.warning("Genome assembly for analysis was not set and cannot be derived from samples.")
         else:
+            hint = "Will not set an organism for analysis."
             organisms = list(set([s.organism for s in self.samples]))
             if len(organisms) == 1:
                 _LOGGER.info("Setting analysis organism as '{}'.".format(organisms[0]))
                 self.organism = organisms[0]
+            elif len(organisms) == 0:
+                msg = "Did not found any organism in the analysis samples. "
+                _LOGGER.warning(msg + hint)
             else:
-                _LOGGER.warning("Found several organism for the various analysis samples. " +
-                                "Will not set a organism for analysis.")
+                msg = "Found several organism for the various analysis samples. "
+                _LOGGER.warning(msg + hint)
+
+            hint = "Will not set a genome for analysis."
             genomes = list(set([s.genome for s in self.samples]))
             if len(genomes) == 1:
                 _LOGGER.info("Setting analysis genome as '{}'.".format(genomes[0]))
                 self.genome = genomes[0]
+            elif len(genomes) == 0:
+                msg = "Did not found any genome assembly in the analysis samples. "
+                _LOGGER.warning(msg + hint)
             else:
-                _LOGGER.warning("Found several genome assemblies for the various analysis samples. " +
-                                "Will not set a genome for analysis.")
+                msg = "Found several genome assemblies for the various analysis samples. "
+                _LOGGER.warning(msg + hint)
 
-    def set_project_attributes(self, overwrite=True):
+    def set_project_attributes(self, overwrite=True, subset_to_data_type=True):
         """
         Set Analysis object attributes ``samples``, ``sample_attributes`` and ``group_atrributes``
         to the values in the associated Project object if existing.
@@ -537,10 +542,19 @@ class Analysis(object):
                             else:
                                 _LOGGER.debug("{} already exist for analysis, not overwriting."
                                               .format(attr.replace("_", " ").capitalize()))
-            if hasattr(self, "comparison_table"):
-                if isinstance(getattr(self, "comparison_table"), str):
-                    _LOGGER.debug("Reading up comparison table.")
-                    self.comparison_table = pd.read_csv(self.comparison_table)
+
+            if subset_to_data_type:
+                if hasattr(self, "samples"):
+                    if self.data_type is not None:
+                        _LOGGER.info("Subsetting samples for samples of type '{}'.".format(self.data_type))
+                        self.samples = [s for s in self.samples if s.protocol == self.data_type]
+                if hasattr(self, "comparison_table"):
+                    if isinstance(getattr(self, "comparison_table"), str):
+                        _LOGGER.debug("Reading up comparison table.")
+                        self.comparison_table = pd.read_csv(self.comparison_table)
+                    if (self.data_type is not None) and ("data_type" in self.comparison_table.columns):
+                        _LOGGER.info("Subsetting comparison_table for comparisons of type '{}'.".format(self.data_type))
+                        self.comparison_table.query("data_type == @self.data_type", inplace=True)
         else:
             _LOGGER.warning("Analysis object does not have an attached Project. " +
                             "Will not add special attributes to analysis such as " +
@@ -717,48 +731,36 @@ class Analysis(object):
 
         return output
 
-    def get_matrix(self, matrix=None, matrix_name=None, samples=None):
+    def get_matrix(self, matrix, samples=None):
         """
-        Return a matrix that is an attribute of self subsetted for the requested samples.
+        Get a matrix that is an attribute of self subsetted for the requested samples.
 
         Parameters
         ----------
-        matrix : pandas.DataFrame
-            Pandas DataFrame.
+        matrix : {str, pandas.DataFrame}
+            The name of the attribute with the matrix or a DataFrame already.
 
         samples : list
             Iterable of peppy.Sample objects to restrict matrix to.
             If not provided (`None` is passed) the matrix will not be subsetted.
 
-        matrix_name : str
-            Name of the matrix that is an attribute of the object
-            with values for samples in `samples`.
-
         Returns
         -------
         pandas.DataFrame
-            Requested DataFrame.
+            Requested matrix (dataframe).
         """
-        if (matrix is None) & (matrix_name is None):
-            msg = "Either arguments `matrix` or `matrix_name` must be provided."
-            _LOGGER.error(msg)
-            raise ValueError(msg)
-        # default to matrix to be normalized
-        if matrix is None:
-            r_matrix = getattr(self, matrix_name)
-        else:
-            r_matrix = matrix
-        # default to all samples in self with matching names in matrix
+        if isinstance(matrix, str):
+            matrix = getattr(self, matrix)
         if samples is None:
-            r_matrix = r_matrix.loc[:, [s.name for s in self.samples]]
+            # all samples in matrix
+            return matrix
         else:
-            r_matrix = r_matrix.loc[:, [s.name for s in samples]]
-
-        return r_matrix
+            # subset to requested samples
+            return matrix.loc[:, [s.name for s in samples]]
 
     def annotate_with_sample_metadata(
             self,
-            quant_matrix=None,
+            matrix=None,
             attributes=None,
             numerical_attributes=None,
             save=True,
@@ -770,7 +772,7 @@ class Analysis(object):
 
         Parameters
         ----------
-        quant_matrix : str, optional
+        matrix : str, optional
             Attribute name of matrix to annotate.
             Default is  infered from the analysis data_type in the following way:
                 - ATAC-seq or ChIP-seq: ``coverage_annotated``;
@@ -821,34 +823,34 @@ class Analysis(object):
 
         if self.data_type == "ATAC-seq":
             output_matrix = "accessibility"
-            if quant_matrix is None:
-                quant_matrix = "coverage_annotated"
+            if matrix is None:
+                matrix = "coverage_annotated"
         elif self.data_type == "ChIP-seq":
             output_matrix = "binding"
-            if quant_matrix is None:
-                quant_matrix = "coverage_annotated"
+            if matrix is None:
+                matrix = "coverage_annotated"
         elif self.data_type == "CNV":
             output_matrix = "cnv"
-            if quant_matrix is None:
-                if not isinstance(getattr(self, quant_matrix), pd.DataFrame):
+            if matrix is None:
+                if not isinstance(getattr(self, matrix), pd.DataFrame):
                     _LOGGER.error("For CNV data type, the matrix to be annotated must be" +
-                                  " directly passed to the function throught the `quant_matrix` argument!")
+                                  " directly passed to the function throught the `matrix` argument!")
                     raise ValueError
-            if quant_matrix is None:
-                quant_matrix = "coverage_norm"
+            if matrix is None:
+                matrix = "coverage_norm"
         elif self.data_type == "RNA-seq":
             output_matrix = "expression"
-            if quant_matrix is None:
-                quant_matrix = "expression_annotated"
+            if matrix is None:
+                matrix = "expression_annotated"
         else:
             _LOGGER.warning("Data type of object not known, will not set as attribute.")
             assign = False
             output_matrix = ""
-            if quant_matrix is None:
-                msg = "Data type of object not known, must specify `quant_matrix` to annotate!"
+            if matrix is None:
+                msg = "Data type of object not known, must specify `matrix` to annotate!"
                 raise ValueError(msg)
 
-        matrix = getattr(self, quant_matrix)
+        matrix = self.get_matrix(matrix)
 
         if isinstance(matrix.columns, pd.core.indexes.multi.MultiIndex):
             matrix.columns = matrix.columns.get_level_values("sample_name")
@@ -1009,7 +1011,7 @@ class Analysis(object):
             self,
             steps=["correlation", "manifold", "pca", "pca_association"],
             data_type=None,
-            quant_matrix=None,
+            matrix=None,
             samples=None,
             attributes_to_plot=None,
             plot_prefix=None,
@@ -1059,7 +1061,7 @@ class Analysis(object):
             Data type. One of "ATAC-seq" or "RNA-seq".
             Defaults to "ATAC-seq".
 
-        quant_matrix : str, optional
+        matrix : str, optional
             Name of analysis attribute contatining the numeric dataframe to perform analysis on.
             Defaults to the value of "norm_matrix_name" which is data-type specific.
             Must have a pandas.MultiIndex as column index.
@@ -1077,7 +1079,7 @@ class Analysis(object):
             Defaults to "all_sites" if data_type is ATAC-seq and "all_genes" if data_type is RNA-seq.
 
         standardize_matrix : bool, optional
-            Whether to standardize variables in `quant_matrix` by removing the mean and scaling to unit variance.
+            Whether to standardize variables in `matrix` by removing the mean and scaling to unit variance.
             It is not applied to the "correlation" step.
             Default is True.
 
@@ -1121,23 +1123,23 @@ class Analysis(object):
         if data_type == "ATAC-seq":
             if plot_prefix is None:
                 plot_prefix = "all_sites"
-            if quant_matrix is None:
-                quant_matrix = "accessibility"
+            if matrix is None:
+                matrix = "accessibility"
         elif data_type == "ChIP-seq":
             if plot_prefix is None:
                 plot_prefix = "all_sites"
-            if quant_matrix is None:
-                quant_matrix = "binding"
+            if matrix is None:
+                matrix = "binding"
         elif data_type == "CNV":
             if plot_prefix is None:
                 plot_prefix = "all_bins"
-            if quant_matrix is None:
-                quant_matrix = "cnv"
+            if matrix is None:
+                matrix = "cnv"
         elif data_type == "RNA-seq":
             if plot_prefix is None:
                 plot_prefix = "all_genes"
-            if quant_matrix is None:
-                quant_matrix = "expression"
+            if matrix is None:
+                matrix = "expression"
         else:
             raise ValueError("Data types can only be 'ATAC-seq', 'ChIP-seq', RNA-seq' or 'CNV'.")
 
@@ -1146,7 +1148,7 @@ class Analysis(object):
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
 
-        matrix = getattr(self, quant_matrix)
+        matrix = getattr(self, matrix)
 
         if not isinstance(matrix.columns, pd.core.indexes.multi.MultiIndex):
             msg = "Provided quantification matrix must have columns with MultiIndex."

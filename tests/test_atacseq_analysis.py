@@ -255,7 +255,7 @@ def test_normalize(analysis):
 
 def test_get_matrix_stats(various_analysis):
     for analysis in various_analysis:
-        annot = analysis.get_matrix_stats(quant_matrix='coverage')
+        annot = analysis.get_matrix_stats(matrix='coverage')
         output = os.path.join(
             analysis.results_dir, "{}_peaks.stats_per_region.csv".format(analysis.name))
         assert os.path.exists(output)
@@ -341,7 +341,7 @@ def test_peak_chromatin_state(analysis, chrom_file):
 
 def test_annotate(analysis, chrom_file):
     analysis.get_peak_chromatin_state(chrom_state_file=chrom_file)
-    analysis.get_matrix_stats(quant_matrix='coverage')
+    analysis.get_matrix_stats(matrix='coverage')
     analysis.get_peak_gene_annotation(max_dist=1e10)
     # At some point, downloading a genome reference in Travis
     # caused memory error.
@@ -355,7 +355,7 @@ def test_annotate(analysis, chrom_file):
             failed = True
         else:
             raise
-    analysis.annotate(quant_matrix="coverage")
+    analysis.annotate(matrix="coverage")
     f = os.path.join(
         analysis.results_dir, analysis.name + "_peaks.coverage_qnorm.annotated.csv")
     assert hasattr(analysis, "coverage_annotated")

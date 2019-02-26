@@ -56,7 +56,7 @@ def analysis(tmp_path):
 
         a.normalize(method="total")
         a.normalize(method="quantile")
-        a.annotate_with_sample_metadata(quant_matrix="coverage_qnorm")
+        a.annotate_with_sample_metadata(matrix="coverage_qnorm")
 
         to_test.append(a)
     return to_test[0]
@@ -95,18 +95,18 @@ class Test_unsupervised_analysis:
 
     def test_matrix_with_no_multiIndex(self, analysis):
         with pytest.raises(TypeError):
-            analysis.unsupervised_analysis(quant_matrix="coverage")
+            analysis.unsupervised_analysis(matrix="coverage")
         assert os.path.exists(os.path.join(analysis.results_dir, "unsupervised_analysis_ATAC-seq"))
 
     def test_various_matrices(self, analysis, outputs):
-        for quant_matrix in ['coverage', 'coverage_rpm', 'coverage_qnorm']:
-            analysis.annotate_with_sample_metadata(quant_matrix=quant_matrix)
+        for matrix in ['coverage', 'coverage_rpm', 'coverage_qnorm']:
+            analysis.annotate_with_sample_metadata(matrix=matrix)
             analysis.unsupervised_analysis()
             for output in outputs:
                 assert os.path.exists(output)
                 assert os.stat(output).st_size > 0
             shutil.rmtree(os.path.join(analysis.results_dir, "unsupervised_analysis_ATAC-seq"))
-        # analysis.annotate_with_sample_metadata(quant_matrix="coverage_qnorm")
+        # analysis.annotate_with_sample_metadata(matrix="coverage_qnorm")
 
     def test_too_low_numbers_of_samples_error(self, analysis):
         for i in range(2):

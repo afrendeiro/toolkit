@@ -291,7 +291,7 @@ def main_analysis_pipeline(
         # analysis.plot_coverage()
         # analysis.plot_variance()
 
-        quant_matrix = "accessibility"
+        matrix = "accessibility"
         feature_name = "sites"
 
     if data_type == "RNA-seq":
@@ -300,13 +300,13 @@ def main_analysis_pipeline(
             samples=analysis.samples,
             sample_attributes=sample_attributes)
 
-        quant_matrix = "expression_annotated"
+        matrix = "expression_annotated"
         feature_name = "genes"
 
     # Unsupervised analysis
     unsupervised_analysis(
         analysis,
-        quant_matrix=quant_matrix,
+        matrix=matrix,
         attributes_to_plot=plotting_attributes,
         data_type=data_type,
         plot_max_attr=20,
@@ -366,13 +366,13 @@ def main_analysis_pipeline(
     if diff.groupby('comparison_name').count().shape[0] > 1:
         differential_overlap(
             diff,
-            getattr(analysis, quant_matrix).shape[0],
+            getattr(analysis, matrix).shape[0],
             data_type=data_type)
 
     plot_differential(
         analysis,
         analysis.differential_results,
-        matrix=getattr(analysis, quant_matrix),
+        matrix=getattr(analysis, matrix),
         comparison_table=comps,
         data_type=data_type,
         alpha=alpha,

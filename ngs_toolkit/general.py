@@ -725,7 +725,7 @@ def deseq_analysis(
 
 
 def least_squares_fit(
-        quant_matrix, design_matrix, test_model,
+        matrix, design_matrix, test_model,
         null_model="~ 1", standardize_data=True,
         multiple_correction_method="fdr_bh"):
     """
@@ -734,7 +734,7 @@ def least_squares_fit(
 
     Parameters
     ----------
-    quant_matrix : pandas.DataFrame
+    matrix : pandas.DataFrame
         A Data frame of shape (samples, variables).
 
     design_matrix : pandas.DataFrame
@@ -760,34 +760,34 @@ def least_squares_fit(
 
     :Example:
 
-    quant_matrix = np.random.random(10000000).reshape(100, 100000)
+    matrix = np.random.random(10000000).reshape(100, 100000)
     P = np.concatenate([[0] * 50, [1] * 50])  # dependent variable
     Q = np.concatenate([[0] * 25, [1] * 25] + [[0] * 25, [1] * 25])  # covariate
     design_matrix = pd.DataFrame([P, Q], index=["P", "Q"]).T
-    quant_matrix = quant_matrix.T * ((1 + design_matrix.sum(axis=1)) * 4).values
-    quant_matrix = pd.DataFrame(quant_matrix.T)
+    matrix = matrix.T * ((1 + design_matrix.sum(axis=1)) * 4).values
+    matrix = pd.DataFrame(matrix.T)
     test_model = "~ Q + P"
     null_model = "~ Q"
-    res = least_squares_fit(quant_matrix, design_matrix, test_model, null_model)
+    res = least_squares_fit(matrix, design_matrix, test_model, null_model)
     res.head()
 
     """
     if standardize_data:
         norm = StandardScaler()
-        quant_matrix = pd.DataFrame(
-            norm.fit_transform(quant_matrix),
-            index=quant_matrix.index, columns=quant_matrix.columns)
+        matrix = pd.DataFrame(
+            norm.fit_transform(matrix),
+            index=matrix.index, columns=matrix.columns)
 
-    A1 = patsy.dmatrix(test_model, design_matrix)
-    betas1, residuals1, _, _ = lstsq(A1, quant_matrix)
+    a1 = patsy.dmatrix(test_model, design_matrix)
+    betas1, residuals1, _, _ = lstsq(a1, matrix)
 
-    A0 = patsy.dmatrix(null_model, design_matrix)
-    betas0, residuals0, _, _ = lstsq(A0, quant_matrix)
+    a0 = patsy.dmatrix(null_model, design_matrix)
+    betas0, residuals0, _, _ = lstsq(a0, matrix)
 
-    results = pd.DataFrame(betas1.T, columns=A1.design_info.column_names, index=quant_matrix.columns)
+    results = pd.DataFrame(betas1.T, columns=a1.design_info.column_names, index=matrix.columns)
 
     # Calculate the log-likelihood ratios
-    n = float(quant_matrix.shape[0])
+    n = float(matrix.shape[0])
     results['model_residuals'] = residuals1
     results['null_residuals'] = residuals0
     results['model_log_likelihood'] = (-n / 2.) * np.log(2 * np.pi) - n / 2. * np.log(results['model_residuals'] / n) - n / 2.
@@ -799,7 +799,7 @@ def least_squares_fit(
     results['q_value'] = multipletests(results['p_value'], method=multiple_correction_method)[1]
 
     if not standardize_data:
-        results["mean"] = quant_matrix.mean(axis=0)
+        results["mean"] = matrix.mean(axis=0)
 
     return results
 

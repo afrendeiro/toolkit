@@ -54,7 +54,7 @@ def analysis(tmp_path):
 
         a.normalize(method="total")
         a.normalize(method="quantile")
-        a.annotate_with_sample_metadata(quant_matrix="coverage_qnorm")
+        a.annotate_with_sample_metadata(matrix="coverage_qnorm")
 
         to_test.append(a)
     return to_test[0]
@@ -62,7 +62,7 @@ def analysis(tmp_path):
 
 class Test_annotate_with_sample_metadata:
     def test_no_arguments(self, analysis):
-        analysis.annotate_with_sample_metadata(quant_matrix="coverage_qnorm")
+        analysis.annotate_with_sample_metadata(matrix="coverage_qnorm")
 
 
 def test_get_matrix(analysis):

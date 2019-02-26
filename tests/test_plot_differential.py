@@ -56,7 +56,7 @@ def analysis(tmp_path):
 
         a.normalize(method="total")
         a.normalize(method="quantile")
-        a.annotate_with_sample_metadata(quant_matrix="coverage_qnorm")
+        a.annotate_with_sample_metadata(matrix="coverage_qnorm")
         a.differential_analysis(filter_support=False)
         # # Sometimes the DESeq2 call fails, but it often works if repeated
         # i = 1

@@ -101,7 +101,7 @@ class ATACSeqAnalysis(Analysis):
 
         # Annotate with sample metadata
         atac_analysis.accessibility = atac_analysis.annotate_with_sample_metadata(
-            quant_matrix="coverage_annotated",
+            matrix="coverage_annotated",
             attributes=atac_analysis.sample_variables)
 
         # Save object
@@ -841,7 +841,7 @@ class ATACSeqAnalysis(Analysis):
         assign : bool
             Whether to assign the normalized DataFrame to an attribute ``.
         """
-        to_norm = self.get_matrix(matrix=matrix, samples=samples, matrix_name="coverage")
+        to_norm = self.get_matrix(matrix="coverage", samples=samples)
         # apply normalization over total
         coverage_rpm = (to_norm / to_norm.sum()) * mult_factor
 
@@ -893,7 +893,7 @@ class ATACSeqAnalysis(Analysis):
             Whether to assign the normalized DataFrame to an attribute `coverage_qnorm`.
         """
         if matrix is None:
-            to_norm = self.get_matrix(matrix=matrix, samples=samples, matrix_name="coverage")
+            to_norm = self.get_matrix(matrix="coverage", samples=samples)
         else:
             to_norm = matrix
 
@@ -1035,7 +1035,7 @@ class ATACSeqAnalysis(Analysis):
         if not hasattr(self, "nuc"):
             self.get_peak_gccontent_length()
 
-        to_norm = self.get_matrix(matrix=matrix, samples=samples, matrix_name="coverage")
+        to_norm = self.get_matrix(matrix="coverage", samples=samples)
         coverage_gc_corrected = (
             cqn(cov=to_norm, gc_content=self.nuc["gc_content"], lengths=self.nuc["length"])
             # .join(self.coverage[['chrom', 'start', 'end']])
@@ -1349,7 +1349,7 @@ class ATACSeqAnalysis(Analysis):
             setattr(self, attr + "_mapping", annot)
         return self.chrom_state_annotation
 
-    def get_matrix_stats(self, quant_matrix=None, samples=None):
+    def get_matrix_stats(self, matrix=None, samples=None):
         """
         Gets a matrix of feature-wise (i.e. for every reg. element) statistics such
         across samples such as mean, variance, deviation, dispersion and amplitude.
@@ -1371,17 +1371,17 @@ class ATACSeqAnalysis(Analysis):
         """
         if samples is None:
             samples = self.samples
-        if quant_matrix is None:
-            quant_matrix = "coverage_gc_corrected"
-        quant_matrix = getattr(self, quant_matrix)
+        if matrix is None:
+            matrix = "coverage_gc_corrected"
+        matrix = getattr(self, matrix)
 
-        quant_matrix = quant_matrix.loc[:, [s.name for s in samples]]
+        matrix = matrix.loc[:, [s.name for s in samples]]
 
-        matrix = pd.DataFrame(index=pd.Index(quant_matrix.index, name="region"))
+        matrix = pd.DataFrame(index=pd.Index(matrix.index, name="region"))
         # calculate mean coverage
-        matrix.loc[:, 'mean'] = quant_matrix.mean(axis=1)
+        matrix.loc[:, 'mean'] = matrix.mean(axis=1)
         # calculate coverage variance
-        matrix.loc[:, 'variance'] = quant_matrix.var(axis=1)
+        matrix.loc[:, 'variance'] = matrix.var(axis=1)
         # calculate std deviation (sqrt(variance))
         matrix.loc[:, 'std_deviation'] = np.sqrt(matrix.loc[:, 'variance'])
         # calculate dispersion (variance / mean)
@@ -1389,9 +1389,9 @@ class ATACSeqAnalysis(Analysis):
         # calculate qv2 (std / mean) ** 2
         matrix.loc[:, 'qv2'] = (matrix.loc[:, 'std_deviation'] / matrix.loc[:, 'mean']) ** 2
         # calculate "amplitude" (max - min)
-        matrix.loc[:, 'amplitude'] = (quant_matrix.max(axis=1) - quant_matrix.min(axis=1))
+        matrix.loc[:, 'amplitude'] = (matrix.max(axis=1) - matrix.min(axis=1))
         # calculate interquantile range
-        matrix.loc[:, 'iqr'] = (quant_matrix.quantile(0.75, axis=1) - quant_matrix.quantile(0.25, axis=1))
+        matrix.loc[:, 'iqr'] = (matrix.quantile(0.75, axis=1) - matrix.quantile(0.25, axis=1))
         matrix.index.name = "index"
         matrix.to_csv(os.path.join(
             self.results_dir, self.name + "_peaks.stats_per_region.csv"),
@@ -1400,12 +1400,12 @@ class ATACSeqAnalysis(Analysis):
         self.stats = matrix
         return self.stats
 
-    def annotate(self, samples=None, quant_matrix=None, permissive=True):
+    def annotate(self, samples=None, matrix=None, permissive=True):
         """
         Annotates analysis regions by aggregating region-wise annotations
         (region, chromatin state, gene annotations and statistics - if present).
 
-        The numeric matrix to be used is specified in `quant_matrix`.
+        The numeric matrix to be used is specified in `matrix`.
         If two annotation dataframes have equally named columns (e.g. chrom, start, end),
         the value of the first is kept.
 
@@ -1416,7 +1416,7 @@ class ATACSeqAnalysis(Analysis):
             If not provided (`None` is passed) the matrix will not be subsetted.
             Calculated metrics will be restricted to these samples.
 
-        quant_matrix : str
+        matrix : str
             Attribute name of matrix to annotate.
 
         permissive : bool
@@ -1435,11 +1435,11 @@ class ATACSeqAnalysis(Analysis):
         if samples is None:
             samples = self.samples
         # TODO: come up with a resonable iterative way to figure out which matrix to use by default
-        if quant_matrix is None:
-            quant_matrix = "coverage_gc_corrected"
-        quant_matrix = getattr(self, quant_matrix)
+        if matrix is None:
+            matrix = "coverage_gc_corrected"
+        matrix = getattr(self, matrix)
 
-        next_matrix = quant_matrix
+        next_matrix = matrix
         # add closest gene
         msg = "`{}` attribute does not exist."
 

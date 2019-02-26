@@ -10,7 +10,6 @@ from ngs_toolkit.analysis import Analysis
 from ngs_toolkit.decorators import (
     check_organism_genome, check_has_sites)
 from ngs_toolkit.general import (
-    get_blacklist_annotations,
     meme_ame, homer_motifs, lola, enrichr)
 from ngs_toolkit.utils import (
     bed_to_index, bed_to_fasta,
@@ -368,9 +367,9 @@ class ATACSeqAnalysis(Analysis):
         if blacklist_bed is None:
             _LOGGER.info("Blacklist file not provided. Downloading...")
             try:
-                blacklist_bed = get_blacklist_annotations(self.organism, self.genome)
+                blacklist_bed = self.get_annotations(steps=["blacklist"])["blacklist_file"]
             except AttributeError:
-                msg = "Blacklist file was not provided and cannot"
+                msg = "Blacklist file was not provided and cannot be"
                 msg += " get one without analysis having `organism` and `genome` set."
                 _LOGGER.error(msg)
                 raise AttributeError(msg)
@@ -533,7 +532,7 @@ class ATACSeqAnalysis(Analysis):
         support.to_csv(os.path.join(self.results_dir, self.name + "_peaks.binary_overlap_support.csv"), index=True)
 
         # divide sum (of unique overlaps) by total to get support value between 0 and 1
-        support["support"] = (
+        support.loc[:, "support"] = (
             support[[sample.name for sample in samples]]
             .apply(lambda x: sum([i if i <= 1 else 1 for i in x]) / float(len(samples)), axis=1))
         # save
@@ -844,11 +843,14 @@ class ATACSeqAnalysis(Analysis):
         """
         to_norm = self.get_matrix(matrix=matrix, samples=samples, matrix_name="coverage")
         # apply normalization over total
-        coverage_rpm = ((pseudocount + to_norm) / (pseudocount + to_norm).sum()) * mult_factor
+        coverage_rpm = (to_norm / to_norm.sum()) * mult_factor
+
+        if coverage_rpm.min().min() <= 0:
+            coverage_rpm += np.absolute(coverage_rpm.min().min())
 
         # Log2 transform
         if log_transform:
-            coverage_rpm = np.log2(coverage_rpm)
+            coverage_rpm = np.log2(pseudocount + coverage_rpm)
 
         # coverage_rpm = coverage_rpm.join(self.coverage[['chrom', 'start', 'end']])
         if save:
@@ -1265,8 +1267,8 @@ class ATACSeqAnalysis(Analysis):
                 self.results_dir, self.name + "_peaks.region_annotation{}.csv".format(a)),
                 index=True)
 
-        setattr(self, attr, annot_comp)
-        setattr(self, attr + "_mapping", annot)
+            setattr(self, attr, annot_comp)
+            setattr(self, attr + "_mapping", annot)
         return self.region_annotation
 
     @check_organism_genome
@@ -1473,6 +1475,103 @@ class ATACSeqAnalysis(Analysis):
 
         # Save
         self.coverage_annotated.to_csv(os.path.join(self.results_dir, self.name + "_peaks.coverage_qnorm.annotated.csv"), index=True)
+
+    def get_sex_chrom_ratio(
+            self,
+            matrix=None,
+            sex_chroms=["chrX", "chrY"],
+            output_dir="{results_dir}",
+            output_prefix="sex_chrom_ratio",
+            plot=True):
+        """
+        Get ratio of signal between sex chromosomes.
+        Useful to quickly assign sex to samples.
+
+        Parameters
+        ----------
+        matrix : pandas.DataFrame, optional
+            Matrix to use.
+            Defaults to `accessibility`.
+
+        sex_chroms : list, optional
+            Names of the two sex chromosomes to use.
+
+        output_dir : str, optional
+            Directory to write output to.
+
+        output_prefix : str, optional
+            String to prefix output with.
+
+        plot : bool, optional
+            Whether to produce illustrative plots.
+
+        Returns
+        ----------
+        pd.Series
+            Ratio of sex chromosomes defined as
+            `sex_chroms[1] - sex_chroms[0]`.
+        """
+        from natsort import natsorted
+        from ngs_toolkit.graphics import savefig
+
+        if matrix is None:
+            matrix = self.accessibility.copy()
+
+        output_dir = self._format_string_with_attributes(output_dir)
+
+        # remove per sample mean
+        matrix -= matrix.mean()
+
+        matrix = matrix.assign(
+            chrom=matrix.index.str.extract(r"^(.*):\d+-\d+$").values)
+        m = matrix.groupby('chrom').mean()
+        # remove per chromosome mean
+        m = (m.T - m.mean(1)).T
+        # order chromosomes
+        m = m.reindex(natsorted(m.index))
+
+        # calculate ratio
+        ratio = (m.loc[sex_chroms[1]] - m.loc[sex_chroms[0]])
+        ratio.name = "{}_to_{}_ratio".format(sex_chroms[1], sex_chroms[0])
+        ratio.to_csv(os.path.join(output_dir, output_prefix + ".csv"), header=True)
+
+        if plot:
+            ratio.sort_values(inplace=True)
+            m = m.reindex(ratio.index, axis=1)
+
+            # Clustermap
+            if isinstance(ratio.index, pd.MultiIndex):
+                cols = m.columns.get_level_values("sample_name")
+            else:
+                cols = m.columns
+            grid = sns.clustermap(
+                m.T, z_score=1, center=0, cmap="RdBu_r",
+                figsize=(m.shape[0] * 0.3, m.shape[1] * 0.3),
+                row_cluster=False, col_cluster=False, cbar_kws={
+                    "label": "Deviation from mean\nchromosome accessibility"},
+                yticklabels=cols)
+            grid.ax_heatmap.set_xlabel("Chromosomes")
+            grid.ax_heatmap.set_ylabel("Samples")
+            savefig(grid, os.path.join(output_dir, output_prefix + ".clustermap.svg"))
+
+            # Value vs Rank
+            fig, axis = plt.subplots(1, figsize=(3, ratio.shape[0] * 0.3))
+            axis.scatter(ratio, ratio.rank(), linestyle="-")
+            axis.axvline(0, linestyle="--", color="grey")
+            axis.set_yticks(range(1, ratio.shape[0] + 1))
+            if isinstance(ratio.index, pd.MultiIndex):
+                axis.set_yticklabels(ratio.index.get_level_values("sample_name"))
+            else:
+                axis.set_yticklabels(ratio.index)
+            axis.set_ylabel("Samples")
+            axis.set_xlabel(ratio.name.replace("_", " "))
+            v = ratio.abs().max()
+            v += v * 0.1
+            axis.set_xlim((-v, v))
+            sns.despine(fig)
+            savefig(fig, os.path.join(output_dir, output_prefix + ".rank_vs_ratio.svg"))
+
+        return ratio.sort_index()
 
     def get_gene_level_accessibility(self, matrix="accessibility", reduce_func=np.mean):
         """

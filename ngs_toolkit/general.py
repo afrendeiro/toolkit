@@ -1409,9 +1409,9 @@ def run_enrichment_jobs(
         Pickle file of the analysis.
         Only required for "region" enrichment.
     """
-    # TODO: replace with info from resources
+    # TODO: replace hardcoded paths with info from resources
     # TODO: make required scripts into recipes or scripts distributed with package
-    # TODO: remove pickle_file requirement to "region" enrichment
+    # TODO: remove pickle_file requirement to "region_enrichment"
 
     tk = NGSTk()
     dbs = {
@@ -1437,7 +1437,7 @@ def run_enrichment_jobs(
                 os.path.join(dir_, name + ".region.sh"),
                 ("shortq", 1, 8000),
                 "python ~/region_enrichment.py --output-file {} {} {}"
-                .format(file, pickle_file, output_)])
+                .format(output_, file, pickle_file)])
 
     # LOLA
     if 'lola' in steps:

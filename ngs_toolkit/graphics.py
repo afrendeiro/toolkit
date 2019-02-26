@@ -470,7 +470,7 @@ def plot_region_context_enrichment(
     row = col = int(np.ceil(np.sqrt(n)))
 
     # barplots
-    for i, var in enumerate([x, y]):
+    for var in [x, y]:
         fig, axis = plt.subplots(row, col, figsize=(col * 3, row * 3))
         if row == col == 1:
             axis = np.array([axis])

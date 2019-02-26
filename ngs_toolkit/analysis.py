@@ -41,8 +41,18 @@ from statsmodels.sandbox.stats.multicomp import multipletests
 from tqdm import tqdm
 
 
+# TODO: Rename "get_annotations" to "get_resources"
+
 # TODO: Rename kwargs "quant_matrix" to "matrix", accept either dataframe or string
 # TODO: Select for data type in samples and comparison_table when loading from PEP
+
+# TODO: Move normalization methods from ATAC-seq here
+# TODO: Make method to retrieve matrix based on either a dataframe or a string
+
+# TODO: Add combat as normalization method
+
+# TODO: Have only 4 types of matrices: raw counts, normalized, feature-annotated and sample-annotated
+# TODO: Store applied normalization method in object.
 
 # TODO: Idea: merging analysis. If same type, merge matrices, otherwise use dicts?
 
@@ -132,8 +142,8 @@ class Analysis(object):
         _LOGGER.debug("Setting data type-specific attributes to None.")
         attrs = [
             "data_type", "var_names",
-            "quantity", "norm_units", "raw_matrix_name",
-            "norm_matrix_name", "annot_matrix_name"]
+            "quantity", "norm_units",
+            "raw_matrix_name", "norm_matrix_name", "annot_matrix_name", "norm_method"]
         for attr in attrs:
             if not hasattr(self, attr):
                 setattr(self, attr, None)
@@ -1633,7 +1643,8 @@ class Analysis(object):
                         s.name
                         for s in self.samples
                         if s.name in comp['sample_name'].tolist()]]
-                    count = count.loc[(sup > 0).any(axis=1), :]
+                    sup = sup.reindex(count.index).dropna()
+                    count = count.reindex(sup[(sup > 0).any(axis=1)].index)
                 count.to_csv(os.path.join(out, "count_matrix.csv"), index=True)
 
                 job_name = "deseq_job.{}".format(comparison_name)
@@ -1768,13 +1779,13 @@ class Analysis(object):
                 raise IOError(msg)
 
         results = pd.concat(results)
-        if save:
-            # save all
-            results.to_csv(results_file, index=False)
 
         # set index
         if "index" in results.columns:
             results = results.set_index("index")
+
+        if save:
+            results.to_csv(results_file, index=True)
 
         if assign:
             self.differential_results = results
@@ -1810,8 +1821,8 @@ class Analysis(object):
             rasterized=True,
             robust=False,
             feature_labels=False,
-            group_wise_colours=False,
-            group_variables=None,
+            group_colours=True,
+            group_attributes=None,
             pallete="tab20",
             cmap="RdBu_r"
             ):
@@ -1936,20 +1947,20 @@ class Analysis(object):
             Whether features (regions/genes) should be labeled in heatmaps.
             Defaults to False.
 
-        group_wise_colours : bool, optional
+        group_colours : bool, optional
             Whether groups of samples should be coloured in heatmaps.
-            Defaults to False.
+            Defaults to True.
 
-        group_variables : list, optional
-            Which variables to colour if `group_wise_colours` if True.
-            Defaults to None (must be given).
+        group_attributes : list, optional
+            Which variables to colour if `group_colours` if True.
+            Defaults to all of analysis.group_attributes.
 
         pallete : str
-            Color pallete to use in levels of `group_variables`.
+            Color pallete to use in levels of `group_attributes`.
             Will be passed to `analysis.get_level_colors`.
 
         cmap : str
-            Color map to use in numerical levels of `group_variables`.
+            Color map to use in numerical levels of `group_attributes`.
             Will be passed to `analysis.get_level_colors`.
         """
         # TODO: split plotting into smaller parts
@@ -2029,17 +2040,21 @@ class Analysis(object):
         matrix = matrix[[s.name for s in samples]]
 
         # Handle group colouring
-        if group_wise_colours:
-            if group_variables is None:
-                msg = "If `group_wise_colours` is True, a list of `group_variables` must be passed."
-                raise AssertionError(msg)
+        if group_colours:
+            if group_attributes is None:
+
+                try:
+                    group_attributes = self.group_attributes
+                except AttributeError:
+                    msg = "`group_colours` is True, and `group_attributes` was not given and cannot be get from analysis!"
+                    raise AssertionError(msg)
 
             # This will always be a matrix for all samples
             color_dataframe = pd.DataFrame(
                 self.get_level_colors(
-                    index=matrix.columns, levels=group_variables,
+                    index=matrix.columns, levels=group_attributes,
                     pallete=pallete, cmap=cmap),
-                index=group_variables, columns=matrix.columns)
+                index=group_attributes, columns=matrix.columns)
             # will be filtered now by the requested samples if needed
             color_dataframe = color_dataframe[[s.name for s in samples]]
             color_dataframe = color_dataframe.loc[:, matrix.columns]
@@ -2088,7 +2103,7 @@ class Analysis(object):
 
                 # log fold-changes distributions
                 fig, axis = plt.subplots(1, 1, figsize=(4, 4))
-                sns.distplot(results[variable].dropna(), kde=True, hist=True, ax=axis)
+                sns.distplot(results[variable].dropna(), kde=False, hist=True, ax=axis)
                 if axvline:
                     axis.axvline(0, color="black", alpha=0.5)
                 axis.set_xlabel(label)
@@ -2100,7 +2115,7 @@ class Analysis(object):
                     # per comparison
                     g = sns.FacetGrid(
                         data=results, col=comparison_column, col_wrap=n_side, height=3, aspect=1)
-                    g.map(sns.distplot, variable, kde=True, hist=False)
+                    g.map(sns.distplot, variable, kde=False, hist=True)
                     for ax in g.axes:
                         ax.set_yscale("log")
                         if axvline:
@@ -2397,7 +2412,7 @@ class Analysis(object):
                         g = sns.clustermap(
                             groups,
                             xticklabels=True, yticklabels=feature_labels, z_score=0, cbar_kws={"label": "Z-score of {}\non differential {}s".format(quantity, var_name)},
-                            cmap="RdBu_r", robust=robust, metric="correlation", rasterized=True, figsize=figsize)
+                            cmap="RdBu_r", center=0, robust=robust, metric="correlation", rasterized=True, figsize=figsize)
                         g.ax_heatmap.set_ylabel("Differential {}s (n = {})".format(var_name, groups.shape[0]))
                         g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90, fontsize="xx-small")
                         g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small")
@@ -2476,7 +2491,7 @@ class Analysis(object):
                             os.path.join(output_dir,
                                          output_prefix + ".diff_{}.groups.{}.clustermap.svg".format(var_name, label.replace(" ", "_"))))
                     except FloatingPointError:
-                        _LOGGER.error("{} contain null of infinite values. Cannot plot.".format(label))
+                        _LOGGER.error("{} likely contains null or infinite values. Cannot plot.".format(label))
 
         # Sample level
         if "heatmap" in steps:
@@ -2493,7 +2508,7 @@ class Analysis(object):
                     " Proceeding without those.")
                 matrix2 = matrix2.dropna()
             figsize = (max(5, 0.12 * matrix2.shape[1]), 5)
-            if group_wise_colours:
+            if group_colours:
                 extra = {"col_colors": color_dataframe.T}
             else:
                 extra = {}
@@ -2610,8 +2625,7 @@ class Analysis(object):
                     [k1, k2, dir1, dir2, len(i1), len(i2), len(i1.intersection(i2)), len(i1.union(i2))],
                     index=["group1", "group2", "dir1", "dir2", "size1", "size2", "intersection", "union"]
                 ),
-                ignore_index=True
-            )
+                ignore_index=True)
         # convert to %
         intersections.loc[:, "intersection"] = intersections["intersection"].astype(float)
         intersections.loc[:, "perc_1"] = intersections["intersection"] / intersections["size1"] * 100.
@@ -2619,12 +2633,12 @@ class Analysis(object):
         intersections.loc[:, "intersection_max_perc"] = intersections[["perc_1", "perc_2"]].max(axis=1)
 
         # calculate p-value from Fisher"s exact test
-        intersections.loc[:, "a"] = total - intersections[["size1", "size2", "intersection"]].sum(axis=1)
+        intersections.loc[:, "a"] = intersections["intersection"]
         intersections.loc[:, "b"] = intersections["size1"] - intersections["intersection"]
         intersections.loc[:, "c"] = intersections["size2"] - intersections["intersection"]
-        intersections.loc[:, "d"] = intersections["intersection"]
+        intersections.loc[:, "d"] = total - intersections[["size1", "size2", "intersection"]].sum(axis=1)
 
-        for i, row in intersections.loc[:, ["d", "b", "c", "a"]].astype(int).iterrows():
+        for i, row in intersections.loc[:, ["a", "b", "c", "d"]].astype(int).iterrows():
             odds, p = fisher_exact(
                 row
                 .values
@@ -3189,7 +3203,7 @@ class Analysis(object):
                     if name in steps:
                         try:
                             enr = function(os.path.join(comparison_dir, suffix), **kwargs)
-                        except IOError as e:
+                        except (IOError, AttributeError) as e:
                             if permissive:
                                 _LOGGER.warning(error_msg.format(name, comp, direction))
                             else:
@@ -3293,8 +3307,9 @@ class Analysis(object):
             Top terms to use to display in plots.
             Defaults to 5
 
-        z_score : bool, optional
+        z_score : {bool, int}, optional
             Which dimention/axis to perform Z-score transformation for.
+            Pass `False` to skip plotting Z-score heatmaps.
             Numpy/Pandas conventions are used:
             `0` is row-wise (in this case across comparisons) and `1` is column-wise (across terms).
             Defaults to 0.
@@ -3361,19 +3376,27 @@ class Analysis(object):
                 params = dict()
             # plot clustered heatmap
             shape = input_df.shape
+
+            # # fix some labels
+            input_df.index = input_df.index.str.replace(r"_Homo.*", "")
+            input_df.index = input_df.index.str.replace(r"_Mus.*", "")
+            input_df.index = input_df.index.str.replace(r" \(GO:.*", "")
+            input_df.index = input_df.index.str.replace("_", " ")
             if z_score is not None:
                 params.update({"cmap": "RdBu_r", "center": 0, "z_score": z_score})
             try:
                 g = sns.clustermap(
                     input_df, figsize=(
-                        max(6, 0.12 * shape[1]), max(6, 0.12 * shape[0])),
+                        0.25 * shape[1], 0.12 * shape[0]),
                     metric=clustermap_metric,
                     xticklabels=True, yticklabels=True, rasterized=rasterized,
                     cbar_kws={"label": label}, **params)
                 g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(),
-                                             rotation=90, ha="right", fontsize="xx-small")
+                                             rotation=90, va="top", ha="center", fontsize="xx-small")
                 g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(),
-                                             rotation=0, fontsize="xx-small")
+                                             rotation=0, ha="left", va="center", fontsize="xx-small")
+                g.ax_heatmap.set_xlabel("Comparison")
+                g.ax_heatmap.set_ylabel("Term")
                 savefig(g.fig, output_file)
             except FloatingPointError:
                 msg = "Plotting of correlation matrix failed: {}".format(output_file)
@@ -3423,15 +3446,20 @@ class Analysis(object):
             z_score_label = "Row"
         elif z_score == 1:
             z_score_label = "Column"
-        elif z_score is None:
+        elif z_score in [None, False]:
             pass
         else:
             raise ValueError("Argument 'z_score' must be on of 0, 1 or None.")
 
         enrichment_table = enrichment_table.copy()
         if ("direction" in enrichment_table.columns) and direction_dependent:
-            enrichment_table.loc[:, comp_variable] = enrichment_table[comp_variable].astype(
-                str) + " " + enrichment_table["direction"].astype(str)
+            enrichment_table.loc[:, comp_variable] = (
+                enrichment_table[comp_variable]
+                .astype(str)
+                .str.replace("_", " ") +
+                " - " +
+                enrichment_table["direction"]
+                .astype(str))
 
         if enrichment_type == "region":
             _LOGGER.info("Plotting enrichments for 'region'")
@@ -3471,6 +3499,7 @@ class Analysis(object):
             _LOGGER.info("Plotting enrichments for 'lola'")
             # get a unique label for each lola region set
             enrichment_table.loc[:, "label"] = (
+                # TODO: re-write
                 enrichment_table["collection"].astype(str) + ", " +
                 enrichment_table["description"].astype(str) + ", " +
                 enrichment_table["filename"].astype(str) + ", " +
@@ -3482,7 +3511,7 @@ class Analysis(object):
                 enrichment_table["label"]
                 .str.replace("nan", "").str.replace("None", "")
                 .str.replace(", $", "").str.replace(", , ", ", ")
-                .str.decode("unicode_escape").str.encode("ascii", "ignore"))
+                .str.decode("unicode_escape")).astype(str)
 
             # Replace inf values with maximum non-inf p-value observed
             r = enrichment_table.loc[enrichment_table["pValueLog"] != np.inf, "pValueLog"].max()
@@ -3551,7 +3580,7 @@ class Analysis(object):
                     lola_pivot.loc[top_terms, :],
                     output_file=os.path.join(output_dir, output_prefix + ".lola.cluster_specific.svg"),
                     label="-log10(p-value) of enrichment\nof differential regions")
-                if z_score is not None:
+                if z_score is not False:
                     enrichment_clustermap(
                         lola_pivot.loc[top_terms, :],
                         output_file=os.path.join(output_dir, output_prefix + ".lola.cluster_specific.{}_z_score.svg".format(z_score_label)),
@@ -3589,7 +3618,7 @@ class Analysis(object):
                     motifs_pivot.loc[:, top_terms],
                     output_file=os.path.join(output_dir, output_prefix + ".motifs.cluster_specific.svg"),
                     label="-log10(p-value) of enrichment\nof differential regions")
-                if z_score is not None:
+                if z_score is not False:
                     enrichment_clustermap(
                         motifs_pivot.loc[:, top_terms],
                         output_file=os.path.join(output_dir, output_prefix + ".motifs.cluster_specific.{}_z_score.svg".format(z_score_label)),
@@ -3670,7 +3699,7 @@ class Analysis(object):
                         motifs_pivot.loc[:, top_terms].T,
                         output_file=os.path.join(output_dir, output_prefix + ".homer_consensus.cluster_specific.svg"),
                         label=label + " differential regions")
-                    if z_score is not None:
+                    if z_score is not False:
                         enrichment_clustermap(
                             motifs_pivot.loc[:, top_terms].T,
                             output_file=os.path.join(
@@ -3772,7 +3801,7 @@ class Analysis(object):
                             output_dir, output_prefix + ".enrichr.{}.cluster_specific.svg"
                             .format(gene_set_library)),
                         label="-log10(p-value) of enrichment\nof differential genes")
-                    if z_score is not None:
+                    if z_score is not False:
                         enrichment_clustermap(
                             enrichr_pivot[list(set(top_terms))].T,
                             output_file=os.path.join(
@@ -3828,7 +3857,7 @@ class Analysis(object):
                             output_dir, output_prefix + ".great.{}.cluster_specific.svg"
                             .format(gene_set_library)),
                         label="-log10(p-value) of enrichment\nof differential genes")
-                    if z_score is not None:
+                    if z_score is not False:
                         enrichment_clustermap(
                             great_pivot[list(set(top_terms))].T,
                             output_file=os.path.join(

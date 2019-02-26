@@ -367,7 +367,7 @@ class ATACSeqAnalysis(Analysis):
         if blacklist_bed is None:
             _LOGGER.info("Blacklist file not provided. Downloading...")
             try:
-                blacklist_bed = self.get_annotations(steps=["blacklist"])["blacklist_file"]
+                blacklist_bed = self.get_resources(steps=["blacklist"])["blacklist_file"]
             except AttributeError:
                 msg = "Blacklist file was not provided and cannot be"
                 msg += " get one without analysis having `organism` and `genome` set."
@@ -959,7 +959,7 @@ class ATACSeqAnalysis(Analysis):
             _LOGGER.info("Reference genome FASTA file was not given, will try to get it.")
             _LOGGER.info("Getting genome FASTA file for organism '{}', genome '{}'. "
                          .format(self.organism, self.genome))
-            fasta_file = self.get_annotations(steps=['genome'])['genome_file']['fasta']
+            fasta_file = self.get_resources(steps=['genome'])['genome_file']['fasta']
 
         nuc = sites.nucleotide_content(fi=fasta_file).to_dataframe(comment="#")[["score", "blockStarts"]]
         nuc.columns = ["gc_content", "length"]
@@ -1141,7 +1141,7 @@ class ATACSeqAnalysis(Analysis):
             _LOGGER.info("Reference TSS file was not given, will try to get TSS annotations.")
             _LOGGER.info("Getting TSS annotations for organism '{}', genome '{}'."
                          .format(self.organism, self.genome))
-            tss_file = self.get_annotations(steps=['tss'])['tss_file']
+            tss_file = self.get_resources(steps=['tss'])['tss_file']
 
         # extract only relevant columns
         tss = pd.read_csv(tss_file, header=None, sep="\t")
@@ -1229,7 +1229,7 @@ class ATACSeqAnalysis(Analysis):
             _LOGGER.info("Reference genomic context file was not given, will try to get it.")
             _LOGGER.info("Getting genomic context annotations for organism '{}', genome '{}'. "
                          .format(self.organism, self.genome))
-            genomic_context_file = self.get_annotations(steps=['genomic_context'])['genomic_context_file']
+            genomic_context_file = self.get_resources(steps=['genomic_context'])['genomic_context_file']
 
         context = pybedtools.BedTool(genomic_context_file)
 
@@ -2357,7 +2357,7 @@ class ATACSeqAnalysis(Analysis):
             hint = " Will not do motif enrichment analysis."
             fasta_file = os.path.join(output_dir, "{}_regions.fa".format(prefix))
 
-            resources = self.get_annotations(steps=['genome'])['genome_file']
+            resources = self.get_resources(steps=['genome'])['genome_file']
             if "fasta" not in resources:
                 reason = "Could not get genome sequence file in either FASTA or 2bit format."
                 _LOGGER.warning(reason + hint)

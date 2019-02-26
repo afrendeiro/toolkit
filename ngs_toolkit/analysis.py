@@ -41,8 +41,6 @@ from statsmodels.sandbox.stats.multicomp import multipletests
 from tqdm import tqdm
 
 
-# TODO: Rename "get_annotations" to "get_resources"
-
 # TODO: Rename kwargs "quant_matrix" to "matrix", accept either dataframe or string
 # TODO: Select for data type in samples and comparison_table when loading from PEP
 
@@ -634,7 +632,7 @@ class Analysis(object):
         return pickle.load(open(pickle_file, "rb"))
 
     @check_organism_genome
-    def get_annotations(
+    def get_resources(
             self,
             steps=["blacklist", "tss", "genomic_context"],
             organism=None, genome_assembly=None,

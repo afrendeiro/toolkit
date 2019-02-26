@@ -14,9 +14,7 @@ from ngs_toolkit.general import (
 from ngs_toolkit.utils import (
     bed_to_index, bed_to_fasta,
     log_pvalues, standard_score,
-    count_reads_in_intervals,
-    normalize_quantiles_r,
-    normalize_quantiles_p)
+    count_reads_in_intervals)
 import numpy as np
 import pandas as pd
 import parmap
@@ -100,7 +98,7 @@ class ATACSeqAnalysis(Analysis):
         atac_analysis.annotate()
 
         # Annotate with sample metadata
-        atac_analysis.accessibility = atac_analysis.annotate_with_sample_metadata(
+        atac_analysis.accessibility = atac_analysis.annotate_with_sample_attributes(
             matrix="coverage_annotated",
             attributes=atac_analysis.sample_variables)
 
@@ -131,14 +129,9 @@ class ATACSeqAnalysis(Analysis):
             **kwargs)
 
         self.data_type = self.__data_type__ = "ATAC-seq"
-        self.var_names = "region"
+        self.var_unit_name = "region"
         self.quantity = "accessibility"
         self.norm_units = "RPM"
-        self.raw_matrix_name = "coverage"
-        self.norm_matrix_name = "coverage_qnorm"  # or coverage_gc_corrected
-        # TODO: have normalization method reset the above value, with info to user
-        # or just overwrite
-        self.annot_matrix_name = "accessibility"
 
     def load_data(self, output_mapping=None, only_these_keys=None, permissive=True, n_header_vars=None):
         """
@@ -152,11 +145,13 @@ class ATACSeqAnalysis(Analysis):
         only_these_keys : list, optional
             Iterable of analysis attributes to load up.
             Possible attributes:
-                "sites", "support", "coverage", "coverage_qnorm",
+                "matrix_raw", "matrix_norm", "matrix_features",
+
+                "sites", "support",
                 "nuc", "coverage_gc_corrected", "gene_annotation",
                 "region_annotation", "region_annotation_b",
                 "chrom_state_annotation", "chrom_state_annotation_b",
-                "coverage_annotated", "accessibility", "differential_results".
+                "stats", differential_results".
 
         bool : permissive
             Whether an error should be thrown if reading a file causes IOError.
@@ -177,16 +172,16 @@ class ATACSeqAnalysis(Analysis):
         """
         if only_these_keys is None:
             only_these_keys = [
-                "sites", "support", "coverage", "coverage_qnorm",
-                "nuc", "coverage_gc_corrected", "closest_tss_distances",
+                "matrix_raw", "matrix_norm", "matrix_features",
+
+                "sites", "support",
+                "nuc", "closest_tss_distances",
                 "gene_annotation",
                 "region_annotation", "region_annotation_b",
                 "region_annotation_mapping", "region_annotation_b_mapping",
                 "chrom_state_annotation", "chrom_state_annotation_b",
                 "chrom_state_annotation_mapping", "chrom_state_annotation_b_mapping",
-                "stats",
-                "coverage_annotated", "accessibility",
-                "differential_results"]
+                "stats", "differential_results"]
 
         # Figure out how many levels of MultiIndex does the 'accessibility' dataframe has
         if n_header_vars is None:
@@ -212,44 +207,43 @@ class ATACSeqAnalysis(Analysis):
             # TODO: get default mapping by having functions declare what they output
             # perhaps also with a dict of kwargs to pass to pandas.read_csv
             output_mapping = {
-                "support":
-                    (prefix + "_peaks.support.csv", kwargs),
-                "coverage":
-                    (prefix + "_peaks.raw_coverage.csv", kwargs),
-                "coverage_qnorm":
-                    (prefix + "_peaks.coverage_qnorm.csv", kwargs),
-                "nuc":
-                    (prefix + "_peaks.gccontent_length.csv", kwargs),
-                "coverage_gc_corrected":
-                    (prefix + "_peaks.coverage_gc_corrected.csv", kwargs),
-                "gene_annotation":
-                    (prefix + "_peaks.gene_annotation.csv", kwargs),
-                "closest_tss_distances":
-                    (prefix + "_peaks.closest_tss_distances.csv", kwargs),
-                "region_annotation":
-                    (prefix + "_peaks.region_annotation.csv", kwargs),
-                "region_annotation_b":
-                    (prefix + "_peaks.region_annotation_background.csv", kwargs),
-                "region_annotation_mapping":
-                    (prefix + "_peaks.region_annotation_mapping.csv", kwargs),
-                "region_annotation_b_mapping":
-                    (prefix + "_peaks.region_annotation_background_mapping.csv", kwargs),
-                "chrom_state_annotation":
-                    (prefix + "_peaks.chrom_state_annotation.csv", kwargs),
-                "chrom_state_annotation_b":
-                    (prefix + "_peaks.chrom_state_annotation_background.csv", kwargs),
-                "chrom_state_annotation_mapping":
-                    (prefix + "_peaks.chrom_state_annotation_mapping.csv", kwargs),
-                "chrom_state_annotation_b_mapping":
-                    (prefix + "_peaks.chrom_state_annotation_background_mapping.csv", kwargs),
-                "stats":
-                    (prefix + "_peaks.stats_per_region.csv", kwargs),
-                "coverage_annotated":
-                    (prefix + "_peaks.coverage_qnorm.annotated.csv", kwargs),
-                "accessibility":
-                    (prefix + ".accessibility.annotated_metadata.csv",
+                "matrix_raw":
+                    (prefix + ".matrix_raw.csv", kwargs),
+                "matrix_norm":
+                    (prefix + ".matrix_norm.csv", kwargs),
+                "matrix_norm":
+                    (prefix + ".matrix_norm.csv",
                         {"index_col": 0, "header": list(range(n_header_vars))
                          if n_header_vars is not None else 'infer'}),
+                "matrix_features":
+                    (prefix + ".matrix_features.csv", kwargs),
+
+                "support":
+                    (prefix + ".support.csv", kwargs),
+                "nuc":
+                    (prefix + ".gccontent_length.csv", kwargs),
+                "gene_annotation":
+                    (prefix + ".gene_annotation.csv", kwargs),
+                "closest_tss_distances":
+                    (prefix + ".closest_tss_distances.csv", kwargs),
+                "region_annotation":
+                    (prefix + ".region_annotation.csv", kwargs),
+                "region_annotation_b":
+                    (prefix + ".region_annotation_background.csv", kwargs),
+                "region_annotation_mapping":
+                    (prefix + ".region_annotation_mapping.csv", kwargs),
+                "region_annotation_b_mapping":
+                    (prefix + ".region_annotation_background_mapping.csv", kwargs),
+                "chrom_state_annotation":
+                    (prefix + ".chrom_state_annotation.csv", kwargs),
+                "chrom_state_annotation_b":
+                    (prefix + ".chrom_state_annotation_background.csv", kwargs),
+                "chrom_state_annotation_mapping":
+                    (prefix + ".chrom_state_annotation_mapping.csv", kwargs),
+                "chrom_state_annotation_b_mapping":
+                    (prefix + ".chrom_state_annotation_background_mapping.csv", kwargs),
+                "stats":
+                    (prefix + ".stats_per_region.csv", kwargs),
                 "differential_results":
                     (os.path.join(self.results_dir, "differential_analysis_{}".format(self.data_type),
                                   "differential_analysis.deseq_result.all_comparisons.csv"), kwargs)}
@@ -268,7 +262,7 @@ class ATACSeqAnalysis(Analysis):
 
         # Special cases
         if "sites" in only_these_keys:
-            file = os.path.join(self.results_dir, self.name + "_peak_set.bed")
+            file = os.path.join(self.results_dir, self.name + ".peak_set.bed")
             try:
                 setattr(self, "sites", pybedtools.BedTool(file))
             except IOError as e:
@@ -422,10 +416,10 @@ class ATACSeqAnalysis(Analysis):
             sites = sites.filter(lambda x: x.chrom != 'chrM')
 
         # Save
-        sites.saveas(os.path.join(self.results_dir, self.name + "_peak_set.bed"))
+        sites.saveas(os.path.join(self.results_dir, self.name + ".peak_set.bed"))
 
         # Read up again
-        self.sites = pybedtools.BedTool(os.path.join(self.results_dir, self.name + "_peak_set.bed"))
+        self.sites = pybedtools.BedTool(os.path.join(self.results_dir, self.name + ".peak_set.bed"))
 
     def set_consensus_sites(self, bed_file, overwrite=True):
         """
@@ -447,7 +441,7 @@ class ATACSeqAnalysis(Analysis):
         """
         self.sites = pybedtools.BedTool(bed_file)
         if overwrite:
-            default_sites = os.path.join(self.results_dir, self.name + "_peak_set.bed")
+            default_sites = os.path.join(self.results_dir, self.name + ".peak_set.bed")
             # pybedtools will pipe to the input file!
             if bed_file == default_sites:
                 self.sites.saveas(default_sites + ".new")
@@ -529,14 +523,14 @@ class ATACSeqAnalysis(Analysis):
         support.columns = ["chrom", "start", "end"] + [sample.name for sample in samples]
         support.index = pd.Index(
             support['chrom'] + ":" + support['start'].astype(str) + "-" + support['end'].astype(str), name="index")
-        support.to_csv(os.path.join(self.results_dir, self.name + "_peaks.binary_overlap_support.csv"), index=True)
+        support.to_csv(os.path.join(self.results_dir, self.name + ".binary_overlap_support.csv"), index=True)
 
         # divide sum (of unique overlaps) by total to get support value between 0 and 1
         support.loc[:, "support"] = (
             support[[sample.name for sample in samples]]
             .apply(lambda x: sum([i if i <= 1 else 1 for i in x]) / float(len(samples)), axis=1))
         # save
-        support.to_csv(os.path.join(self.results_dir, self.name + "_peaks.support.csv"), index=True)
+        support.to_csv(os.path.join(self.results_dir, self.name + ".support.csv"), index=True)
 
         setattr(self, 'support', support)
         return self.support
@@ -595,7 +589,7 @@ class ATACSeqAnalysis(Analysis):
 
         output_file : str
             A path to a CSV file with coverage output.
-            Default is `self.results_dir/self.name + "_peaks.raw_coverage.csv"`.
+            Default is `self.results_dir/self.name + ".raw_coverage.csv"`.
 
         permissive : bool
             Whether Samples that which `region_type` attribute file does not exist
@@ -618,8 +612,8 @@ class ATACSeqAnalysis(Analysis):
 
         Attributes
         ----------
-        coverage : pd.DataFrame
-            Sets a `coverage` variable with DataFrame with read counts of shape (n_sites, m_samples).
+        matrix_raw : pd.DataFrame
+            Sets a `matrix_raw` variable with DataFrame with read counts of shape (n_sites, m_samples).
 
         Returns
         -------
@@ -656,7 +650,7 @@ class ATACSeqAnalysis(Analysis):
                     str(i.stop) for i in pybedtools.BedTool(sites)]
 
             # count, create dataframe
-            coverage = pd.DataFrame(
+            matrix_raw = pd.DataFrame(
                 map(
                     lambda x:
                         pd.Series(x),
@@ -671,14 +665,14 @@ class ATACSeqAnalysis(Analysis):
             ).T
 
             if assign:
-                self.coverage = coverage
+                self.matrix_raw = matrix_raw
             if save:
                 if output_file is not None:
-                    coverage.to_csv(output_file, index=True)
+                    matrix_raw.to_csv(output_file, index=True)
                 else:
-                    self.coverage.to_csv(os.path.join(
-                        self.results_dir, self.name + "_peaks.raw_coverage.csv"), index=True)
-            return coverage
+                    self.matrix_raw.to_csv(os.path.join(
+                        self.results_dir, self.name + ".matrix_raw.csv"), index=True)
+            return matrix_raw
 
         else:
             import textwrap
@@ -729,7 +723,7 @@ class ATACSeqAnalysis(Analysis):
 
         output_file : str
             A path to a CSV file with coverage output.
-            Default is `self.results_dir/self.name + "_peaks.raw_coverage.csv"`.
+            Default is `self.results_dir/self.name + ".raw_coverage.csv"`.
 
         permissive : bool
             Whether Samples without an existing coverage file does not exist
@@ -768,7 +762,7 @@ class ATACSeqAnalysis(Analysis):
         samples = self._get_samples_with_input_file("_coverage", permissive=permissive, samples=samples)
 
         # Read in counts
-        coverage = list()
+        matrix_raw = list()
         for i, sample in tqdm(enumerate(samples), total=len(samples)):
             cov = pd.read_csv(
                 sample._coverage, sep="\t", header=None,
@@ -782,9 +776,9 @@ class ATACSeqAnalysis(Analysis):
                 else:
                     _LOGGER.warning(msg)
                     continue
-            coverage.append(cov)
+            matrix_raw.append(cov)
 
-        if len(coverage) == 0:
+        if len(matrix_raw) == 0:
             msg = "No sample had a valid coverage file!"
             if permissive:
                 _LOGGER.warning(msg)
@@ -793,138 +787,22 @@ class ATACSeqAnalysis(Analysis):
                 _LOGGER.error(msg)
                 raise IOError(msg)
 
-        coverage = (
-            pd.concat(coverage, axis=0, sort=False)
+        matrix_raw = (
+            pd.concat(matrix_raw, axis=0, sort=False)
             .melt(id_vars=['chrom', 'start', 'end'])
             .pivot_table(index=['chrom', 'start', 'end'], columns="variable", values="value")
             .astype(int, downcast=True))
-        coverage.index = bed_to_index(coverage.index.to_frame())
+        matrix_raw.index = bed_to_index(matrix_raw.index.to_frame())
 
         if assign:
-            self.coverage = coverage
+            self.matrix_raw = matrix_raw
         if save:
             if output_file is not None:
-                coverage.to_csv(output_file, index=True)
+                matrix_raw.to_csv(output_file, index=True)
             else:
-                self.coverage.to_csv(os.path.join(
-                    self.results_dir, self.name + "_peaks.raw_coverage.csv"), index=True)
-        return coverage
-
-    def normalize_coverage_rpm(
-            self, matrix=None, samples=None,
-            mult_factor=1e6, log_transform=True, pseudocount=1,
-            save=True, assign=True):
-        """
-        Normalization of matrix of (n_features, n_samples) by total in each sample.
-
-        Parameters
-        ----------
-        matrix : str
-            Attribute name of matrix to normalize. Defaults to 'coverage'.
-
-        samples : list
-            Iterable of peppy.Sample objects to restrict matrix to.
-            If not provided (`None` is passed) the matrix will not be subsetted.
-
-        mult_factor : float
-            A constant to multiply values for.
-
-        log_transform : bool
-            Whether to log transform values or not.
-
-        pseudocount : int|float
-            A constant to add to values.
-
-        save : bool
-            Whether to write normalized DataFrame to disk.
-
-        assign : bool
-            Whether to assign the normalized DataFrame to an attribute ``.
-        """
-        to_norm = self.get_matrix(matrix="coverage", samples=samples)
-        # apply normalization over total
-        coverage_rpm = (to_norm / to_norm.sum()) * mult_factor
-
-        if coverage_rpm.min().min() <= 0:
-            coverage_rpm += np.absolute(coverage_rpm.min().min())
-
-        # Log2 transform
-        if log_transform:
-            coverage_rpm = np.log2(pseudocount + coverage_rpm)
-
-        # coverage_rpm = coverage_rpm.join(self.coverage[['chrom', 'start', 'end']])
-        if save:
-            coverage_rpm.to_csv(os.path.join(self.results_dir, self.name + "_peaks.coverage_rpm.csv"), index=True)
-        if assign:
-            self.coverage_rpm = coverage_rpm
-
-        return coverage_rpm
-
-    def normalize_coverage_quantiles(
-            self, matrix=None, samples=None, implementation="Python",
-            log_transform=True, pseudocount=1, save=True, assign=True):
-        """
-        Quantile normalization of matrix of (n_features, n_samples).
-
-        Parameters
-        ----------
-        matrix : str
-            Attribute name of matrix to normalize. Defaults to 'coverage'.
-
-        samples : list
-            Iterable of peppy.Sample objects to restrict matrix to.
-            If not provided (`None` is passed) the matrix will not be subsetted.
-
-        implementation : str
-            One of `"R"` or `"Python"`. Dictates which implementation is to be used.
-            The R implementation comes from the `preprocessCore` package,
-            and the Python one is from https://github.com/ShawnLYU/Quantile_Normalize.
-
-        log_transform : bool
-            Whether to log transform values or not.
-
-        pseudocount : float
-            A constant to add before log transformation.
-
-        save : bool
-            Whether to write normalized DataFrame to disk.
-
-        assign : bool
-            Whether to assign the normalized DataFrame to an attribute `coverage_qnorm`.
-        """
-        if matrix is None:
-            to_norm = self.get_matrix(matrix="coverage", samples=samples)
-        else:
-            to_norm = matrix
-
-        if implementation == "R":
-            coverage_qnorm = pd.DataFrame(
-                normalize_quantiles_r(to_norm.values),
-                index=to_norm.index,
-                columns=to_norm.columns)
-        elif implementation == "Python":
-            coverage_qnorm = normalize_quantiles_p(to_norm)
-        else:
-            msg = "Implementation of quantile normalization must be one of 'R' of 'Python'"
-            _LOGGER.error(msg)
-            raise ValueError(msg)
-
-        if coverage_qnorm.min().min() <= 0:
-            coverage_qnorm += np.absolute(coverage_qnorm.min().min())
-
-        # Log2 transform
-        if log_transform:
-            coverage_qnorm = np.log2(pseudocount + coverage_qnorm)
-
-        # # Add back postition columns
-        # coverage_qnorm = coverage_qnorm.join(self.coverage[['chrom', 'start', 'end']])
-        if save:
-            coverage_qnorm.to_csv(os.path.join(
-                self.results_dir, self.name + "_peaks.coverage_qnorm.csv"), index=True)
-        if assign:
-            self.coverage_qnorm = coverage_qnorm
-
-        return coverage_qnorm
+                self.matrix_raw.to_csv(os.path.join(
+                    self.results_dir, self.name + ".matrix_raw.csv"), index=True)
+        return matrix_raw
 
     @check_organism_genome
     def get_peak_gccontent_length(
@@ -966,17 +844,17 @@ class ATACSeqAnalysis(Analysis):
         nuc.index = [str(i.chrom) + ":" + str(i.start) + "-" + str(i.stop) for i in sites]
 
         # get only the sites matching the coverage (not overlapping blacklist)
-        self.nuc = nuc.ix[self.coverage.index]
+        self.nuc = nuc.ix[self.matrix_raw.index]
 
         self.nuc.to_csv(os.path.join(
-            self.results_dir, self.name + "_peaks.gccontent_length.csv"), index=True)
+            self.results_dir, self.name + ".gccontent_length.csv"), index=True)
 
         return self.nuc
 
-    def normalize_gc_content(self, matrix=None, samples=None, save=True, assign=True):
+    def normalize_cqn(self, matrix="matrix_raw", samples=None, save=True, assign=True):
         """
-        Quantile normalization of matrix of (n_features, n_samples) followed by GC content
-        correction by regression.
+        Conditional quantile normalization (CQN) of a matrix.
+        It uses GC content and length of regulatory elements as covariates.
 
         Requires the R package "cqn" to be installed:
             >>> source('http://bioconductor.org/biocLite.R')
@@ -985,7 +863,8 @@ class ATACSeqAnalysis(Analysis):
         Parameters
         ----------
         matrix : str
-            Attribute name of matrix to normalize. Defaults to 'coverage'.
+            Attribute name of matrix to normalize.
+            Defaults to 'matrix_raw'.
 
         samples : list
             Iterable of peppy.Sample objects to restrict matrix to.
@@ -1029,77 +908,24 @@ class ATACSeqAnalysis(Analysis):
 
         # Perform quantile normalization first
         if not hasattr(self, "nuc"):
-            self.normalize_coverage_quantiles(samples)
+            self.normalize_quantiles(matrix=matrix, samples=samples)
 
         # Get GC content and length of each feature
         if not hasattr(self, "nuc"):
             self.get_peak_gccontent_length()
 
-        to_norm = self.get_matrix(matrix="coverage", samples=samples)
-        coverage_gc_corrected = (
-            cqn(cov=to_norm, gc_content=self.nuc["gc_content"], lengths=self.nuc["length"])
-            # .join(self.coverage[['chrom', 'start', 'end']])
-        )
+        matrix_norm = cqn(
+            cov=self.get_matrix(matrix=matrix, samples=samples),
+            gc_content=self.nuc["gc_content"], lengths=self.nuc["length"])
 
         if save:
-            coverage_gc_corrected.to_csv(os.path.join(
-                self.results_dir, self.name + "_peaks.coverage_gc_corrected.csv"), index=True)
+            matrix_norm.to_csv(os.path.join(
+                self.results_dir, self.name + ".matrix_norm.csv"), index=True)
         if assign:
-            self.coverage_gc_corrected = coverage_gc_corrected
+            self.matrix_norm = matrix_norm
+            self.norm_method = "cqn"
 
-        return coverage_gc_corrected
-
-    def normalize(self, method="quantile", matrix=None, samples=None, save=True, assign=True):
-        """
-        Normalization of matrix of (n_features, n_samples).
-
-        Parameters
-        ----------
-        method : str
-            Normalization method to apply. One of:
-             - `total`: Reads per total normalization (RPM).
-             - `quantile`: Quantile normalization and log2 transformation.
-             - `gc_content`: Quantile normalization followed by GC content
-                             correction by regression (cqn R package)
-                             and log2 transformation.
-
-        matrix : str
-            Attribute name of matrix to normalize.
-
-        samples : list
-            Iterable of peppy.Sample objects to restrict matrix to.
-            If not provided (`None` is passed) the matrix will not be subsetted.
-
-        save : bool
-            Whether to write normalized DataFrame to disk.
-
-        assign : bool
-            Whether to assign the normalized DataFrame to an attribute
-            (see variables below for each respective normalization type).
-
-        Attributes
-        ----------
-        {coverage_rpm, coverage_qnorm, coverage_gc_corrected} : pd.DataFrame
-            If `assign` is True, a pandas DataFrame normalized with respective method.
-
-        Returns
-        -------
-        pd.DataFrame
-            Normalized pandas DataFrame.
-        """
-        if method == "total":
-            return self.normalize_coverage_rpm(
-                matrix=matrix, samples=samples, save=save, assign=assign)
-        elif method == "quantile":
-            return self.normalize_coverage_quantiles(
-                matrix=matrix, samples=samples, save=save, assign=assign)
-        elif method == "gc_content":
-            return self.normalize_gc_content(
-                matrix=matrix, samples=samples, save=save, assign=assign)
-        else:
-            msg = "Requested normalization method is not available!"
-            _LOGGER.error(msg)
-            raise ValueError(msg)
+        return matrix_norm
 
     @check_has_sites
     def get_peak_gene_annotation(self, tss_file=None, max_dist=100000):
@@ -1183,11 +1009,11 @@ class ATACSeqAnalysis(Analysis):
         # save to disk
         self.closest_tss_distances.to_csv(
             os.path.join(self.results_dir,
-                         self.name + "_peaks.closest_tss_distances.csv"),
+                         self.name + ".closest_tss_distances.csv"),
             index=True)
         self.gene_annotation.to_csv(
             os.path.join(self.results_dir,
-                         self.name + "_peaks.gene_annotation.csv"),
+                         self.name + ".gene_annotation.csv"),
             index=True)
         return self.gene_annotation
 
@@ -1261,10 +1087,10 @@ class ATACSeqAnalysis(Analysis):
             # save to disk
             a = "" if (label == "real") else ("_" + label)
             annot.to_csv(os.path.join(
-                self.results_dir, self.name + "_peaks.region_annotation{}_mapping.csv".format(a)),
+                self.results_dir, self.name + ".region_annotation{}_mapping.csv".format(a)),
                 index=True)
             annot_comp.to_csv(os.path.join(
-                self.results_dir, self.name + "_peaks.region_annotation{}.csv".format(a)),
+                self.results_dir, self.name + ".region_annotation{}.csv".format(a)),
                 index=True)
 
             setattr(self, attr, annot_comp)
@@ -1339,10 +1165,10 @@ class ATACSeqAnalysis(Analysis):
             # save to disk
             a = "" if (label == "real") else ("_" + label)
             annot.to_csv(os.path.join(
-                self.results_dir, self.name + "_peaks.chrom_state_annotation{}_mapping.csv".format(a)),
+                self.results_dir, self.name + ".chrom_state_annotation{}_mapping.csv".format(a)),
                 index=True)
             annot_comp.to_csv(os.path.join(
-                self.results_dir, self.name + "_peaks.chrom_state_annotation{}.csv".format(a)),
+                self.results_dir, self.name + ".chrom_state_annotation{}.csv".format(a)),
                 index=True)
 
             setattr(self, attr, annot_comp)
@@ -1357,7 +1183,8 @@ class ATACSeqAnalysis(Analysis):
         Parameters
         ----------
         matrix : str
-            Attribute name of matrix to normalize. Defaults to 'coverage'.
+            Attribute name of matrix to normalize.
+            Defaults to 'matrix_raw'.
 
         Returns
         -------
@@ -1372,7 +1199,7 @@ class ATACSeqAnalysis(Analysis):
         if samples is None:
             samples = self.samples
         if matrix is None:
-            matrix = "coverage_gc_corrected"
+            matrix = "matrix_raw"
         matrix = getattr(self, matrix)
 
         matrix = matrix.loc[:, [s.name for s in samples]]
@@ -1394,7 +1221,7 @@ class ATACSeqAnalysis(Analysis):
         matrix.loc[:, 'iqr'] = (matrix.quantile(0.75, axis=1) - matrix.quantile(0.25, axis=1))
         matrix.index.name = "index"
         matrix.to_csv(os.path.join(
-            self.results_dir, self.name + "_peaks.stats_per_region.csv"),
+            self.results_dir, self.name + ".stats_per_region.csv"),
             index=True)
 
         self.stats = matrix
@@ -1429,14 +1256,13 @@ class ATACSeqAnalysis(Analysis):
 
         Attributes
         ----------
-        coverage_annotated : pd.DataFrame
+        matrix_features : pd.DataFrame
             A pandas DataFrame containing annotations of the region features.
         """
         if samples is None:
             samples = self.samples
-        # TODO: come up with a resonable iterative way to figure out which matrix to use by default
         if matrix is None:
-            matrix = "coverage_gc_corrected"
+            matrix = "matrix_norm"
         matrix = getattr(self, matrix)
 
         next_matrix = matrix
@@ -1448,11 +1274,11 @@ class ATACSeqAnalysis(Analysis):
         for matrix_name in ['gene_annotation', 'region_annotation', 'chrom_state_annotation', 'support', 'stats']:
             if hasattr(self, matrix_name):
                 matrix = getattr(self, matrix_name)
-                self.coverage_annotated = pd.merge(
+                self.matrix_features = pd.merge(
                     next_matrix,
                     matrix[matrix.columns.difference(next_matrix.columns)],
                     left_index=True, right_index=True, how="left")
-                next_matrix = self.coverage_annotated
+                next_matrix = self.matrix_features
             else:
                 if not permissive:
                     _LOGGER.error(msg.format(matrix_name))
@@ -1460,25 +1286,23 @@ class ATACSeqAnalysis(Analysis):
                 else:
                     _LOGGER.debug(msg.format(matrix_name) + " Proceeding anyway.")
 
-        if not hasattr(self, "coverage_annotated"):
-            self.coverage_annotated = next_matrix
+        if not hasattr(self, "matrix_features"):
+            self.matrix_features = next_matrix
 
         # Pair indexes
-        msg = "Annotated matrix does not have same feature length as coverage matrix."
-        if not self.coverage.shape[0] == self.coverage_annotated.shape[0]:
+        msg = "Annotated matrix does not have same feature length as matrix_raw matrix."
+        if not self.matrix_raw.shape[0] == self.matrix_features.shape[0]:
             _LOGGER.error(msg)
             raise AssertionError(msg)
-        self.coverage_annotated.index = self.coverage.index
-        self.coverage_annotated.index.name = "index"
-
-        # TODO: call annotate with samples_metadata maybe?
+        self.matrix_features.index = self.matrix_raw.index
+        self.matrix_features.index.name = "index"
 
         # Save
-        self.coverage_annotated.to_csv(os.path.join(self.results_dir, self.name + "_peaks.coverage_qnorm.annotated.csv"), index=True)
+        self.matrix_features.to_csv(os.path.join(self.results_dir, self.name + ".matrix_features.csv"), index=True)
 
     def get_sex_chrom_ratio(
             self,
-            matrix=None,
+            matrix="matrix_norm",
             sex_chroms=["chrX", "chrY"],
             output_dir="{results_dir}",
             output_prefix="sex_chrom_ratio",
@@ -1491,7 +1315,7 @@ class ATACSeqAnalysis(Analysis):
         ----------
         matrix : pandas.DataFrame, optional
             Matrix to use.
-            Defaults to `accessibility`.
+            Defaults to `matrix_norm`.
 
         sex_chroms : list, optional
             Names of the two sex chromosomes to use.
@@ -1514,8 +1338,7 @@ class ATACSeqAnalysis(Analysis):
         from natsort import natsorted
         from ngs_toolkit.graphics import savefig
 
-        if matrix is None:
-            matrix = self.accessibility.copy()
+        matrix = self.get_matrix(matrix)
 
         output_dir = self._format_string_with_attributes(output_dir)
 
@@ -1573,7 +1396,7 @@ class ATACSeqAnalysis(Analysis):
 
         return ratio.sort_index()
 
-    def get_gene_level_accessibility(self, matrix="accessibility", reduce_func=np.mean):
+    def get_gene_level_accessibility(self, matrix="matrix_norm", reduce_func=np.mean):
         """
         Get gene-level measurements of coverage.
         Requires a 'gene_annotation' attribute to be set containing a mapping between the
@@ -1581,8 +1404,8 @@ class ATACSeqAnalysis(Analysis):
 
         Parameters
         ----------
-        matrix : str
-            Quantification matrix to be used (e.g. 'coverage' or 'accessibility')
+        matrix : str, optional
+            Quantification matrix to use (e.g. 'matrix_raw' or 'matrix_norm')
 
         reduce_func : func
             Function to apply to reduce values.
@@ -1599,7 +1422,7 @@ class ATACSeqAnalysis(Analysis):
             _LOGGER.error(msg + hint)
             raise AssertionError(msg)
 
-        matrix = getattr(self, matrix).copy()
+        matrix = self.get_matrix(matrix).copy()
 
         # if isinstance(matrix.columns, pd.MultiIndex):
         #     matrix.columns = matrix.columns.get_level_values("sample_name")
@@ -2008,7 +1831,7 @@ class ATACSeqAnalysis(Analysis):
 
         if by_attribute is None:
             cov = pd.melt(
-                np.log2(1 + self.coverage[[s.name for s in samples]]),
+                np.log2(1 + self.matrix_raw[[s.name for s in samples]]),
                 var_name="Sample name", value_name="Raw counts (log2)"
             )
             fig, axis = plt.subplots(1, 1, figsize=(6, 1 * 4))
@@ -2025,7 +1848,7 @@ class ATACSeqAnalysis(Analysis):
             for i, attr in enumerate(attrs):
                 _LOGGER.info(attr)
                 cov = pd.melt(
-                    np.log2(1 + self.coverage[[s.name for s in samples if getattr(s, by_attribute) == attr]]),
+                    np.log2(1 + self.matrix_raw[[s.name for s in samples if getattr(s, by_attribute) == attr]]),
                     var_name="Sample name", value_name="Raw counts (log2)"
                 )
                 sns.violinplot(
@@ -2044,7 +1867,7 @@ class ATACSeqAnalysis(Analysis):
         # TODO: add plots for overal genome
         # TODO: add raw counts too
 
-        data = self.accessibility.copy()
+        data = self.matrix_norm.copy()
         # (rewrite to avoid putting them there in the first place)
         variables = ['gene_name', 'genomic_region', 'chromatin_state']
 
@@ -2295,6 +2118,7 @@ class ATACSeqAnalysis(Analysis):
             Which steps of the analysis to perform.
             Default is all: ['region', 'lola', 'meme', 'homer', 'enrichr']
         """
+        from ngs_toolkit.utils import location_index_to_bed
         # use all sites as universe
         if universe_file is None:
             try:
@@ -2312,13 +2136,14 @@ class ATACSeqAnalysis(Analysis):
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
 
+        bed = location_index_to_bed(differential.index)
         # save to bed
         bed_file = os.path.join(output_dir, "{}_regions.bed".format(prefix))
-        differential[['chrom', 'start', 'end']].to_csv(
+        bed.to_csv(
             bed_file, sep="\t", header=False, index=False)
         # save as tsv
         tsv_file = os.path.join(output_dir, "{}_regions.tsv".format(prefix))
-        differential[['chrom', 'start', 'end']].reset_index().to_csv(
+        bed.reset_index().to_csv(
             tsv_file, sep="\t", header=False, index=False)
 
         # export gene names

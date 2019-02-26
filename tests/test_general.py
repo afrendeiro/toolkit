@@ -52,37 +52,36 @@ def analysis(tmp_path):
         a.set_project_attributes()
         a.load_data()
 
-        a.normalize(method="total")
-        a.normalize(method="quantile")
-        a.annotate_with_sample_metadata(matrix="coverage_qnorm")
+        a.normalize(method="rpm")
+        a.annotate_with_sample_attributes()
 
         to_test.append(a)
     return to_test[0]
 
 
-class Test_annotate_with_sample_metadata:
+class Test_annotate_with_sample_attributes:
     def test_no_arguments(self, analysis):
-        analysis.annotate_with_sample_metadata(matrix="coverage_qnorm")
+        analysis.annotate_with_sample_attributes()
 
 
 def test_get_matrix(analysis):
     import numpy as np
     import pandas as pd
 
-    matrix = analysis.get_matrix(matrix_name="coverage")
-    assert np.array_equal(matrix.values, analysis.coverage.values)
-    assert (matrix == analysis.coverage).all().all()
-    analysis.dummy = analysis.coverage + 1
-    matrix = analysis.get_matrix(matrix_name="dummy")
-    assert (matrix == (analysis.coverage + 1)).all().all()
+    matrix = analysis.get_matrix(matrix="matrix_raw")
+    assert np.array_equal(matrix.values, analysis.matrix_raw.values)
+    assert (matrix == analysis.matrix_raw).all().all()
+    analysis.dummy = analysis.matrix_raw + 1
+    matrix = analysis.get_matrix(matrix="dummy")
+    assert (matrix == (analysis.matrix_raw + 1)).all().all()
 
-    matrix = analysis.get_matrix(matrix=analysis.coverage)
-    assert np.array_equal(matrix.values, analysis.coverage.values)
-    assert (matrix == analysis.coverage).all().all()
-    analysis.dummy = analysis.coverage + 1
-    matrix = analysis.get_matrix(matrix_name="dummy")
-    assert (matrix == (analysis.coverage + 1)).all().all()
+    matrix = analysis.get_matrix(matrix=analysis.matrix_raw)
+    assert np.array_equal(matrix.values, analysis.matrix_raw.values)
+    assert (matrix == analysis.matrix_raw).all().all()
+    analysis.dummy = analysis.matrix_raw + 1
+    matrix = analysis.get_matrix(matrix="dummy")
+    assert (matrix == (analysis.matrix_raw + 1)).all().all()
 
     # sample subssetting
-    matrix = analysis.get_matrix(matrix_name="coverage", samples=analysis.samples[:2])
+    matrix = analysis.get_matrix(matrix="matrix_raw", samples=analysis.samples[:2])
     assert (pd.Series([s.name for s in analysis.samples[:2]]) == matrix.columns).all()

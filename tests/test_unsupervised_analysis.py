@@ -54,9 +54,8 @@ def analysis(tmp_path):
         a.set_project_attributes()
         a.load_data()
 
-        a.normalize(method="total")
-        a.normalize(method="quantile")
-        a.annotate_with_sample_metadata(matrix="coverage_qnorm")
+        a.normalize(method="rpm")
+        a.annotate_with_sample_attributes()
 
         to_test.append(a)
     return to_test[0]
@@ -65,7 +64,8 @@ def analysis(tmp_path):
 @pytest.fixture
 def outputs(analysis):
     prefix = os.path.join(
-        analysis.results_dir, "unsupervised_analysis_ATAC-seq", analysis.name + ".all_sites.")
+        analysis.results_dir, "unsupervised_analysis_ATAC-seq", analysis.name + ".all_{}s."
+        .format(analysis.var_unit_name))
     outputs = [
         prefix + "isomap.svg",
         prefix + "locallylinearembedding.svg",
@@ -85,7 +85,7 @@ def outputs(analysis):
     return outputs
 
 
-class Test_unsupervised_analysis:
+class TestUnsupervisedAnalysis:
     def test_no_arguments(self, analysis, outputs):
         # no arguments
         analysis.unsupervised_analysis()
@@ -93,20 +93,19 @@ class Test_unsupervised_analysis:
             assert os.path.exists(output)
             assert os.stat(output).st_size > 0
 
-    def test_matrix_with_no_multiIndex(self, analysis):
-        with pytest.raises(TypeError):
-            analysis.unsupervised_analysis(matrix="coverage")
+    def test_matrix_with_no_multiindex(self, analysis):
+        analysis.unsupervised_analysis(matrix="matrix_raw")
         assert os.path.exists(os.path.join(analysis.results_dir, "unsupervised_analysis_ATAC-seq"))
 
     def test_various_matrices(self, analysis, outputs):
-        for matrix in ['coverage', 'coverage_rpm', 'coverage_qnorm']:
-            analysis.annotate_with_sample_metadata(matrix=matrix)
+        for matrix in ['matrix_raw', 'matrix_norm']:
+            analysis.annotate_with_sample_attributes(matrix=matrix)
             analysis.unsupervised_analysis()
             for output in outputs:
                 assert os.path.exists(output)
                 assert os.stat(output).st_size > 0
             shutil.rmtree(os.path.join(analysis.results_dir, "unsupervised_analysis_ATAC-seq"))
-        # analysis.annotate_with_sample_metadata(matrix="coverage_qnorm")
+        # analysis.annotate_with_sample_attributes(matrix="coverage_qnorm")
 
     def test_too_low_numbers_of_samples_error(self, analysis):
         for i in range(2):
@@ -117,7 +116,7 @@ class Test_unsupervised_analysis:
 
     def test_low_samples_no_manifolds(self, analysis):
         prefix = os.path.join(
-            analysis.results_dir, "unsupervised_analysis_ATAC-seq", analysis.name + ".all_sites.")
+            analysis.results_dir, "unsupervised_analysis_ATAC-seq", analysis.name + ".all_{}s.".format(analysis.var_unit_name))
         outputs2 = [
             prefix + "mds.svg",
             prefix + "pca.explained_variance.csv",
@@ -158,7 +157,7 @@ class Test_unsupervised_analysis:
 
     def test_various_plotting_attributes(self, analysis, outputs):
         prefix = os.path.join(
-            analysis.results_dir, "unsupervised_analysis_ATAC-seq", analysis.name + ".all_sites.")
+            analysis.results_dir, "unsupervised_analysis_ATAC-seq", analysis.name + ".all_{}s.".format(analysis.var_unit_name))
         not_outputs = [
             prefix + "pca.variable_principle_components_association.p_value.masked.svg",
             prefix + "pca.variable_principle_components_association.p_value.svg",
@@ -177,8 +176,8 @@ class Test_unsupervised_analysis:
     def test_various_plot_prefixes_attributes(self, analysis, outputs):
         analysis.unsupervised_analysis(plot_prefix="test")
         for output in outputs:
-            assert os.path.exists(output.replace("all_sites", "test"))
-            assert os.stat(output.replace("all_sites", "test")).st_size > 0
+            assert os.path.exists(output.replace("all_{}s".format(analysis.var_unit_name), "test"))
+            assert os.stat(output.replace("all_{}s".format(analysis.var_unit_name), "test")).st_size > 0
 
     def test_standardized_matrix(self, analysis, outputs):
         analysis.unsupervised_analysis(standardize_matrix=True)

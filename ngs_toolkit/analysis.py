@@ -26,7 +26,10 @@ from ngs_toolkit.general import (
     get_blacklist_annotations,
     get_tss_annotations,
     get_genomic_context)
-from ngs_toolkit.utils import log_pvalues
+from ngs_toolkit.utils import (
+    log_pvalues,
+    normalize_quantiles_r,
+    normalize_quantiles_p)
 
 import numpy as np
 import pandas as pd
@@ -41,13 +44,7 @@ from statsmodels.sandbox.stats.multicomp import multipletests
 from tqdm import tqdm
 
 
-# TODO: Move normalization methods from ATAC-seq here
-# TODO: Make method to retrieve matrix based on either a dataframe or a string
-
 # TODO: Add combat as normalization method
-
-# TODO: Have only 4 types of matrices: raw counts, normalized, feature-annotated and sample-annotated
-# TODO: Store applied normalization method in object.
 
 # TODO: Idea: merging analysis. If same type, merge matrices, otherwise use dicts?
 
@@ -129,6 +126,9 @@ class Analysis(object):
         self.samples = samples
         self.prj = prj
         self.pickle_file = pickle_file
+        self.raw_matrix_name = "matrix_raw"
+        self.norm_matrix_name = "matrix_norm"
+        self.feature_matrix_name = "matrix_features"
 
         # parse remaining kwargs
         _LOGGER.debug("Adding additional kwargs to analysis object.")
@@ -731,6 +731,176 @@ class Analysis(object):
 
         return output
 
+    def normalize_rpm(
+            self, matrix="matrix_raw", samples=None,
+            mult_factor=1e6, log_transform=True, pseudocount=1,
+            save=True, assign=True):
+        """
+        Normalization of matrix of (n_features, n_samples) by total in each sample.
+
+        Parameters
+        ----------
+        matrix : str
+            Attribute name of matrix to normalize.
+            Defaults to 'matrix_raw'.
+
+        samples : list
+            Iterable of peppy.Sample objects to restrict matrix to.
+            If not provided (`None` is passed) the matrix will not be subsetted.
+
+        mult_factor : float
+            A constant to multiply values for.
+
+        log_transform : bool
+            Whether to log transform values or not.
+
+        pseudocount : int|float
+            A constant to add to values.
+
+        save : bool
+            Whether to write normalized DataFrame to disk.
+
+        assign : bool
+            Whether to assign the normalized DataFrame to an attribute ``.
+        """
+        to_norm = self.get_matrix(matrix=matrix, samples=samples)
+        # apply normalization over total
+        matrix_norm = (to_norm / to_norm.sum()) * mult_factor
+
+        # Make non-negative
+        if matrix_norm.min().min() <= 0:
+            matrix_norm += np.absolute(matrix_norm.min().min())
+
+        # Log2 transform
+        if log_transform:
+            matrix_norm = np.log2(pseudocount + matrix_norm)
+
+        # matrix_norm = matrix_norm.join(self.matrix_raw[['chrom', 'start', 'end']])
+        if save:
+            matrix_norm.to_csv(os.path.join(self.results_dir, self.name + ".matrix_norm.csv"), index=True)
+        if assign:
+            self.matrix_norm = matrix_norm
+            self.norm_method = "rpm"
+
+        return matrix_norm
+
+    def normalize_quantiles(
+            self, matrix="matrix_raw", samples=None, implementation="Python",
+            log_transform=True, pseudocount=1, save=True, assign=True):
+        """
+        Quantile normalization of matrix of (n_features, n_samples).
+
+        Parameters
+        ----------
+        matrix : str
+            Attribute name of matrix to normalize.
+            Defaults to 'matrix_raw'.
+
+        samples : list
+            Iterable of peppy.Sample objects to restrict matrix to.
+            If not provided (`None` is passed) the matrix will not be subsetted.
+
+        implementation : str
+            One of `"R"` or `"Python"`. Dictates which implementation is to be used.
+            The R implementation comes from the `preprocessCore` package,
+            and the Python one is from https://github.com/ShawnLYU/Quantile_Normalize.
+
+        log_transform : bool
+            Whether to log transform values or not.
+
+        pseudocount : float
+            A constant to add before log transformation.
+
+        save : bool
+            Whether to write normalized DataFrame to disk.
+
+        assign : bool
+            Whether to assign the normalized DataFrame to an attribute `matrix_norm`.
+        """
+        to_norm = self.get_matrix(matrix=matrix, samples=samples)
+
+        if implementation == "R":
+            matrix_norm = pd.DataFrame(
+                normalize_quantiles_r(to_norm.values),
+                index=to_norm.index,
+                columns=to_norm.columns)
+        elif implementation == "Python":
+            matrix_norm = normalize_quantiles_p(to_norm)
+        else:
+            msg = "Implementation of quantile normalization must be one of 'R' of 'Python'"
+            _LOGGER.error(msg)
+            raise ValueError(msg)
+
+        # Make non-negative
+        if matrix_norm.min().min() <= 0:
+            matrix_norm += np.absolute(matrix_norm.min().min())
+
+        # Log2 transform
+        if log_transform:
+            matrix_norm = np.log2(pseudocount + matrix_norm)
+
+        if save:
+            matrix_norm.to_csv(os.path.join(
+                self.results_dir, self.name + ".matrix_norm.csv"), index=True)
+        if assign:
+            self.matrix_norm = matrix_norm
+            self.norm_method = "quantile"
+
+        return matrix_norm
+
+    def normalize(self, method="quantile", matrix="matrix_raw", samples=None, save=True, assign=True):
+        """
+        Normalization of matrix of (n_features, n_samples).
+
+        Parameters
+        ----------
+        method : str
+            Normalization method to apply. One of:
+             - `rpm`: Reads per million normalization (RPM).
+             - `quantile`: Quantile normalization and log2 transformation.
+             - `cqn`: Conditional quantile normalization (uses `cqn` R package).
+                      Only available for ATAC-seq.
+
+        matrix : str
+            Attribute name of matrix to normalize.
+
+        samples : list
+            Iterable of peppy.Sample objects to restrict matrix to.
+            If not provided (`None` is passed) the matrix will not be subsetted.
+
+        save : bool
+            Whether to write normalized DataFrame to disk.
+
+        assign : bool
+            Whether to assign the normalized DataFrame to an attribute
+            (see variables below for each respective normalization type).
+
+        Attributes
+        ----------
+        matrix_norm : pd.DataFrame
+            If `assign` is True, a pandas DataFrame normalized with respective method.
+
+        Returns
+        -------
+        pd.DataFrame
+            Normalized pandas DataFrame.
+        """
+        if method == "rpm":
+            return self.normalize_rpm(
+                matrix=matrix, samples=samples, save=save, assign=assign)
+        elif method == "quantile":
+            return self.normalize_quantiles(
+                matrix=matrix, samples=samples, save=save, assign=assign)
+        elif method == "cqn":
+            if self.data_type != "RNA-seq":
+                raise ValueError("Cannot use `cqn` normalization with this data_type: {}".format(self.data_type))
+            return self.normalize_cqn(
+                matrix=matrix, samples=samples, save=save, assign=assign)
+        else:
+            msg = "Requested normalization method is not available!"
+            _LOGGER.error(msg)
+            raise ValueError(msg)
+
     def get_matrix(self, matrix, samples=None):
         """
         Get a matrix that is an attribute of self subsetted for the requested samples.
@@ -758,9 +928,9 @@ class Analysis(object):
             # subset to requested samples
             return matrix.loc[:, [s.name for s in samples]]
 
-    def annotate_with_sample_metadata(
+    def annotate_with_sample_attributes(
             self,
-            matrix=None,
+            matrix="matrix_norm",
             attributes=None,
             numerical_attributes=None,
             save=True,
@@ -774,9 +944,7 @@ class Analysis(object):
         ----------
         matrix : str, optional
             Attribute name of matrix to annotate.
-            Default is  infered from the analysis data_type in the following way:
-                - ATAC-seq or ChIP-seq: ``coverage_annotated``;
-                - RNA-seq: ``expression_annotated``.
+            Defaults to "matrix_norm".
 
         attributes : list, optional
             Desired attributes to be annotated.
@@ -792,10 +960,7 @@ class Analysis(object):
             Default is True.
 
         assign : bool, optional
-            Whether to assign the normalized DataFrame to an attribute
-             - ``accessibility`` if ``data_type`` is "ATAC-seq,
-             - ``binding`` if ``data_type`` is "ChIP-seq, or
-             - ``expression`` if ``data_type`` is "RNA-seq.
+            Whether to assign the normalized DataFrame to "matrix_norm".
 
         Returns
         -------
@@ -804,9 +969,10 @@ class Analysis(object):
 
         Attributes
         ----------
-        {accessibility, binding, expression} : pandas.DataFrame
+        matrix_norm : pandas.DataFrame
             A pandas DataFrame with  MultiIndex column index containing the sample's attributes specified.
         """
+        # TODO: reimplement for CNV (dict)
         if (attributes is None) and hasattr(self, "sample_attributes"):
             _LOGGER.info("Using 'sample_attributes' from analysis to annotate matrix: {}"
                          .format(",".join(self.sample_attributes)))
@@ -821,34 +987,12 @@ class Analysis(object):
             msg = "Attributes not given and could not be set from Analysis or Project."
             raise ValueError(msg)
 
-        if self.data_type == "ATAC-seq":
-            output_matrix = "accessibility"
-            if matrix is None:
-                matrix = "coverage_annotated"
-        elif self.data_type == "ChIP-seq":
-            output_matrix = "binding"
-            if matrix is None:
-                matrix = "coverage_annotated"
-        elif self.data_type == "CNV":
-            output_matrix = "cnv"
+        if self.data_type == "CNV":
             if matrix is None:
                 if not isinstance(getattr(self, matrix), pd.DataFrame):
                     _LOGGER.error("For CNV data type, the matrix to be annotated must be" +
                                   " directly passed to the function throught the `matrix` argument!")
                     raise ValueError
-            if matrix is None:
-                matrix = "coverage_norm"
-        elif self.data_type == "RNA-seq":
-            output_matrix = "expression"
-            if matrix is None:
-                matrix = "expression_annotated"
-        else:
-            _LOGGER.warning("Data type of object not known, will not set as attribute.")
-            assign = False
-            output_matrix = ""
-            if matrix is None:
-                msg = "Data type of object not known, must specify `matrix` to annotate!"
-                raise ValueError(msg)
 
         matrix = self.get_matrix(matrix)
 
@@ -879,13 +1023,10 @@ class Analysis(object):
         # Save
         if save:
             df.to_csv(
-                os.path.join(
-                    self.results_dir,
-                    self.name + "{}.annotated_metadata.csv"
-                        .format("." + output_matrix if output_matrix != "" else output_matrix)),
+                os.path.join(self.results_dir, self.name + ".matrix_norm.csv"),
                 index=True)
         if assign:
-            setattr(self, output_matrix, df)
+            self.matrix_norm = df
         return df
 
     def get_level_colors(
@@ -1010,8 +1151,7 @@ class Analysis(object):
     def unsupervised_analysis(
             self,
             steps=["correlation", "manifold", "pca", "pca_association"],
-            data_type=None,
-            matrix=None,
+            matrix="matrix_norm",
             samples=None,
             attributes_to_plot=None,
             plot_prefix=None,
@@ -1057,14 +1197,10 @@ class Analysis(object):
             List of step keywords to be performed as described above.
             Defaults to all available.
 
-        data_type : str, optional
-            Data type. One of "ATAC-seq" or "RNA-seq".
-            Defaults to "ATAC-seq".
-
         matrix : str, optional
             Name of analysis attribute contatining the numeric dataframe to perform analysis on.
-            Defaults to the value of "norm_matrix_name" which is data-type specific.
             Must have a pandas.MultiIndex as column index.
+            Defaults to "matrix_norm".
 
         samples : list, optional
             List of sample objects to restrict analysis to.
@@ -1076,7 +1212,7 @@ class Analysis(object):
 
         plot_prefix : str, optional
             Prefix for output files.
-            Defaults to "all_sites" if data_type is ATAC-seq and "all_genes" if data_type is RNA-seq.
+            Defaults to "all_regions" if data_type is ATAC-seq and "all_genes" if data_type is RNA-seq.
 
         standardize_matrix : bool, optional
             Whether to standardize variables in `matrix` by removing the mean and scaling to unit variance.
@@ -1118,43 +1254,20 @@ class Analysis(object):
         **kwargs: optional
             kwargs are passed to ngs_toolkit.graphics.plot_projection
         """
-        data_type = self._get_data_type(data_type)
+        matrix = self.get_matrix(matrix)
 
-        if data_type == "ATAC-seq":
-            if plot_prefix is None:
-                plot_prefix = "all_sites"
-            if matrix is None:
-                matrix = "accessibility"
-        elif data_type == "ChIP-seq":
-            if plot_prefix is None:
-                plot_prefix = "all_sites"
-            if matrix is None:
-                matrix = "binding"
-        elif data_type == "CNV":
-            if plot_prefix is None:
-                plot_prefix = "all_bins"
-            if matrix is None:
-                matrix = "cnv"
-        elif data_type == "RNA-seq":
-            if plot_prefix is None:
-                plot_prefix = "all_genes"
-            if matrix is None:
-                matrix = "expression"
-        else:
-            raise ValueError("Data types can only be 'ATAC-seq', 'ChIP-seq', RNA-seq' or 'CNV'.")
+        if plot_prefix is None:
+            plot_prefix = "all_{}s".format(self.var_unit_name)
 
-        if ("{results_dir}" in output_dir) and ("{data_type}" in output_dir):
-            output_dir = output_dir.format(results_dir=self.results_dir, data_type=data_type)
+        output_dir = self._format_string_with_attributes(output_dir)
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
 
-        matrix = getattr(self, matrix)
-
         if not isinstance(matrix.columns, pd.core.indexes.multi.MultiIndex):
             msg = "Provided quantification matrix must have columns with MultiIndex."
-            hint = " Use ngs_toolkit.general.annotate_with_sample_metadata to do that."
-            _LOGGER.error(msg + hint)
-            raise TypeError(msg)
+            hint = " Will try to use `analysis.annotate_with_sample_attributes` to do that."
+            _LOGGER.info(msg + hint)
+            matrix = self.annotate_with_sample_attributes(matrix=matrix, save=False, assign=False)
 
         if samples is None:
             samples = [s for s in self.samples
@@ -1424,7 +1537,6 @@ class Analysis(object):
     def differential_analysis(
             self,
             comparison_table=None,
-            data_type=None,
             samples=None,
             covariates=None,
             output_dir="{results_dir}/differential_analysis_{data_type}",
@@ -1452,10 +1564,6 @@ class Analysis(object):
             A dataframe with "comparison_name", "comparison_side" and "sample_name", "sample_group" columns.
             Defaults to the analysis' own "comparison_table" attribute.
 
-        data_type : str, optional
-            Type of data under analysis. One of "ATAC-seq" or "RNA-seq".
-            Defaults to analysis' own data_type.
-
         samples : list, optional
             Samples to limit analysis to.
             Defaults to all samples in analysis object.
@@ -1466,8 +1574,8 @@ class Analysis(object):
 
         output_dir : str, optional
             Output directory for analysis.
+            Variables in curly braces will be formated with attributes from analysis.
             Defaults to "{results_dir}/differential_analysis_{data_type}".
-            If containing "{data_type}", will format string with variable.
 
         output_prefix : str, optional
             Prefix for output files.
@@ -1519,8 +1627,6 @@ class Analysis(object):
                 _LOGGER.info(hint)
                 raise e
 
-        data_type = self._get_data_type(data_type)
-
         # Check comparisons
         # check comparison table has required columns
         req_attrs = ["comparison_name", "comparison_side", "sample_name", "sample_group"]
@@ -1547,14 +1653,7 @@ class Analysis(object):
             os.makedirs(output_dir)
 
         # Get matrix and samples
-        if data_type == "ATAC-seq":
-            count_matrix = self.coverage
-        elif data_type == "RNA-seq":
-            count_matrix = self.expression_matrix_counts
-        else:
-            msg = "Differential analysis is only implemented for data types 'ATAC-seq' or 'RNA-seq'."
-            raise ValueError(msg)
-
+        count_matrix = self.matrix_raw
         if samples is None:
             samples = self.samples
         samples = [s for s in samples if
@@ -1593,7 +1692,7 @@ class Analysis(object):
         # Run DESeq2 analysis
         if not distributed:
             # filter features without support for given comparison
-            if data_type in ["ATAC-seq", "ChIP-seq"] and filter_support:
+            if (self.data_type != "RNA-seq") and filter_support:
                 if not hasattr(self, "support"):
                     msg = "`filter_support` enabled but analysis has no `support` attribute!"
                     _LOGGER.error(msg)
@@ -1633,7 +1732,7 @@ class Analysis(object):
 
                 count = count_matrix.loc[:, comp["sample_name"].drop_duplicates()]
                 # filter features without support for given comparison
-                if data_type in ["ATAC-seq", "ChIP-seq"] and filter_support:
+                if self.data_type in ["ATAC-seq", "ChIP-seq", "ChIPmentation"] and filter_support:
                     if not hasattr(self, "support"):
                         msg = "`filter_support` enabled by analysis has no `support` attribute!"
                         _LOGGER.error(msg)
@@ -1671,7 +1770,6 @@ class Analysis(object):
     def collect_differential_analysis(
             self,
             comparison_table=None,
-            data_type="ATAC-seq",
             input_dir="{results_dir}/differential_analysis_{data_type}",
             input_prefix="differential_analysis",
             output_dir="{results_dir}/differential_analysis_{data_type}",
@@ -1688,10 +1786,6 @@ class Analysis(object):
         comparison_table : pandas.DataFrame
             A dataframe with "comparison_name", "comparison_side" and "sample_name", "sample_group" columns.
             Defaults to the analysis's own "comparison_table" attribute.
-
-        data_type : str, optional
-            Type of data under analysis. One of "ATAC-seq" or "RNA-seq".
-            Defaults to analysis' own data_type.
 
         input_dir, output_dir : str, optional
             In-/Output directory of files.
@@ -1800,9 +1894,8 @@ class Analysis(object):
             results=None,
             comparison_table=None,
             samples=None,
-            matrix=None,
+            matrix="matrix_norm",
             only_comparison_samples=False,
-            data_type=None,
             alpha=0.05,
             corrected_p_value=True,
             fold_change=None,
@@ -1861,15 +1954,11 @@ class Analysis(object):
 
         matrix : str, optional
             Matrix of quantification to use for plotting feature values across samples/groups.
-            Defaults to either "accessibility" for ATAC-seq analysis or "expression" for RNA-seq.
+            Defaults to "matrix_norm".
 
         only_comparison_samples : bool, optional
             Whether to use only samples present in the `comparison_table` and `results` table.
             Defaults to False.
-
-        data_type : str, optional
-            The data type being analyzed. Currently supported are "ATAC-seq" or "RNA-seq".
-            Defaults to the analysis' own data_type.
 
         alpha : float, optional
             Significance level to consider a feature differential.
@@ -1977,21 +2066,11 @@ class Analysis(object):
                 hint = " Run differential_self to produce differential results."
                 _LOGGER.error(msg)
                 raise ValueError
+        results = results.copy()
 
         req_attrs = [mean_column, log_fold_change_column, p_value_column, adjusted_p_value_column, comparison_column]
         if not all([x in results.columns for x in req_attrs]):
             raise AssertionError("Results dataframe must have '{}' columns.".format(", ".join(req_attrs)))
-
-        if data_type is None:
-            msg = "Data type not defined and Analysis object does not have a `data_type` attribute."
-            try:
-                data_type = self.data_type
-            except AttributeError as e:
-                _LOGGER.error(msg)
-                raise e
-            if data_type is None:
-                _LOGGER.error(msg)
-                raise ValueError
 
         # Make output dir
         output_dir = self._format_string_with_attributes(output_dir)
@@ -1999,28 +2078,15 @@ class Analysis(object):
             os.makedirs(output_dir)
 
         # Get matrix and samples
-        results = results.copy()
-        if data_type == "ATAC-seq":
-            if matrix is None:
-                matrix = self.accessibility
-            results.index.name = "region"
-            var_name = "region"
-            quantity = "Accessibility"
-            unit = "RPM"
-        elif data_type == "RNA-seq":
-            if matrix is None:
-                matrix = self.expression
-            results.index.name = "gene_name"
-            var_name = "gene"
-            quantity = "Expression"
-            unit = "TPM"
-        else:
-            msg = "Plot differential is only implemented for data types 'ATAC-seq' or 'RNA-seq'."
-            raise AssertionError(msg)
-
         if samples is None:
             samples = self.samples
+
+        matrix = self.get_matrix(matrix, samples)
         samples = [s for s in samples if s.name in matrix.columns]
+
+        # Get labels
+        var_name = self.var_unit_name
+        quantity = self.quantity
 
         if comparison_table is None:
             msg = "`comparison_table` was not given and is not set in analysis object."
@@ -2187,8 +2253,8 @@ class Analysis(object):
                     a = c.loc[c["comparison_side"] >= 1, "sample_name"]
                     b = c.loc[c["comparison_side"] <= 0, "sample_name"]
 
-                    a = matrix.loc[:, [s.name for s in samples if s.name in a.tolist() and s.library == data_type]].mean(axis=1)
-                    b = matrix.loc[:, [s.name for s in samples if s.name in b.tolist() and s.library == data_type]].mean(axis=1)
+                    a = matrix.loc[:, [s.name for s in samples if s.name in a.tolist() and s.library == self.data_type]].mean(axis=1)
+                    b = matrix.loc[:, [s.name for s in samples if s.name in b.tolist() and s.library == self.data_type]].mean(axis=1)
 
                     # Hexbin plot
                     ax = next(axes)
@@ -2564,7 +2630,6 @@ class Analysis(object):
     def differential_overlap(
             self,
             differential=None,
-            data_type=None,
             output_dir="{results_dir}/differential_analysis_{data_type}",
             output_prefix="differential_analysis"):
         """
@@ -2575,10 +2640,6 @@ class Analysis(object):
         differential : pandas.DataFrame, optional
             DataFrame containing result of comparisons filtered for features considered as differential.
 
-        data_type : str, optional
-            Data type.
-            Defaults to analysis' own data type.
-
         output_dir : str, optional
             Directory to create output files.
             Defaults to "{results_dir}/differential_analysis_{data_type}".
@@ -2588,23 +2649,13 @@ class Analysis(object):
             Defaults to "differential_analysis".
         """
         # TODO: use global thresholds to subset differential
-        data_type = self._get_data_type(data_type)
         # Make output dir
         output_dir = self._format_string_with_attributes(output_dir)
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
 
-        if data_type in ["ATAC-seq", "ChIP-seq"]:
-            unit = "region"
-            total = self.coverage.shape[0]
-        elif data_type == "CNV":
-            unit = "bin"
-        elif data_type == "RNA-seq":
-            unit = "gene"
-            total = self.expression.shape[0]
-        else:
-            _LOGGER.warning("Unknown data type. Will not use data-specific units.")
-            unit = "feature"
+        total = self.matrix_raw.shape[0]
+        unit = self.var_unit_name
 
         if "direction" not in differential.columns:
             differential.loc[:, "direction"] = differential["log2FoldChange"].apply(lambda x: "up" if x > 0 else "down")
@@ -2821,7 +2872,6 @@ class Analysis(object):
     def differential_enrichment(
             self,
             differential=None,
-            data_type=None,
             output_dir="{results_dir}/differential_analysis_{data_type}/enrichments",
             output_prefix="differential_analysis",
             genome=None,
@@ -2844,10 +2894,6 @@ class Analysis(object):
             but filtered by some threshold for the relevant (significant regions).
             Must contain a "comparison_name" column.
             Defaults to `analysis.differential_results`.
-
-        data_type : str, optional
-            Data type. One of "ATAC-seq" and "RNA-seq".
-            Defaults to the analysis' data_type attributes.
 
         output_dir : str, optional
             Directory to create output files.
@@ -2915,25 +2961,12 @@ class Analysis(object):
                 _LOGGER.info(hint)
                 raise ValueError
 
-        if data_type is None:
-            msg = "Data type not given and Analysis object does not have a `data_type` attribute."
-            try:
-                data_type = self.data_type
-            except AttributeError as e:
-                _LOGGER.error(msg)
-                raise e
-            if data_type is None:
-                _LOGGER.error(msg)
-                raise ValueError
-
         if genome is None:
             genome = self.genome
 
-        if data_type == "ATAC-seq":
-            matrix = self.coverage_annotated
-        elif data_type == "RNA-seq":
-            matrix = self.expression
-        else:
+        matrix = self.matrix_features
+
+        if data_type not in ["ATAC-seq", "RNA-seq"]:
             msg = "Differential enrichment is only implemented for data types 'ATAC-seq' and 'RNA-seq'."
             raise ValueError(msg)
 
@@ -3015,7 +3048,7 @@ class Analysis(object):
                     os.makedirs(comparison_dir)
 
                 # Prepare files and run (if not distributed)
-                if data_type == "RNA-seq":
+                if self.data_type == "RNA-seq":
                     _LOGGER.debug("Doing genes of comparison '{}', direction '{}'.".format(comp, direction))
                     comparison_df.index.name = "gene_name"
                     # write gene names to file
@@ -3062,7 +3095,7 @@ class Analysis(object):
                         os.path.join(output_dir, output_prefix + output_suffix), index=False, encoding="utf-8")
         else:
             background = ""
-            if data_type != "RNA-seq":
+            if self.data_type != "RNA-seq":
                 try:
                     _LOGGER.info("Using background region set from analysis.sites")
                     background = getattr(self, "sites").fn
@@ -3083,8 +3116,7 @@ class Analysis(object):
             output_dir="{results_dir}/differential_analysis_{data_type}/enrichments",
             input_prefix="differential_analysis",
             output_prefix="differential_analysis",
-            differential=None,
-            data_type=None):
+            differential=None):
         """
         Collect the results of enrichment analysis ran after a differential analysis.
 
@@ -3104,10 +3136,6 @@ class Analysis(object):
             Data frame with differential results to select which comparisons to collect
             enrichments for. Usually produced by ``ngs_toolkit.general.differential_analysis``.
             Defaults to analysis `differential_results`.
-
-        data_type : str, optional
-            Data type. One of "ATAC-seq" and "RNA-seq".
-            Defaults to Analysis' data_type.
 
         output_dir : str, optional
             Directory to create output files.
@@ -3129,10 +3157,6 @@ class Analysis(object):
         """
         # TODO: separate and fix mouse TF ids
         # TODO: separate homer_consensus output processing
-        data_type = self._get_data_type(data_type)
-        if data_type not in ["ATAC-seq", "RNA-seq"]:
-            raise ValueError("`data_type` must match one of 'ATAC-seq' or 'RNA-seq'.")
-
         output_dir = self._format_string_with_attributes(output_dir)
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
@@ -3142,9 +3166,9 @@ class Analysis(object):
             "ChIP-seq": ["region", "lola", "motif", "homer", "homer_consensus", "enrichr"],
             "RNA-seq": ["enrichr"]}
         if steps is None:
-            steps = [s for s in steps if s in data_type_steps[data_type]]
+            steps = [s for s in steps if s in data_type_steps[self.data_type]]
         for step in steps:
-            if step not in data_type_steps[data_type]:
+            if step not in data_type_steps[self.data_type]:
                 steps.pop(steps.index(step))
         if len(steps) == 0:
             msg = "No valid steps for the respective data type selected."
@@ -3172,7 +3196,7 @@ class Analysis(object):
             ("lola", lola_enr, pd.read_csv, {"sep": "\t"}, "allEnrichments.tsv", ".lola.csv"),
             ("enrichr", pathway_enr, pd.read_csv, {"encoding": "utf-8"}, input_prefix + ".enrichr.csv", ".enrichr.csv")]
 
-        if data_type == "RNA-seq":
+        if self.data_type == "RNA-seq":
             possible_steps = [x for x in possible_steps if x[0] == "enrichr"]
 
         # Examine each region cluster

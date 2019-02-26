@@ -34,21 +34,21 @@ def full_analysis():
 
 
 class Test_check_organism_genome:
-    # here we use 'get_annotations' as en example
+    # here we use 'get_resources' as en example
     # decorated function that won't fail for some other
     # reason on a fairly empty analysis object
     def test_empty_analysis(self, empty_analysis):
         # Make sure it raises AttributeError
         with pytest.raises(AttributeError):
-            empty_analysis.get_annotations(steps=[])
+            empty_analysis.get_resources(steps=[])
 
     def test_null_analysis(self, null_analysis):
         # Make sure it raises AttributeError
         with pytest.raises(AttributeError):
-            null_analysis.get_annotations(steps=[])
+            null_analysis.get_resources(steps=[])
 
     def test_full_analysis(self, full_analysis):
-        full_analysis.get_annotations(steps=[])
+        full_analysis.get_resources(steps=[])
 
 
 class Test_check_has_sites:

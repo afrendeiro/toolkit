@@ -167,9 +167,6 @@ def generate_project(
         if data_type == "ATAC-seq":
             bed = location_index_to_bed(n.index)
             bed.to_csv(os.path.join(
-                output_dir, project_name, "results", project_name + "_peak_set.bed"), index=False, sep="\t", header=False)
-            n.to_csv(os.path.join(
-                output_dir, project_name, "results", project_name + "_peaks.raw_coverage.csv"))
-        elif data_type == "RNA-seq":
-            n.to_csv(os.path.join(
-                output_dir, project_name, "results", project_name + ".expression_counts.gene_level.csv"))
+                output_dir, project_name, "results", project_name + ".peak_set.bed"), index=False, sep="\t", header=False)
+        n.to_csv(os.path.join(
+            output_dir, project_name, "results", project_name + ".matrix_raw.csv"))

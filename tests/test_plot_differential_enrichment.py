@@ -55,7 +55,7 @@ def analysis(tmp_path):
     a.load_data()
 
     a.get_peak_gene_annotation()
-    a.annotate(matrix="coverage")
+    a.annotate(matrix="matrix_raw")
     a.differential_analysis(filter_support=False)
 
     _CONFIG['resources']['enrichr']['gene_set_libraries'] = [

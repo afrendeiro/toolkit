@@ -54,11 +54,10 @@ def analysis(tmp_path):
         a.set_project_attributes()
         a.load_data()
 
-        a.normalize(method="total")
-        a.normalize(method="quantile")
+        a.normalize(method="rpm")
         a.get_peak_gene_annotation()
-        a.annotate(matrix="coverage_qnorm")
-        a.annotate_with_sample_metadata(matrix="coverage_qnorm")
+        a.annotate()
+        a.annotate_with_sample_attributes()
         a.differential_analysis(filter_support=False)
         to_test.append(a)
     return to_test[0]

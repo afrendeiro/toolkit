@@ -60,7 +60,7 @@ def analysis(tmp_path):
     return analysis
 
 
-class Test_Analysis():
+class TestAnalysis():
     def test_analysis_creation(self, tmp_path):
 
         tmp_path = str(tmp_path)  # for Python2

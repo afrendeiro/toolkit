@@ -263,9 +263,9 @@ def main_analysis_pipeline(
         # Get coverage values for each peak in each sample of ATAC-seq and ChIPmentation
         analysis.measure_coverage()
         # normalize coverage values
-        analysis.normalize_coverage_quantiles()
+        analysis.normalize_quantiles()
         analysis.get_peak_gccontent_length(genome=genome)
-        analysis.normalize_gc_content()
+        analysis.normalize_cqn()
 
         # Annotate peaks with closest gene
         if os.path.exists(os.path.join("data", "external", "refseq.refflat.tss.bed")):
@@ -281,7 +281,7 @@ def main_analysis_pipeline(
         attrs = (
             ['sample_name'] + sample_attributes
             if "sample_name" not in sample_attributes else sample_attributes)
-        analysis.annotate_with_sample_metadata(attributes=attrs)
+        analysis.annotate_with_sample_attributes(attributes=attrs)
         analysis.to_pickle()
 
         # QC plots

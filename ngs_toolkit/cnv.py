@@ -43,12 +43,9 @@ class CNVAnalysis(Analysis):
             **kwargs)
 
         self.data_type = self.__data_type__ = "CNV"
-        self._var_names = "region"
-        self._quantity = "copy_number"
-        self._norm_units = "log2(ratio)"
-        self._raw_matrix_name = "coverage"
-        self._norm_matrix_name = "coverage_norm"
-        self._annot_matrix_name = "cnv"
+        self.var_unit_name = "bin"
+        self.quantity = "copy_number"
+        self.norm_units = "log2(ratio)"
 
         self.resolutions = resolutions
 
@@ -212,7 +209,7 @@ class CNVAnalysis(Analysis):
 
         return coverage
 
-    def normalize_coverage_median(
+    def normalize_median(
             self, matrix=None, resolutions=None,
             samples=None, function=np.nanmedian, fillna=True,
             save=True, assign=True):
@@ -285,7 +282,7 @@ class CNVAnalysis(Analysis):
 
         return coverage_norm
 
-    def normalize_coverage_pca(
+    def normalize_pca(
             self, pc,
             matrix=None, resolutions=None, samples=None,
             save=True, assign=True):
@@ -339,7 +336,7 @@ class CNVAnalysis(Analysis):
             samples = self.samples
 
         # first make sure data is centered
-        to_norm = self.normalize_coverage_median(
+        to_norm = self.normalize_median(
             matrix, resolutions=resolutions, samples=samples, save=False, assign=False)
 
         coverage_norm = dict()
@@ -407,13 +404,13 @@ class CNVAnalysis(Analysis):
             Sets a `coverage_norm` dictionary with CNV matrices for each resolution.
         """
         if method == "median":
-            return self.normalize_coverage_median(
+            return self.normalize_median(
                 matrix=matrix, resolutions=resolutions, samples=samples,
                 save=save, assign=assign)
         elif method == "pca":
             if pc is None:
                 raise ValueError("If method is 'pca', the value of 'pc' must be given.")
-            return self.normalize_coverage_pca(
+            return self.normalize_pca(
                 matrix=matrix, resolutions=resolutions, samples=samples, pc=pc,
                 save=save, assign=assign)
         else:

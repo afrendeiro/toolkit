@@ -405,10 +405,10 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
         # remove blacklist regions
         blacklist = pybedtools.BedTool(os.path.join(self.data_dir, "external", blacklist_bed))
         # remove chrM peaks and save
-        sites.intersect(v=True, b=blacklist).filter(lambda x: x.chrom != 'chrM').saveas(os.path.join(self.results_dir, self.name + "_peak_set.bed"))
+        sites.intersect(v=True, b=blacklist).filter(lambda x: x.chrom != 'chrM').saveas(os.path.join(self.results_dir, self.name + ".peak_set.bed"))
 
         # Read up again
-        self.sites = pybedtools.BedTool(os.path.join(self.results_dir, self.name + "_peak_set.bed"))
+        self.sites = pybedtools.BedTool(os.path.join(self.results_dir, self.name + ".peak_set.bed"))
 
     def set_consensus_sites(self, bed_file, overwrite=True):
         """
@@ -417,7 +417,7 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
         """
         self.sites = pybedtools.BedTool(bed_file)
         if overwrite:
-            self.sites.saveas(os.path.join(self.results_dir, self.name + "_peak_set.bed"))
+            self.sites.saveas(os.path.join(self.results_dir, self.name + ".peak_set.bed"))
 
     def calculate_peak_support(self, **kwargs):
         """

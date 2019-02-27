@@ -64,47 +64,44 @@ class ATACSeqAnalysis(Analysis):
         If the analysis should be loaded from an existing pickle object.
         Default is `False.
 
-    Remaining keyword arguments will be passed to parent class `ngs_toolkit.general.Analysis`.
+    from_pep : str, optional
+        PEP configuration file to initialize analysis from.
+        Defaults to None.
+
+    kwargs : dict, optional
+        Additional keyword arguments will be passed to parent class `ngs_toolkit.analysis.Analysis`.
 
     :Example:
 
     .. code-block:: python
-        from peppy import Project
-        import os
         from ngs_toolkit.atacseq import ATACSeqAnalysis
 
-        prj = Project(os.path.join("metadata", "project_config.yaml"))
-        atac_analysis = ATACSeqAnalysis(
-            name=prj.project_name, prj=prj,
-            samples=[s for s in prj.samples if s.protocol == "ATAC-seq"])
+        pep = "metadata/project_config.yaml"
+        a = ATACSeqAnalysis(from_pep=pep)
 
         # Get consensus peak set from all samples
-        atac_analysis.get_consensus_sites(atac_analysis.samples)
+        a.get_consensus_sites(a.samples)
 
         # Annotate regions
-        atac_analysis.calculate_peak_support(atac_analysis.samples)
-        atac_analysis.get_peak_gene_annotation()
-        atac_analysis.get_peak_genomic_location()
-        atac_analysis.get_peak_chromatin_state(
-            os.path.join(atac_analysis.data_dir, "external", "E032_15_coreMarks_mnemonics.bed"))
+        a.calculate_peak_support(a.samples)
+        a.get_peak_gene_annotation()
+        a.get_peak_genomic_location()
+        a.get_peak_chromatin_state("E032_15_coreMarks_mnemonics.bed")
 
         # Get coverage values for each peak in each sample of ATAC-seq
-        atac_analysis.measure_coverage(atac_analysis.samples)
+        a.measure_coverage()
 
         # Normalize jointly (quantile normalization + GC correction)
-        atac_analysis.normalize(method="gc_content")
+        a.normalize(method="gc_content")
 
         # Annotate quantified peaks with previously calculated metrics and features
-        atac_analysis.annotate()
+        a.annotate()
 
         # Annotate with sample metadata
-        atac_analysis.accessibility = atac_analysis.annotate_with_sample_attributes(
-            matrix="coverage_annotated",
-            attributes=atac_analysis.sample_variables)
+        a.accessibility = a.annotate_with_sample_attributes()
 
         # Save object
-        atac_analysis.to_pickle()
-
+        a.to_pickle()
     """
     def __init__(
             self,
@@ -115,7 +112,7 @@ class ATACSeqAnalysis(Analysis):
             results_dir="results",
             pickle_file=None,
             from_pickle=False,
-            pep=False,
+            from_pep=False,
             **kwargs):
         super(ATACSeqAnalysis, self).__init__(
             name=name,
@@ -125,7 +122,7 @@ class ATACSeqAnalysis(Analysis):
             samples=samples,
             prj=prj,
             from_pickle=from_pickle,
-            pep=pep,
+            from_pep=from_pep,
             **kwargs)
 
         self.data_type = self.__data_type__ = "ATAC-seq"
@@ -133,13 +130,18 @@ class ATACSeqAnalysis(Analysis):
         self.quantity = "accessibility"
         self.norm_units = "RPM"
 
-    def load_data(self, output_mapping=None, only_these_keys=None, permissive=True):
+    def load_data(
+            self,
+            output_map=None,
+            only_these_keys=None,
+            prefix="{results_dir}/{name}",
+            permissive=True):
         """
         Load the output files of the major functions of the Analysis.
 
         Parameters
         ----------
-        output_mapping : dict
+        output_map : dict
             Dictionary with "attribute name": "path prefix" to load the files.
 
         only_these_keys : list, optional
@@ -153,8 +155,14 @@ class ATACSeqAnalysis(Analysis):
                 "chrom_state_annotation", "chrom_state_annotation_b",
                 "stats", differential_results".
 
-        bool : permissive
-            Whether an error should be thrown if reading a file causes IOError.
+        prefix : str, optional
+            String prefix of files to load.
+            Variables in curly braces will be formated with attributes of analysis.
+            Defaults to "{results_dir}/{name}".
+
+        bool : permissive, optional
+            Whether an error should be ignored if reading a file causes IOError.
+            Default is True.
 
         Attributes
         ----------
@@ -170,43 +178,11 @@ class ATACSeqAnalysis(Analysis):
         IOError
             If not permissive and a file is not found
         """
-        def fix_header(df):
-            cols = list()
-            for i in df.index[:300]:
-                try:
-                    df.loc[i, :].astype(float)
-                except ValueError:
-                    cols.append(i)
-            if len(cols) == 0:
-                pass
-            elif len(cols) == 1:
-                df.columns = df.loc[cols[0]]
-                df = df.loc[~df.index.isin(cols)]
-            else:
-                df.columns = pd.MultiIndex.from_arrays(df.loc[cols].values, names=cols)
-                df = df.loc[~df.index.isin(cols)]
-            df.index.name = None
-            return df.astype(float)
+        prefix = self._format_string_with_attributes(prefix)
 
-        if only_these_keys is None:
-            only_these_keys = [
-                "matrix_raw", "matrix_norm", "matrix_features",
-
-                "sites", "support",
-                "nuc", "closest_tss_distances",
-                "gene_annotation",
-                "region_annotation", "region_annotation_b",
-                "region_annotation_mapping", "region_annotation_b_mapping",
-                "chrom_state_annotation", "chrom_state_annotation_b",
-                "chrom_state_annotation_mapping", "chrom_state_annotation_b_mapping",
-                "stats", "differential_results"]
-
-        prefix = os.path.join(self.results_dir, self.name)
-        kwargs = {"index_col": 0}
-        if output_mapping is None:
-            # TODO: get default mapping by having functions declare what they output
-            # perhaps also with a dict of kwargs to pass to pandas.read_csv
-            output_mapping = {
+        if output_map is None:
+            kwargs = {"index_col": 0}
+            output_map = {
                 "matrix_raw":
                     (prefix + ".matrix_raw.csv", kwargs),
                 "matrix_norm":
@@ -244,23 +220,17 @@ class ATACSeqAnalysis(Analysis):
                     (os.path.join(self.results_dir, "differential_analysis_{}".format(self.data_type),
                                   "differential_analysis.deseq_result.all_comparisons.csv"), kwargs)}
 
-        output_mapping = {k: v for k, v in output_mapping.items() if k in only_these_keys}
+        if only_these_keys is None:
+            only_these_keys = list(output_map.keys())
 
-        for name, (file, kwargs) in output_mapping.items():
-            _LOGGER.info("Loading '{}' analysis attribute.".format(name))
-            try:
-                setattr(self, name, pd.read_csv(file, **kwargs))
+        # Use the parent method just with an updated output_map dictionary
+        Analysis.load_data(
+            self,
+            output_map=output_map,
+            only_these_keys=only_these_keys,
+            prefix=prefix, permissive=permissive)
 
-                # Fix possible multiindex for coverage_norm
-                if name == "coverage_norm":
-                    setattr(self, name, getattr(self, name))
-            except IOError as e:
-                if not permissive:
-                    raise e
-                else:
-                    _LOGGER.warning(e)
-
-        # Special cases
+        # Special case
         if "sites" in only_these_keys:
             file = os.path.join(self.results_dir, self.name + ".peak_set.bed")
             try:

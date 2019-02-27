@@ -226,7 +226,7 @@ def get_blacklist_annotations(
     if genome_assembly is None:
         genome_assembly = organisms[organism]
         _LOGGER.warning("Genome assembly not selected. Using assembly '{}' for '{}'."
-                     .format(genome_assembly, organism))
+                        .format(genome_assembly, organism))
 
     output_file = os.path.join(output_dir, "{}.{}.blacklist.bed"
                                .format(organism, genome_assembly))
@@ -1845,7 +1845,7 @@ def query_biomart(
 
 
 def subtract_principal_component(
-        X, pc=1, norm=False, plot=True, plot_name="PCA_based_batch_correction.svg", pcs_to_plot=6):
+        x, pc=1, norm=False, plot=True, plot_name="PCA_based_batch_correction.svg", pcs_to_plot=6):
     """
     Given a matrix (n_samples, n_variables), remove `pc` (1-based) from matrix.
     """
@@ -1853,33 +1853,33 @@ def subtract_principal_component(
 
     # All regions
     if norm:
-        X = StandardScaler().fit_transform(X)
+        x = StandardScaler().fit_transform(x)
 
     # PCA
     pca = PCA()
-    X_hat = pca.fit_transform(X)
+    x_hat = pca.fit_transform(x)
 
     # Remove PC
-    X2 = X - np.outer(X_hat[:, pc], pca.components_[pc, :])
+    x2 = x - np.outer(x_hat[:, pc], pca.components_[pc, :])
 
     # plot
     if plot:
-        X2_hat = pca.fit_transform(X2)
+        x2_hat = pca.fit_transform(x2)
         fig, axis = plt.subplots(pcs_to_plot, 2, figsize=(4 * 2, 4 * pcs_to_plot))
         for pc in range(pcs_to_plot):
             # before
-            for j, sample in enumerate(X.index):
-                axis[pc, 0].scatter(X_hat[j, pc], X_hat[j, pc + 1], s=50, rasterized=True)
+            for j, sample in enumerate(x.index):
+                axis[pc, 0].scatter(x_hat[j, pc], x_hat[j, pc + 1], s=50, rasterized=True)
             axis[pc, 0].set_xlabel("PC{}".format(pc + 1))
             axis[pc, 0].set_ylabel("PC{}".format(pc + 2))
             # after
-            for j, sample in enumerate(X2.index):
-                axis[pc, 1].scatter(X2_hat[j, pc], X2_hat[j, pc + 1], s=35, alpha=0.8, rasterized=True)
+            for j, sample in enumerate(x2.index):
+                axis[pc, 1].scatter(x2_hat[j, pc], x2_hat[j, pc + 1], s=35, alpha=0.8, rasterized=True)
             axis[pc, 1].set_xlabel("PC{}".format(pc + 1))
             axis[pc, 1].set_ylabel("PC{}".format(pc + 2))
         fig.savefig(plot_name)
 
-    return X2
+    return x2
 
 
 def subtract_principal_component_by_attribute(df, attributes, pc=1):
@@ -1888,22 +1888,22 @@ def subtract_principal_component_by_attribute(df, attributes, pc=1):
     """
     pc -= 1
 
-    X2 = pd.DataFrame(index=df.index, columns=df.columns)
+    x2 = pd.DataFrame(index=df.index, columns=df.columns)
     for attr in attributes:
         _LOGGER.info(attr)
         sel = df.index[df.index.str.contains(attr)]
-        X = df.loc[sel, :]
+        x = df.loc[sel, :]
 
         # PCA
         pca = PCA()
-        X_hat = pca.fit_transform(X)
+        x_hat = pca.fit_transform(x)
 
         # Remove PC
-        X2.loc[sel, :] = X - np.outer(X_hat[:, pc], pca.components_[pc, :])
+        x2.loc[sel, :] = x - np.outer(x_hat[:, pc], pca.components_[pc, :])
     for sample in df.index:
-        if X2.loc[sample, :].isnull().all():
-            X2.loc[sample, :] = df.loc[sample, :]
-    return X2
+        if x2.loc[sample, :].isnull().all():
+            x2.loc[sample, :] = df.loc[sample, :]
+    return x2
 
 
 def fix_batch_effect_limma(matrix, batch_variable="batch", covariates=None):

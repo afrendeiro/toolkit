@@ -654,6 +654,89 @@ class Analysis(object):
             pickle_file = self.pickle_file
         return pickle.load(open(pickle_file, "rb"))
 
+    def load_data(
+            self,
+            output_map=None,
+            only_these_keys=None,
+            prefix="{results_dir}/{name}",
+            permissive=True):
+        """
+        Load the output files of the major functions of the Analysis.
+
+        Parameters
+        ----------
+        output_map : dict
+            Dictionary with {attribute_name: (file_path, kwargs)} to load the files.
+            The kwargs in the tuple will be passed to pandas.read_csv.
+            The default is the required to read the keys in `only_these_keys`.
+
+        only_these_keys : list, optional
+            Iterable of analysis attributes to load up.
+            Possible attributes:
+                "matrix_raw"
+                "matrix_norm"
+                "matrix_features"
+                "differential_results"
+
+        prefix : str, optional
+            String prefix of files to load.
+            Variables in curly braces will be formated with attributes of analysis.
+            Defaults to "{results_dir}/{name}".
+
+        bool : permissive, optional
+            Whether an error should be ignored if reading a file causes IOError.
+            Default is True.
+
+        Attributes
+        ----------
+        pandas.DataFrame
+            Dataframes holding the respective data, available as attributes described
+            in the `only_these_keys` parameter.
+
+        Raises
+        ----------
+        IOError
+            If not permissive and a file is not found
+        """
+        # TODO: get default output_map by having functions declare what they output
+        # perhaps also with a dict of kwargs to pass to pandas.read_csv
+        from ngs_toolkit.utils import fix_dataframe_header
+
+        prefix = self._format_string_with_attributes(prefix)
+
+        if output_map is None:
+            kwargs = {"index_col": 0}
+            output_map = {
+                "matrix_raw":
+                    (prefix + ".matrix_raw.csv", kwargs),
+                "matrix_norm":
+                    (prefix + ".matrix_norm.csv",
+                        {"index_col": 0, "header": None}),
+                "matrix_features":
+                    (prefix + ".matrix_features.csv", kwargs),
+                "differential_results":
+                    (os.path.join(self.results_dir, "differential_analysis_{}".format(self.data_type),
+                                  "differential_analysis.deseq_result.all_comparisons.csv"), kwargs)}
+
+        if only_these_keys is None:
+            only_these_keys = list(output_map.keys())
+
+        output_map = {k: v for k, v in output_map.items() if k in only_these_keys}
+
+        for name, (file, kwargs) in output_map.items():
+            _LOGGER.info("Loading '{}' analysis attribute.".format(name))
+            try:
+                setattr(self, name, pd.read_csv(file, **kwargs))
+
+                # Fix possible multiindex for coverage_norm
+                if name == "coverage_norm":
+                    setattr(self, name, fix_dataframe_header(getattr(self, name)))
+            except IOError as e:
+                if not permissive:
+                    raise e
+                else:
+                    _LOGGER.warning(e)
+
     @check_organism_genome
     def get_resources(
             self,

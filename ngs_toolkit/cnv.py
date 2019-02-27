@@ -5,6 +5,7 @@ import string
 import warnings
 
 import matplotlib.pyplot as plt
+from ngs_toolkit import _LOGGER
 from ngs_toolkit.analysis import Analysis
 from ngs_toolkit.general import query_biomart
 from ngs_toolkit.general import subtract_principal_component
@@ -49,66 +50,86 @@ class CNVAnalysis(Analysis):
 
         self.resolutions = resolutions
 
-    def load_data(self, resolutions=None, permissive=True, norm_method="median"):
+    def load_data(
+            self,
+            output_map=None,
+            only_these_keys=None,
+            prefix="{results_dir}/{name}",
+            permissive=True):
         """
-        Load data from a previous analysis.
+        Load the output files of the major functions of the Analysis.
 
         Parameters
         ----------
-        resolutions : list, optional
-            Resolutions of analysis, defaults to resolutions in Analysis object.
+        output_map : dict
+            Dictionary with {attribute_name: (file_path, kwargs)} to load the files.
+            The kwargs in the tuple will be passed to pandas.read_csv.
+            The default is the required to read the keys in `only_these_keys`.
 
-        permissive : bool, optional
-            Whether missing files should be allowed.
-            Defaults to True
+        only_these_keys : list, optional
+            Iterable of analysis attributes to load up.
+            Possible attributes:
+                "matrix_raw"
+                "matrix_norm"
+                "matrix_features"
+                "differential_results"
 
-        norm_method : str, optional
-            Normalization method used in the previous files.
-            One of {'median', pca'}.
-            Defaults to "median".
+        prefix : str, optional
+            String prefix of files to load.
+            Variables in curly braces will be formated with attributes of analysis.
+            Defaults to "{results_dir}/{name}".
+
+        bool : permissive, optional
+            Whether an error should be ignored if reading a file causes IOError.
+            Default is True.
+
+        Attributes
+        ----------
+        pandas.DataFrame
+            Dataframes holding the respective data, available as attributes described
+            in the `only_these_keys` parameter.
 
         Raises
-        -------
-        ValueError
-            If normalization method is not recognized.
+        ----------
+        IOError
+            If not permissive and a file is not found
         """
-        if resolutions is None:
-            resolutions = self.resolutions
+        from ngs_toolkit.utils import fix_dataframe_header
 
-        if norm_method == "median":
-            suf = "coverage_median"
-        elif norm_method == "pca":
-            suf = "coverage_pcanorm"
-        else:
-            raise ValueError("Normalization method unknown!")
+        prefix = self._format_string_with_attributes(prefix)
 
-        self.coverage = dict()
-        self.coverage_norm = dict()
-        self.segmentation = dict()
-        self.segmentation_annot = dict()
-        to_load = [
-            ("coverage",
-                os.path.join(self.results_dir, self.name + ".{}.raw_coverage.csv"),
-                "Raw coverage", {"index_col": 0}),
-            ("coverage_norm",
-                os.path.join(self.results_dir, self.name + ".{}" + ".{}.csv".format(suf)),
-                "Normalized coverage", {"index_col": 0}),
-            ("segmentation",
-                os.path.join(self.results_dir, self.name + ".{}.segmentation.csv"),
-                "Segmentation", {}),
-            ("segmentation_annot",
-                os.path.join(self.results_dir, self.name + ".{}.segmentation.annotated.csv"),
-                "Annotated segmentation", {})]
+        if output_map is None:
+            kwargs = {"index_col": 0}
+            output_map = {
+                "matrix_raw":
+                    (os.path.join(self.results_dir, self.name + ".{}.matrix_raw.csv"), kwargs),
+                "matrix_norm":
+                    (os.path.join(self.results_dir, self.name + ".{}.matrix_norm.csv"), kwargs),
+                "segmentation":
+                    (os.path.join(self.results_dir, self.name + ".{}.segmentation.csv"), {}),
+                "segmentation_annot":
+                    (os.path.join(self.results_dir, self.name + ".{}.segmentation.annotated.csv"), {})}
+        if only_these_keys is None:
+            only_these_keys = list(output_map.keys())
+
+        output_map = {k: v for k, v in output_map.items() if k in only_these_keys}
+
         for resolution in self.resolutions:
-            for attr, f, desc, params in to_load:
-                f = f.format(resolution)
+            for name, (file, kwargs) in output_map.items():
+                file = file.format(resolution)
+                _LOGGER.info("Loading '{}' analysis attribute.".format(name))
+                if not hasattr(self, name):
+                    setattr(self, name, {})
                 try:
-                    getattr(self, attr)[resolution] = pd.read_csv(f, **params)
+                    getattr(self, name)[resolution] = pd.read_csv(file, **kwargs)
+                    # Fix possible multiindex for coverage_norm
+                    if name == "coverage_norm":
+                        getattr(self, name)[resolution] = fix_dataframe_header(getattr(self, name)[resolution])
                 except IOError as e:
-                    if permissive:
-                        print("{} file '{}' could not be read.".format(desc, f))
-                    else:
+                    if not permissive:
                         raise e
+                    else:
+                        _LOGGER.warning(e)
 
     def get_cnv_data(
             self, resolutions=None, samples=None, save=True, assign=True, permissive=False):

@@ -206,6 +206,28 @@ def log_pvalues(x, f=0.1):
     return ll.replace(np.inf, rmax + rmax * f)
 
 
+def fix_dataframe_header(df, force_dtypes=float):
+    cols = list()
+    for i in df.index[:300]:
+        try:
+            df.loc[i, :].astype(float)
+        except ValueError:
+            cols.append(i)
+    if len(cols) == 0:
+        pass
+    elif len(cols) == 1:
+        df.columns = df.loc[cols[0]]
+        df = df.loc[~df.index.isin(cols)]
+    else:
+        df.columns = pd.MultiIndex.from_arrays(df.loc[cols].values, names=cols)
+        df = df.loc[~df.index.isin(cols)]
+    df.index.name = None
+    if force_dtypes is not None:
+        return df.astype(force_dtypes)
+    else:
+        return df
+
+
 def r2pandas_df(r_df):
     df = pd.DataFrame(np.asarray(r_df)).T
     df.columns = [str(x) for x in r_df.colnames]

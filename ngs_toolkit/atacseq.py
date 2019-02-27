@@ -133,7 +133,7 @@ class ATACSeqAnalysis(Analysis):
         self.quantity = "accessibility"
         self.norm_units = "RPM"
 
-    def load_data(self, output_mapping=None, only_these_keys=None, permissive=True, n_header_vars=None):
+    def load_data(self, output_mapping=None, only_these_keys=None, permissive=True):
         """
         Load the output files of the major functions of the Analysis.
 
@@ -170,6 +170,24 @@ class ATACSeqAnalysis(Analysis):
         IOError
             If not permissive and a file is not found
         """
+        def fix_header(df):
+            cols = list()
+            for i in df.index[:300]:
+                try:
+                    df.loc[i, :].astype(float)
+                except ValueError:
+                    cols.append(i)
+            if len(cols) == 0:
+                pass
+            elif len(cols) == 1:
+                df.columns = df.loc[cols[0]]
+                df = df.loc[~df.index.isin(cols)]
+            else:
+                df.columns = pd.MultiIndex.from_arrays(df.loc[cols].values, names=cols)
+                df = df.loc[~df.index.isin(cols)]
+            df.index.name = None
+            return df.astype(float)
+
         if only_these_keys is None:
             only_these_keys = [
                 "matrix_raw", "matrix_norm", "matrix_features",
@@ -183,24 +201,6 @@ class ATACSeqAnalysis(Analysis):
                 "chrom_state_annotation_mapping", "chrom_state_annotation_b_mapping",
                 "stats", "differential_results"]
 
-        # Figure out how many levels of MultiIndex does the 'accessibility' dataframe has
-        if n_header_vars is None:
-            if hasattr(self, "sample_attributes"):
-                n_header_vars = len(self.sample_attributes)
-            else:
-                msg = "`n_header_vars` was not given and analysis does not have `sample_attributes`."
-                msg += " Cannot load `accessibility` attribute."
-                hint = " Other attributes loaded though."
-                if permissive:
-                    _LOGGER.warn(msg + hint)
-                    try:
-                        only_these_keys.pop(only_these_keys.index("accessibility"))
-                    except ValueError:
-                        pass
-                else:
-                    _LOGGER.error(msg + hint)
-                    raise ValueError(msg)
-
         prefix = os.path.join(self.results_dir, self.name)
         kwargs = {"index_col": 0}
         if output_mapping is None:
@@ -210,14 +210,10 @@ class ATACSeqAnalysis(Analysis):
                 "matrix_raw":
                     (prefix + ".matrix_raw.csv", kwargs),
                 "matrix_norm":
-                    (prefix + ".matrix_norm.csv", kwargs),
-                "matrix_norm":
                     (prefix + ".matrix_norm.csv",
-                        {"index_col": 0, "header": list(range(n_header_vars))
-                         if n_header_vars is not None else 'infer'}),
+                        {"index_col": 0, "header": None}),
                 "matrix_features":
                     (prefix + ".matrix_features.csv", kwargs),
-
                 "support":
                     (prefix + ".support.csv", kwargs),
                 "nuc":
@@ -254,6 +250,10 @@ class ATACSeqAnalysis(Analysis):
             _LOGGER.info("Loading '{}' analysis attribute.".format(name))
             try:
                 setattr(self, name, pd.read_csv(file, **kwargs))
+
+                # Fix possible multiindex for coverage_norm
+                if name == "coverage_norm":
+                    setattr(self, name, getattr(self, name))
             except IOError as e:
                 if not permissive:
                     raise e

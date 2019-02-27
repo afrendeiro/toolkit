@@ -60,9 +60,9 @@ class Analysis(object):
     Objects of this type can be used to store data (e.g. dataframes), variables
     (e.g. paths to files or configurations) and are easily serializable (saved
     to a file as an object) for rapid loading and cross-environment portability.
-    See the ``ngs_toolkit.general.Analysis.to_pickle``,
-    ``ngs_toolkit.general.Analysis.from_pickle`` and
-    ``ngs_toolkit.general.Analysis.update`` functions for this.
+    See the ``ngs_toolkit.analysis.Analysis.to_pickle``,
+    ``ngs_toolkit.analysis.Analysis.from_pickle`` and
+    ``ngs_toolkit.analysis.Analysis.update`` functions for this.
 
     Parameters
     ----------
@@ -95,6 +95,10 @@ class Analysis(object):
         Whether the analysis should be loaded from an existing
         serialized analysis object in ``pickle_file``.
         Defaults to False.
+
+    from_pep : str, optional
+        PEP configuration file to initialize analysis from.
+        Defaults to None.
 
     kwargs : dict, optional
         Additional keyword arguments will simply be stored as object attributes.
@@ -205,7 +209,7 @@ class Analysis(object):
         data_type : str
             Data type to check.
 
-        Parameters
+        Returns
         ----------
         bool
             Whether data_type is supported.
@@ -222,8 +226,12 @@ class Analysis(object):
         ----------
         data_type : str, optional
             Data type to check.
+
+        Returns
+        ----------
+        str
+            A supported data_type.
         """
-        # TODO: test
         if data_type is None:
             msg = "Data type not defined and Analysis object does not have"
             msg += " a `data_type` attribute."
@@ -254,7 +262,7 @@ class Analysis(object):
         attr : str
             An attribute of the analysis' samples to check existence of files.
 
-        f : function
+        f : function, optional
             Function to reduce output across samples.
             Defaults to `all`.
 
@@ -435,13 +443,6 @@ class Analysis(object):
             peppy.Project from given PEP configuration file.
         """
         self.prj = Project(pep_config)
-        # msg = "Provided PEP configuration file could not be read."
-        # try:
-        #     self.prj = Project(pep_config)
-        # except (KeyError, yaml.scanner.ScannerError):  # This is for a malformed yaml
-        #     # Does not cover a bad path: IsADirectoryError (Python3) and IOError (Python2)
-        #     _LOGGER.error(msg)
-        #     raise
 
     def update(self, pickle_file=None):
         """
@@ -451,7 +452,8 @@ class Analysis(object):
         Parameters
         ----------
         pickle_file : str, optional
-            Pickle file to load. By default this is the object"s attribute `pickle_file`.
+            Pickle file to load.
+            Defaults to the analysis' `pickle_file`.
         """
         self.__dict__.update(self.from_pickle(pickle_file=pickle_file).__dict__)
 
@@ -460,13 +462,11 @@ class Analysis(object):
         Attempt to derive the analysis' organism and genome assembly
         by inspecting the same attributes of its samples.
 
-
         Attributes
         ----------
         organism, genome : str
             Organism and genome assembly of the analysis
             if all samples agree in these attributes.
-
         """
         if self.samples is None:
             _LOGGER.warning("Genome assembly for analysis was not set and cannot be derived from samples.")
@@ -504,6 +504,10 @@ class Analysis(object):
         ----------
         overwrite : bool, optional
             Whether to overwrite attribute values if existing.
+            Defaults to True
+
+        subset_to_data_type : bool, optional
+            Whether to subset samples and comparison_table to entries of same data_type as analysis.
             Defaults to True
 
         Attributes
@@ -621,7 +625,7 @@ class Analysis(object):
 
         Parameters
         ----------
-        timestamp : bool
+        timestamp : bool, optional
             Whether to timestamp the file.
         """
         if timestamp:
@@ -640,6 +644,11 @@ class Analysis(object):
         pickle_file : str, optional
             Pickle file to load.
             By default this is the object"s attribute `pickle_file`.
+
+        Returns
+        -------
+        Analysis
+            The analysis serialized in the pickle file.
         """
         if pickle_file is None:
             pickle_file = self.pickle_file
@@ -652,7 +661,7 @@ class Analysis(object):
             organism=None, genome_assembly=None,
             output_dir=None, overwrite=False):
         """
-        Get genome annotations and other resources for several ngs_toolkit analysis.
+        Get genome-centric resources used by several `ngs_toolkit` analysis functions.
 
         Parameters
         ----------
@@ -740,28 +749,43 @@ class Analysis(object):
 
         Parameters
         ----------
-        matrix : str
+        matrix : str, optional
             Attribute name of matrix to normalize.
             Defaults to 'matrix_raw'.
 
-        samples : list
+        samples : list, optional
             Iterable of peppy.Sample objects to restrict matrix to.
-            If not provided (`None` is passed) the matrix will not be subsetted.
+            Defaults to all samples in matrix.
 
-        mult_factor : float
+        mult_factor : float, optional
             A constant to multiply values for.
+            Defaults to 1e6.
 
-        log_transform : bool
+        log_transform : bool, optional
             Whether to log transform values or not.
+            Defaults to True.
 
-        pseudocount : int|float
+        pseudocount : int|float, optional
             A constant to add to values.
+            Defaults to 1.
 
-        save : bool
+        save : bool, optional
             Whether to write normalized DataFrame to disk.
+            Defaults to True.
 
-        assign : bool
+        assign : bool, optional
             Whether to assign the normalized DataFrame to an attribute ``.
+            Defaults to True.
+
+        Attributes
+        ----------
+        matrix_norm : pd.DataFrame
+            If `assign` is True, a pandas DataFrame normalized with respective method.
+
+        Returns
+        -------
+        pd.DataFrame
+            Normalized pandas DataFrame.
         """
         to_norm = self.get_matrix(matrix=matrix, samples=samples)
         # apply normalization over total
@@ -796,26 +820,43 @@ class Analysis(object):
             Attribute name of matrix to normalize.
             Defaults to 'matrix_raw'.
 
-        samples : list
+        samples : list, optional
             Iterable of peppy.Sample objects to restrict matrix to.
-            If not provided (`None` is passed) the matrix will not be subsetted.
+            Defaults to all in matrix.
 
-        implementation : str
-            One of `"R"` or `"Python"`. Dictates which implementation is to be used.
+        implementation : str, optional
+            One of `"Python"` or `"R"`.
+            Dictates which implementation is to be used.
             The R implementation comes from the `preprocessCore` package,
             and the Python one is from https://github.com/ShawnLYU/Quantile_Normalize.
+            They give very similar results.
+            Default is "Python".
 
-        log_transform : bool
+        log_transform : bool, optional
             Whether to log transform values or not.
+            Default is True.
 
-        pseudocount : float
+        pseudocount : float, optional
             A constant to add before log transformation.
+            Default is 1.
 
-        save : bool
+        save : bool, optional
             Whether to write normalized DataFrame to disk.
+            Default is True.
 
-        assign : bool
+        assign : bool, optional
             Whether to assign the normalized DataFrame to an attribute `matrix_norm`.
+            Default is True.
+
+        Attributes
+        ----------
+        matrix_norm : pd.DataFrame
+            If `assign` is True, a pandas DataFrame normalized with respective method.
+
+        Returns
+        -------
+        pd.DataFrame
+            Normalized pandas DataFrame.
         """
         to_norm = self.get_matrix(matrix=matrix, samples=samples)
 
@@ -854,26 +895,29 @@ class Analysis(object):
 
         Parameters
         ----------
-        method : str
+        method : str, optional
             Normalization method to apply. One of:
              - `rpm`: Reads per million normalization (RPM).
              - `quantile`: Quantile normalization and log2 transformation.
              - `cqn`: Conditional quantile normalization (uses `cqn` R package).
-                      Only available for ATAC-seq.
+                      Not available for RNA-seq.
+            Defaults to "quantile".
 
-        matrix : str
+        matrix : str, optional
             Attribute name of matrix to normalize.
+            Defaults to "matrix_raw".
 
-        samples : list
+        samples : list, optional
             Iterable of peppy.Sample objects to restrict matrix to.
-            If not provided (`None` is passed) the matrix will not be subsetted.
+            Default is all samples in matrix.
 
-        save : bool
+        save : bool, optional
             Whether to write normalized DataFrame to disk.
+            Defaults to True.
 
         assign : bool
-            Whether to assign the normalized DataFrame to an attribute
-            (see variables below for each respective normalization type).
+            Whether to assign the result to "matrix_norm".
+            Defaults to True.
 
         Attributes
         ----------
@@ -892,7 +936,7 @@ class Analysis(object):
             return self.normalize_quantiles(
                 matrix=matrix, samples=samples, save=save, assign=assign)
         elif method == "cqn":
-            if self.data_type != "RNA-seq":
+            if self.data_type == "RNA-seq":
                 raise ValueError("Cannot use `cqn` normalization with this data_type: {}".format(self.data_type))
             return self.normalize_cqn(
                 matrix=matrix, samples=samples, save=save, assign=assign)
@@ -2966,10 +3010,6 @@ class Analysis(object):
 
         matrix = self.matrix_features
 
-        if data_type not in ["ATAC-seq", "RNA-seq"]:
-            msg = "Differential enrichment is only implemented for data types 'ATAC-seq' and 'RNA-seq'."
-            raise ValueError(msg)
-
         known = ["region", "lola", "meme", "homer", "enrichr"]
         if not all([x in known for x in steps]):
             _LOGGER.warning("Not all provided steps for enrichment are known! Proceeding anyway.")
@@ -2991,7 +3031,7 @@ class Analysis(object):
             ("lola", lola_enr, pd.read_csv, {"sep", "\t"}, "allEnrichments.tsv", ".lola.csv"),
             ("enrichr", pathway_enr, pd.read_csv, {"encoding": "utf-8"}, output_prefix + "_regions.enrichr.csv", ".enrichr.csv")]
 
-        if data_type == "RNA-seq":
+        if self.data_type == "RNA-seq":
             possible_steps = [x for x in possible_steps if x[0] == "enrichr"]
 
         # Examine each region cluster

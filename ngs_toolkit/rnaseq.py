@@ -43,67 +43,75 @@ class RNASeqAnalysis(Analysis):
             **kwargs)
 
         self.data_type = self.__data_type__ = "RNA-seq"
-        self.var_names = "gene"
+        self.var_unit_name = "gene"
         self.quantity = "expression"
         self.norm_units = "RPM"
-        self.raw_matrix_name = "count_matrix"
-        self.norm_matrix_name = "expression"
-        self.annot_matrix_name = "expression_annotated"
 
     def collect_bitseq_output(self, samples=None, permissive=True, expression_type="counts"):
         """
         Collect gene expression (read counts, transcript-level) output from Bitseq
         into expression matrix for `samples`.
         """
+        # TODO: drop support for legacy pipeline output and assume one input file with all required columns
+        # TODO: add support for RPKM
         if samples is None:
             samples = self.samples
 
-        first = True
+        if expression_type != "counts":
+            raise NotImplementedError("`expression_type` must be 'counts'!")
+
+        expr = list()
         for i, sample in enumerate(samples):
-            if first:
-                msg = "Sample {} is missing.".format(sample.name)
-                try:
-                    # read the "tr" file of one sample to get indexes
-                    tr = pd.read_csv(
-                        os.path.join(
-                            sample.paths.sample_root, "bowtie1_{}".format(sample.transcriptome),
-                            "bitSeq",
-                            sample.name + ".tr"),
-                        sep=" ", header=None, skiprows=1,
-                        names=["ensembl_gene_id", "ensembl_transcript_id", "v1", "v2"])
-                except IOError(msg) as e:
-                    if permissive:
-                        _LOGGER.warning(e)
-                    else:
-                        raise e
-                # add id index
-                tr.set_index("ensembl_gene_id", append=False, inplace=True)
-                tr.set_index("ensembl_transcript_id", append=True, inplace=True)
-                # create dataframe
-                expr = pd.DataFrame(index=tr.index)
-                first = False
+            _LOGGER.debug("Reading transcriptome files for sample '{}'.".format(sample.name))
+            tr_file = os.path.join(
+                sample.paths.sample_root, "bowtie1_{}".format(sample.transcriptome),
+                "bitSeq", sample.name + ".tr")
+            counts_file = os.path.join(
+                sample.paths.sample_root, "bowtie1_{}".format(sample.transcriptome),
+                "bitSeq", sample.name + ".counts")
 
-            # load counts
+            # read the "tr" file of one sample to get indexes
             try:
-                if expression_type == "counts":
-                    e = pd.read_csv(os.path.join(
-                            sample.paths.sample_root, "bowtie1_{}".format(sample.transcriptome),
-                            "bitSeq",
-                            sample.name + ".counts"), sep=" ")
-                elif expression_type == "rpkm":
-                    e = pd.read_csv(os.path.join(
-                            sample.paths.sample_root, "bowtie1_{}".format(sample.transcriptome),
-                            "bitSeq",
-                            sample.name + ".mean"), sep=" ", comment="#", header=None).iloc[:, 0]
-                else:
-                    raise ValueError("Argument 'expression_type' must be one of {counts, rpkm}")
+                tr = pd.read_csv(tr_file, sep=" ", header=None, skiprows=1,
+                                 names=["ensembl_gene_id", "ensembl_transcript_id", "v1", "v2"])
             except IOError:
-                _LOGGER.warning("Sample {} is missing.".format(sample.name))
-                continue
-            e.index = expr.index
+                msg = "Could not open file '{}'' is missing.".format(tr_file)
+                if permissive:
+                    _LOGGER.warning(msg)
+                    continue
+                else:
+                    raise
 
-            # Append
-            expr[sample.name] = e
+            # read the "counts" file of one sample to get indexes
+            try:
+                e = pd.read_csv(counts_file, sep=" ")
+            except IOError:
+                msg = "Could not open file '{}'' is missing.".format(counts_file)
+                if permissive:
+                    _LOGGER.warning(msg)
+                    continue
+                else:
+                    raise
+
+            e = tr.drop(['v1', 'v2'], axis=1).join(e)
+            e.loc[:, "sample_name"] = sample.name
+            expr.append(e)
+
+        if len(expr) == 0:
+            msg = "No sample had a valid expression file!"
+            if permissive:
+                _LOGGER.warning(msg)
+                return
+            else:
+                _LOGGER.error(msg)
+                raise IOError(msg)
+
+        expr = (
+            pd.concat(expr, axis=0, sort=False)
+            .melt(id_vars=['ensembl_gene_id', 'ensembl_transcript_id', 'sample_name'])
+            .pivot_table(index=['ensembl_gene_id', 'ensembl_transcript_id'],
+                         columns="sample_name", values="value", fill_value=0)
+            .astype(int, downcast=True))
 
         return expr
 
@@ -185,9 +193,11 @@ class RNASeqAnalysis(Analysis):
     #     return expr.sort_index()
 
     def get_gene_expression(
-            self, samples=None, sample_attributes=["sample_name"],
-            expression_type="counts",
-            genome_assembly="grch37", species="hsapiens", mul_factor=1e6):
+            self,
+            expression_type="counts", expression_level="gene",
+            samples=None, sample_attributes=None,
+            genome_assembly=None, species=None, pseudocount=1, mul_factor=1e6,
+            save=True, assign=True):
         """
         Collect gene expression (read counts, transcript level) for all samples,
         annotates ensembl IDs with gene names, reduces gene expression to gene-level,
@@ -211,65 +221,61 @@ class RNASeqAnalysis(Analysis):
         species : str
             Ensembl species name (e.g. "hsapiens", "mmusculus")
 
-        # TODO: Rewrite to have loop perform same transformations on transcript and gene-level quantifications
         # TODO: Save all matrices of both levels with clear, consistent naming
         # TODO: Declare saved files and outputs in docstring
+        # TODO: Pass correct organism, genome to query_biomart
         """
+        if expression_type != "counts":
+            raise NotImplementedError("`expression_type` must be 'counts'!")
+
+        if expression_level not in ["gene", "transcript"]:
+            raise NotImplementedError("`expression_level` must be one of 'gene' or 'transcript'!")
+
         if samples is None:
             samples = [s for s in self.samples if s.library == "RNA-seq"]
 
-        self.count_matrix = self.collect_bitseq_output(
+        if sample_attributes is None:
+            if hasattr(self, "sample_attributes"):
+                sample_attributes = self.sample_attributes
+
+        transcript_counts = self.collect_bitseq_output(
             samples=samples, expression_type=expression_type)
 
         # Map ensembl gene IDs to gene names
         mapping = query_biomart(attributes=["ensembl_transcript_id", "external_gene_name"])
+        mapping.columns = ["ensembl_transcript_id", "gene_name"]
 
-        # mapping['ensembl_transcript_id'] = mapping['ensembl_transcript_id'].str.replace("\..*", "")
-        self.count_matrix = self.count_matrix.reset_index(drop=True, level="ensembl_gene_id")
-        # self.count_matrix.index = self.count_matrix.index.str.replace("\..*", "")
+        # Join gene names to existing Ensembl
+        transcript_counts = transcript_counts.reset_index(drop=True, level="ensembl_gene_id")
+        transcript_counts = (
+            transcript_counts
+            .join(mapping.set_index("ensembl_transcript_id"))
+            .set_index(["gene_name"], append=True)
+            .sort_index(axis=0))
 
-        self.count_matrix = self.count_matrix.join(mapping.set_index("ensembl_transcript_id"))
-        self.count_matrix.to_csv(
-            os.path.join(self.results_dir, self.name + ".expression_{}.csv"
-                         .format(expression_type)), index=True)
+        gene_counts = transcript_counts.groupby("gene_name").max()
 
-        # Quantile normalize
-        self.matrix_qnorm = normalize_quantiles_p(
-            self.count_matrix.reset_index().drop(["ensembl_transcript_id", "gene_name"], axis=1))
-        self.matrix_qnorm.index = self.count_matrix.index
-
-        # Log2 TPM
-        # see if pseudocount has already been added
-        if self.matrix_qnorm.min().min() <= 0:
-            pseudocount = 1
-        else:
-            pseudocount = 0
-
-        self.matrix_qnorm_log = np.log2(
-            (pseudocount + self.matrix_qnorm) / self.matrix_qnorm.sum(axis=0)
-            * mul_factor)
-        self.matrix_qnorm_log.to_csv(
-            os.path.join(self.results_dir, self.name +
-                         ".expression_{}.transcript_level.quantile_normalized.log2_tpm.csv")
-            .format(expression_type, index=False))
-
-        # Reduce to gene-level measurements by max of transcripts
-        self.expression_matrix_counts = self.count_matrix.groupby("gene_name").max()
+        if expression_level == "gene":
+            matrix = gene_counts
+        elif expression_level == "transcript":
+            matrix = transcript_counts
 
         # Quantile normalize
-        self.expression_matrix_qnorm = normalize_quantiles_p(self.expression_matrix_counts)
-
+        matrix_qnorm = normalize_quantiles_p(matrix)
         # Log2 TPM
-        if self.expression_matrix_qnorm.min().min() <= 0:
-            pseudocount = 1
-        else:
+        # # make matrix non-negative
+        if matrix_qnorm.min().min() <= 0:
+            matrix_qnorm += np.absolute(matrix_qnorm.min().min())
+        # # for some reason bitSeq kind of already adds a pseudocount or something :/
+        # # so, if minimum is 1, we'll skip that
+        if matrix_qnorm.min().min() == 1:
             pseudocount = 0
-        self.expression = np.log2(
-            ((pseudocount + self.expression_matrix_qnorm) /
-                self.expression_matrix_qnorm.sum(axis=0)) * mul_factor)
+
+        # # Log2 transform
+        matrix_qnorm_log = np.log2(pseudocount + matrix_qnorm)
 
         # Annotate with sample metadata
-        _samples = [s for s in samples if s.name in self.expression.columns]
+        _samples = [s for s in samples if s.name in matrix_qnorm_log.columns]
         attrs = list()
         for attr in sample_attributes:
             ll = list()
@@ -282,27 +288,34 @@ class RNASeqAnalysis(Analysis):
 
         # Generate multiindex columns
         index = pd.MultiIndex.from_arrays(attrs, names=sample_attributes)
-        self.expression_annotated = self.expression[[s.name for s in _samples]]
-        self.expression_annotated.columns = index
+        expression_annotated = matrix_qnorm_log[[s.name for s in _samples]]
+        expression_annotated.columns = index
 
         # Save
-        self.expression_matrix_counts.to_csv(
-            os.path.join(
-                self.results_dir, self.name +
-                ".expression_counts.gene_level.csv"), index=True)
-        self.expression_matrix_qnorm.to_csv(
-            os.path.join(
-                self.results_dir, self.name +
-                ".expression_counts.gene_level.quantile_normalized.csv"), index=True)
-        self.expression.to_csv(
-            os.path.join(
-                self.results_dir, self.name +
-                ".expression_counts.gene_level.quantile_normalized.log2_tpm.csv"), index=True)
-        self.expression_annotated.to_csv(
-            os.path.join(
-                self.results_dir, self.name +
-                ".expression_counts.gene_level.quantile_normalized.log2_tpm.annotated_metadata.csv"),
-            index=True)
+        if assign:
+            self.transcript_counts = transcript_counts
+            self.gene_counts = gene_counts
+            self.expression = matrix_qnorm_log
+            self.expression_annotated = expression_annotated
+        if save:
+            transcript_counts.to_csv(
+                os.path.join(self.results_dir, self.name + ".expression_{}.transcript_level.csv"
+                             .format(expression_type)), index=True)
+            gene_counts.to_csv(
+                os.path.join(self.results_dir, self.name + ".expression_{}.gene_level.csv"
+                             .format(expression_type)), index=True)
+            matrix_qnorm_log.to_csv(
+                os.path.join(
+                    self.results_dir, self.name +
+                    ".expression_{}.{}_level.quantile_normalized.log2_tpm.csv"
+                    .format(expression_type, expression_level)),
+                index=True)
+            expression_annotated.to_csv(
+                os.path.join(
+                    self.results_dir, self.name +
+                    ".expression_{}.{}_level.quantile_normalized.log2_tpm.annotated_metadata.csv"
+                    .format(expression_type, expression_level)),
+                index=True)
 
     def plot_expression_characteristics(
             self,
@@ -592,14 +605,14 @@ def knockout_plot(
         bbox_inches="tight")
 
 
-def assess_cell_cycle(analysis, quant_matrix=None, output_dir=None, output_prefix="cell_cycle_assessment"):
+def assess_cell_cycle(analysis, matrix=None, output_dir=None, output_prefix="cell_cycle_assessment"):
     """
     Predict cell cycle phase from expression data.
 
     :param analysis: [description]
     :type analysis: [type]
-    :param quant_matrix: [description], defaults to None
-    :type quant_matrix: [type], optional
+    :param matrix: [description], defaults to None
+    :type matrix: [type], optional
     :param output_dir: [description], defaults to None
     :type output_dir: [type], optional
     :param output_prefix: [description], defaults to "cell_cycle_assessment"
@@ -610,16 +623,16 @@ def assess_cell_cycle(analysis, quant_matrix=None, output_dir=None, output_prefi
     import anndata
     import scanpy.api as sc
 
-    if quant_matrix is None:
-        quant_matrix = analysis.expression
+    if matrix is None:
+        matrix = analysis.expression
 
-    # quant_matrix = pd.read_csv(os.path.join(
+    # matrix = pd.read_csv(os.path.join(
     #         "results",
     #         "arid1a_rnaseq.expression_counts.gene_level.quantile_normalized.log2_tpm.csv"),
     #     index_col=0)
     exp_z = pd.DataFrame(
-        zscore(quant_matrix, axis=0),
-        index=quant_matrix.index, columns=quant_matrix.columns)
+        zscore(matrix, axis=0),
+        index=matrix.index, columns=matrix.columns)
 
     # Score samples for cell cycle
     cl = "https://raw.githubusercontent.com/theislab/scanpy_usage/master/"
@@ -627,7 +640,7 @@ def assess_cell_cycle(analysis, quant_matrix=None, output_dir=None, output_prefi
     cc_prots = pd.read_csv(cl, header=None).squeeze()
     s_genes = cc_prots[:43].tolist()
     g2m_genes = cc_prots[43:].tolist()
-    cc_prots = [x for x in cc_prots if x in quant_matrix.index.tolist()]
+    cc_prots = [x for x in cc_prots if x in matrix.index.tolist()]
 
     knockout_plot(
         knockout_genes=cc_prots,

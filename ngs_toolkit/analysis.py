@@ -115,28 +115,12 @@ class Analysis(object):
             from_pickle=False,
             from_pep=False,
             **kwargs):
-        # parse kwargs with default
-        if root_dir is None:
-            self.root_dir = os.curdir
-        self.root_dir = os.path.abspath(self.root_dir)
-
-        # # if given absolute paths, keep them, otherwise append to root directory
-        for dir_, attr in [(data_dir, "data_dir"), (results_dir, "results_dir")]:
-            if not os.path.isabs(dir_):
-                setattr(self, attr, os.path.join(self.root_dir, dir_))
-            else:
-                setattr(self, attr, dir_)
-
         self.samples = samples
         self.prj = prj
         self.pickle_file = pickle_file
         self.raw_matrix_name = "matrix_raw"
         self.norm_matrix_name = "matrix_norm"
         self.feature_matrix_name = "matrix_features"
-
-        # parse remaining kwargs
-        _LOGGER.debug("Adding additional kwargs to analysis object.")
-        self.__dict__.update(kwargs)
 
         _LOGGER.debug("Setting data type-specific attributes to None.")
         attrs = [
@@ -150,28 +134,14 @@ class Analysis(object):
         # Generate from PEP configuration file
         if from_pep is not False:
             self.from_pep(from_pep)
-            if name is None:
-                if hasattr(getattr(self, "prj"), "name"):
-                    if getattr(getattr(self, "prj"), "name") is not None:
-                        self.name = getattr(getattr(self, "prj"), "name")
-                        _LOGGER.info("Setting Project's name as the analysis's name: '{}'.".format(self.name))
-        self.name = "analysis" if name is None else name
-
-        # Set default location for the pickle
-        if self.pickle_file is None:
-            self.pickle_file = os.path.join(results_dir, "{}.pickle".format(self.name))
-        # reload itself if required
-        if from_pickle:
-            _LOGGER.info("Updating analysis object from pickle file: '{}'.".format(self.pickle_file))
-            self.update(pickle_file=self.pickle_file)
-
-        for directory in [self.data_dir, self.results_dir]:
-            if not os.path.exists(directory):
-                os.makedirs(directory)
 
         # Store projects attributes in self
         _LOGGER.debug("Trying to set analysis attributes.")
         self.set_project_attributes(overwrite=False)
+
+        # Get name
+        if not hasattr(self, "name"):
+            self.name = "analysis" if name is None else name
 
         # Try to set genome if not set
         self.organism, self.genome = (None, None)
@@ -182,6 +152,41 @@ class Analysis(object):
         # Add sample input file locations
         _LOGGER.debug("Trying to set sample input file attributes.")
         self.set_samples_input_files()
+
+        # Set default location for the pickle
+        if self.pickle_file is None:
+            self.pickle_file = os.path.join(results_dir, self.name + ".pickle")
+        # reload itself if required
+        if from_pickle:
+            _LOGGER.info("Updating analysis object from pickle file: '{}'."
+                         .format(self.pickle_file))
+            self.update(pickle_file=self.pickle_file)
+
+        if not hasattr(self, "root_dir"):
+            if root_dir is None:
+                self.root_dir = os.curdir
+            else:
+                self.root_dir = root_dir
+        self.root_dir = os.path.abspath(self.root_dir)
+
+        # # if given absolute paths, keep them, otherwise append to root directory
+        for dir_, attr in [(data_dir, "data_dir"), (results_dir, "results_dir")]:
+            if not os.path.isabs(dir_):
+                setattr(self, attr, os.path.join(self.root_dir, dir_))
+            else:
+                setattr(self, attr, dir_)
+
+        for directory in [self.data_dir, self.results_dir]:
+            if not os.path.exists(directory):
+                try:
+                    os.makedirs(directory)
+                except OSError:
+                    _LOGGER.debug("Could not make directory for Analysis: '{}'".format(directory))
+                    pass
+
+        # parse remaining kwargs
+        _LOGGER.debug("Adding additional kwargs to analysis object.")
+        self.__dict__.update(kwargs)
 
     def __repr__(self):
         t = "'{}' analysis".format(self.data_type) if self.data_type is not None else "Analysis"
@@ -525,7 +530,9 @@ class Analysis(object):
         hint = " Adding a '{}' section to your project configuration file allows the analysis"
         hint += " object to use those attributes during the analysis."
         if self.prj is not None:
+            self.prj.root_dir = self.prj.output_dir
             for attr, parent in [
+                    ("name", self.prj), ("root_dir", self.prj),
                     ("samples", self.prj), ("sample_attributes", self.prj),
                     ("group_attributes", self.prj), ("comparison_table", self.prj.metadata)]:
                 if not hasattr(parent, attr):
@@ -728,8 +735,8 @@ class Analysis(object):
             try:
                 setattr(self, name, pd.read_csv(file, **kwargs))
 
-                # Fix possible multiindex for coverage_norm
-                if name == "coverage_norm":
+                # Fix possible multiindex for matrix_norm
+                if name == "matrix_norm":
                     setattr(self, name, fix_dataframe_header(getattr(self, name)))
             except IOError as e:
                 if not permissive:
@@ -972,7 +979,135 @@ class Analysis(object):
 
         return matrix_norm
 
-    def normalize(self, method="quantile", matrix="matrix_raw", samples=None, save=True, assign=True):
+    def normalize_median(
+            self, matrix="matrix_raw",
+            samples=None, function=np.nanmedian, fillna=True,
+            save=True, assign=True):
+        """
+        Normalization of matrices of (n_features, n_samples)
+        by subtracting the median from each sample/feature.
+        Most appopriate for CNV data.
+
+        Parameters
+        ----------
+        matrix : str, optional
+            Attribute name of dictionary of matrices to normalize.
+            Defaults to `matrix_raw`.
+
+        samples : list, optional
+            Samples to restrict analysis to.
+            Defaults to samples in Analysis object.
+
+        function : function, optional
+            An alternative function to calculate across samples. Data will be subtracted by this.
+            Defaults to numpy.nanmedian
+
+        fillna : bool, optional
+            Whether to fill NaN with zero.
+            Defaults to True
+
+        save : bool, optional
+            Whether results should be saved to disc.
+            Defaults to True
+
+        assign : bool, optional
+            Whether results should be assigned to Analysis object.
+            Defaults to True
+
+        Attributes
+        ----------
+        matrix_norm : pd.DataFrame
+            If `assign` is True, a pandas DataFrame normalized with respective method.
+
+        Returns
+        -------
+        pd.DataFrame
+            Normalized pandas DataFrame.
+        """
+        matrix = self.get_matrix(matrix, samples=samples)
+
+        matrix_norm = dict()
+
+        to_norm = self.get_matrix(matrix=matrix, samples=samples)
+        matrix_norm = (to_norm.T - function(to_norm, axis=1)).T
+        if fillna:
+            matrix_norm = matrix_norm.fillna(0)
+        if save:
+            matrix_norm.to_csv(os.path.join(
+                self.results_dir, self.name + ".matrix_norm.csv"), index=True)
+        if assign:
+            self.matrix_norm = matrix_norm
+            self.norm_method = "median"
+
+        return matrix_norm
+
+    def normalize_pca(
+            self,
+            pc,
+            matrix="matrix_raw", samples=None,
+            save=True, assign=True):
+        """
+        Normalization of a matrix by subtracting the
+        contribution of Principal Component `pc` from each sample/feature.
+
+        Parameters
+        ----------
+        pc : int
+            Principal Component to remove. 1-based.
+
+        matrix : str, optional
+            Attribute name of dictionary of matrices to normalize.
+            Defaults to `matrix_raw`.
+
+        samples : list, optional
+            Samples to restrict analysis to.
+            Defaults to all samples.
+
+        save : bool, optional
+            Whether results should be saved to disc.
+            Defaults to True
+
+        assign : bool, optional
+            Whether results should be assigned to Analysis object.
+            Defaults to True
+
+        Attributes
+        ----------
+        matrix_norm : pd.DataFrame
+            If `assign` is True, a pandas DataFrame normalized with respective method.
+
+        Returns
+        -------
+        pd.DataFrame
+            Normalized pandas DataFrame.
+        """
+        from ngs_toolkit.general import subtract_principal_component
+        if pc is None:
+            raise ValueError("Principal Component to remove must be specified!")
+
+        matrix = self.get_matrix(matrix, samples=samples)
+
+        # first make sure data is centered
+        to_norm = self.normalize_median(
+            matrix, samples=samples, save=False, assign=False)
+        # then remove the PC
+        matrix_norm = subtract_principal_component(to_norm.T.fillna(0), pc=pc).T
+
+        if save:
+            matrix_norm.to_csv(os.path.join(
+                    self.results_dir, self.name + ".matrix_norm.csv"), index=True)
+        if assign:
+            self.matrix_norm = matrix_norm
+            self.norm_method = "pca"
+
+        return matrix_norm
+
+    def normalize(
+            self,
+            method="quantile",
+            matrix="matrix_raw", samples=None,
+            save=True, assign=True,
+            **kwargs):
         """
         Normalization of matrix of (n_features, n_samples).
 
@@ -984,6 +1119,10 @@ class Analysis(object):
              - `quantile`: Quantile normalization and log2 transformation.
              - `cqn`: Conditional quantile normalization (uses `cqn` R package).
                       Not available for RNA-seq.
+             - `median`: Substraction of median per feature.
+                      Only useful for CNV.
+             - `pca`: Subtraction of Principal Component from matrix.
+                      Requires which PC to subtract. `pc` must be passed as kwarg.
             Defaults to "quantile".
 
         matrix : str, optional
@@ -1023,6 +1162,14 @@ class Analysis(object):
                 raise ValueError("Cannot use `cqn` normalization with this data_type: {}".format(self.data_type))
             return self.normalize_cqn(
                 matrix=matrix, samples=samples, save=save, assign=assign)
+        elif method == "median":
+            return self.normalize_median(
+                matrix=matrix, samples=samples, save=save, assign=assign)
+        elif method == "pca":
+            if "pc" not in kwargs:
+                raise ValueError("`pca` normalization requires `pc` as kwarg")
+            return self.normalize_pca(
+                matrix=matrix, samples=samples, save=save, assign=assign, pc=kwargs["pc"])
         else:
             msg = "Requested normalization method is not available!"
             _LOGGER.error(msg)
@@ -1441,15 +1588,15 @@ class Analysis(object):
         color_dataframe = color_dataframe[[s.name for s in samples]]
 
         # All regions, matching samples (provided samples in matrix)
-        X = matrix.loc[:, matrix.columns.get_level_values("sample_name").isin([s.name for s in samples])]
+        x = matrix.loc[:, matrix.columns.get_level_values("sample_name").isin([s.name for s in samples])]
 
-        if isinstance(X.columns, pd.MultiIndex):
-            sample_display_names = X.columns.get_level_values("sample_name")
+        if isinstance(x.columns, pd.MultiIndex):
+            sample_display_names = x.columns.get_level_values("sample_name")
         else:
-            sample_display_names = X.columns
+            sample_display_names = x.columns
         # TODO: Re-implement to accomodate multiindex
         # if prettier_sample_names:
-        #     X.columns = (
+        #     x.columns = (
         #         color_dataframe.columns
         #         .str.replace("ATAC-seq_", "")
         #         .str.replace("RNA-seq_", "")
@@ -1460,9 +1607,9 @@ class Analysis(object):
             for method in ["pearson", "spearman"]:
                 _LOGGER.info("Plotting pairwise correlation with '{}' metric.".format(method))
                 g = sns.clustermap(
-                    X.astype(float).corr(method),
+                    x.astype(float).corr(method),
                     xticklabels=False, yticklabels=sample_display_names, annot=display_corr_values,
-                    cmap="Spectral_r", figsize=(0.2 * X.shape[1], 0.2 * X.shape[1]),
+                    cmap="Spectral_r", figsize=(0.2 * x.shape[1], 0.2 * x.shape[1]),
                     cbar_kws={"label": "{} correlation".format(method.capitalize())},
                     row_colors=color_dataframe.T, col_colors=color_dataframe.T)
                 g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small")
@@ -1474,7 +1621,7 @@ class Analysis(object):
 
         if standardize_matrix:
             std = StandardScaler()
-            X = pd.DataFrame(std.fit_transform(X.T).T, index=X.index, columns=X.columns)
+            x = pd.DataFrame(std.fit_transform(x.T).T, index=x.index, columns=x.columns)
 
         if "manifold" in steps:
             # Manifolds
@@ -1493,13 +1640,13 @@ class Analysis(object):
 
                 manif = getattr(manifold, algo)(**params[algo])
                 try:
-                    x_new = manif.fit_transform(X.T)
+                    x_new = manif.fit_transform(x.T)
                 except (TypeError, ValueError):
                     hint = " Number of samples might be too small to perform '{}'".format(algo)
                     _LOGGER.error(msg + " failed!" + hint)
                     continue
 
-                x_new = pd.DataFrame(x_new, index=X.columns, columns=list(range(x_new.shape[1])))
+                x_new = pd.DataFrame(x_new, index=x.columns, columns=list(range(x_new.shape[1])))
 
                 _LOGGER.info("Plotting projection of manifold with '{}' algorithm.".format(algo))
                 plot_projection(
@@ -1511,17 +1658,17 @@ class Analysis(object):
 
         if "pca" in steps:
             # PCA
-            pcs = min(*X.shape) - 1
+            pcs = min(*x.shape) - 1
             _LOGGER.info("Decomposing data with 'PCA' algorithm for {} dimensions.".format(pcs))
             pca = PCA(n_components=pcs, svd_solver="arpack")
-            x_new = pca.fit_transform(X.T)
+            x_new = pca.fit_transform(x.T)
 
             pcs_order = range(pca.n_components_)
-            x_new = pd.DataFrame(x_new, index=X.columns, columns=pcs_order)
+            x_new = pd.DataFrame(x_new, index=x.columns, columns=pcs_order)
             x_new.to_csv(
                 os.path.join(output_dir, "{}.{}.pca.fit.csv".format(
                     self.name, plot_prefix)))
-            comps = pd.DataFrame(pca.components_.T, index=X.index, columns=pcs_order)
+            comps = pd.DataFrame(pca.components_.T, index=x.index, columns=pcs_order)
             comps.to_csv(
                 os.path.join(output_dir, "{}.{}.pca.loadings.csv".format(
                     self.name, plot_prefix)))

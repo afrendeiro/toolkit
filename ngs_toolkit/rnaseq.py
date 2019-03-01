@@ -22,7 +22,7 @@ class RNASeqAnalysis(Analysis):
     """
     def __init__(
             self,
-            name="analysis",
+            name=None,
             samples=None,
             prj=None,
             data_dir="data",
@@ -31,6 +31,12 @@ class RNASeqAnalysis(Analysis):
             from_pickle=False,
             pep=False,
             **kwargs):
+
+        self.data_type = self.__data_type__ = "RNA-seq"
+        self.var_unit_name = "gene"
+        self.quantity = "expression"
+        self.norm_units = "RPM"
+
         super(RNASeqAnalysis, self).__init__(
             name=name,
             data_dir=data_dir,
@@ -41,11 +47,6 @@ class RNASeqAnalysis(Analysis):
             from_pickle=from_pickle,
             pep=pep,
             **kwargs)
-
-        self.data_type = self.__data_type__ = "RNA-seq"
-        self.var_unit_name = "gene"
-        self.quantity = "expression"
-        self.norm_units = "RPM"
 
     def collect_bitseq_output(self, samples=None, permissive=True, expression_type="counts"):
         """

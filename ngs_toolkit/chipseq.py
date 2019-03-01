@@ -22,7 +22,7 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
     """
     def __init__(
             self,
-            name="analysis",
+            name=None,
             samples=None,
             prj=None,
             data_dir="data",
@@ -31,6 +31,12 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
             from_pickle=False,
             pep=False,
             **kwargs):
+
+        self.data_type = self.__data_type__ = "ChIP-seq"
+        self.var_names = "region"
+        self.quantity = "binding"
+        self.norm_units = "RPM"
+
         super(ChIPSeqAnalysis, self).__init__(
             name=name,
             data_dir=data_dir,
@@ -41,16 +47,6 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
             from_pickle=from_pickle,
             pep=pep,
             **kwargs)
-
-        self.data_type = self.__data_type__ = "ChIP-seq"
-        self.var_names = "region"
-        self.quantity = "binding"
-        self.norm_units = "RPM"
-        self.raw_matrix_name = "coverage"
-        self.norm_matrix_name = "coverage_qnorm"  # or coverage_gc_corrected
-        # TODO: have normalization method reset the above value, with info to user
-        # or just overwrite
-        self.annot_matrix_name = "binding"
 
     def call_peaks_from_comparisons(
             self, comparison_table, output_dir="{results_dir}/chipseq_peaks",

@@ -105,7 +105,7 @@ class ATACSeqAnalysis(Analysis):
     """
     def __init__(
             self,
-            name="atacseq_analysis",
+            name=None,
             samples=None,
             prj=None,
             data_dir="data",
@@ -114,6 +114,12 @@ class ATACSeqAnalysis(Analysis):
             from_pickle=False,
             from_pep=False,
             **kwargs):
+
+        self.data_type = self.__data_type__ = "ATAC-seq"
+        self.var_unit_name = "region"
+        self.quantity = "accessibility"
+        self.norm_units = "RPM"
+
         super(ATACSeqAnalysis, self).__init__(
             name=name,
             data_dir=data_dir,
@@ -124,11 +130,6 @@ class ATACSeqAnalysis(Analysis):
             from_pickle=from_pickle,
             from_pep=from_pep,
             **kwargs)
-
-        self.data_type = self.__data_type__ = "ATAC-seq"
-        self.var_unit_name = "region"
-        self.quantity = "accessibility"
-        self.norm_units = "RPM"
 
     def load_data(
             self,
@@ -183,6 +184,8 @@ class ATACSeqAnalysis(Analysis):
         if output_map is None:
             kwargs = {"index_col": 0}
             output_map = {
+                "sites":
+                    (prefix + ".peak_set.bed", {}),
                 "matrix_raw":
                     (prefix + ".matrix_raw.csv", kwargs),
                 "matrix_norm":
@@ -226,7 +229,7 @@ class ATACSeqAnalysis(Analysis):
         # Use the parent method just with an updated output_map dictionary
         Analysis.load_data(
             self,
-            output_map=output_map,
+            output_map={k: v for k, v in output_map.items() if k != "sites"},
             only_these_keys=only_these_keys,
             prefix=prefix, permissive=permissive)
 

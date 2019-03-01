@@ -19,19 +19,89 @@ from tqdm import tqdm
 class CNVAnalysis(Analysis):
     """
     Class to model analysis of CNV data.
+    Inherits from the `ngs_toolkit.general.Analysis` class.
+
+    Parameters
+    ----------
+    name : str, optional
+        Name to give analysis object.
+        Default is ``analysis`` or if ``from_pep`` the name of the PEP.
+
+    samples : list, optional
+        Iterable of peppy.Sample objects use in analysis.
+        Default is samples from PEP if ``from_pep``, otherwise an empty list.
+
+    prj : peppy.Project, optional
+        Project to tie analysis to.
+        Default is the PEP project if ``from_pep``, otherwise None.
+
+    data_dir : str, optional
+        Directory containing relevant data for analysis.
+        Default is `data`.
+
+    results_dir : str, optional
+        Directory to output relevant analysis results.
+        Default is `results`.
+
+    pickle_file : str, optional
+        File path to use to save serialized object in `pickle` format.
+        Default is "{results_dir}/{name}.pickle"
+
+    from_pickle : bool, optional
+        If the analysis should be loaded from an existing pickle object.
+        Default is `False.
+
+    from_pep : str, optional
+        PEP configuration file to initialize analysis from.
+        Defaults to None.
+
+    kwargs : dict, optional
+        Additional keyword arguments will be passed to parent class `ngs_toolkit.analysis.Analysis`.
+
+    :Example:
+
+    .. code-block:: python
+        from ngs_toolkit.cnv import CNVAnalysis
+
+        pep = "metadata/project_config.yaml"
+        a = CNVAnalysis(from_pep=pep)
+
+        # Get consensus peak set from all samples
+        a.get_cnv_data()
+
+        # Normalize
+        a.normalize(method="median")
+
+        # Segmentation
+        a.segment_genome()
+
+        # General plots
+        a.plot_all_data()
+        a.plot_segmentation_stats()
+
+        # Unsupervised analysis
+        a.unsupervised_analysis()
+
+        # Save object
+        a.to_pickle()
     """
     def __init__(
             self,
-            name="analysis",
+            name=None,
             samples=None,
             prj=None,
             data_dir="data",
             results_dir="results",
             pickle_file=None,
             from_pickle=False,
-            resolutions=['1000kb', '100kb', '20kb', '10kb'],
             pep=False,
             **kwargs):
+
+        self.data_type = self.__data_type__ = "CNV"
+        self.var_unit_name = "bin"
+        self.quantity = "copy_number"
+        self.norm_units = "log2(ratio)"
+
         super(CNVAnalysis, self).__init__(
             name=name,
             data_dir=data_dir,
@@ -43,12 +113,8 @@ class CNVAnalysis(Analysis):
             pep=pep,
             **kwargs)
 
-        self.data_type = self.__data_type__ = "CNV"
-        self.var_unit_name = "bin"
-        self.quantity = "copy_number"
-        self.norm_units = "log2(ratio)"
-
-        self.resolutions = resolutions
+        if not hasattr(self, "resolutions"):
+            self.resolutions = ['1000kb', '100kb', '20kb', '10kb'],
 
     def load_data(
             self,
@@ -122,8 +188,8 @@ class CNVAnalysis(Analysis):
                     setattr(self, name, {})
                 try:
                     getattr(self, name)[resolution] = pd.read_csv(file, **kwargs)
-                    # Fix possible multiindex for coverage_norm
-                    if name == "coverage_norm":
+                    # Fix possible multiindex for matrix_norm
+                    if name == "matrix_norm":
                         getattr(self, name)[resolution] = fix_dataframe_header(getattr(self, name)[resolution])
                 except IOError as e:
                     if not permissive:
@@ -170,8 +236,8 @@ class CNVAnalysis(Analysis):
 
         Attributes
         ----------
-        coverage : dict
-            Sets a `coverage` dictionary with CNV matrices for each resolution.
+        matrix : dict
+            Sets a `matrix` dictionary with CNV matrices for each resolution.
         """
         if resolutions is None:
             resolutions = self.resolutions
@@ -179,10 +245,10 @@ class CNVAnalysis(Analysis):
         if samples is None:
             samples = self.samples
 
-        coverage = dict()
+        matrix = dict()
 
         for resolution in tqdm(resolutions, total=len(resolutions), desc="Resolution"):
-            coverage[resolution] = pd.DataFrame()
+            matrix[resolution] = pd.DataFrame()
 
             for sample in tqdm(samples, total=len(samples), desc="Sample"):
                 # Read log2 file
@@ -208,178 +274,34 @@ class CNVAnalysis(Analysis):
                     .str.replace(".merged.sorted.subsample.bam", ""))
 
                 # normalize signal to control
-                coverage[resolution][sample.name] = (
+                matrix[resolution][sample.name] = (
                     np.log2(((0.1 + (2 ** cov.loc[:, sample.name])) /
                              (0.1 + (2 ** cov.iloc[:, -1]))))
                 )
 
-            coverage[resolution].index = (
+            matrix[resolution].index = (
                 cov['Chromosome'] + ":" +
                 cov['Start'].astype(int).astype(str) + "-" +
                 cov['End'].astype(int).astype(str))
-            coverage[resolution].index.name = "index"
+            matrix[resolution].index.name = "index"
 
             if save:
-                coverage[resolution].to_csv(
-                    os.path.join(self.results_dir, self.name + "{}.raw_coverage.csv".format(
+                matrix[resolution].to_csv(
+                    os.path.join(self.results_dir, self.name + "{}.matrix_raw.csv".format(
                         resolution)),
                     index=True)
 
         if assign:
-            self.coverage = coverage
+            self.matrix = matrix
 
-        return coverage
-
-    def normalize_median(
-            self, matrix=None, resolutions=None,
-            samples=None, function=np.nanmedian, fillna=True,
-            save=True, assign=True):
-        """
-        Normalization of matrices of (n_features, n_samples) by subtracting the
-        median from each sample/feature.
-
-        Parameters
-        ----------
-        matrix : str, optional
-            Attribute name of dictionary of matrices to normalize.
-            Defaults to `coverage`.
-
-        resolutions : list, optional
-            Resolutions of analysis.
-            Defaults to resolutions in Analysis object.
-
-        samples : list, optional
-            Samples to restrict analysis to.
-            Defaults to samples in Analysis object.
-
-        function : function, optional
-            An alternative function to calculate across samples. Data will be subtracted by this.
-            Defaults to numpy.nanmedian
-
-        fillna : bool, optional
-            Whether to fill NaN with zero.
-            Defaults to True
-
-        save : bool, optional
-            Whether results should be saved to disc.
-            Defaults to True
-
-        assign : bool, optional
-            Whether results should be assigned to an attribute in the Analsyis object.
-            Defaults to True
-
-        Returns
-        -------
-        dict
-            Dictionary with normalized CNV matrices for each resolution.
-
-        Attributes
-        ----------
-        coverage_norm : dict
-            Sets a `coverage_norm` dictionary with CNV matrices for each resolution.
-        """
-        if matrix is None:
-            matrix = self.coverage
-        if resolutions is None:
-            resolutions = self.resolutions
-        if samples is None:
-            samples = self.samples
-
-        coverage_norm = dict()
-        for resolution in tqdm(resolutions, desc="Resolution"):
-            to_norm = matrix[resolution].loc[
-                :, [s.name for s in samples if s.name in matrix[resolution].columns]]
-            coverage_norm[resolution] = (to_norm.T - function(to_norm, axis=1)).T
-            if fillna:
-                coverage_norm[resolution] = coverage_norm[resolution].fillna(0)
-            if save:
-                coverage_norm[resolution].to_csv(
-                    os.path.join(
-                        self.results_dir,
-                        self.name + "{}.coverage_median.csv".format(resolution)),
-                    index=True)
-        if assign:
-            self.coverage_norm = coverage_norm
-
-        return coverage_norm
-
-    def normalize_pca(
-            self, pc,
-            matrix=None, resolutions=None, samples=None,
-            save=True, assign=True):
-        """
-        Normalization of matrices of (n_features, n_samples) by subtracting the
-        contribution of a Principal Component from each sample/feature.
-
-        Parameters
-        ----------
-        pc : int
-            Principal Component to remove. 1-based.
-
-        matrix : str, optional
-            Attribute name of dictionary of matrices to normalize.
-            Defaults to `coverage`.
-
-        resolutions : list, optional
-            Resolutions of analysis.
-            Defaults to resolutions in Analysis object.
-
-        samples : list, optional
-            Samples to restrict analysis to.
-            Defaults to samples in Analysis object.
-
-        save : bool, optional
-            Whether results should be saved to disc.
-            Defaults to True
-
-        assign : bool, optional
-            Whether results should be assigned to an attribute in the Analsyis object.
-            Defaults to True
-
-        Returns
-        -------
-        dict
-            Dictionary with normalized CNV matrices for each resolution.
-
-        Attributes
-        ----------
-        coverage_norm : dict
-            Sets a `coverage_norm` dictionary with CNV matrices for each resolution.
-        """
-        if pc is None:
-            raise ValueError("Principal Component to remove must be specified!")
-
-        if matrix is None:
-            matrix = self.coverage
-        if resolutions is None:
-            resolutions = self.resolutions
-        if samples is None:
-            samples = self.samples
-
-        # first make sure data is centered
-        to_norm = self.normalize_median(
-            matrix, resolutions=resolutions, samples=samples, save=False, assign=False)
-
-        coverage_norm = dict()
-        for resolution in tqdm(resolutions, desc="Resolution"):
-            # then remove the PC
-            coverage_norm[resolution] = subtract_principal_component(
-                to_norm[resolution].T.fillna(0), pc=pc).T
-
-            if save:
-                coverage_norm[resolution].to_csv(
-                    os.path.join(
-                        self.results_dir,
-                        self.name + "{}.coverage_pcanorm.csv".format(resolution)),
-                    index=True)
-        if assign:
-            self.coverage_norm = coverage_norm
-
-        return coverage_norm
+        return matrix
 
     def normalize(
-            self, resolutions=None, method="median",
-            pc=None, matrix=None, samples=None, save=True, assign=True):
+            self,
+            method="median",
+            matrix="matrix_raw", samples=None,
+            save=True, assign=True,
+            **kwargs):
         """
         Normalization of dictionary of matrices with (n_features, n_samples).
 
@@ -400,7 +322,7 @@ class CNVAnalysis(Analysis):
 
         matrix : str, optional
             Attribute name of dictionary of matrices to normalize.
-            Defaults to `coverage`.
+            Defaults to `matrix_raw`.
 
         samples : list
             Iterable of peppy.Sample objects to restrict matrix to.
@@ -414,6 +336,9 @@ class CNVAnalysis(Analysis):
             Whether results should be assigned to an attribute in the Analsyis object.
             Defaults to True
 
+        kwargs : dict, optional
+            Additional kwargs are passed to the respective normalization method.
+
         Returns
         -------
         dict
@@ -421,21 +346,41 @@ class CNVAnalysis(Analysis):
 
         Attributes
         ----------
-        coverage_norm : dict
-            Sets a `coverage_norm` dictionary with CNV matrices for each resolution.
+        matrix_norm : dict
+            Sets a `matrix_norm` dictionary with CNV matrices for each resolution.
         """
-        if method == "median":
-            return self.normalize_median(
-                matrix=matrix, resolutions=resolutions, samples=samples,
-                save=save, assign=assign)
-        elif method == "pca":
-            if pc is None:
-                raise ValueError("If method is 'pca', the value of 'pc' must be given.")
-            return self.normalize_pca(
-                matrix=matrix, resolutions=resolutions, samples=samples, pc=pc,
-                save=save, assign=assign)
-        else:
-            raise ValueError("Requested method '{}' is not known.".format(method))
+        matrix_norm = dict()
+        if "resolutions" not in kwargs:
+            resolutions = self.resolutions
+
+        if matrix is None:
+            matrix = self.matrix_raw
+
+        for resolution in resolutions:
+            if method == "median":
+                matrix_norm[resolution] = self.normalize_median(
+                    matrix=matrix[resolution],
+                    samples=samples,
+                    save=False, assign=False)
+            elif method == "pca":
+                if "pc" not in kwargs:
+                    raise ValueError("If method is 'pca', the value of 'pc' must be given.")
+                matrix_norm[resolution] = self.normalize_pca(
+                    matrix=matrix[resolution],
+                    samples=samples, pc=kwargs["pc"],
+                    save=False, assign=False)
+            else:
+                raise ValueError("Requested method '{}' is not known.".format(method))
+
+            if save:
+                matrix_norm[resolution].to_csv(
+                    os.path.join(
+                        self.results_dir,
+                        self.name + "{}.matrix_norm.csv".format),
+                    index=True).to_csv(os.path.join(self.results_dir))
+        if assign:
+            self.matrix_norm = matrix_norm
+        return matrix_norm
 
     def plot_all_data(
             self, matrix=None, resolutions=None, samples=None,
@@ -451,7 +396,7 @@ class CNVAnalysis(Analysis):
         ----------
         matrix : str, optional
             Attribute name of dictionary of matrices to normalize.
-            Defaults to `coverage_norm`.
+            Defaults to `matrix_norm`.
 
         resolutions : list, optional
             Resolutions of analysis.
@@ -494,7 +439,7 @@ class CNVAnalysis(Analysis):
         """
         # TODO: add support for group colours
         if matrix is None:
-            matrix = self.coverage_norm
+            matrix = self.matrix_norm
         if resolutions is None:
             resolutions = self.resolutions
         if samples is None:
@@ -540,7 +485,7 @@ class CNVAnalysis(Analysis):
                 bbox_inches="tight", dpi=dpi)
 
     def plot_stats_per_chromosome(
-            self, matrix=None, resolutions=None, samples=None,
+            self, matrix="matrix_norm", resolutions=None, samples=None,
             output_dir=None,
             output_prefix="{analysis_name}.all_data",
             robust=True, rasterized=True, dpi=300,
@@ -554,7 +499,7 @@ class CNVAnalysis(Analysis):
         ----------
         matrix : str, optional
             Attribute name of dictionary of matrices to normalize.
-                       Defaults to `coverage_norm`.
+            Defaults to `matrix_norm`.
 
         resolutions : list, optional
             Resolutions of analysis.
@@ -588,8 +533,7 @@ class CNVAnalysis(Analysis):
             Whether to label samples with their name.
             Defaults to True
         """
-        if matrix is None:
-            matrix = self.coverage_norm
+        matrix = self.get_matrix(matrix, samples=samples)
         if resolutions is None:
             resolutions = self.resolutions
         if samples is None:
@@ -654,7 +598,7 @@ class CNVAnalysis(Analysis):
                     bbox_inches="tight", dpi=dpi)
 
     def segment_genome(
-            self, matrix=None, resolutions=None, samples=None, save=True, assign=True):
+            self, matrix="matrix_norm", resolutions=None, samples=None, save=True, assign=True):
         """
         Segment CNV data to create calls of significant deviations.
         Will be done independently for each specified resolution.
@@ -667,7 +611,7 @@ class CNVAnalysis(Analysis):
         ----------
         matrix : str, optional
             Attribute name of dictionary of matrices to segment.
-            Defaults to `coverage_norm`.
+            Defaults to `matrix_norm`.
 
         resolutions : list, optional
             Resolutions of analysis.
@@ -711,7 +655,7 @@ class CNVAnalysis(Analysis):
         # _plotSample = robjects.r('plotSample')
 
         if matrix is None:
-            matrix = self.coverage_norm
+            matrix = self.matrix_norm
         if resolutions is None:
             resolutions = self.resolutions
         if samples is None:
@@ -903,13 +847,13 @@ class CNVAnalysis(Analysis):
         # if per_sample:
 
 
-def all_to_igv(coverage, output_prefix, **kwargs):
+def all_to_igv(matrix, output_prefix, **kwargs):
     """
     Convert dictionary of DataFrame with CNV data in several resolutions to IGV format.
 
     Parameters
     ----------
-    coverage : pandas.DataFrame
+    matrix : pandas.DataFrame
         DataFrame with CNV data to convert.
 
     optional output_prefix : str,
@@ -924,11 +868,11 @@ def all_to_igv(coverage, output_prefix, **kwargs):
         Dictionary of CNV data in IGV format for each resolution.
     """
     igvs = dict()
-    resolutions = coverage.keys()
+    resolutions = matrix.keys()
     for resolution in tqdm(resolutions, total=len(resolutions), desc="Resolution"):
         print("Making IGV visualization for resolution '{}'.".format(resolution))
         igvs[resolution] = to_igv(
-            coverage[resolution],
+            matrix[resolution],
             output_file="{}_{}".format(output_prefix, resolution),
             **kwargs)
 

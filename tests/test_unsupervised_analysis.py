@@ -37,6 +37,7 @@ def analysis(tmp_path):
         config = os.path.join(
             tmp_path, project_name, "metadata", "project_config.yaml")
         c = yaml.safe_load(open(config, 'r'))
+        c['metadata']['output_dir'] = os.path.abspath(tmp_path)
         c['metadata']['sample_annotation'] = os.path.abspath(
             os.path.join(tmp_path, project_name, "metadata", "annotation.csv"))
         c['metadata']['comparison_table'] = os.path.abspath(

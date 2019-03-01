@@ -19,19 +19,61 @@ from tqdm import tqdm
 class ChIPSeqAnalysis(ATACSeqAnalysis):
     """
     Class to model analysis of ChIP-seq data.
+    Inherits from the `ngs_toolkit.atacseq.ATACSeqAnalysis` class.
+
+    Parameters
+    ----------
+    name : str, optional
+        Name of the analysis.
+        Defaults to ``analysis``.
+
+    from_pep : str, optional
+        PEP configuration file to initialize analysis from.
+        The analysis will adopt as much attributes from the PEP as possible
+        but keyword arguments passed at initialization will still have priority.
+        Defaults to None (no PEP used).
+
+    from_pickle : str, optional
+        Pickle file of an existing serialized analysis object
+        from which the analysis should be loaded.
+        Defaults to None (will not load).
+
+    root_dir : str, optional
+        Base directory for the project.
+        Defaults to current directory or to what is specified in PEP if `from_pep`.
+
+    data_dir : str, optional
+        Directory containing processed data (e.g. by looper) that will
+        be input to the analysis. This is in principle not required.
+        Defaults to ``data``.
+
+    results_dir : str, optional
+        Directory to contain outputs produced by the analysis.
+        Defaults to ``results``.
+
+    prj : peppy.Project, optional
+        A ``peppy.Project`` object that this analysis is tied to.
+        Defaults to ``None``.
+
+    samples : list, optional
+        List of ``peppy.Sample`` objects that this analysis is tied to.
+        Defaults to ``None``.
+
+    kwargs : dict, optional
+        Additional keyword arguments will be passed to parent class `ngs_toolkit.analysis.Analysis`.
+
     """
     def __init__(
             self,
             name=None,
-            samples=None,
-            prj=None,
+            from_pep=False,
+            from_pickle=False,
+            root_dir=None,
             data_dir="data",
             results_dir="results",
-            pickle_file=None,
-            from_pickle=False,
-            pep=False,
+            prj=None,
+            samples=None,
             **kwargs):
-
         self.data_type = self.__data_type__ = "ChIP-seq"
         self.var_names = "region"
         self.quantity = "binding"
@@ -39,13 +81,13 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
 
         super(ChIPSeqAnalysis, self).__init__(
             name=name,
+            from_pep=from_pep,
+            from_pickle=from_pickle,
+            root_dir=root_dir,
             data_dir=data_dir,
             results_dir=results_dir,
-            pickle_file=pickle_file,
-            samples=samples,
             prj=prj,
-            from_pickle=from_pickle,
-            pep=pep,
+            samples=samples,
             **kwargs)
 
     def call_peaks_from_comparisons(

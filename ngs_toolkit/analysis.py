@@ -70,13 +70,20 @@ class Analysis(object):
         Name of the analysis.
         Defaults to ``analysis``.
 
-    samples : list, optional
-        List of ``peppy.Sample`` objects that this analysis is tied to.
-        Defaults to ``None``.
+    from_pep : str, optional
+        PEP configuration file to initialize analysis from.
+        The analysis will adopt as much attributes from the PEP as possible
+        but keyword arguments passed at initialization will still have priority.
+        Defaults to None (no PEP used).
 
-    prj : peppy.Project, optional
-        A ``peppy.Project`` object that this analysis is tied to.
-        Defaults to ``None``.
+    from_pickle : str, optional
+        Pickle file of an existing serialized analysis object
+        from which the analysis should be loaded.
+        Defaults to None (will not load).
+
+    root_dir : str, optional
+        Base directory for the project.
+        Defaults to current directory or to what is specified in PEP if `from_pep`.
 
     data_dir : str, optional
         Directory containing processed data (e.g. by looper) that will
@@ -87,18 +94,13 @@ class Analysis(object):
         Directory to contain outputs produced by the analysis.
         Defaults to ``results``.
 
-    pickle_file : str, optional
-        A pickle file to serialize the object.
-        Defaults to "`name`.pickle".
+    prj : peppy.Project, optional
+        A ``peppy.Project`` object that this analysis is tied to.
+        Defaults to ``None``.
 
-    from_pickle : bool, optional
-        Whether the analysis should be loaded from an existing
-        serialized analysis object in ``pickle_file``.
-        Defaults to False.
-
-    from_pep : str, optional
-        PEP configuration file to initialize analysis from.
-        Defaults to None.
+    samples : list, optional
+        List of ``peppy.Sample`` objects that this analysis is tied to.
+        Defaults to ``None``.
 
     kwargs : dict, optional
         Additional keyword arguments will simply be stored as object attributes.
@@ -106,21 +108,36 @@ class Analysis(object):
     def __init__(
             self,
             name=None,
-            samples=None,
-            prj=None,
+            from_pep=False,
+            from_pickle=False,
             root_dir=None,
             data_dir="data",
             results_dir="results",
-            pickle_file=None,
-            from_pickle=False,
-            from_pep=False,
+            prj=None,
+            samples=None,
             **kwargs):
-        self.samples = samples
+        # Add given args and kwargs to object
+        _LOGGER.debug("Adding given arguments to analysis object.")
+        self.name = name
+        self.root_dir = root_dir
+        self.data_dir = data_dir
+        self.results_dir = results_dir
         self.prj = prj
-        self.pickle_file = pickle_file
+        self.samples = samples
+
+        # Add default values for matrices
         self.raw_matrix_name = "matrix_raw"
         self.norm_matrix_name = "matrix_norm"
         self.feature_matrix_name = "matrix_features"
+        _LOGGER.debug("Adding additional kwargs to analysis object.")
+        self.__dict__.update(kwargs)
+
+        # If from_pickle, load and return
+        if from_pickle is not False:
+            _LOGGER.info("Updating analysis object from pickle file: '{}'."
+                         .format(from_pickle))
+            self.update(pickle_file=from_pickle)
+            return None
 
         _LOGGER.debug("Setting data type-specific attributes to None.")
         attrs = [
@@ -133,15 +150,15 @@ class Analysis(object):
 
         # Generate from PEP configuration file
         if from_pep is not False:
-            self.from_pep(from_pep)
+            self.from_pep(pep_config=from_pep)
 
         # Store projects attributes in self
         _LOGGER.debug("Trying to set analysis attributes.")
         self.set_project_attributes(overwrite=False)
 
         # Get name
-        if not hasattr(self, "name"):
-            self.name = "analysis" if name is None else name
+        if self.name is None:
+            self.name = "analysis"
 
         # Try to set genome if not set
         self.organism, self.genome = (None, None)
@@ -153,20 +170,9 @@ class Analysis(object):
         _LOGGER.debug("Trying to set sample input file attributes.")
         self.set_samples_input_files()
 
-        # Set default location for the pickle
-        if self.pickle_file is None:
-            self.pickle_file = os.path.join(results_dir, self.name + ".pickle")
-        # reload itself if required
-        if from_pickle:
-            _LOGGER.info("Updating analysis object from pickle file: '{}'."
-                         .format(self.pickle_file))
-            self.update(pickle_file=self.pickle_file)
-
-        if not hasattr(self, "root_dir"):
-            if root_dir is None:
-                self.root_dir = os.curdir
-            else:
-                self.root_dir = root_dir
+        # Set root_dir
+        if self.root_dir is None:
+            self.root_dir = os.curdir
         self.root_dir = os.path.abspath(self.root_dir)
 
         # # if given absolute paths, keep them, otherwise append to root directory
@@ -176,17 +182,18 @@ class Analysis(object):
             else:
                 setattr(self, attr, dir_)
 
+        # Try to make directories
         for directory in [self.data_dir, self.results_dir]:
             if not os.path.exists(directory):
                 try:
                     os.makedirs(directory)
                 except OSError:
-                    _LOGGER.debug("Could not make directory for Analysis: '{}'".format(directory))
-                    pass
+                    _LOGGER.debug("Could not make directory for Analysis: '{}'"
+                                  .format(directory))
 
-        # parse remaining kwargs
-        _LOGGER.debug("Adding additional kwargs to analysis object.")
-        self.__dict__.update(kwargs)
+        # Set pickle file
+        if not hasattr(self, "pickle_file"):
+            self.pickle_file = os.path.join(self.results_dir, self.name + ".pickle")
 
     def __repr__(self):
         t = "'{}' analysis".format(self.data_type) if self.data_type is not None else "Analysis"

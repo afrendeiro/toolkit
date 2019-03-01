@@ -33,40 +33,45 @@ from tqdm import tqdm
 class ATACSeqAnalysis(Analysis):
     """
     Class to model analysis of ATAC-seq data.
-    Inherits from the `ngs_toolkit.general.Analysis` class.
+    Inherits from the `ngs_toolkit.analysis.Analysis` class.
 
     Parameters
     ----------
-    name : str
-        Name to give analysis object.
-        Default is ``atacseq_analysis``.
-
-    samples : list
-        Iterable of peppy.Sample objects use in analysis.
-        If not provided (`None` is passed) and `prj` is.
-        Defaults to all samples in the `prj` object (`samples` attribute).
-
-    prj : peppy.Project
-        Project to tie analysis to.
-
-    data_dir : str
-        Directory containing relevant data for analysis.
-        Default is `data`.
-
-    results_dir : str
-        Directory to output relevant analysis results.
-        Default is `results`.
-
-    pickle_file : str
-        File path to use to save serialized object in `pickle` format.
-
-    from_pickle : bool
-        If the analysis should be loaded from an existing pickle object.
-        Default is `False.
+    name : str, optional
+        Name of the analysis.
+        Defaults to ``analysis``.
 
     from_pep : str, optional
         PEP configuration file to initialize analysis from.
-        Defaults to None.
+        The analysis will adopt as much attributes from the PEP as possible
+        but keyword arguments passed at initialization will still have priority.
+        Defaults to None (no PEP used).
+
+    from_pickle : str, optional
+        Pickle file of an existing serialized analysis object
+        from which the analysis should be loaded.
+        Defaults to None (will not load).
+
+    root_dir : str, optional
+        Base directory for the project.
+        Defaults to current directory or to what is specified in PEP if `from_pep`.
+
+    data_dir : str, optional
+        Directory containing processed data (e.g. by looper) that will
+        be input to the analysis. This is in principle not required.
+        Defaults to ``data``.
+
+    results_dir : str, optional
+        Directory to contain outputs produced by the analysis.
+        Defaults to ``results``.
+
+    prj : peppy.Project, optional
+        A ``peppy.Project`` object that this analysis is tied to.
+        Defaults to ``None``.
+
+    samples : list, optional
+        List of ``peppy.Sample`` objects that this analysis is tied to.
+        Defaults to ``None``.
 
     kwargs : dict, optional
         Additional keyword arguments will be passed to parent class `ngs_toolkit.analysis.Analysis`.
@@ -106,15 +111,14 @@ class ATACSeqAnalysis(Analysis):
     def __init__(
             self,
             name=None,
-            samples=None,
-            prj=None,
+            from_pep=False,
+            from_pickle=False,
+            root_dir=None,
             data_dir="data",
             results_dir="results",
-            pickle_file=None,
-            from_pickle=False,
-            from_pep=False,
+            prj=None,
+            samples=None,
             **kwargs):
-
         self.data_type = self.__data_type__ = "ATAC-seq"
         self.var_unit_name = "region"
         self.quantity = "accessibility"
@@ -122,13 +126,13 @@ class ATACSeqAnalysis(Analysis):
 
         super(ATACSeqAnalysis, self).__init__(
             name=name,
+            from_pep=from_pep,
+            from_pickle=from_pickle,
+            root_dir=root_dir,
             data_dir=data_dir,
             results_dir=results_dir,
-            pickle_file=pickle_file,
-            samples=samples,
             prj=prj,
-            from_pickle=from_pickle,
-            from_pep=from_pep,
+            samples=samples,
             **kwargs)
 
     def load_data(

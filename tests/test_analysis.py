@@ -41,6 +41,7 @@ def analysis(tmp_path):
     config = os.path.join(
         tmp_path, project_name, "metadata", "project_config.yaml")
     c = yaml.safe_load(open(config, 'r'))
+    c['metadata']['output_dir'] = os.path.abspath(tmp_path)
     c['metadata']['sample_annotation'] = os.path.abspath(
         os.path.join(tmp_path, project_name, "metadata", "annotation.csv"))
     c['metadata']['comparison_table'] = os.path.abspath(
@@ -117,6 +118,7 @@ class TestAnalysis():
                 config = os.path.join(
                     tmp_path, project_name, "metadata", "project_config.yaml")
                 c = yaml.safe_load(open(config, 'r'))
+                c['metadata']['output_dir'] = os.path.abspath(tmp_path)
                 c['metadata']['sample_annotation'] = os.path.abspath(
                     os.path.join(tmp_path, project_name, "metadata", "annotation.csv"))
                 c['metadata']['comparison_table'] = os.path.abspath(
@@ -160,23 +162,26 @@ class TestAnalysis():
                 )) == 2
 
     def test_analysis_loading(self, tmp_path):
-
         tmp_path = str(tmp_path)  # for Python2
-
         pickle_file = os.path.join(tmp_path, "pickle")
-        a = Analysis(pickle_file=pickle_file)
-        a.secret = "I've existed before"
+        secret = "I've existed before"
+
+        a = Analysis()
+        a.pickle_file = pickle_file
+        a.secret = secret
         a.to_pickle()
 
-        a2 = Analysis(pickle_file=pickle_file, from_pickle=True)
-        assert a2.secret == "I've existed before"
+        a2 = Analysis(from_pickle=pickle_file)
+        assert a2.secret == secret
 
         a3 = Analysis()
         a3.update(pickle_file)
-        assert a3.secret == "I've existed before"
+        assert a3.secret == secret
 
-        a4 = Analysis(pickle_file=pickle_file).from_pickle()
-        assert a4.secret == "I've existed before"
+        a4 = Analysis()
+        a4.pickle_file = pickle_file
+        a4 = a4.from_pickle()
+        assert a4.secret == secret
 
         shutil.rmtree(tmp_path)
 

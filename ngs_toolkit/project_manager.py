@@ -20,63 +20,72 @@ def parse_arguments(cli_string=None):
     epilog = "https://github.com/afrendeiro/toolkit"
 
     parser = argparse.ArgumentParser(
-        description=description, epilog=epilog,
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+        description=description,
+        epilog=epilog,
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
 
-    parser.add_argument("-V", "--version", action="version",
-                        version=ngs_toolkit.__version__)
+    parser.add_argument(
+        "-V", "--version", action="version", version=ngs_toolkit.__version__
+    )
 
     subparsers = parser.add_subparsers(dest="command")
 
     # Create command
     create_subparser = subparsers.add_parser(
-        "create", description="Create project.",
-        help="Create project.")
-    create_subparser.add_argument(
-        dest="project_name",
-        help="Project name.")
+        "create", description="Create project.", help="Create project."
+    )
+    create_subparser.add_argument(dest="project_name", help="Project name.")
     # # parse default assemblies from config
-    default = ",".join([":".join([k, v])
-                        for x in _CONFIG["preferences"]["default_genome_assemblies"]
-                        for k, v in x.items()])
+    default = ",".join(
+        [
+            ":".join([k, v])
+            for x in _CONFIG["preferences"]["default_genome_assemblies"]
+            for k, v in x.items()
+        ]
+    )
     # default = "human:hg19,mouse:mm10"
     create_subparser.add_argument(
-        "-g", "--genome-assembly",
+        "-g",
+        "--genome-assembly",
         default=default,
         dest="genome_assemblies",
         help="List of 'organism:assembly' pairs for project. "
-             "Comma-separated list of pairs of supported organism/genome assembly. "
-             "Defaults to '{}'.".format(default))
+        "Comma-separated list of pairs of supported organism/genome assembly. "
+        "Defaults to '{}'.".format(default),
+    )
     create_subparser.add_argument(
-        "-r", "--root-dir",
+        "-r",
+        "--root-dir",
         default=os.path.curdir,
         dest="root_dir",
-        help="Root directory to create projects.")
+        help="Root directory to create projects.",
+    )
     create_subparser.add_argument(
-        "-d",
-        "--dry-run",
-        action="store_true",
-        help="Don't actually do anything.")
+        "-d", "--dry-run", action="store_true", help="Don't actually do anything."
+    )
     create_subparser.add_argument(
         "--overwrite",
         action="store_true",
         default=False,
-        help="Don't overwrite any existing directory or file.")
+        help="Don't overwrite any existing directory or file.",
+    )
 
     # Recipe command
     recipe_subparser = subparsers.add_parser(
-        "recipe", description="Run recipe.",
-        help="Run ngs_toolkit recipe for a given project.")
+        "recipe",
+        description="Run recipe.",
+        help="Run ngs_toolkit recipe for a given project.",
+    )
+    recipe_subparser.add_argument(dest="recipe_name", help="Recipe name.")
     recipe_subparser.add_argument(
-        dest="recipe_name",
-        help="Recipe name.")
-    recipe_subparser.add_argument(
-        dest="project_config",
-        help="Project configuration file.")
+        dest="project_config", help="Project configuration file."
+    )
 
     for p in [create_subparser, recipe_subparser]:
-        p.add_argument("-V", "--version", action="version",
-                       version=ngs_toolkit.__version__)
+        p.add_argument(
+            "-V", "--version", action="version", version=ngs_toolkit.__version__
+        )
 
     if cli_string is None:
         args = parser.parse_args()
@@ -89,8 +98,14 @@ def parse_arguments(cli_string=None):
 
 
 def create_project(
-        project_name, root_dir, genome_assemblies, overwrite=False,
-        username=None, email=None, url=None):
+    project_name,
+    root_dir,
+    genome_assemblies,
+    overwrite=False,
+    username=None,
+    email=None,
+    url=None,
+):
     """
     Main function: Create project.
     """
@@ -158,20 +173,53 @@ def create_project(
     trackhubs:
         trackhub_dir: /data/groups/lab_bock/public_html/{username}/{project_name}/
         url: {url}""".format(
-        project_name=project_name, username=username, email=email, url=url,
-        genome_assemblies="\n".join([
-            "'{}':\n                genome: '{}'".format(s, g) for s, g in genome_assemblies.items()]))
+        project_name=project_name,
+        username=username,
+        email=email,
+        url=url,
+        genome_assemblies="\n".join(
+            [
+                "'{}':\n                genome: '{}'".format(s, g)
+                for s, g in genome_assemblies.items()
+            ]
+        ),
+    )
 
-    merge_table_template = ",".join([
-        "sample_name", "flowcell", "lane", "BSF_name", "data_source"])
-    annotation_table_template = ",".join([
-        "sample_name", "toggle", "pass_qc", "protocol", "library",
-        "cell_line", "cell_type", "condition",
-        "experimental_batch", "experiment_name", "replicate",
-        "organism", "flowcell", "lane", "BSF_name", "data_source"])
-    comparison_table_template = ",".join([
-        "comparison_type", "data_type", "comparison_name", "comparison_side",
-        "sample_name", "sample_group", "comparison_genome", "toggle"])
+    merge_table_template = ",".join(
+        ["sample_name", "flowcell", "lane", "BSF_name", "data_source"]
+    )
+    annotation_table_template = ",".join(
+        [
+            "sample_name",
+            "toggle",
+            "pass_qc",
+            "protocol",
+            "library",
+            "cell_line",
+            "cell_type",
+            "condition",
+            "experimental_batch",
+            "experiment_name",
+            "replicate",
+            "organism",
+            "flowcell",
+            "lane",
+            "BSF_name",
+            "data_source",
+        ]
+    )
+    comparison_table_template = ",".join(
+        [
+            "comparison_type",
+            "data_type",
+            "comparison_name",
+            "comparison_side",
+            "sample_name",
+            "sample_group",
+            "comparison_genome",
+            "toggle",
+        ]
+    )
 
     # write config and tables
     with open(project_config, "w") as handle:
@@ -188,20 +236,23 @@ def create_project(
 
 
 def create_requirements_file(
-        project_name,
-        project_dir,
-        requirements=None,
-        overwrite=False):
+    project_name, project_dir, requirements=None, overwrite=False
+):
     """
     Create a requirements.txt file with pip requirements.
     """
+
     def get_current_requirements():
         import requests
+
         package_name = "ngs-toolkit"
         url = "https://pypi.python.org/pypi/" + str(package_name) + "/json"
         data = requests.get(url).json()
-        requirements = [x.replace(r" ", "").replace("(", "").replace(")", "")
-                        for x in data["info"]["requires_dist"] if "extra" not in x]
+        requirements = [
+            x.replace(r" ", "").replace("(", "").replace(")", "")
+            for x in data["info"]["requires_dist"]
+            if "extra" not in x
+        ]
         requirements.append("ngs_toolkit=={}".format(ngs_toolkit.__version__))
         return requirements
 
@@ -222,8 +273,7 @@ def create_requirements_file(
         handle.write(textwrap.dedent(requirements_filecontent) + "\n")
 
 
-def create_makefile(
-        project_name, project_dir, overwrite=False):
+def create_makefile(project_name, project_dir, overwrite=False):
     """
     Create a Makefile to manage the project execution.
     """
@@ -264,9 +314,10 @@ def create_makefile(
     all: requirements process analysis
 
     .PHONY: requirements process summarize mklog analysis all""".format(
-        project_config=project_config,
-        project_name=project_name,
-        log_dir=log_dir).replace("    ", "\t")
+        project_config=project_config, project_name=project_name, log_dir=log_dir
+    ).replace(
+        "    ", "\t"
+    )
 
     # write Makefile
     with open(makefile, "w") as handle:
@@ -275,9 +326,12 @@ def create_makefile(
 
 def run_recipe(recipe_name, project_config):
     import subprocess
-    return subprocess.call("python -m ngs_toolkit.recipes.{} {}"
-                           .format(recipe_name, project_config)
-                           .split(" "))
+
+    return subprocess.call(
+        "python -m ngs_toolkit.recipes.{} {}".format(recipe_name, project_config).split(
+            " "
+        )
+    )
 
 
 def main():
@@ -289,43 +343,47 @@ def main():
     args = parse_arguments()
 
     if args.command == "create":
-        _LOGGER.info("Creating project '{}' in '{}'.".format(
-            args.project_name, args.root_dir))
+        _LOGGER.info(
+            "Creating project '{}' in '{}'.".format(args.project_name, args.root_dir)
+        )
 
         genome_assemblies = {
-            x.split(":")[0]: x.split(":")[1]
-            for x in args.genome_assemblies.split(",")}
+            x.split(":")[0]: x.split(":")[1] for x in args.genome_assemblies.split(",")
+        }
         # Create project.
         git_ok = create_project(
             project_name=args.project_name,
             root_dir=args.root_dir,
             genome_assemblies=genome_assemblies,
-            overwrite=args.overwrite)
+            overwrite=args.overwrite,
+        )
         if git_ok != 0:
             _LOGGER.error("Initialization of project failed.")
             return git_ok
 
         # Create requirements file.
-        _LOGGER.info("Creating requirements file for project '{}'.".format(
-            args.project_name))
+        _LOGGER.info(
+            "Creating requirements file for project '{}'.".format(args.project_name)
+        )
         create_requirements_file(
             project_name=args.project_name,
             project_dir=os.path.join(args.root_dir, args.project_name),
-            overwrite=args.overwrite)
+            overwrite=args.overwrite,
+        )
 
         # Create Makefile.
-        _LOGGER.info("Creating Makefile file for project '{}'.".format(
-            args.project_name))
+        _LOGGER.info(
+            "Creating Makefile file for project '{}'.".format(args.project_name)
+        )
         create_makefile(
             project_name=args.project_name,
             project_dir=os.path.join(args.root_dir, args.project_name),
-            overwrite=args.overwrite)
+            overwrite=args.overwrite,
+        )
 
     elif args.command == "recipe":
         _LOGGER.info("Running recipe '{}'.".format(args.recipe_name))
-        run_recipe(
-            recipe_name=args.recipe_name,
-            project_config=args.project_config)
+        run_recipe(recipe_name=args.recipe_name, project_config=args.project_config)
 
     _LOGGER.info("Completed.")
 

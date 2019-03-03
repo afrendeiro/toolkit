@@ -26,7 +26,7 @@ def parse_ame(ame_output):
     IOError
         If directory contain
     """
-    with open(ame_output, 'r') as handle:
+    with open(ame_output, "r") as handle:
         lines = handle.readlines()
 
     output = list()
@@ -73,25 +73,38 @@ def parse_homer(homer_dir):
     output = pd.DataFrame()
     for motif_html in motif_htmls:
 
-        motif = int(re.sub(".info.html", "", re.sub(os.path.join(homer_dir, "motif"), "", motif_html)))
+        motif = int(
+            re.sub(
+                ".info.html",
+                "",
+                re.sub(os.path.join(homer_dir, "motif"), "", motif_html),
+            )
+        )
 
-        with open(motif_html, 'r') as handle:
+        with open(motif_html, "r") as handle:
             content = handle.read()
 
         # Parse table with motif info
         info_table = content[
-            re.search("""<TABLE border="1" cellpading="0" cellspacing="0">""", content).end():
-            re.search("</TABLE>", content).start()].strip()
+            re.search("""<TABLE border="1" cellpading="0" cellspacing="0">""", content)
+            .end() : re.search("</TABLE>", content)
+            .start()
+        ].strip()
 
-        info_table = pd.DataFrame([x.split("</TD><TD>") for x in info_table.replace("<TR><TD>", "").split("</TD></TR>")])
+        info_table = pd.DataFrame(
+            [
+                x.split("</TD><TD>")
+                for x in info_table.replace("<TR><TD>", "").split("</TD></TR>")
+            ]
+        )
         info_table.columns = ["description", "value"]
         info_table["description"] = info_table["description"].str.strip()
         info_table["motif"] = motif
 
         # Add most probable known motif name
         info_table["known_motif"] = content[
-            re.search("<H4>", content).end():
-            re.search("</H4>", content).start()]
+            re.search("<H4>", content).end() : re.search("</H4>", content).start()
+        ]
 
         # append
         output = output.append(info_table, ignore_index=True)

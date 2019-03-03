@@ -72,14 +72,20 @@ def barmap(x, figsize=None, square=False, row_colors=None, z_score=None, ylims=N
         figsize = (x_size * square_size, y_size * square_size)
         if square:
             figsize = (figsize[0], figsize[0])
-    fig, axis = plt.subplots(y_size, 1, figsize=figsize, gridspec_kw={"wspace": 0, "hspace": 0})
+    fig, axis = plt.subplots(
+        y_size, 1, figsize=figsize, gridspec_kw={"wspace": 0, "hspace": 0}
+    )
 
     # Plot row-by-row
     for i, row in enumerate(range(y_size)):
         color = row_colors[i] if row_colors is not None else None
         axis[i].bar(
-            left=range(x_size), height=x.iloc[i, :],
-            width=0.95, align="center", color=[color] * x_size if row_colors is not None else None)
+            left=range(x_size),
+            height=x.iloc[i, :],
+            width=0.95,
+            align="center",
+            color=[color] * x_size if row_colors is not None else None,
+        )
         # axis[i].set_yticklabels(axis[i].get_yticklabels(), visible=False)
         axis[i].axhline(0, linestyle="--", color="black", linewidth=0.5)
         if i != y_size - 1:
@@ -90,7 +96,8 @@ def barmap(x, figsize=None, square=False, row_colors=None, z_score=None, ylims=N
 
     axis[-1].set_xticks(range(x_size))
     axis[-1].set_xticklabels(
-        x.columns, rotation='vertical', ha="center", va="top", fontsize=figsize[1])
+        x.columns, rotation="vertical", ha="center", va="top", fontsize=figsize[1]
+    )
 
     for i, ax in enumerate(axis):
         # m = max(ax.get_yticks())
@@ -98,8 +105,13 @@ def barmap(x, figsize=None, square=False, row_colors=None, z_score=None, ylims=N
         # ax.set_yticklabels([str(m)], rotation='horizontal', ha="center",
         #                    va="center", visible=True, fontsize=figsize[1])
         ax.set_ylabel(
-            str(x.index[i]), rotation='horizontal', ha="right", va="center",
-            visible=True, fontsize=figsize[1])
+            str(x.index[i]),
+            rotation="horizontal",
+            ha="right",
+            va="center",
+            visible=True,
+            fontsize=figsize[1],
+        )
 
     return fig
 
@@ -120,10 +132,13 @@ def barmap(x, figsize=None, square=False, row_colors=None, z_score=None, ylims=N
 
 
 def radar_plot(
-        data,
-        subplot_var="patient_id", group_var="timepoint",
-        radial_vars=["NaiveBcell", "SwitchedBcell", "UnswitchedBcell"],
-        cmap="inferno", scale_to_max=True):
+    data,
+    subplot_var="patient_id",
+    group_var="timepoint",
+    radial_vars=["NaiveBcell", "SwitchedBcell", "UnswitchedBcell"],
+    cmap="inferno",
+    scale_to_max=True,
+):
     """
     
     data : pandas.DataFrame
@@ -138,7 +153,7 @@ def radar_plot(
     Heavy inspiration from here: https://matplotlib.org/examples/api/radar_chart.html
     """
 
-    def radar_factory(num_vars, frame='circle'):
+    def radar_factory(num_vars, frame="circle"):
         """Create a radar chart with `num_vars` axes.
 
         This function creates a RadarAxes projection and registers it.
@@ -158,18 +173,18 @@ def radar_plot(
 
         def draw_poly_patch(self):
             verts = unit_poly_verts(theta)
-            return plt.Polygon(verts, closed=True, edgecolor='k')
+            return plt.Polygon(verts, closed=True, edgecolor="k")
 
         def draw_circle_patch(self):
             # unit circle centered on (0.5, 0.5)
             return plt.Circle((0.5, 0.5), 0.5)
 
-        patch_dict = {'polygon': draw_poly_patch, 'circle': draw_circle_patch}
+        patch_dict = {"polygon": draw_poly_patch, "circle": draw_circle_patch}
         if frame not in patch_dict:
-            raise ValueError('unknown value for `frame`: %s' % frame)
+            raise ValueError("unknown value for `frame`: %s" % frame)
 
         class RadarAxes(PolarAxes):
-            name = 'radar'
+            name = "radar"
             # use 1 line segment to connect specified points
             RESOLUTION = 1
             # define draw_frame method
@@ -177,7 +192,7 @@ def radar_plot(
 
             def fill(self, *args, **kwargs):
                 """Override fill so that line is closed by default"""
-                closed = kwargs.pop('closed', True)
+                closed = kwargs.pop("closed", True)
                 return super(RadarAxes, self).fill(closed=closed, *args, **kwargs)
 
             def plot(self, *args, **kwargs):
@@ -202,13 +217,13 @@ def radar_plot(
                 return self.draw_patch()
 
             def _gen_axes_spines(self):
-                if frame == 'circle':
+                if frame == "circle":
                     return PolarAxes._gen_axes_spines(self)
                 # The following is a hack to get the spines (i.e. the axes frame)
                 # to draw correctly for a polygon frame.
 
                 # spine_type must be 'left', 'right', 'top', 'bottom', or `circle`.
-                spine_type = 'circle'
+                spine_type = "circle"
                 verts = unit_poly_verts(theta)
                 # close off polygon by repeating first vertex
                 verts.append(verts[0])
@@ -216,7 +231,7 @@ def radar_plot(
 
                 spine = Spine(self, spine_type, path)
                 spine.set_transform(self.transAxes)
-                return {'polar': spine}
+                return {"polar": spine}
 
         register_projection(RadarAxes)
         return theta
@@ -227,15 +242,16 @@ def radar_plot(
         This polygon is circumscribed by a unit circle centered at (0.5, 0.5)
         """
         x0, y0, r = [0.5] * 3
-        verts = [(r*np.cos(t) + x0, r*np.sin(t) + y0) for t in theta]
+        verts = [(r * np.cos(t) + x0, r * np.sin(t) + y0) for t in theta]
         return verts
 
-    theta = radar_factory(len(radial_vars), frame='polygon')
+    theta = radar_factory(len(radial_vars), frame="polygon")
 
     n_row = n_col = int(np.ceil(np.sqrt(len(data[subplot_var].unique()))))
 
-    fig, axes = plt.subplots(figsize=(9, 9), nrows=n_row, ncols=n_col,
-                             subplot_kw=dict(projection='radar'))
+    fig, axes = plt.subplots(
+        figsize=(9, 9), nrows=n_row, ncols=n_col, subplot_kw=dict(projection="radar")
+    )
     fig.subplots_adjust(wspace=0.25, hspace=0.20, top=0.85, bottom=0.05)
 
     colors = plt.get_cmap(cmap, len(data[group_var].unique()))
@@ -246,11 +262,18 @@ def radar_plot(
 
         if scale_to_max:
             case_data.loc[:, radial_vars] = (
-                case_data.loc[:, radial_vars] / case_data.loc[:, radial_vars].max())
+                case_data.loc[:, radial_vars] / case_data.loc[:, radial_vars].max()
+            )
 
         ax.set_rgrids([0.2, 0.4, 0.6, 0.8])
-        ax.set_title(subplot_title, weight='bold', size='medium', position=(0.5, 1.1),
-                     horizontalalignment='center', verticalalignment='center')
+        ax.set_title(
+            subplot_title,
+            weight="bold",
+            size="medium",
+            position=(0.5, 1.1),
+            horizontalalignment="center",
+            verticalalignment="center",
+        )
         for group in case_data[group_var].unique():
             d = case_data.loc[case_data[group_var] == group, radial_vars].squeeze()
             color = colors(np.log2(1 + group) / np.log2(1 + 256))
@@ -260,8 +283,7 @@ def radar_plot(
         ax.set_varlabels(radial_vars)
 
         # add legend relative to top-left plot
-        ax.legend(loc=(0.9, .95),
-                  labelspacing=0.1, fontsize='small')
+        ax.legend(loc=(0.9, 0.95), labelspacing=0.1, fontsize="small")
 
     return fig
 
@@ -274,38 +296,47 @@ def add_colorbar_to_axis(collection, label=None, position="right", size="5%", pa
 
 def clustermap_fix_label_orientation(grid, fontsize="xx-small", **kwargs):
     grid.ax_heatmap.set_xticklabels(
-        grid.ax_heatmap.get_xticklabels(), rotation=90, fontsize=fontsize, **kwargs)
+        grid.ax_heatmap.get_xticklabels(), rotation=90, fontsize=fontsize, **kwargs
+    )
     grid.ax_heatmap.set_yticklabels(
-        grid.ax_heatmap.get_yticklabels(), rotation=0, fontsize=fontsize, **kwargs)
+        grid.ax_heatmap.get_yticklabels(), rotation=0, fontsize=fontsize, **kwargs
+    )
 
 
 def clustermap_rasterize_heatmap(grid):
-    q = [x for x in grid.ax_heatmap.get_children()
-         if isinstance(x, matplotlib.collections.QuadMesh)][0]
+    q = [
+        x
+        for x in grid.ax_heatmap.get_children()
+        if isinstance(x, matplotlib.collections.QuadMesh)
+    ][0]
     q.set_rasterized(True)
 
 
 def savefig(fig, file_name, **kwargs):
     if isinstance(fig, sns.axisgrid.Grid):
         fig = fig.fig
-    default_kwargs = _CONFIG['preferences']['graphics']['figure_saving']
+    default_kwargs = _CONFIG["preferences"]["graphics"]["figure_saving"]
     default_kwargs.update(kwargs)
     fig.savefig(file_name, **default_kwargs)
-    if _CONFIG['preferences']['graphics']['close_saved_figures']:
+    if _CONFIG["preferences"]["graphics"]["close_saved_figures"]:
         plt.close(fig)
 
 
 def plot_projection(
-        df,
-        color_dataframe,
-        dims,
-        output_file,
-        attributes_to_plot,
-        plot_max_dims=8,
-        rasterized=False, plot_group_centroids=True,
-        axis_ticklabels=True, axis_ticklabels_name="PC",
-        axis_lines=True,
-        legends=False, always_legend=False):
+    df,
+    color_dataframe,
+    dims,
+    output_file,
+    attributes_to_plot,
+    plot_max_dims=8,
+    rasterized=False,
+    plot_group_centroids=True,
+    axis_ticklabels=True,
+    axis_ticklabels_name="PC",
+    axis_lines=True,
+    legends=False,
+    always_legend=False,
+):
     """
     Plot a low dimentionality projection of samples.
 
@@ -366,10 +397,14 @@ def plot_projection(
                 sample = pd.Series(sample, index=df.index.names)
                 label = df.index.get_level_values(attr)[j]
                 axis[pc, i].scatter(
-                    df.loc[sample['sample_name'], pc],
-                    df.loc[sample['sample_name'], pc + 1],
-                    s=30, color=color_dataframe.loc[attr, sample['sample_name']],
-                    alpha=0.75, label=label, rasterized=rasterized)
+                    df.loc[sample["sample_name"], pc],
+                    df.loc[sample["sample_name"], pc + 1],
+                    s=30,
+                    color=color_dataframe.loc[attr, sample["sample_name"]],
+                    alpha=0.75,
+                    label=label,
+                    rasterized=rasterized,
+                )
 
             # Plot groups
             if plot_group_centroids:
@@ -378,26 +413,40 @@ def plot_projection(
                 cd = color_dataframe.loc[attr, :]
                 cd.name = None
                 cd.index = df.index.get_level_values(attr)
-                cd = cd.apply(lambda x: tuple(x) if isinstance(x, list) else x)  # fix for deduplicating lists
+                cd = cd.apply(
+                    lambda x: tuple(x) if isinstance(x, list) else x
+                )  # fix for deduplicating lists
                 cd = cd.reset_index().drop_duplicates().set_index(attr)
                 for j, group in enumerate(df2.index):
                     axis[pc, i].scatter(
                         df2.loc[group, pc],
                         df2.loc[group, pc + 1],
-                        marker="s", s=50, color=cd.loc[group].squeeze(),
-                        alpha=0.95, label=group, rasterized=rasterized)
+                        marker="s",
+                        s=50,
+                        color=cd.loc[group].squeeze(),
+                        alpha=0.95,
+                        label=group,
+                        rasterized=rasterized,
+                    )
                     axis[pc, i].text(
                         df2.loc[group, pc],
-                        df2.loc[group, pc + 1], group,
-                        color=cd.loc[group].squeeze(), alpha=0.95)
+                        df2.loc[group, pc + 1],
+                        group,
+                        color=cd.loc[group].squeeze(),
+                        alpha=0.95,
+                    )
 
             # Graphics
             axis[pc, i].set_title(attr)
             axis[pc, i].set_xlabel("{} {}".format(axis_ticklabels_name, pc + 1))
             axis[pc, i].set_ylabel("{} {}".format(axis_ticklabels_name, pc + 2))
             if not axis_ticklabels:
-                axis[pc, i].set_xticklabels(axis[pc, i].get_xticklabels(), visible=False)
-                axis[pc, i].set_yticklabels(axis[pc, i].get_yticklabels(), visible=False)
+                axis[pc, i].set_xticklabels(
+                    axis[pc, i].get_xticklabels(), visible=False
+                )
+                axis[pc, i].set_yticklabels(
+                    axis[pc, i].get_yticklabels(), visible=False
+                )
             if axis_lines:
                 axis[pc, i].axhline(0, linestyle="--", color="black", alpha=0.3)
                 axis[pc, i].axvline(0, linestyle="--", color="black", alpha=0.3)
@@ -406,23 +455,27 @@ def plot_projection(
                 # Unique legend labels
                 handles, labels = axis[pc, i].get_legend_handles_labels()
                 by_label = OrderedDict(zip(labels, handles))
-                if any([isinstance(c, str) for c in by_label.keys()]) and len(by_label) <= plot_max_dims:
+                if (
+                    any([isinstance(c, str) for c in by_label.keys()])
+                    and len(by_label) <= plot_max_dims
+                ):
                     # if not any([re.match("^\d", c) for c in by_label.keys()]):
                     if always_legend:
                         axis[pc, i].legend(by_label.values(), by_label.keys())
                     else:
                         if pc == (dims - 1):
-                            axis[pc, i].legend(
-                                by_label.values(), by_label.keys())
+                            axis[pc, i].legend(by_label.values(), by_label.keys())
     savefig(fig, output_file)
 
 
 def plot_region_context_enrichment(
-        enr,
-        output_dir="results",
-        output_prefix="region_type_enrichment",
-        across_attribute=None,
-        pvalue=0.05, top_n=5):
+    enr,
+    output_dir="results",
+    output_prefix="region_type_enrichment",
+    across_attribute=None,
+    pvalue=0.05,
+    top_n=5,
+):
     """
     Plot results of ATACSeqAnalysis.region_context_enrichment.
 
@@ -456,7 +509,7 @@ def plot_region_context_enrichment(
         os.makedirs(output_dir)
 
     # replace inf p-values with
-    x, y, z = 'log2_odds_ratio', '-log10(p-value)', "region_type"
+    x, y, z = "log2_odds_ratio", "-log10(p-value)", "region_type"
     enr = enr.sort_values(x)
 
     if across_attribute is not None:
@@ -464,7 +517,7 @@ def plot_region_context_enrichment(
         n = len(level)
     else:
         level = [""]
-        across_attribute = 'intercept'
+        across_attribute = "intercept"
         enr.loc[:, across_attribute] = ""
         n = 1
     row = col = int(np.ceil(np.sqrt(n)))
@@ -479,14 +532,21 @@ def plot_region_context_enrichment(
             axis[i].set_title(value)
             sns.barplot(
                 data=enr.loc[enr[across_attribute] == value, :].reset_index(),
-                x=var, y="region", hue=z,
-                orient="horizontal", dodge=False, ax=axis[i])
+                x=var,
+                y="region",
+                hue=z,
+                orient="horizontal",
+                dodge=False,
+                ax=axis[i],
+            )
             if (enr[var] < 0).any():
                 m = enr[var].abs().max()
                 m += m * 0.1
                 axis[i].set_xlim((-m, m))
                 axis[i].axvline(0, linestyle="--", color="grey")
-        savefig(fig, os.path.join(output_dir, output_prefix + ".{}.barplot.svg".format(var)))
+        savefig(
+            fig, os.path.join(output_dir, output_prefix + ".{}.barplot.svg".format(var))
+        )
 
     # volcano plot
     fig, axis = plt.subplots(row, col, figsize=(col * 3, row * 3))
@@ -498,9 +558,7 @@ def plot_region_context_enrichment(
         axis[i].set_title(value)
         axis[i].axvline(0, linestyle="--", color="grey")
         axis[i].axhline(-np.log10(pvalue), linestyle="--", color="grey")
-        sns.scatterplot(
-            data=spec.reset_index(),
-            x=x, y=y, hue=z, ax=axis[i])
+        sns.scatterplot(data=spec.reset_index(), x=x, y=y, hue=z, ax=axis[i])
         # label top points
         for n, s in spec.nlargest(top_n, y).iterrows():
             axis[i].text(s[x], s[y], s=n)
@@ -508,13 +566,17 @@ def plot_region_context_enrichment(
         ll = spec.loc[:, x].abs().max()
         ll += ll * 0.1
         axis[i].set_xlim((-ll, ll))
-    savefig(fig, os.path.join(output_dir, output_prefix + ".volcano_plot.top_{}_labeled.svg".format(top_n)))
+    savefig(
+        fig,
+        os.path.join(
+            output_dir, output_prefix + ".volcano_plot.top_{}_labeled.svg".format(top_n)
+        ),
+    )
 
 
 def plot_comparison_correlations(
-        diff,
-        output_dir,
-        output_prefix="comparison_correlations"):
+    diff, output_dir, output_prefix="comparison_correlations"
+):
     """
     Plot pairwise log fold changes for various comparisons.
 
@@ -531,20 +593,22 @@ def plot_comparison_correlations(
         Prefix for plots.
         Defaults to "comparison_correlations"
     """
-    comps = diff['comparison_name'].unique()
+    comps = diff["comparison_name"].unique()
     n = len(comps)
     rows = cols = int(np.ceil(np.sqrt(n)))
-    v = diff['log2FoldChange'].abs().max()
+    v = diff["log2FoldChange"].abs().max()
     # vmax = (-np.log10(diff['pvalue'])).max()
 
-    fig, axis = plt.subplots(rows, cols, figsize=(cols * 3, rows * 3), tight_layout=True)
+    fig, axis = plt.subplots(
+        rows, cols, figsize=(cols * 3, rows * 3), tight_layout=True
+    )
     for i, (base, comps) in enumerate(comps):
-        a = diff.loc[diff['comparison_name'] == base, "log2FoldChange"]
+        a = diff.loc[diff["comparison_name"] == base, "log2FoldChange"]
         sign = (a > 0).astype(int).replace(0, -1)
-        c = sign * (-np.log10(diff.loc[diff['comparison_name'] == base, "pvalue"]))
+        c = sign * (-np.log10(diff.loc[diff["comparison_name"] == base, "pvalue"]))
         vmax = np.sqrt(c.abs().max())
         for j, comp in enumerate(comps):
-            b = diff.loc[diff['comparison_name'] == comp, "log2FoldChange"]
+            b = diff.loc[diff["comparison_name"] == comp, "log2FoldChange"]
             axis[i, j].set_xlabel(base)
             axis[i, j].set_ylabel(comp)
             # equal limits and x = y line
@@ -562,25 +626,42 @@ def plot_comparison_correlations(
             y = x * slope + intercept
             axis[i, j].plot(x, y, color="orange")
             axis[i, j].text(
-                -7, 7, s="y = {:.2f}x + {:.2f}\n".format(slope, intercept) +
-                "r = {:.3f}\n".format(r) +
-                "p = {:.3E}\n".format(p), fontsize=7, va="top")
+                -7,
+                7,
+                s="y = {:.2f}x + {:.2f}\n".format(slope, intercept)
+                + "r = {:.3f}\n".format(r)
+                + "p = {:.3E}\n".format(p),
+                fontsize=7,
+                va="top",
+            )
 
             # lastly the actual scatter
-            axis[i, j].scatter(a, b, s=2, alpha=0.5, rasterized=True, c=c, cmap="RdBu_r", vmin=-vmax, vmax=vmax)  # color="grey")
+            axis[i, j].scatter(
+                a,
+                b,
+                s=2,
+                alpha=0.5,
+                rasterized=True,
+                c=c,
+                cmap="RdBu_r",
+                vmin=-vmax,
+                vmax=vmax,
+            )  # color="grey")
 
-        for ax in axis[i, (j + 1):]:
+        for ax in axis[i, (j + 1) :]:
             ax.set_visible(False)
     savefig(fig, os.path.join(output_dir, output_prefix + ".lmfit.svg"))
 
-    fig, axis = plt.subplots(rows, cols, figsize=(cols * 3, rows * 3), tight_layout=True)
+    fig, axis = plt.subplots(
+        rows, cols, figsize=(cols * 3, rows * 3), tight_layout=True
+    )
     for i, (base, comps) in enumerate(comps):
-        a = diff.loc[diff['comparison_name'] == base, "log2FoldChange"]
+        a = diff.loc[diff["comparison_name"] == base, "log2FoldChange"]
         sign = (a > 0).astype(int).replace(0, -1)
-        c = sign * (-np.log10(diff.loc[diff['comparison_name'] == base, "pvalue"]))
+        c = sign * (-np.log10(diff.loc[diff["comparison_name"] == base, "pvalue"]))
         vmax = np.sqrt(c.abs().max())
         for j, comp in enumerate(comps):
-            b = diff.loc[diff['comparison_name'] == comp, "log2FoldChange"]
+            b = diff.loc[diff["comparison_name"] == comp, "log2FoldChange"]
             axis[i, j].set_xlabel(base)
             axis[i, j].set_ylabel(comp)
             # equal limits and x = y line
@@ -598,13 +679,18 @@ def plot_comparison_correlations(
             y = x * slope + intercept
             axis[i, j].plot(x, y, color="orange")
             axis[i, j].text(
-                -7, 7, s="y = {:.2f}x + {:.2f}\n".format(slope, intercept) +
-                "r = {:.3f}\n".format(r) +
-                "p = {:.3E}\n".format(p), fontsize=7, va="top")
+                -7,
+                7,
+                s="y = {:.2f}x + {:.2f}\n".format(slope, intercept)
+                + "r = {:.3f}\n".format(r)
+                + "p = {:.3E}\n".format(p),
+                fontsize=7,
+                va="top",
+            )
 
             # lastly the actual scatter
             axis[i, j].scatter(a, b, s=2, alpha=0.5, rasterized=True, color="grey")
 
-        for ax in axis[i, (j + 1):]:
+        for ax in axis[i, (j + 1) :]:
             ax.set_visible(False)
     savefig(fig, os.path.join(output_dir, output_prefix + ".lmfit.no_color.svg"))

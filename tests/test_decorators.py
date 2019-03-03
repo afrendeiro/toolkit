@@ -6,7 +6,7 @@ import pytest
 import os
 
 
-travis = 'TRAVIS' in os.environ
+travis = "TRAVIS" in os.environ
 
 
 @pytest.fixture

@@ -89,17 +89,19 @@ class CNVAnalysis(Analysis):
         # Save object
         a.to_pickle()
     """
+
     def __init__(
-            self,
-            name=None,
-            from_pep=False,
-            from_pickle=False,
-            root_dir=None,
-            data_dir="data",
-            results_dir="results",
-            prj=None,
-            samples=None,
-            **kwargs):
+        self,
+        name=None,
+        from_pep=False,
+        from_pickle=False,
+        root_dir=None,
+        data_dir="data",
+        results_dir="results",
+        prj=None,
+        samples=None,
+        **kwargs
+    ):
         self.data_type = self.__data_type__ = "CNV"
         self.var_unit_name = "bin"
         self.quantity = "copy_number"
@@ -114,17 +116,19 @@ class CNVAnalysis(Analysis):
             results_dir=results_dir,
             prj=prj,
             samples=samples,
-            **kwargs)
+            **kwargs
+        )
 
         if not hasattr(self, "resolutions"):
-            self.resolutions = ['1000kb', '100kb', '20kb', '10kb'],
+            self.resolutions = (["1000kb", "100kb", "20kb", "10kb"],)
 
     def load_data(
-            self,
-            output_map=None,
-            only_these_keys=None,
-            prefix="{results_dir}/{name}",
-            permissive=True):
+        self,
+        output_map=None,
+        only_these_keys=None,
+        prefix="{results_dir}/{name}",
+        permissive=True,
+    ):
         """
         Load the output files of the major functions of the Analysis.
 
@@ -170,14 +174,25 @@ class CNVAnalysis(Analysis):
         if output_map is None:
             kwargs = {"index_col": 0}
             output_map = {
-                "matrix_raw":
-                    (os.path.join(self.results_dir, self.name + ".{}.matrix_raw.csv"), kwargs),
-                "matrix_norm":
-                    (os.path.join(self.results_dir, self.name + ".{}.matrix_norm.csv"), kwargs),
-                "segmentation":
-                    (os.path.join(self.results_dir, self.name + ".{}.segmentation.csv"), {}),
-                "segmentation_annot":
-                    (os.path.join(self.results_dir, self.name + ".{}.segmentation.annotated.csv"), {})}
+                "matrix_raw": (
+                    os.path.join(self.results_dir, self.name + ".{}.matrix_raw.csv"),
+                    kwargs,
+                ),
+                "matrix_norm": (
+                    os.path.join(self.results_dir, self.name + ".{}.matrix_norm.csv"),
+                    kwargs,
+                ),
+                "segmentation": (
+                    os.path.join(self.results_dir, self.name + ".{}.segmentation.csv"),
+                    {},
+                ),
+                "segmentation_annot": (
+                    os.path.join(
+                        self.results_dir, self.name + ".{}.segmentation.annotated.csv"
+                    ),
+                    {},
+                ),
+            }
         if only_these_keys is None:
             only_these_keys = list(output_map.keys())
 
@@ -193,7 +208,9 @@ class CNVAnalysis(Analysis):
                     getattr(self, name)[resolution] = pd.read_csv(file, **kwargs)
                     # Fix possible multiindex for matrix_norm
                     if name == "matrix_norm":
-                        getattr(self, name)[resolution] = fix_dataframe_header(getattr(self, name)[resolution])
+                        getattr(self, name)[resolution] = fix_dataframe_header(
+                            getattr(self, name)[resolution]
+                        )
                 except IOError as e:
                     if not permissive:
                         raise e
@@ -201,7 +218,8 @@ class CNVAnalysis(Analysis):
                         _LOGGER.warning(e)
 
     def get_cnv_data(
-            self, resolutions=None, samples=None, save=True, assign=True, permissive=False):
+        self, resolutions=None, samples=None, save=True, assign=True, permissive=False
+    ):
         """
         Load CNV data from ATAC-seq CNV pipeline and create CNV matrix at various resolutions.
 
@@ -256,15 +274,19 @@ class CNVAnalysis(Analysis):
             for sample in tqdm(samples, total=len(samples), desc="Sample"):
                 # Read log2 file
                 sample.copywriter_output_file = os.path.join(
-                    self.data_dir, sample.name + "_" + resolution,
-                    "CNAprofiles", "log2_read_counts.igv")
+                    self.data_dir,
+                    sample.name + "_" + resolution,
+                    "CNAprofiles",
+                    "log2_read_counts.igv",
+                )
                 try:
                     cov = pd.read_csv(
-                        sample.copywriter_output_file,
-                        sep="\t", comment="#").set_index("Feature")
+                        sample.copywriter_output_file, sep="\t", comment="#"
+                    ).set_index("Feature")
                 except IOError as e:
                     e = "Sample {} does not have a 'log2_read_counts.igv' file: '{}'.".format(
-                        sample.name, sample.copywriter_output_file)
+                        sample.name, sample.copywriter_output_file
+                    )
                     if permissive:
                         print(e)
                         continue
@@ -274,25 +296,34 @@ class CNVAnalysis(Analysis):
                 cov.columns = (
                     cov.columns.str.replace("log2.", "")
                     .str.replace(".trimmed.bowtie2.filtered.bam", "")
-                    .str.replace(".merged.sorted.subsample.bam", ""))
+                    .str.replace(".merged.sorted.subsample.bam", "")
+                )
 
                 # normalize signal to control
-                matrix[resolution][sample.name] = (
-                    np.log2(((0.1 + (2 ** cov.loc[:, sample.name])) /
-                             (0.1 + (2 ** cov.iloc[:, -1]))))
+                matrix[resolution][sample.name] = np.log2(
+                    (
+                        (0.1 + (2 ** cov.loc[:, sample.name]))
+                        / (0.1 + (2 ** cov.iloc[:, -1]))
+                    )
                 )
 
             matrix[resolution].index = (
-                cov['Chromosome'] + ":" +
-                cov['Start'].astype(int).astype(str) + "-" +
-                cov['End'].astype(int).astype(str))
+                cov["Chromosome"]
+                + ":"
+                + cov["Start"].astype(int).astype(str)
+                + "-"
+                + cov["End"].astype(int).astype(str)
+            )
             matrix[resolution].index.name = "index"
 
             if save:
                 matrix[resolution].to_csv(
-                    os.path.join(self.results_dir, self.name + "{}.matrix_raw.csv".format(
-                        resolution)),
-                    index=True)
+                    os.path.join(
+                        self.results_dir,
+                        self.name + "{}.matrix_raw.csv".format(resolution),
+                    ),
+                    index=True,
+                )
 
         if assign:
             self.matrix = matrix
@@ -300,11 +331,14 @@ class CNVAnalysis(Analysis):
         return matrix
 
     def normalize(
-            self,
-            method="median",
-            matrix="matrix_raw", samples=None,
-            save=True, assign=True,
-            **kwargs):
+        self,
+        method="median",
+        matrix="matrix_raw",
+        samples=None,
+        save=True,
+        assign=True,
+        **kwargs
+    ):
         """
         Normalization of dictionary of matrices with (n_features, n_samples).
 
@@ -362,35 +396,48 @@ class CNVAnalysis(Analysis):
         for resolution in resolutions:
             if method == "median":
                 matrix_norm[resolution] = self.normalize_median(
-                    matrix=matrix[resolution],
-                    samples=samples,
-                    save=False, assign=False)
+                    matrix=matrix[resolution], samples=samples, save=False, assign=False
+                )
             elif method == "pca":
                 if "pc" not in kwargs:
-                    raise ValueError("If method is 'pca', the value of 'pc' must be given.")
+                    raise ValueError(
+                        "If method is 'pca', the value of 'pc' must be given."
+                    )
                 matrix_norm[resolution] = self.normalize_pca(
                     matrix=matrix[resolution],
-                    samples=samples, pc=kwargs["pc"],
-                    save=False, assign=False)
+                    samples=samples,
+                    pc=kwargs["pc"],
+                    save=False,
+                    assign=False,
+                )
             else:
                 raise ValueError("Requested method '{}' is not known.".format(method))
 
             if save:
                 matrix_norm[resolution].to_csv(
                     os.path.join(
-                        self.results_dir,
-                        self.name + "{}.matrix_norm.csv".format),
-                    index=True).to_csv(os.path.join(self.results_dir))
+                        self.results_dir, self.name + "{}.matrix_norm.csv".format
+                    ),
+                    index=True,
+                ).to_csv(os.path.join(self.results_dir))
         if assign:
             self.matrix_norm = matrix_norm
         return matrix_norm
 
     def plot_all_data(
-            self, matrix=None, resolutions=None, samples=None,
-            output_dir=None,
-            output_prefix="{analysis_name}.all_data",
-            robust=True, vmin=None, vmax=None, rasterized=True, dpi=300,
-            sample_labels=True):
+        self,
+        matrix=None,
+        resolutions=None,
+        samples=None,
+        output_dir=None,
+        output_prefix="{analysis_name}.all_data",
+        robust=True,
+        vmin=None,
+        vmax=None,
+        rasterized=True,
+        dpi=300,
+        sample_labels=True,
+    ):
         """
         Visualize CNV data genome-wide using heatmaps.
         Will be done independently for each specified resolution.
@@ -459,40 +506,70 @@ class CNVAnalysis(Analysis):
             fig, axis = plt.subplots(1, 1, figsize=(4 * 2, 4 * 1))
             sns.heatmap(
                 matrix[resolution].T,
-                cmap="RdBu_r", center=0, robust=robust, ax=axis, vmin=vmin, vmax=vmax,
-                rasterized=rasterized, xticklabels=False,
+                cmap="RdBu_r",
+                center=0,
+                robust=robust,
+                ax=axis,
+                vmin=vmin,
+                vmax=vmax,
+                rasterized=rasterized,
+                xticklabels=False,
                 yticklabels=names if sample_labels else False,
-                cbar_kws={"label": "log2(change)"})
+                cbar_kws={"label": "log2(change)"},
+            )
             axis.set_xlabel("Chromosome position")
             axis.set_ylabel("Sample")
             fig.savefig(
                 os.path.join(
                     self.results_dir,
-                    self.name + "{}.{}.full_data.heatmap.svg".format(resolution, output_prefix)),
-                bbox_inches="tight", dpi=dpi)
+                    self.name
+                    + "{}.{}.full_data.heatmap.svg".format(resolution, output_prefix),
+                ),
+                bbox_inches="tight",
+                dpi=dpi,
+            )
 
             grid = sns.clustermap(
-                matrix[resolution].fillna(0).T, metric="correlation",
-                cmap="RdBu_r", center=0, col_cluster=False,
-                robust=robust, vmin=vmin, vmax=vmax,
-                rasterized=rasterized, xticklabels=False,
+                matrix[resolution].fillna(0).T,
+                metric="correlation",
+                cmap="RdBu_r",
+                center=0,
+                col_cluster=False,
+                robust=robust,
+                vmin=vmin,
+                vmax=vmax,
+                rasterized=rasterized,
+                xticklabels=False,
                 yticklabels=names if sample_labels else False,
-                cbar_kws={"label": "log2(change)"}, figsize=(4 * 2, 4 * 1))
+                cbar_kws={"label": "log2(change)"},
+                figsize=(4 * 2, 4 * 1),
+            )
             grid.ax_heatmap.set_xlabel("Chromosome position")
             grid.ax_heatmap.set_ylabel("Sample")
             grid.savefig(
                 os.path.join(
                     self.results_dir,
-                    self.name + "{}.{}.full_data.fillna.clustermap.svg"
-                                .format(resolution, output_prefix)),
-                bbox_inches="tight", dpi=dpi)
+                    self.name
+                    + "{}.{}.full_data.fillna.clustermap.svg".format(
+                        resolution, output_prefix
+                    ),
+                ),
+                bbox_inches="tight",
+                dpi=dpi,
+            )
 
     def plot_stats_per_chromosome(
-            self, matrix="matrix_norm", resolutions=None, samples=None,
-            output_dir=None,
-            output_prefix="{analysis_name}.all_data",
-            robust=True, rasterized=True, dpi=300,
-            sample_labels=True):
+        self,
+        matrix="matrix_norm",
+        resolutions=None,
+        samples=None,
+        output_dir=None,
+        output_prefix="{analysis_name}.all_data",
+        robust=True,
+        rasterized=True,
+        dpi=300,
+        sample_labels=True,
+    ):
         """
         Visualize mean and variation of CNV data for each chromosome using heatmaps.
         Will be done independently for each specified resolution.
@@ -549,59 +626,109 @@ class CNVAnalysis(Analysis):
         # Plot mean and variationper chromosome
         for resolution in tqdm(resolutions, desc="Resolution"):
             for label, function in tqdm(
-                    [("variation", np.std), ("mean", np.mean)], desc="metric"):
+                [("variation", np.std), ("mean", np.mean)], desc="metric"
+            ):
                 to_plot = matrix[resolution].copy()
                 names = [s.name for s in samples if s.name in to_plot.columns]
                 to_plot = to_plot.loc[:, names]
-                to_plot['chr'] = map(lambda x: x[0], to_plot.index.str.split(":"))
+                to_plot["chr"] = map(lambda x: x[0], to_plot.index.str.split(":"))
 
                 p = to_plot[names + ["chr"]].groupby("chr").apply(function)
                 grid = sns.clustermap(
                     p + p.min().min(),
-                    cbar_kws={"label": label}, cmap="Greens",
-                    xticklabels=sample_labels, yticklabels=True, rasterized=rasterized)
-                grid.ax_heatmap.set_yticklabels(grid.ax_heatmap.get_yticklabels(), rotation=0)
-                grid.ax_heatmap.set_xticklabels(grid.ax_heatmap.get_xticklabels(), rotation=90)
+                    cbar_kws={"label": label},
+                    cmap="Greens",
+                    xticklabels=sample_labels,
+                    yticklabels=True,
+                    rasterized=rasterized,
+                )
+                grid.ax_heatmap.set_yticklabels(
+                    grid.ax_heatmap.get_yticklabels(), rotation=0
+                )
+                grid.ax_heatmap.set_xticklabels(
+                    grid.ax_heatmap.get_xticklabels(), rotation=90
+                )
                 grid.savefig(
                     os.path.join(
                         output_dir,
-                        self.name + ".{}.".format(resolution) + output_prefix +
-                        ".{}_per_chrom.svg".format(label)),
-                    bbox_inches="tight", dpi=dpi)
+                        self.name
+                        + ".{}.".format(resolution)
+                        + output_prefix
+                        + ".{}_per_chrom.svg".format(label),
+                    ),
+                    bbox_inches="tight",
+                    dpi=dpi,
+                )
 
-                p = to_plot.loc[
-                    ~to_plot['chr'].str.contains("X|Y"),
-                    names + ["chr"]].groupby("chr").apply(function)
+                p = (
+                    to_plot.loc[~to_plot["chr"].str.contains("X|Y"), names + ["chr"]]
+                    .groupby("chr")
+                    .apply(function)
+                )
                 grid = sns.clustermap(
                     p + abs(p.min().min()),
-                    cbar_kws={"label": label}, cmap="Greens",
+                    cbar_kws={"label": label},
+                    cmap="Greens",
                     xticklabels=sample_labels,
-                    yticklabels=True, rasterized=rasterized, robust=robust)
-                grid.ax_heatmap.set_yticklabels(grid.ax_heatmap.get_yticklabels(), rotation=0)
-                grid.ax_heatmap.set_xticklabels(grid.ax_heatmap.get_xticklabels(), rotation=90)
+                    yticklabels=True,
+                    rasterized=rasterized,
+                    robust=robust,
+                )
+                grid.ax_heatmap.set_yticklabels(
+                    grid.ax_heatmap.get_yticklabels(), rotation=0
+                )
+                grid.ax_heatmap.set_xticklabels(
+                    grid.ax_heatmap.get_xticklabels(), rotation=90
+                )
                 grid.savefig(
                     os.path.join(
                         output_dir,
-                        self.name + ".{}.".format(resolution) +
-                        output_prefix + ".{}_per_chrom.no_sex_chroms.svg".format(label)),
-                    bbox_inches="tight", dpi=dpi)
+                        self.name
+                        + ".{}.".format(resolution)
+                        + output_prefix
+                        + ".{}_per_chrom.no_sex_chroms.svg".format(label),
+                    ),
+                    bbox_inches="tight",
+                    dpi=dpi,
+                )
 
                 grid = sns.clustermap(
                     p,
-                    cbar_kws={"label": label + " (Z-score)"}, cmap="RdBu_r", center=0, z_score=1,
-                    xticklabels=sample_labels, yticklabels=True,
-                    rasterized=rasterized, robust=robust)
-                grid.ax_heatmap.set_yticklabels(grid.ax_heatmap.get_yticklabels(), rotation=0)
-                grid.ax_heatmap.set_xticklabels(grid.ax_heatmap.get_xticklabels(), rotation=90)
+                    cbar_kws={"label": label + " (Z-score)"},
+                    cmap="RdBu_r",
+                    center=0,
+                    z_score=1,
+                    xticklabels=sample_labels,
+                    yticklabels=True,
+                    rasterized=rasterized,
+                    robust=robust,
+                )
+                grid.ax_heatmap.set_yticklabels(
+                    grid.ax_heatmap.get_yticklabels(), rotation=0
+                )
+                grid.ax_heatmap.set_xticklabels(
+                    grid.ax_heatmap.get_xticklabels(), rotation=90
+                )
                 grid.savefig(
                     os.path.join(
                         output_dir,
-                        self.name + ".{}.".format(resolution) +
-                        output_prefix + ".{}_per_chrom.no_sex_chroms.zscore.svg".format(label)),
-                    bbox_inches="tight", dpi=dpi)
+                        self.name
+                        + ".{}.".format(resolution)
+                        + output_prefix
+                        + ".{}_per_chrom.no_sex_chroms.zscore.svg".format(label),
+                    ),
+                    bbox_inches="tight",
+                    dpi=dpi,
+                )
 
     def segment_genome(
-            self, matrix="matrix_norm", resolutions=None, samples=None, save=True, assign=True):
+        self,
+        matrix="matrix_norm",
+        resolutions=None,
+        samples=None,
+        save=True,
+        assign=True,
+    ):
         """
         Segment CNV data to create calls of significant deviations.
         Will be done independently for each specified resolution.
@@ -646,15 +773,16 @@ class CNVAnalysis(Analysis):
         from rpy2.rinterface import RRuntimeWarning
         from rpy2.robjects import numpy2ri, pandas2ri
         import rpy2.robjects as robjects
+
         warnings.filterwarnings("ignore", category=RRuntimeWarning)
         numpy2ri.activate()
         pandas2ri.activate()
 
         robjects.r('require("DNAcopy")')
-        _CNA = robjects.r('CNA')
-        _segment = robjects.r('segment')
-        _segments_p = robjects.r('segments.p')
-        _segments_summary = robjects.r('segments.summary')
+        _CNA = robjects.r("CNA")
+        _segment = robjects.r("segment")
+        _segments_p = robjects.r("segments.p")
+        _segments_summary = robjects.r("segments.summary")
         # _plotSample = robjects.r('plotSample')
 
         if matrix is None:
@@ -666,8 +794,15 @@ class CNVAnalysis(Analysis):
 
         segmentation = dict()
         for resolution in tqdm(resolutions, desc="Resolution"):
-            chrom = np.array(map(lambda x: x[0], matrix[resolution].index.str.split(":")))
-            start = np.array(map(lambda x: int(x[1].split("-")[0]), matrix[resolution].index.str.split(":")))
+            chrom = np.array(
+                map(lambda x: x[0], matrix[resolution].index.str.split(":"))
+            )
+            start = np.array(
+                map(
+                    lambda x: int(x[1].split("-")[0]),
+                    matrix[resolution].index.str.split(":"),
+                )
+            )
 
             names = [s.name for s in samples]
             cna = _CNA(matrix[resolution].loc[:, names], chrom=chrom, maploc=start)
@@ -684,31 +819,56 @@ class CNVAnalysis(Analysis):
             for col in seg.columns[5:]:
                 seg[col] = seg[col].replace("NA", np.nan).astype(float)
 
-            sample_labels = pd.Series(dict(zip(
-                ["Sample.{}".format(i) for i in range(1, len(names) + 1)],
-                names)), name="sample_name").to_frame()
+            sample_labels = pd.Series(
+                dict(
+                    zip(
+                        ["Sample.{}".format(i) for i in range(1, len(names) + 1)], names
+                    )
+                ),
+                name="sample_name",
+            ).to_frame()
             sample_labels.index.name = "ID"
 
-            segmentation[resolution] = pd.merge(sample_labels.reset_index(), seg).drop("ID", axis=1)
+            segmentation[resolution] = pd.merge(sample_labels.reset_index(), seg).drop(
+                "ID", axis=1
+            )
 
-            segmentation[resolution].columns = (
-                ['sample_name', 'chrom', 'start', 'end', 'bin_size'] +
-                ['segment_mean', 'B_stat', 'p_value', "lcl", "ucl", 'segment_std', "segment_median", "segment_mad"])
+            segmentation[resolution].columns = [
+                "sample_name",
+                "chrom",
+                "start",
+                "end",
+                "bin_size",
+            ] + [
+                "segment_mean",
+                "B_stat",
+                "p_value",
+                "lcl",
+                "ucl",
+                "segment_std",
+                "segment_median",
+                "segment_mad",
+            ]
             segmentation[resolution]["segment_length"] = (
-                segmentation[resolution]['end'] -
-                segmentation[resolution]['start']) + int(resolution.replace("kb", "")) * 1000
+                segmentation[resolution]["end"] - segmentation[resolution]["start"]
+            ) + int(resolution.replace("kb", "")) * 1000
 
             if save:
                 segmentation[resolution].to_csv(
-                    os.path.join(self.results_dir, self.name + ".{}.segmentation.csv".format(resolution)),
-                    index=False)
+                    os.path.join(
+                        self.results_dir,
+                        self.name + ".{}.segmentation.csv".format(resolution),
+                    ),
+                    index=False,
+                )
         if assign:
             self.segmentation = segmentation
 
         return segmentation
 
     def annotate_with_chrom_bands(
-            self, segmentation=None, resolutions=None, save=True, assign=True):
+        self, segmentation=None, resolutions=None, save=True, assign=True
+    ):
         """
         Annotate segmentation with chromosome bands and overlaping genes.
         Will be done independently for each specified resolution.
@@ -752,47 +912,71 @@ class CNVAnalysis(Analysis):
             segmentation = self.segmentation
 
         annotation = query_biomart(
-            attributes=["chromosome_name", "start_position", "end_position", "external_gene_name", "band"])
+            attributes=[
+                "chromosome_name",
+                "start_position",
+                "end_position",
+                "external_gene_name",
+                "band",
+            ]
+        )
 
         annotation["chromosome_name"] = "chr" + annotation["chromosome_name"]
-        annotation = annotation[~annotation['chromosome_name'].str.contains("_")]
-        annotation['band'] = annotation['chromosome_name'] + "_" + annotation['band']
+        annotation = annotation[~annotation["chromosome_name"].str.contains("_")]
+        annotation["band"] = annotation["chromosome_name"] + "_" + annotation["band"]
         annotation_bed = pybedtools.BedTool.from_dataframe(annotation.fillna("NA"))
 
         segmentation_annot = dict()
         for resolution in resolutions:
             seg = segmentation[resolution]
-            seg['chrom'] = "chr" + (seg['chrom'].astype(int).astype(str)
-                                    .replace("23", "X").replace("24", "Y"))
-            seg['start'] = seg['start'].astype(int)
-            seg['end'] = seg['end'].astype(int)
-            seg_bed = pybedtools.BedTool.from_dataframe(seg[['chrom', 'start', 'end']])
+            seg["chrom"] = "chr" + (
+                seg["chrom"]
+                .astype(int)
+                .astype(str)
+                .replace("23", "X")
+                .replace("24", "Y")
+            )
+            seg["start"] = seg["start"].astype(int)
+            seg["end"] = seg["end"].astype(int)
+            seg_bed = pybedtools.BedTool.from_dataframe(seg[["chrom", "start", "end"]])
 
             inter = seg_bed.intersect(annotation_bed, wa=True, wb=True).to_dataframe()
-            annot = inter.groupby(['chrom', 'start', 'end'])['thickStart'].apply(
-                lambda x: string.join(set(x)))
-            annot_band = inter.groupby(['chrom', 'start', 'end'])['thickEnd'].apply(
-                lambda x: string.join(set(x)))
+            annot = inter.groupby(["chrom", "start", "end"])["thickStart"].apply(
+                lambda x: string.join(set(x))
+            )
+            annot_band = inter.groupby(["chrom", "start", "end"])["thickEnd"].apply(
+                lambda x: string.join(set(x))
+            )
             annot_band.name = "chromosome_band"
             annot = annot.to_frame(name="gene").join(annot_band)
 
-            seg_annot = seg.set_index(['chrom', 'start', 'end']).join(annot).reset_index()
+            seg_annot = (
+                seg.set_index(["chrom", "start", "end"]).join(annot).reset_index()
+            )
             segmentation_annot[resolution] = seg_annot.reindex(
-                seg.columns.tolist() + ['chromosome_band', 'gene'], axis=1)
+                seg.columns.tolist() + ["chromosome_band", "gene"], axis=1
+            )
 
             if save:
                 segmentation_annot[resolution].to_csv(
                     os.path.join(
                         self.results_dir,
-                        self.name + ".{}.segmentation.annotated.csv".format(resolution)),
-                    index=False)
+                        self.name + ".{}.segmentation.annotated.csv".format(resolution),
+                    ),
+                    index=False,
+                )
 
         if assign:
             self.segmentation_annot = segmentation_annot
 
     def plot_segmentation_stats(
-            self, segmentation=None, resolutions=None, per_sample=False,
-            output_dir=None, output_prefix="{resolution}.segmentation_metrics"):
+        self,
+        segmentation=None,
+        resolutions=None,
+        per_sample=False,
+        output_dir=None,
+        output_prefix="{resolution}.segmentation_metrics",
+    ):
         """
         Visualize distribution of statistics of CNV data segmentation.
         Will be done independently for each specified resolution.
@@ -829,23 +1013,35 @@ class CNVAnalysis(Analysis):
             output_dir = self.results_dir
 
         metric_vars = [
-            'bin_size', 'segment_mean', 'B_stat', 'p_value', 'lcl', 'ucl',
-            'segment_std', 'segment_median', 'segment_mad', 'segment_length']
+            "bin_size",
+            "segment_mean",
+            "B_stat",
+            "p_value",
+            "lcl",
+            "ucl",
+            "segment_std",
+            "segment_median",
+            "segment_mad",
+            "segment_length",
+        ]
 
         for resolution in resolutions:
             segments = segmentation[resolution]
-            segments['log_p_value'] = -np.log10(segments['p_value'].astype(float))
+            segments["log_p_value"] = -np.log10(segments["p_value"].astype(float))
 
             grid = sns.pairplot(
-                segments[metric_vars + ['log_p_value']].dropna(),
-                vars=metric_vars + ['log_p_value'],
+                segments[metric_vars + ["log_p_value"]].dropna(),
+                vars=metric_vars + ["log_p_value"],
                 plot_kws=dict(s=3, alpha=0.2, linewidth=0, rasterized=True),
-                diag_kws=dict(rasterized=True))
+                diag_kws=dict(rasterized=True),
+            )
             if "{resolution}" in output_prefix:
                 op = output_prefix.format(resolution=resolution)
             grid.savefig(
                 os.path.join(output_dir, op + ".all_samples.svg"),
-                dpi=300, bbox_inches="tight")
+                dpi=300,
+                bbox_inches="tight",
+            )
 
         # if per_sample:
 
@@ -877,7 +1073,8 @@ def all_to_igv(matrix, output_prefix, **kwargs):
         igvs[resolution] = to_igv(
             matrix[resolution],
             output_file="{}_{}".format(output_prefix, resolution),
-            **kwargs)
+            **kwargs
+        )
 
     return igvs
 
@@ -916,20 +1113,29 @@ def to_igv(matrix, output_file=None, save=True, view_limits=(-2, 2)):
 
     # as IGV file
     igv = pd.DataFrame(index=matrix.index)
-    igv.loc[:, 'Chromosome'] = map(lambda x: x[0], matrix.index.str.split(":"))
-    igv.loc[:, 'Start'] = map(lambda x: int(x[1].split("-")[0]), matrix.index.str.split(":"))
-    igv.loc[:, 'End'] = map(lambda x: int(x[1].split("-")[1]), matrix.index.str.split(":"))
-    igv.loc[:, 'Name'] = igv.index
+    igv.loc[:, "Chromosome"] = map(lambda x: x[0], matrix.index.str.split(":"))
+    igv.loc[:, "Start"] = map(
+        lambda x: int(x[1].split("-")[0]), matrix.index.str.split(":")
+    )
+    igv.loc[:, "End"] = map(
+        lambda x: int(x[1].split("-")[1]), matrix.index.str.split(":")
+    )
+    igv.loc[:, "Name"] = igv.index
 
     igv = igv.join(matrix).reset_index(drop=True)
 
     if save:
         if output_file is None:
-            raise ValueError("If the 'save' option is specified, 'output_file' must also be!")
-        open(output_file, 'w')
-        output_handle = open(output_file, 'a')
-        output_handle.write('#track viewLimits=-{}:{} graphType=heatmap color=255,0,0\n'
-                            .format(*view_limits))
+            raise ValueError(
+                "If the 'save' option is specified, 'output_file' must also be!"
+            )
+        open(output_file, "w")
+        output_handle = open(output_file, "a")
+        output_handle.write(
+            "#track viewLimits=-{}:{} graphType=heatmap color=255,0,0\n".format(
+                *view_limits
+            )
+        )
         igv.to_csv(output_handle, sep="\t", index=False)
         output_handle.close()
 

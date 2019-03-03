@@ -7,14 +7,15 @@ import os
 import matplotlib.pyplot as plt
 from ngs_toolkit import _LOGGER
 from ngs_toolkit.analysis import Analysis
-from ngs_toolkit.decorators import (
-    check_organism_genome, check_has_sites)
-from ngs_toolkit.general import (
-    meme_ame, homer_motifs, lola, enrichr)
+from ngs_toolkit.decorators import check_organism_genome, check_has_sites
+from ngs_toolkit.general import meme_ame, homer_motifs, lola, enrichr
 from ngs_toolkit.utils import (
-    bed_to_index, bed_to_fasta,
-    log_pvalues, standard_score,
-    count_reads_in_intervals)
+    bed_to_index,
+    bed_to_fasta,
+    log_pvalues,
+    standard_score,
+    count_reads_in_intervals,
+)
 import numpy as np
 import pandas as pd
 import parmap
@@ -108,17 +109,19 @@ class ATACSeqAnalysis(Analysis):
         # Save object
         a.to_pickle()
     """
+
     def __init__(
-            self,
-            name=None,
-            from_pep=False,
-            from_pickle=False,
-            root_dir=None,
-            data_dir="data",
-            results_dir="results",
-            prj=None,
-            samples=None,
-            **kwargs):
+        self,
+        name=None,
+        from_pep=False,
+        from_pickle=False,
+        root_dir=None,
+        data_dir="data",
+        results_dir="results",
+        prj=None,
+        samples=None,
+        **kwargs
+    ):
         self.data_type = self.__data_type__ = "ATAC-seq"
         self.var_unit_name = "region"
         self.quantity = "accessibility"
@@ -133,14 +136,16 @@ class ATACSeqAnalysis(Analysis):
             results_dir=results_dir,
             prj=prj,
             samples=samples,
-            **kwargs)
+            **kwargs
+        )
 
     def load_data(
-            self,
-            output_map=None,
-            only_these_keys=None,
-            prefix="{results_dir}/{name}",
-            permissive=True):
+        self,
+        output_map=None,
+        only_these_keys=None,
+        prefix="{results_dir}/{name}",
+        permissive=True,
+    ):
         """
         Load the output files of the major functions of the Analysis.
 
@@ -188,44 +193,59 @@ class ATACSeqAnalysis(Analysis):
         if output_map is None:
             kwargs = {"index_col": 0}
             output_map = {
-                "sites":
-                    (prefix + ".peak_set.bed", {}),
-                "matrix_raw":
-                    (prefix + ".matrix_raw.csv", kwargs),
-                "matrix_norm":
-                    (prefix + ".matrix_norm.csv",
-                        {"index_col": 0, "header": None}),
-                "matrix_features":
-                    (prefix + ".matrix_features.csv", kwargs),
-                "support":
-                    (prefix + ".support.csv", kwargs),
-                "nuc":
-                    (prefix + ".gccontent_length.csv", kwargs),
-                "gene_annotation":
-                    (prefix + ".gene_annotation.csv", kwargs),
-                "closest_tss_distances":
-                    (prefix + ".closest_tss_distances.csv", kwargs),
-                "region_annotation":
-                    (prefix + ".region_annotation.csv", kwargs),
-                "region_annotation_b":
-                    (prefix + ".region_annotation_background.csv", kwargs),
-                "region_annotation_mapping":
-                    (prefix + ".region_annotation_mapping.csv", kwargs),
-                "region_annotation_b_mapping":
-                    (prefix + ".region_annotation_background_mapping.csv", kwargs),
-                "chrom_state_annotation":
-                    (prefix + ".chrom_state_annotation.csv", kwargs),
-                "chrom_state_annotation_b":
-                    (prefix + ".chrom_state_annotation_background.csv", kwargs),
-                "chrom_state_annotation_mapping":
-                    (prefix + ".chrom_state_annotation_mapping.csv", kwargs),
-                "chrom_state_annotation_b_mapping":
-                    (prefix + ".chrom_state_annotation_background_mapping.csv", kwargs),
-                "stats":
-                    (prefix + ".stats_per_region.csv", kwargs),
-                "differential_results":
-                    (os.path.join(self.results_dir, "differential_analysis_{}".format(self.data_type),
-                                  "differential_analysis.deseq_result.all_comparisons.csv"), kwargs)}
+                "sites": (prefix + ".peak_set.bed", {}),
+                "matrix_raw": (prefix + ".matrix_raw.csv", kwargs),
+                "matrix_norm": (
+                    prefix + ".matrix_norm.csv",
+                    {"index_col": 0, "header": None},
+                ),
+                "matrix_features": (prefix + ".matrix_features.csv", kwargs),
+                "support": (prefix + ".support.csv", kwargs),
+                "nuc": (prefix + ".gccontent_length.csv", kwargs),
+                "gene_annotation": (prefix + ".gene_annotation.csv", kwargs),
+                "closest_tss_distances": (
+                    prefix + ".closest_tss_distances.csv",
+                    kwargs,
+                ),
+                "region_annotation": (prefix + ".region_annotation.csv", kwargs),
+                "region_annotation_b": (
+                    prefix + ".region_annotation_background.csv",
+                    kwargs,
+                ),
+                "region_annotation_mapping": (
+                    prefix + ".region_annotation_mapping.csv",
+                    kwargs,
+                ),
+                "region_annotation_b_mapping": (
+                    prefix + ".region_annotation_background_mapping.csv",
+                    kwargs,
+                ),
+                "chrom_state_annotation": (
+                    prefix + ".chrom_state_annotation.csv",
+                    kwargs,
+                ),
+                "chrom_state_annotation_b": (
+                    prefix + ".chrom_state_annotation_background.csv",
+                    kwargs,
+                ),
+                "chrom_state_annotation_mapping": (
+                    prefix + ".chrom_state_annotation_mapping.csv",
+                    kwargs,
+                ),
+                "chrom_state_annotation_b_mapping": (
+                    prefix + ".chrom_state_annotation_background_mapping.csv",
+                    kwargs,
+                ),
+                "stats": (prefix + ".stats_per_region.csv", kwargs),
+                "differential_results": (
+                    os.path.join(
+                        self.results_dir,
+                        "differential_analysis_{}".format(self.data_type),
+                        "differential_analysis.deseq_result.all_comparisons.csv",
+                    ),
+                    kwargs,
+                ),
+            }
 
         if only_these_keys is None:
             only_these_keys = list(output_map.keys())
@@ -235,7 +255,9 @@ class ATACSeqAnalysis(Analysis):
             self,
             output_map={k: v for k, v in output_map.items() if k != "sites"},
             only_these_keys=only_these_keys,
-            prefix=prefix, permissive=permissive)
+            prefix=prefix,
+            permissive=permissive,
+        )
 
         # Special case
         if "sites" in only_these_keys:
@@ -252,8 +274,8 @@ class ATACSeqAnalysis(Analysis):
     def check_region_index(matrix):
         return (
             matrix.index.str.contains(":").all()
-            and
-            matrix.index.str.contains("-").all())
+            and matrix.index.str.contains("-").all()
+        )
 
     @staticmethod
     def set_region_index(matrix):
@@ -261,23 +283,28 @@ class ATACSeqAnalysis(Analysis):
             _LOGGER.warning("Matrix already has well-formatted index.")
             return matrix
         else:
-            req = ['chrom', 'start', 'end']
+            req = ["chrom", "start", "end"]
             if all([x in matrix.columns for x in req]):
                 matrix.index = (
-                    matrix['chrom'].astype(str) +
-                    ":" +
-                    matrix['start'].astype(str) +
-                    "-" +
-                    matrix['end'].astype(str))
+                    matrix["chrom"].astype(str)
+                    + ":"
+                    + matrix["start"].astype(str)
+                    + "-"
+                    + matrix["end"].astype(str)
+                )
             else:
                 raise ValueError()
 
     def get_consensus_sites(
-            self, samples=None, region_type="summits", extension=250,
-            blacklist_bed=None,
-            filter_mito_chr=True,
-            permissive=False,
-            **kwargs):
+        self,
+        samples=None,
+        region_type="summits",
+        extension=250,
+        blacklist_bed=None,
+        filter_mito_chr=True,
+        permissive=False,
+        **kwargs
+    ):
         """
         Get consensus (union) of enriched sites (peaks) across samples.
         There are two modes possible, defined by the value of ``region_type``:
@@ -324,7 +351,7 @@ class ATACSeqAnalysis(Analysis):
         sites : pybedtools.BedTool
             Sets a `sites` variable with consensus peak set.
         """
-        if region_type not in ['summits', 'peaks']:
+        if region_type not in ["summits", "peaks"]:
             msg = "`region_type` attribute must be one of 'summits' or 'peaks'!"
             _LOGGER.error(msg)
             raise ValueError(msg)
@@ -333,12 +360,16 @@ class ATACSeqAnalysis(Analysis):
             samples = self.samples
 
         # Check which samples to run (dependent on permissive)
-        samples = self._get_samples_with_input_file(region_type, permissive=permissive, samples=samples)
+        samples = self._get_samples_with_input_file(
+            region_type, permissive=permissive, samples=samples
+        )
 
         if blacklist_bed is None:
             _LOGGER.info("Blacklist file not provided. Downloading...")
             try:
-                blacklist_bed = self.get_resources(steps=["blacklist"])["blacklist_file"]
+                blacklist_bed = self.get_resources(steps=["blacklist"])[
+                    "blacklist_file"
+                ]
             except AttributeError:
                 msg = "Blacklist file was not provided and cannot be"
                 msg += " get one without analysis having `organism` and `genome` set."
@@ -349,11 +380,16 @@ class ATACSeqAnalysis(Analysis):
             # print(sample.name)
             if region_type == "summits":
                 try:
-                    peaks = pybedtools.BedTool(sample.summits).slop(b=extension, genome=sample.genome)
+                    peaks = pybedtools.BedTool(sample.summits).slop(
+                        b=extension, genome=sample.genome
+                    )
                 except ValueError as e:
                     if permissive:
                         _LOGGER.warning(
-                            "Summits for sample {} ({}) not found!".format(sample, sample.summits))
+                            "Summits for sample {} ({}) not found!".format(
+                                sample, sample.summits
+                            )
+                        )
                         continue
                     else:
                         raise e
@@ -363,7 +399,10 @@ class ATACSeqAnalysis(Analysis):
                 except ValueError as e:
                     if permissive:
                         _LOGGER.warning(
-                            "Peaks for sample {} ({}) not found!".format(sample, sample.peaks))
+                            "Peaks for sample {} ({}) not found!".format(
+                                sample, sample.peaks
+                            )
+                        )
                         continue
                     else:
                         raise e
@@ -390,13 +429,15 @@ class ATACSeqAnalysis(Analysis):
                 sites = sites.intersect(v=True, b=blacklist)
         # # remove chrM peaks
         if filter_mito_chr:
-            sites = sites.filter(lambda x: x.chrom != 'chrM')
+            sites = sites.filter(lambda x: x.chrom != "chrM")
 
         # Save
         sites.saveas(os.path.join(self.results_dir, self.name + ".peak_set.bed"))
 
         # Read up again
-        self.sites = pybedtools.BedTool(os.path.join(self.results_dir, self.name + ".peak_set.bed"))
+        self.sites = pybedtools.BedTool(
+            os.path.join(self.results_dir, self.name + ".peak_set.bed")
+        )
 
     def set_consensus_sites(self, bed_file, overwrite=True):
         """
@@ -429,11 +470,8 @@ class ATACSeqAnalysis(Analysis):
 
     @check_has_sites
     def calculate_peak_support(
-            self,
-            samples=None,
-            region_type="summits",
-            permissive=False,
-            **kwargs):
+        self, samples=None, region_type="summits", permissive=False, **kwargs
+    ):
         """
         Count number of called peaks per sample in the consensus region set.
         In addition calculate a measure of peak support (or ubiquitouness) by
@@ -475,7 +513,9 @@ class ATACSeqAnalysis(Analysis):
             samples = self.samples
 
         # Check which samples to run (dependent on permissive)
-        samples = self._get_samples_with_input_file(region_type, permissive=permissive, samples=samples)
+        samples = self._get_samples_with_input_file(
+            region_type, permissive=permissive, samples=samples
+        )
 
         # calculate support (number of samples overlaping each merged peak)
         for i, sample in tqdm(enumerate(samples), total=len(samples), desc="Sample"):
@@ -491,30 +531,48 @@ class ATACSeqAnalysis(Analysis):
 
         try:
             support = support.to_dataframe()
-        except (ValueError, pybedtools.MalformedBedLineError, pybedtools.helpers.BEDToolsError, OverflowError):
-            _LOGGER.debug("Could not convert support intersection directly to dataframe, saving temporarly file.")
+        except (
+            ValueError,
+            pybedtools.MalformedBedLineError,
+            pybedtools.helpers.BEDToolsError,
+            OverflowError,
+        ):
+            _LOGGER.debug(
+                "Could not convert support intersection directly to dataframe, saving temporarly file."
+            )
             support.saveas("_tmp.peaks.bed")
             support = pd.read_csv("_tmp.peaks.bed", sep="\t", header=None)
             os.remove("_tmp.peaks.bed")
 
-        support.columns = ["chrom", "start", "end"] + [sample.name for sample in samples]
+        support.columns = ["chrom", "start", "end"] + [
+            sample.name for sample in samples
+        ]
         support.index = pd.Index(
-            support['chrom'] + ":" + support['start'].astype(str) + "-" + support['end'].astype(str), name="index")
-        support.to_csv(os.path.join(self.results_dir, self.name + ".binary_overlap_support.csv"), index=True)
+            support["chrom"]
+            + ":"
+            + support["start"].astype(str)
+            + "-"
+            + support["end"].astype(str),
+            name="index",
+        )
+        support.to_csv(
+            os.path.join(self.results_dir, self.name + ".binary_overlap_support.csv"),
+            index=True,
+        )
 
         # divide sum (of unique overlaps) by total to get support value between 0 and 1
-        support.loc[:, "support"] = (
-            support[[sample.name for sample in samples]]
-            .apply(lambda x: sum([i if i <= 1 else 1 for i in x]) / float(len(samples)), axis=1))
+        support.loc[:, "support"] = support[[sample.name for sample in samples]].apply(
+            lambda x: sum([i if i <= 1 else 1 for i in x]) / float(len(samples)), axis=1
+        )
         # save
-        support.to_csv(os.path.join(self.results_dir, self.name + ".support.csv"), index=True)
+        support.to_csv(
+            os.path.join(self.results_dir, self.name + ".support.csv"), index=True
+        )
 
-        setattr(self, 'support', support)
+        setattr(self, "support", support)
         return self.support
 
-    def get_supported_peaks(
-            self, samples=None,
-            **kwargs):
+    def get_supported_peaks(self, samples=None, **kwargs):
         """
         Get mask of sites with 0 support in the given samples.
         Requires support matrix produced by `ngs_toolkit.atacseq.ATACSeqAnalysis.calculate_peak_support`.
@@ -537,9 +595,16 @@ class ATACSeqAnalysis(Analysis):
         return self.support.loc[:, [s.name for s in samples]].sum(1) != 0
 
     def measure_coverage(
-            self, samples=None, sites=None, assign=True,
-            save=True, output_file=None, permissive=False,
-            distributed=False, peak_set_name="peak_set"):
+        self,
+        samples=None,
+        sites=None,
+        assign=True,
+        save=True,
+        output_file=None,
+        permissive=False,
+        distributed=False,
+        peak_set_name="peak_set",
+    ):
         """
         Measure read coverage (counts) of each sample in each region in consensus sites.
         Uses parallel computing using the `parmap` library.
@@ -598,11 +663,14 @@ class ATACSeqAnalysis(Analysis):
             Pandas DataFrame with read counts of shape (n_sites, m_samples).
         """
         from pypiper.ngstk import NGSTk
+
         if samples is None:
             samples = self.samples
 
         # Check which samples to run (dependent on permissive)
-        samples = self._get_samples_with_input_file("aligned_filtered_bam", permissive=permissive, samples=samples)
+        samples = self._get_samples_with_input_file(
+            "aligned_filtered_bam", permissive=permissive, samples=samples
+        )
 
         if sites is None:
             sites = self.sites
@@ -612,33 +680,39 @@ class ATACSeqAnalysis(Analysis):
             # make strings with intervals
             if isinstance(sites, pybedtools.BedTool):
                 sites_str = [
-                    str(i.chrom) + ":" +
-                    str(i.start) + "-" +
-                    str(i.stop) for i in self.sites]
+                    str(i.chrom) + ":" + str(i.start) + "-" + str(i.stop)
+                    for i in self.sites
+                ]
             elif isinstance(sites, pd.core.frame.DataFrame):
                 sites_str = (
-                    sites.iloc[:, 0] + ":" +
-                    sites.iloc[:, 1].astype(str) + "-" +
-                    sites.iloc[:, 2].astype(str)).astype(str).tolist()
+                    (
+                        sites.iloc[:, 0]
+                        + ":"
+                        + sites.iloc[:, 1].astype(str)
+                        + "-"
+                        + sites.iloc[:, 2].astype(str)
+                    )
+                    .astype(str)
+                    .tolist()
+                )
             elif isinstance(sites, str):
                 sites_str = [
-                    str(i.chrom) + ":" +
-                    str(i.start) + "-" +
-                    str(i.stop) for i in pybedtools.BedTool(sites)]
+                    str(i.chrom) + ":" + str(i.start) + "-" + str(i.stop)
+                    for i in pybedtools.BedTool(sites)
+                ]
 
             # count, create dataframe
             matrix_raw = pd.DataFrame(
                 map(
-                    lambda x:
-                        pd.Series(x),
-                        parmap.map(
-                            count_reads_in_intervals,
-                            [sample.aligned_filtered_bam for sample in samples],
-                            sites_str,
-                            parallel=True
-                        )
+                    lambda x: pd.Series(x),
+                    parmap.map(
+                        count_reads_in_intervals,
+                        [sample.aligned_filtered_bam for sample in samples],
+                        sites_str,
+                        parallel=True,
+                    ),
                 ),
-                index=[sample.name for sample in samples]
+                index=[sample.name for sample in samples],
             ).T
 
             if assign:
@@ -647,12 +721,15 @@ class ATACSeqAnalysis(Analysis):
                 if output_file is not None:
                     matrix_raw.to_csv(output_file, index=True)
                 else:
-                    self.matrix_raw.to_csv(os.path.join(
-                        self.results_dir, self.name + ".matrix_raw.csv"), index=True)
+                    self.matrix_raw.to_csv(
+                        os.path.join(self.results_dir, self.name + ".matrix_raw.csv"),
+                        index=True,
+                    )
             return matrix_raw
 
         else:
             import textwrap
+
             tk = NGSTk()
             for s in samples:
                 output_dir = os.path.join(s.paths.sample_root, "coverage")
@@ -660,13 +737,22 @@ class ATACSeqAnalysis(Analysis):
                     os.makedirs(output_dir)
 
                 job_name = "{}.{}_coverage".format(peak_set_name, s.name)
-                output_file = os.path.join(output_dir, s.name + ".{}_coverage.bed".format(peak_set_name))
-                log_file = os.path.join(output_dir, s.name + ".{}_coverage.log".format(peak_set_name))
-                job_file = os.path.join(output_dir, s.name + ".{}_coverage.sh".format(peak_set_name))
+                output_file = os.path.join(
+                    output_dir, s.name + ".{}_coverage.bed".format(peak_set_name)
+                )
+                log_file = os.path.join(
+                    output_dir, s.name + ".{}_coverage.log".format(peak_set_name)
+                )
+                job_file = os.path.join(
+                    output_dir, s.name + ".{}_coverage.sh".format(peak_set_name)
+                )
 
                 cmd = tk.slurm_header(
-                    job_name=job_name, output=log_file,
-                    cpus_per_task=1, mem_per_cpu=8000)
+                    job_name=job_name,
+                    output=log_file,
+                    cpus_per_task=1,
+                    mem_per_cpu=8000,
+                )
                 cmd += "bedtools coverage -counts"
                 cmd += " -abam {}".format(s.aligned_filtered_bam)
                 cmd += " -b {}".format(sites.fn)
@@ -675,13 +761,21 @@ class ATACSeqAnalysis(Analysis):
                 cmd += tk.slurm_footer()
 
                 with open(job_file, "w") as handle:
-                    handle.write(textwrap.dedent(cmd).replace("\n ", "\n").replace("  ", ""))
+                    handle.write(
+                        textwrap.dedent(cmd).replace("\n ", "\n").replace("  ", "")
+                    )
 
                 tk.slurm_submit_job(job_file)
 
     def collect_coverage(
-            self, samples=None, assign=True,
-            save=True, output_file=None, permissive=False, peak_set_name="peak_set"):
+        self,
+        samples=None,
+        assign=True,
+        save=True,
+        output_file=None,
+        permissive=False,
+        peak_set_name="peak_set",
+    ):
         """
         Collect read coverage (counts) of each sample in each region in consensus sites from existing files.
         Useful after runnning analysis.measure_coverage() in distributed mode.
@@ -731,19 +825,29 @@ class ATACSeqAnalysis(Analysis):
 
         for sample in samples:
             setattr(
-                sample, "_coverage",
-                os.path.join(sample.paths.sample_root, "coverage",
-                             sample.name + ".{}_coverage.bed".format(peak_set_name)))
+                sample,
+                "_coverage",
+                os.path.join(
+                    sample.paths.sample_root,
+                    "coverage",
+                    sample.name + ".{}_coverage.bed".format(peak_set_name),
+                ),
+            )
 
         # Check which samples to run (dependent on permissive)
-        samples = self._get_samples_with_input_file("_coverage", permissive=permissive, samples=samples)
+        samples = self._get_samples_with_input_file(
+            "_coverage", permissive=permissive, samples=samples
+        )
 
         # Read in counts
         matrix_raw = list()
         for i, sample in tqdm(enumerate(samples), total=len(samples)):
             cov = pd.read_csv(
-                sample._coverage, sep="\t", header=None,
-                names=['chrom', 'start', 'end', sample.name])
+                sample._coverage,
+                sep="\t",
+                header=None,
+                names=["chrom", "start", "end", sample.name],
+            )
 
             if cov.empty:
                 msg = "Coverage file for sample '{}' is empty!".format(sample.name)
@@ -766,9 +870,12 @@ class ATACSeqAnalysis(Analysis):
 
         matrix_raw = (
             pd.concat(matrix_raw, axis=0, sort=False)
-            .melt(id_vars=['chrom', 'start', 'end'])
-            .pivot_table(index=['chrom', 'start', 'end'], columns="variable", values="value")
-            .astype(int, downcast=True))
+            .melt(id_vars=["chrom", "start", "end"])
+            .pivot_table(
+                index=["chrom", "start", "end"], columns="variable", values="value"
+            )
+            .astype(int, downcast=True)
+        )
         matrix_raw.index = bed_to_index(matrix_raw.index.to_frame())
 
         if assign:
@@ -777,13 +884,14 @@ class ATACSeqAnalysis(Analysis):
             if output_file is not None:
                 matrix_raw.to_csv(output_file, index=True)
             else:
-                self.matrix_raw.to_csv(os.path.join(
-                    self.results_dir, self.name + ".matrix_raw.csv"), index=True)
+                self.matrix_raw.to_csv(
+                    os.path.join(self.results_dir, self.name + ".matrix_raw.csv"),
+                    index=True,
+                )
         return matrix_raw
 
     @check_organism_genome
-    def get_peak_gccontent_length(
-            self, bed_file=None, fasta_file=None):
+    def get_peak_gccontent_length(self, bed_file=None, fasta_file=None):
         """
         Get length and GC content of features in region set.
 
@@ -811,20 +919,31 @@ class ATACSeqAnalysis(Analysis):
             sites = pybedtools.BedTool(bed_file)
 
         if fasta_file is None:
-            _LOGGER.info("Reference genome FASTA file was not given, will try to get it.")
-            _LOGGER.info("Getting genome FASTA file for organism '{}', genome '{}'. "
-                         .format(self.organism, self.genome))
-            fasta_file = self.get_resources(steps=['genome'])['genome_file']['fasta']
+            _LOGGER.info(
+                "Reference genome FASTA file was not given, will try to get it."
+            )
+            _LOGGER.info(
+                "Getting genome FASTA file for organism '{}', genome '{}'. ".format(
+                    self.organism, self.genome
+                )
+            )
+            fasta_file = self.get_resources(steps=["genome"])["genome_file"]["fasta"]
 
-        nuc = sites.nucleotide_content(fi=fasta_file).to_dataframe(comment="#")[["score", "blockStarts"]]
+        nuc = sites.nucleotide_content(fi=fasta_file).to_dataframe(comment="#")[
+            ["score", "blockStarts"]
+        ]
         nuc.columns = ["gc_content", "length"]
-        nuc.index = [str(i.chrom) + ":" + str(i.start) + "-" + str(i.stop) for i in sites]
+        nuc.index = [
+            str(i.chrom) + ":" + str(i.start) + "-" + str(i.stop) for i in sites
+        ]
 
         # get only the sites matching the coverage (not overlapping blacklist)
         self.nuc = nuc.ix[self.matrix_raw.index]
 
-        self.nuc.to_csv(os.path.join(
-            self.results_dir, self.name + ".gccontent_length.csv"), index=True)
+        self.nuc.to_csv(
+            os.path.join(self.results_dir, self.name + ".gccontent_length.csv"),
+            index=True,
+        )
 
         return self.nuc
 
@@ -853,6 +972,7 @@ class ATACSeqAnalysis(Analysis):
         assign : bool
             Whether to assign the normalized DataFrame to an attribute ``.
         """
+
         def cqn(cov, gc_content, lengths):
             # install R package
             # source('http://bioconductor.org/biocLite.R')
@@ -861,25 +981,22 @@ class ATACSeqAnalysis(Analysis):
             from rpy2.rinterface import RRuntimeWarning
             import rpy2.robjects.pandas2ri
             import warnings
+
             warnings.filterwarnings("ignore", category=RRuntimeWarning)
             robjects.numpy2ri.deactivate()
             rpy2.robjects.pandas2ri.activate()
 
             robjects.r('require("cqn")')
-            cqn = robjects.r('cqn')
+            cqn = robjects.r("cqn")
 
             cqn_out = cqn(cov, x=gc_content, lengths=lengths)
 
-            y_r = cqn_out[list(cqn_out.names).index('y')]
-            y = pd.DataFrame(
-                np.array(y_r),
-                index=cov.index,
-                columns=cov.columns)
-            offset_r = cqn_out[list(cqn_out.names).index('offset')]
+            y_r = cqn_out[list(cqn_out.names).index("y")]
+            y = pd.DataFrame(np.array(y_r), index=cov.index, columns=cov.columns)
+            offset_r = cqn_out[list(cqn_out.names).index("offset")]
             offset = pd.DataFrame(
-                np.array(offset_r),
-                index=cov.index,
-                columns=cov.columns)
+                np.array(offset_r), index=cov.index, columns=cov.columns
+            )
 
             return y + offset
 
@@ -893,11 +1010,15 @@ class ATACSeqAnalysis(Analysis):
 
         matrix_norm = cqn(
             cov=self.get_matrix(matrix=matrix, samples=samples),
-            gc_content=self.nuc["gc_content"], lengths=self.nuc["length"])
+            gc_content=self.nuc["gc_content"],
+            lengths=self.nuc["length"],
+        )
 
         if save:
-            matrix_norm.to_csv(os.path.join(
-                self.results_dir, self.name + ".matrix_norm.csv"), index=True)
+            matrix_norm.to_csv(
+                os.path.join(self.results_dir, self.name + ".matrix_norm.csv"),
+                index=True,
+            )
         if assign:
             self.matrix_norm = matrix_norm
             self.norm_method = "cqn"
@@ -941,10 +1062,15 @@ class ATACSeqAnalysis(Analysis):
         cols = [6, 8, 9]
 
         if tss_file is None:
-            _LOGGER.info("Reference TSS file was not given, will try to get TSS annotations.")
-            _LOGGER.info("Getting TSS annotations for organism '{}', genome '{}'."
-                         .format(self.organism, self.genome))
-            tss_file = self.get_resources(steps=['tss'])['tss_file']
+            _LOGGER.info(
+                "Reference TSS file was not given, will try to get TSS annotations."
+            )
+            _LOGGER.info(
+                "Getting TSS annotations for organism '{}', genome '{}'.".format(
+                    self.organism, self.genome
+                )
+            )
+            tss_file = self.get_resources(steps=["tss"])["tss_file"]
 
         # extract only relevant columns
         tss = pd.read_csv(tss_file, header=None, sep="\t")
@@ -958,46 +1084,53 @@ class ATACSeqAnalysis(Analysis):
         self.closest_tss_distances = self.sites.closest(tss, D="b").to_dataframe()
 
         # rename
-        self.closest_tss_distances = (self.closest_tss_distances[
-            ['chrom', 'start', 'end'] +
-            self.closest_tss_distances.columns[cols].tolist()])
+        self.closest_tss_distances = self.closest_tss_distances[
+            ["chrom", "start", "end"]
+            + self.closest_tss_distances.columns[cols].tolist()
+        ]
         self.closest_tss_distances.columns = [
-            'chrom', 'start', 'end', 'gene_name', "strand", 'distance']
+            "chrom",
+            "start",
+            "end",
+            "gene_name",
+            "strand",
+            "distance",
+        ]
 
         # set NaN to distance without assignment (rather than the default '-1' from bedtools)
         self.closest_tss_distances.loc[
-            self.closest_tss_distances['gene_name'] == '.', 'distance'] = np.nan
+            self.closest_tss_distances["gene_name"] == ".", "distance"
+        ] = np.nan
 
         # set NaN to assignments out of range
         self.closest_tss_distances.loc[
-            self.closest_tss_distances['distance'].abs() > max_dist,
-            ['gene_name', 'strand', 'distance']] = np.nan
+            self.closest_tss_distances["distance"].abs() > max_dist,
+            ["gene_name", "strand", "distance"],
+        ] = np.nan
 
         # aggregate annotation per peak, concatenate various genes (comma-separated)
         self.gene_annotation = (
-            self.closest_tss_distances
-            .groupby(['chrom', 'start', 'end'])
-            .aggregate(
-                lambda x: ",".join(set([str(i) for i in x if i != '.'])))
-            .reset_index())
+            self.closest_tss_distances.groupby(["chrom", "start", "end"])
+            .aggregate(lambda x: ",".join(set([str(i) for i in x if i != "."])))
+            .reset_index()
+        )
         self.closest_tss_distances.index = bed_to_index(self.closest_tss_distances)
         self.gene_annotation.index = bed_to_index(self.gene_annotation)
 
         # save to disk
         self.closest_tss_distances.to_csv(
-            os.path.join(self.results_dir,
-                         self.name + ".closest_tss_distances.csv"),
-            index=True)
+            os.path.join(self.results_dir, self.name + ".closest_tss_distances.csv"),
+            index=True,
+        )
         self.gene_annotation.to_csv(
-            os.path.join(self.results_dir,
-                         self.name + ".gene_annotation.csv"),
-            index=True)
+            os.path.join(self.results_dir, self.name + ".gene_annotation.csv"),
+            index=True,
+        )
         return self.gene_annotation
 
     @check_organism_genome
     @check_has_sites
-    def get_peak_genomic_location(
-            self, genomic_context_file=None):
+    def get_peak_genomic_location(self, genomic_context_file=None):
         """
         Annotates a consensus peak set (``sites`` attribute of analysis) with their genomic context.
         The genomic context is mostly gene-centric, which includes overlap with
@@ -1029,10 +1162,17 @@ class ATACSeqAnalysis(Analysis):
         """
 
         if genomic_context_file is None:
-            _LOGGER.info("Reference genomic context file was not given, will try to get it.")
-            _LOGGER.info("Getting genomic context annotations for organism '{}', genome '{}'. "
-                         .format(self.organism, self.genome))
-            genomic_context_file = self.get_resources(steps=['genomic_context'])['genomic_context_file']
+            _LOGGER.info(
+                "Reference genomic context file was not given, will try to get it."
+            )
+            _LOGGER.info(
+                "Getting genomic context annotations for organism '{}', genome '{}'. ".format(
+                    self.organism, self.genome
+                )
+            )
+            genomic_context_file = self.get_resources(steps=["genomic_context"])[
+                "genomic_context_file"
+            ]
 
         context = pybedtools.BedTool(genomic_context_file)
 
@@ -1045,30 +1185,42 @@ class ATACSeqAnalysis(Analysis):
 
         cols = [0, 1, 2, 6]
         for label, attr, bed in [
-                ("background", "region_annotation_b", background),
-                ("real", "region_annotation", self.sites)]:
+            ("background", "region_annotation_b", background),
+            ("real", "region_annotation", self.sites),
+        ]:
             annot = (
                 bed.intersect(context, wa=True, wb=True, f=0.2)
-                .sort().to_dataframe(usecols=cols))
+                .sort()
+                .to_dataframe(usecols=cols)
+            )
             annot.index = bed_to_index(annot)
-            annot.columns = ['chrom', 'start', 'end', 'genomic_region']
+            annot.columns = ["chrom", "start", "end", "genomic_region"]
 
             # remove duplicates (there shouldn't be anyway)
             annot = annot.drop_duplicates()
             # join various annotations per peak
             annot_comp = (
-                annot.groupby(['chrom', 'start', 'end'])
-                .aggregate(lambda x: ",".join(set([str(i) for i in x]))).reset_index())
+                annot.groupby(["chrom", "start", "end"])
+                .aggregate(lambda x: ",".join(set([str(i) for i in x])))
+                .reset_index()
+            )
             annot_comp.index = bed_to_index(annot_comp)
-            annot_comp.columns = ['chrom', 'start', 'end', 'genomic_region']
+            annot_comp.columns = ["chrom", "start", "end", "genomic_region"]
             # save to disk
             a = "" if (label == "real") else ("_" + label)
-            annot.to_csv(os.path.join(
-                self.results_dir, self.name + ".region_annotation{}_mapping.csv".format(a)),
-                index=True)
-            annot_comp.to_csv(os.path.join(
-                self.results_dir, self.name + ".region_annotation{}.csv".format(a)),
-                index=True)
+            annot.to_csv(
+                os.path.join(
+                    self.results_dir,
+                    self.name + ".region_annotation{}_mapping.csv".format(a),
+                ),
+                index=True,
+            )
+            annot_comp.to_csv(
+                os.path.join(
+                    self.results_dir, self.name + ".region_annotation{}.csv".format(a)
+                ),
+                index=True,
+            )
 
             setattr(self, attr, annot_comp)
             setattr(self, attr + "_mapping", annot)
@@ -1076,8 +1228,7 @@ class ATACSeqAnalysis(Analysis):
 
     @check_organism_genome
     @check_has_sites
-    def get_peak_chromatin_state(
-            self, chrom_state_file, frac=0.2):
+    def get_peak_chromatin_state(self, chrom_state_file, frac=0.2):
         """
         Annotates a consensus peak set (``sites`` attribute of analysis) with their chromatin
         state context. This would be given, for example by a chromatin state segmentation
@@ -1120,33 +1271,45 @@ class ATACSeqAnalysis(Analysis):
         background = self.sites.shuffle(genome=self.genome, chrom=True)
 
         for label, attr, bed in [
-                ("real", "chrom_state_annotation", self.sites),
-                ("background", "chrom_state_annotation_b", background)]:
-            _LOGGER.debug("Getting chromatinn state annotation for {} regions."
-                          .format(label))
-            annot = (
-                bed.intersect(states, wa=True, wb=True, f=frac, loj=True)
-                .to_dataframe(usecols=[0, 1, 2, 6]))
+            ("real", "chrom_state_annotation", self.sites),
+            ("background", "chrom_state_annotation_b", background),
+        ]:
+            _LOGGER.debug(
+                "Getting chromatinn state annotation for {} regions.".format(label)
+            )
+            annot = bed.intersect(
+                states, wa=True, wb=True, f=frac, loj=True
+            ).to_dataframe(usecols=[0, 1, 2, 6])
             annot.iloc[:, 3] = annot.iloc[:, 3].astype(str)
 
             # remove duplicates (there shouldn't be anyway)
             annot = annot.drop_duplicates()
             annot.index = bed_to_index(annot)
-            annot.columns = ['chrom', 'start', 'end', 'chromatin_state']
+            annot.columns = ["chrom", "start", "end", "chromatin_state"]
             # join various annotations per peak
             annot_comp = (
-                annot.groupby(['chrom', 'start', 'end'])
-                .aggregate(lambda x: ",".join(set([str(i) for i in x]))).reset_index())
+                annot.groupby(["chrom", "start", "end"])
+                .aggregate(lambda x: ",".join(set([str(i) for i in x])))
+                .reset_index()
+            )
             annot_comp.index = bed_to_index(annot_comp)
-            annot_comp.columns = ['chrom', 'start', 'end', 'chromatin_state']
+            annot_comp.columns = ["chrom", "start", "end", "chromatin_state"]
             # save to disk
             a = "" if (label == "real") else ("_" + label)
-            annot.to_csv(os.path.join(
-                self.results_dir, self.name + ".chrom_state_annotation{}_mapping.csv".format(a)),
-                index=True)
-            annot_comp.to_csv(os.path.join(
-                self.results_dir, self.name + ".chrom_state_annotation{}.csv".format(a)),
-                index=True)
+            annot.to_csv(
+                os.path.join(
+                    self.results_dir,
+                    self.name + ".chrom_state_annotation{}_mapping.csv".format(a),
+                ),
+                index=True,
+            )
+            annot_comp.to_csv(
+                os.path.join(
+                    self.results_dir,
+                    self.name + ".chrom_state_annotation{}.csv".format(a),
+                ),
+                index=True,
+            )
 
             setattr(self, attr, annot_comp)
             setattr(self, attr + "_mapping", annot)
@@ -1183,23 +1346,28 @@ class ATACSeqAnalysis(Analysis):
 
         matrix = pd.DataFrame(index=pd.Index(matrix.index, name="region"))
         # calculate mean coverage
-        matrix.loc[:, 'mean'] = matrix.mean(axis=1)
+        matrix.loc[:, "mean"] = matrix.mean(axis=1)
         # calculate coverage variance
-        matrix.loc[:, 'variance'] = matrix.var(axis=1)
+        matrix.loc[:, "variance"] = matrix.var(axis=1)
         # calculate std deviation (sqrt(variance))
-        matrix.loc[:, 'std_deviation'] = np.sqrt(matrix.loc[:, 'variance'])
+        matrix.loc[:, "std_deviation"] = np.sqrt(matrix.loc[:, "variance"])
         # calculate dispersion (variance / mean)
-        matrix.loc[:, 'dispersion'] = matrix.loc[:, 'variance'] / matrix.loc[:, 'mean']
+        matrix.loc[:, "dispersion"] = matrix.loc[:, "variance"] / matrix.loc[:, "mean"]
         # calculate qv2 (std / mean) ** 2
-        matrix.loc[:, 'qv2'] = (matrix.loc[:, 'std_deviation'] / matrix.loc[:, 'mean']) ** 2
+        matrix.loc[:, "qv2"] = (
+            matrix.loc[:, "std_deviation"] / matrix.loc[:, "mean"]
+        ) ** 2
         # calculate "amplitude" (max - min)
-        matrix.loc[:, 'amplitude'] = (matrix.max(axis=1) - matrix.min(axis=1))
+        matrix.loc[:, "amplitude"] = matrix.max(axis=1) - matrix.min(axis=1)
         # calculate interquantile range
-        matrix.loc[:, 'iqr'] = (matrix.quantile(0.75, axis=1) - matrix.quantile(0.25, axis=1))
+        matrix.loc[:, "iqr"] = matrix.quantile(0.75, axis=1) - matrix.quantile(
+            0.25, axis=1
+        )
         matrix.index.name = "index"
-        matrix.to_csv(os.path.join(
-            self.results_dir, self.name + ".stats_per_region.csv"),
-            index=True)
+        matrix.to_csv(
+            os.path.join(self.results_dir, self.name + ".stats_per_region.csv"),
+            index=True,
+        )
 
         self.stats = matrix
         return self.stats
@@ -1248,13 +1416,22 @@ class ATACSeqAnalysis(Analysis):
 
         # TODO: decide if this function should call the others to produce the annotations first
 
-        for matrix_name in ['gene_annotation', 'region_annotation', 'chrom_state_annotation', 'support', 'stats']:
+        for matrix_name in [
+            "gene_annotation",
+            "region_annotation",
+            "chrom_state_annotation",
+            "support",
+            "stats",
+        ]:
             if hasattr(self, matrix_name):
                 matrix = getattr(self, matrix_name)
                 self.matrix_features = pd.merge(
                     next_matrix,
                     matrix[matrix.columns.difference(next_matrix.columns)],
-                    left_index=True, right_index=True, how="left")
+                    left_index=True,
+                    right_index=True,
+                    how="left",
+                )
                 next_matrix = self.matrix_features
             else:
                 if not permissive:
@@ -1275,15 +1452,19 @@ class ATACSeqAnalysis(Analysis):
         self.matrix_features.index.name = "index"
 
         # Save
-        self.matrix_features.to_csv(os.path.join(self.results_dir, self.name + ".matrix_features.csv"), index=True)
+        self.matrix_features.to_csv(
+            os.path.join(self.results_dir, self.name + ".matrix_features.csv"),
+            index=True,
+        )
 
     def get_sex_chrom_ratio(
-            self,
-            matrix="matrix_norm",
-            sex_chroms=["chrX", "chrY"],
-            output_dir="{results_dir}",
-            output_prefix="sex_chrom_ratio",
-            plot=True):
+        self,
+        matrix="matrix_norm",
+        sex_chroms=["chrX", "chrY"],
+        output_dir="{results_dir}",
+        output_prefix="sex_chrom_ratio",
+        plot=True,
+    ):
         """
         Get ratio of signal between sex chromosomes.
         Useful to quickly assign sex to samples.
@@ -1322,16 +1503,15 @@ class ATACSeqAnalysis(Analysis):
         # remove per sample mean
         matrix -= matrix.mean()
 
-        matrix = matrix.assign(
-            chrom=matrix.index.str.extract(r"^(.*):\d+-\d+$").values)
-        m = matrix.groupby('chrom').mean()
+        matrix = matrix.assign(chrom=matrix.index.str.extract(r"^(.*):\d+-\d+$").values)
+        m = matrix.groupby("chrom").mean()
         # remove per chromosome mean
         m = (m.T - m.mean(1)).T
         # order chromosomes
         m = m.reindex(natsorted(m.index))
 
         # calculate ratio
-        ratio = (m.loc[sex_chroms[1]] - m.loc[sex_chroms[0]])
+        ratio = m.loc[sex_chroms[1]] - m.loc[sex_chroms[0]]
         ratio.name = "{}_to_{}_ratio".format(sex_chroms[1], sex_chroms[0])
         ratio.to_csv(os.path.join(output_dir, output_prefix + ".csv"), header=True)
 
@@ -1345,11 +1525,16 @@ class ATACSeqAnalysis(Analysis):
             else:
                 cols = m.columns
             grid = sns.clustermap(
-                m.T, z_score=1, center=0, cmap="RdBu_r",
+                m.T,
+                z_score=1,
+                center=0,
+                cmap="RdBu_r",
                 figsize=(m.shape[0] * 0.3, m.shape[1] * 0.3),
-                row_cluster=False, col_cluster=False, cbar_kws={
-                    "label": "Deviation from mean\nchromosome accessibility"},
-                yticklabels=cols)
+                row_cluster=False,
+                col_cluster=False,
+                cbar_kws={"label": "Deviation from mean\nchromosome accessibility"},
+                yticklabels=cols,
+            )
             grid.ax_heatmap.set_xlabel("Chromosomes")
             grid.ax_heatmap.set_ylabel("Samples")
             savefig(grid, os.path.join(output_dir, output_prefix + ".clustermap.svg"))
@@ -1404,14 +1589,16 @@ class ATACSeqAnalysis(Analysis):
         # if isinstance(matrix.columns, pd.MultiIndex):
         #     matrix.columns = matrix.columns.get_level_values("sample_name")
 
-        g = self.gene_annotation['gene_name'].str.split(",").apply(pd.Series).stack()
+        g = self.gene_annotation["gene_name"].str.split(",").apply(pd.Series).stack()
         g.index = g.index.droplevel(1)
         g.name = "gene_name"
 
         matrix2 = matrix.join(g).drop("gene_name", axis=1)
-        matrix2.index = matrix.join(g).reset_index().set_index(['index', 'gene_name']).index
+        matrix2.index = (
+            matrix.join(g).reset_index().set_index(["index", "gene_name"]).index
+        )
         matrix2.columns = matrix.columns
-        matrix3 = matrix2.groupby(level=['gene_name']).apply(reduce_func)
+        matrix3 = matrix2.groupby(level=["gene_name"]).apply(reduce_func)
 
         return matrix3.loc[:, ~matrix3.isnull().all()]
 
@@ -1444,18 +1631,29 @@ class ATACSeqAnalysis(Analysis):
         if differential_results is None:
             differential_results = self.differential_results
 
-        g = self.gene_annotation['gene_name'].str.split(",").apply(pd.Series).stack()
+        g = self.gene_annotation["gene_name"].str.split(",").apply(pd.Series).stack()
         g.index = g.index.droplevel(1)
         g.name = "gene_name"
 
         dr2 = differential_results.join(g).drop("gene_name", axis=1)
-        dr2.index = differential_results.join(g).reset_index().set_index(['index', 'gene_name']).index
+        dr2.index = (
+            differential_results.join(g)
+            .reset_index()
+            .set_index(["index", "gene_name"])
+            .index
+        )
         dr2.columns = differential_results.columns
-        dr3 = dr2.reset_index().groupby(['gene_name', 'comparison_name']).apply(reduce_func)
+        dr3 = (
+            dr2.reset_index()
+            .groupby(["gene_name", "comparison_name"])
+            .apply(reduce_func)
+        )
 
         return dr3.loc[:, ~dr3.isnull().all()]
 
-    def plot_peak_characteristics(self, samples=None, by_attribute=None, genome_space=3e9):
+    def plot_peak_characteristics(
+        self, samples=None, by_attribute=None, genome_space=3e9
+    ):
         """
         Several diagnostic plots on the analysis' consensus peak set
         and the sample's signal on them.
@@ -1479,28 +1677,33 @@ class ATACSeqAnalysis(Analysis):
             count_lines,
             get_total_region_area,
             get_region_lengths,
-            get_regions_per_chromosomes)
+            get_regions_per_chromosomes,
+        )
         from ngs_toolkit.graphics import savefig
 
         if samples is None:
             samples = self.samples
 
-        reads = parmap.map(count_bam_file_length, [s.aligned_filtered_bam for s in samples])
+        reads = parmap.map(
+            count_bam_file_length, [s.aligned_filtered_bam for s in samples]
+        )
         peaks = list(map(count_lines, [s.peaks for s in samples]))
         open_chrom = list(map(get_total_region_area, [s.peaks for s in samples]))
 
         stats = pd.DataFrame(
             [reads, peaks, open_chrom],
             index=["reads_used", "peak_number", "open_chromatin"],
-            columns=[s.name for s in samples]).T
+            columns=[s.name for s in samples],
+        ).T
 
         stats["peaks_norm"] = (stats["peak_number"] / stats["reads_used"]) * 1e3
-        stats["open_chromatin_norm"] = (stats["open_chromatin"] / stats["reads_used"])
+        stats["open_chromatin_norm"] = stats["open_chromatin"] / stats["reads_used"]
         stats.to_csv(
             os.path.join(
-                self.results_dir,
-                "{}.open_chromatin_space.csv".format(self.name)),
-            index=True)
+                self.results_dir, "{}.open_chromatin_space.csv".format(self.name)
+            ),
+            index=True,
+        )
         # stats = pd.read_csv(os.path.join(
         #         self.results_dir,
         #         "{}.open_chromatin_space.csv"
@@ -1511,171 +1714,262 @@ class ATACSeqAnalysis(Analysis):
         if by_attribute is not None:
             stats = pd.merge(
                 stats,
-                stats.groupby(by_attribute)
-                ['open_chromatin'].median()
-                .to_frame(name='group_open_chromatin').reset_index())
+                stats.groupby(by_attribute)["open_chromatin"]
+                .median()
+                .to_frame(name="group_open_chromatin")
+                .reset_index(),
+            )
             stats = pd.merge(
                 stats,
-                stats.groupby(by_attribute)
-                ['open_chromatin_norm'].median()
-                .to_frame(name='group_open_chromatin_norm')
-                .reset_index())
+                stats.groupby(by_attribute)["open_chromatin_norm"]
+                .median()
+                .to_frame(name="group_open_chromatin_norm")
+                .reset_index(),
+            )
 
         # plot
         stats = stats.sort_values("open_chromatin_norm")
         fig, axis = plt.subplots(2, 1, figsize=(1 * 3, 2 * 3))
         sns.barplot(
-            y="index", x="open_chromatin",
-            orient="horiz", data=stats.reset_index(), palette="summer",
-            ax=axis[0])
+            y="index",
+            x="open_chromatin",
+            orient="horiz",
+            data=stats.reset_index(),
+            palette="summer",
+            ax=axis[0],
+        )
         sns.barplot(
-            y="index", x="open_chromatin_norm",
-            orient="horiz", data=stats.reset_index(), palette="summer",
-            ax=axis[1])
+            y="index",
+            x="open_chromatin_norm",
+            orient="horiz",
+            data=stats.reset_index(),
+            palette="summer",
+            ax=axis[1],
+        )
         axis[0].set_xlabel("Total open chromatin space (bp)")
         axis[1].set_xlabel("Total open chromatin space (normalized)")
         sns.despine(fig)
-        savefig(fig, os.path.join(
-            self.results_dir,
-            "{}.total_open_chromatin_space.per_sample.svg"
-            .format(self.name)))
+        savefig(
+            fig,
+            os.path.join(
+                self.results_dir,
+                "{}.total_open_chromatin_space.per_sample.svg".format(self.name),
+            ),
+        )
 
         if by_attribute is not None:
             # median lengths per group (split-apply-combine)
             stats = pd.merge(
                 stats,
-                stats.groupby(by_attribute)
-                ['open_chromatin'].median()
-                .to_frame(name='group_open_chromatin')
+                stats.groupby(by_attribute)["open_chromatin"]
+                .median()
+                .to_frame(name="group_open_chromatin")
                 .reset_index()
-                .sort_values("group_open_chromatin"))
+                .sort_values("group_open_chromatin"),
+            )
 
             fig, axis = plt.subplots(2, 1, figsize=(4 * 2, 6 * 1))
             stats = stats.sort_values("group_open_chromatin")
             sns.barplot(
-                y=by_attribute, x="open_chromatin", orient="horiz",
-                data=stats.reset_index(), palette="summer", ax=axis[0])
+                y=by_attribute,
+                x="open_chromatin",
+                orient="horiz",
+                data=stats.reset_index(),
+                palette="summer",
+                ax=axis[0],
+            )
             sns.stripplot(
-                y=by_attribute, x="open_chromatin", orient="horiz",
-                data=stats.reset_index(), palette="summer", ax=axis[0])
+                y=by_attribute,
+                x="open_chromatin",
+                orient="horiz",
+                data=stats.reset_index(),
+                palette="summer",
+                ax=axis[0],
+            )
             stats = stats.sort_values("group_open_chromatin_norm")
             sns.barplot(
-                y=by_attribute, x="open_chromatin_norm", orient="horiz",
-                data=stats.reset_index(), palette="summer", ax=axis[1])
+                y=by_attribute,
+                x="open_chromatin_norm",
+                orient="horiz",
+                data=stats.reset_index(),
+                palette="summer",
+                ax=axis[1],
+            )
             sns.stripplot(
-                y=by_attribute, x="open_chromatin_norm", orient="horiz",
-                data=stats.reset_index(), palette="summer", ax=axis[1])
+                y=by_attribute,
+                x="open_chromatin_norm",
+                orient="horiz",
+                data=stats.reset_index(),
+                palette="summer",
+                ax=axis[1],
+            )
             axis[0].axhline(
-                stats.groupby(by_attribute)
-                ['open_chromatin'].median()["WT"],
-                color="black", linestyle="--")
+                stats.groupby(by_attribute)["open_chromatin"].median()["WT"],
+                color="black",
+                linestyle="--",
+            )
             axis[1].axhline(
-                stats.groupby(by_attribute)
-                ['open_chromatin_norm'].median()["WT"],
-                color="black", linestyle="--")
+                stats.groupby(by_attribute)["open_chromatin_norm"].median()["WT"],
+                color="black",
+                linestyle="--",
+            )
             axis[0].set_xlabel("Total open chromatin space (bp)")
             axis[1].set_xlabel("Total open chromatin space (normalized)")
             sns.despine(fig)
-            savefig(fig, os.path.join(
-                self.results_dir,
-                "{}.total_open_chromatin_space.per_{}.svg"
-                .format(self.name, by_attribute)))
+            savefig(
+                fig,
+                os.path.join(
+                    self.results_dir,
+                    "{}.total_open_chromatin_space.per_{}.svg".format(
+                        self.name, by_attribute
+                    ),
+                ),
+            )
 
         # plot distribution of peak lengths
         sample_peak_lengths = map(get_region_lengths, [s.peaks for s in samples])
-        lengths = pd.melt(pd.DataFrame(
-                sample_peak_lengths,
-                index=[s.name for s in samples]).T,
-            value_name='peak_length', var_name="sample_name").dropna()
+        lengths = pd.melt(
+            pd.DataFrame(sample_peak_lengths, index=[s.name for s in samples]).T,
+            value_name="peak_length",
+            var_name="sample_name",
+        ).dropna()
 
         # median lengths per sample (split-apply-combine)
         lengths = pd.merge(
             lengths,
-            lengths.groupby('sample_name')
-            ['peak_length'].median()
-            .to_frame(name='mean_peak_length')
+            lengths.groupby("sample_name")["peak_length"]
+            .median()
+            .to_frame(name="mean_peak_length")
             .reset_index()
-            .sort_values("mean_peak_length"))
+            .sort_values("mean_peak_length"),
+        )
 
         fig, axis = plt.subplots(2, 1, figsize=(3 * 1, 3 * 2))
         sns.boxplot(
-            y="sample_name", x="peak_length", orient="horiz",
-            data=lengths, palette="summer", ax=axis[0],
-            showfliers=False)
+            y="sample_name",
+            x="peak_length",
+            orient="horiz",
+            data=lengths,
+            palette="summer",
+            ax=axis[0],
+            showfliers=False,
+        )
         axis[0].set_ylabel("Peak length (bp)")
         axis[0].set_xticklabels(axis[0].get_xticklabels(), visible=False)
         sns.boxplot(
-            y="sample_name", x="peak_length", orient="horiz",
-            data=lengths, palette="summer", ax=axis[1],
-            showfliers=False)
+            y="sample_name",
+            x="peak_length",
+            orient="horiz",
+            data=lengths,
+            palette="summer",
+            ax=axis[1],
+            showfliers=False,
+        )
         axis[1].set_xscale("log")
         axis[1].set_xlabel("Peak length (bp)")
         sns.despine(fig)
-        savefig(fig, os.path.join(
-            self.results_dir,
-            "{}.peak_lengths.per_sample.svg"
-            .format(self.name)))
+        savefig(
+            fig,
+            os.path.join(
+                self.results_dir, "{}.peak_lengths.per_sample.svg".format(self.name)
+            ),
+        )
 
         if by_attribute is not None:
             # median lengths per group (split-apply-combine)
             lengths = pd.merge(
                 lengths,
-                lengths.groupby(by_attribute)
-                ['peak_length'].median()
-                .to_frame(name='group_mean_peak_length')
+                lengths.groupby(by_attribute)["peak_length"]
+                .median()
+                .to_frame(name="group_mean_peak_length")
                 .reset_index()
-                .sort_values("group_mean_peak_length"))
+                .sort_values("group_mean_peak_length"),
+            )
 
             fig, axis = plt.subplots(2, 1, figsize=(3 * 1, 3 * 2))
             sns.boxplot(
-                y=by_attribute, x="peak_length", orient="horiz",
-                data=lengths, palette="summer", ax=axis[0], showfliers=False)
+                y=by_attribute,
+                x="peak_length",
+                orient="horiz",
+                data=lengths,
+                palette="summer",
+                ax=axis[0],
+                showfliers=False,
+            )
             axis[0].set_xlabel("Peak length (bp)")
             sns.boxplot(
-                y=by_attribute, x="peak_length", orient="horiz",
-                data=lengths, palette="summer", ax=axis[1], showfliers=False)
+                y=by_attribute,
+                x="peak_length",
+                orient="horiz",
+                data=lengths,
+                palette="summer",
+                ax=axis[1],
+                showfliers=False,
+            )
             axis[1].set_xscale("log")
             axis[1].set_xlabel("Peak length (bp)")
             axis[1].set_yticklabels(axis[1].get_yticklabels(), visible=False)
             sns.despine(fig)
-            savefig(fig, os.path.join(
-                self.results_dir,
-                "{}.peak_lengths.per_{}.svg"
-                .format(self.name, by_attribute)))
+            savefig(
+                fig,
+                os.path.join(
+                    self.results_dir,
+                    "{}.peak_lengths.per_{}.svg".format(self.name, by_attribute),
+                ),
+            )
 
         # peaks per chromosome per sample
-        chroms = pd.DataFrame(
-            map(get_regions_per_chromosomes, [s.peaks for s in samples]),
-            index=[s.name for s in samples]).fillna(0).T
+        chroms = (
+            pd.DataFrame(
+                map(get_regions_per_chromosomes, [s.peaks for s in samples]),
+                index=[s.name for s in samples],
+            )
+            .fillna(0)
+            .T
+        )
         chroms_norm = (chroms / chroms.sum(axis=0)) * 100
 
         if hasattr(self, "organim"):
             if self.organism == "human":
                 chroms_norm = chroms_norm.loc[
-                    ["chr{}".format(i) for i in list(range(1, 23)) + ['X', 'Y', 'M']], :]
+                    ["chr{}".format(i) for i in list(range(1, 23)) + ["X", "Y", "M"]], :
+                ]
             elif self.organism == "mouse":
                 chroms_norm = chroms_norm.loc[
-                    ["chr{}".format(i) for i in list(range(1, 19)) + ['X', 'Y', 'M']], :]
+                    ["chr{}".format(i) for i in list(range(1, 19)) + ["X", "Y", "M"]], :
+                ]
 
         fig, axis = plt.subplots(1, 1, figsize=(8 * 1, 8 * 1))
         sns.heatmap(
-            chroms_norm, square=True, cmap="summer",
-            xticklabels=True, yticklabels=True, ax=axis)
+            chroms_norm,
+            square=True,
+            cmap="summer",
+            xticklabels=True,
+            yticklabels=True,
+            ax=axis,
+        )
         axis.set_xticklabels(axis.get_xticklabels(), rotation=90, ha="right")
         axis.set_yticklabels(axis.get_yticklabels(), rotation=0, ha="right")
-        savefig(fig, os.path.join(self.results_dir, "{}.peak_location.per_sample.svg".format(self.name)))
+        savefig(
+            fig,
+            os.path.join(
+                self.results_dir, "{}.peak_location.per_sample.svg".format(self.name)
+            ),
+        )
 
         # Peak set across samples:
         # interval lengths
         fig, axis = plt.subplots(1, 1, figsize=(3, 3))
         sns.distplot(
             [interval.length for interval in self.sites if interval.length < 2000],
-            hist=False, kde=True, ax=axis)
+            hist=False,
+            kde=True,
+            ax=axis,
+        )
         axis.set_xlabel("Peak width (bp)")
         axis.set_ylabel("Density")
         sns.despine(fig)
-        savefig(fig, os.path.join(
-            self.results_dir, "{}.lengths.svg".format(self.name)))
+        savefig(fig, os.path.join(self.results_dir, "{}.lengths.svg".format(self.name)))
 
         # plot support
         if hasattr(self, "support"):
@@ -1683,49 +1977,78 @@ class ATACSeqAnalysis(Analysis):
             sns.distplot(self.support["support"], bins=40, ax=axis)
             axis.set_ylabel("frequency")
             sns.despine(fig)
-            savefig(fig, os.path.join(
-                self.results_dir, "{}.support.svg".format(self.name)))
+            savefig(
+                fig, os.path.join(self.results_dir, "{}.support.svg".format(self.name))
+            )
 
         # Plot distance to nearest TSS
         if hasattr(self, "closest_tss_distances"):
             fig, axis = plt.subplots(
-                2, 2, figsize=(4 * 2, 4 * 2),
-                sharex=False, sharey=False)
+                2, 2, figsize=(4 * 2, 4 * 2), sharex=False, sharey=False
+            )
             sns.distplot(
-                self.closest_tss_distances['distance'],
-                bins=1000, kde=True, hist=False, ax=axis[0][0])
+                self.closest_tss_distances["distance"],
+                bins=1000,
+                kde=True,
+                hist=False,
+                ax=axis[0][0],
+            )
             sns.distplot(
-                self.closest_tss_distances['distance'],
-                bins=1000, kde=True, hist=False, ax=axis[0][1])
+                self.closest_tss_distances["distance"],
+                bins=1000,
+                kde=True,
+                hist=False,
+                ax=axis[0][1],
+            )
             sns.distplot(
-                self.closest_tss_distances['distance'],
-                bins=1000, kde=True, hist=False, ax=axis[1][0])
+                self.closest_tss_distances["distance"],
+                bins=1000,
+                kde=True,
+                hist=False,
+                ax=axis[1][0],
+            )
             sns.distplot(
-                self.closest_tss_distances['distance'],
-                bins=1000, kde=True, hist=False, ax=axis[1][1])
+                self.closest_tss_distances["distance"],
+                bins=1000,
+                kde=True,
+                hist=False,
+                ax=axis[1][1],
+            )
             for ax in axis.flat:
                 ax.set_xlabel("Distance to nearest TSS (bp)")
                 ax.set_ylabel("Density")
             axis[0][1].set_yscale("log")
             axis[1][1].set_yscale("log")
             sns.despine(fig)
-            savefig(fig, os.path.join(
-                self.results_dir, "{}.tss_distance.svg"
-                .format(self.name)))
+            savefig(
+                fig,
+                os.path.join(self.results_dir, "{}.tss_distance.svg".format(self.name)),
+            )
 
         # Plot genomic regions
         datas = list()
         for name, attr, attr_b in [
-                ('genomic_region', 'region_annotation_mapping', 'region_annotation_b_mapping'),
-                ('chromatin_state', 'chrom_state_annotation_mapping', 'chrom_state_annotation_b_mapping')]:
+            (
+                "genomic_region",
+                "region_annotation_mapping",
+                "region_annotation_b_mapping",
+            ),
+            (
+                "chromatin_state",
+                "chrom_state_annotation_mapping",
+                "chrom_state_annotation_b_mapping",
+            ),
+        ]:
             if hasattr(self, attr):
                 f = getattr(self, attr)
                 b = getattr(self, attr_b)
                 # count region frequency
                 data = f[name].value_counts().sort_values(ascending=False)
                 background = b[name].value_counts().sort_values(ascending=False)
-                data = data.to_frame(name="foreground").join(background.to_frame(name="background"))
-                data["fold_change"] = np.log2(data['foreground'] / data['background'])
+                data = data.to_frame(name="foreground").join(
+                    background.to_frame(name="background")
+                )
+                data["fold_change"] = np.log2(data["foreground"] / data["background"])
                 data.index.name = "region"
 
                 # plot also % of genome space "used"
@@ -1738,25 +2061,44 @@ class ATACSeqAnalysis(Analysis):
 
                 # plot together
                 g = sns.FacetGrid(
-                    data=pd.melt(data.reset_index(), id_vars='region'),
-                    col="variable", col_wrap=2, sharex=False, sharey=True, size=2, aspect=1.2)
+                    data=pd.melt(data.reset_index(), id_vars="region"),
+                    col="variable",
+                    col_wrap=2,
+                    sharex=False,
+                    sharey=True,
+                    size=2,
+                    aspect=1.2,
+                )
                 g.map(sns.barplot, "value", "region", orient="horiz")
                 sns.despine(fig)
-                savefig(g, os.path.join(
-                    self.results_dir, "{}.{}s.svg"
-                    .format(self.name, name)))
+                savefig(
+                    g,
+                    os.path.join(
+                        self.results_dir, "{}.{}s.svg".format(self.name, name)
+                    ),
+                )
 
         # plot together
         if len(datas) > 1:
             data = pd.concat(datas)
             g = sns.FacetGrid(
-                data=pd.melt(data.reset_index(), id_vars='region'),
-                col="variable", col_wrap=2, sharex=False, sharey=True, size=2, aspect=1.2)
+                data=pd.melt(data.reset_index(), id_vars="region"),
+                col="variable",
+                col_wrap=2,
+                sharex=False,
+                sharey=True,
+                size=2,
+                aspect=1.2,
+            )
             g.map(sns.barplot, "value", "region", orient="horiz")
             sns.despine(fig)
-            savefig(g, os.path.join(
-                self.results_dir, "{}.genomic_region_and_chromatin_states.svg"
-                .format(self.name)))
+            savefig(
+                g,
+                os.path.join(
+                    self.results_dir,
+                    "{}.genomic_region_and_chromatin_states.svg".format(self.name),
+                ),
+            )
 
         # distribution of count statistics
         if hasattr(self, "stats"):
@@ -1764,17 +2106,23 @@ class ATACSeqAnalysis(Analysis):
                 fig, axis = plt.subplots(1, 1, figsize=(3, 3))
                 sns.distplot(self.stats.loc[:, attr], hist=False, kde=True, ax=axis)
                 sns.despine(fig)
-                savefig(fig, os.path.join(
-                    self.results_dir, "{}.{}.distplot.svg"
-                    .format(self.name, attr)))
+                savefig(
+                    fig,
+                    os.path.join(
+                        self.results_dir, "{}.{}.distplot.svg".format(self.name, attr)
+                    ),
+                )
         if hasattr(self, "support"):
             attr = "support"
             fig, axis = plt.subplots(1, 1, figsize=(3, 3))
             sns.distplot(self.support.loc[:, attr], hist=False, kde=True, ax=axis)
             sns.despine(fig)
-            savefig(fig, os.path.join(
-                self.results_dir, "{}.{}.distplot.svg"
-                .format(self.name, attr)))
+            savefig(
+                fig,
+                os.path.join(
+                    self.results_dir, "{}.{}.distplot.svg".format(self.name, attr)
+                ),
+            )
 
         # Pairwise against mean
         if hasattr(self, "stats"):
@@ -1783,10 +2131,19 @@ class ATACSeqAnalysis(Analysis):
             for attr in self.stats.columns:
                 if attr == "mean":
                     continue
-                p = self.stats[(self.stats["mean"] > 0) & (self.stats[attr] < np.percentile(self.stats[attr], 99) * 3)]
-                g = sns.jointplot(p["mean"], p[attr], s=1, alpha=0.1, rasterized=True, height=3)
-                savefig(g.fig, os.path.join(
-                    self.results_dir, "{}.mean_vs_{}.svg".format(self.name, attr)))
+                p = self.stats[
+                    (self.stats["mean"] > 0)
+                    & (self.stats[attr] < np.percentile(self.stats[attr], 99) * 3)
+                ]
+                g = sns.jointplot(
+                    p["mean"], p[attr], s=1, alpha=0.1, rasterized=True, height=3
+                )
+                savefig(
+                    g.fig,
+                    os.path.join(
+                        self.results_dir, "{}.mean_vs_{}.svg".format(self.name, attr)
+                    ),
+                )
 
     def plot_raw_coverage(self, samples=None, by_attribute=None):
         """
@@ -1809,35 +2166,62 @@ class ATACSeqAnalysis(Analysis):
         if by_attribute is None:
             cov = pd.melt(
                 np.log2(1 + self.matrix_raw[[s.name for s in samples]]),
-                var_name="Sample name", value_name="Raw counts (log2)"
+                var_name="Sample name",
+                value_name="Raw counts (log2)",
             )
             fig, axis = plt.subplots(1, 1, figsize=(6, 1 * 4))
             sns.violinplot(
-                "Raw counts (log2)", "Sample name",
-                orient="horizontal", palette="tab20", data=cov, ax=axis)
+                "Raw counts (log2)",
+                "Sample name",
+                orient="horizontal",
+                palette="tab20",
+                data=cov,
+                ax=axis,
+            )
             sns.despine(fig)
             fig.savefig(
-                os.path.join(self.results_dir, self.name + ".raw_counts.violinplot.svg"),
-                bbox_inches="tight")
+                os.path.join(
+                    self.results_dir, self.name + ".raw_counts.violinplot.svg"
+                ),
+                bbox_inches="tight",
+            )
         else:
             attrs = set([getattr(s, by_attribute) for s in samples])
             fig, axis = plt.subplots(len(attrs), 1, figsize=(8, len(attrs) * 6))
             for i, attr in enumerate(attrs):
                 _LOGGER.info(attr)
                 cov = pd.melt(
-                    np.log2(1 + self.matrix_raw[[s.name for s in samples if getattr(s, by_attribute) == attr]]),
-                    var_name="Sample name", value_name="Raw counts (log2)"
+                    np.log2(
+                        1
+                        + self.matrix_raw[
+                            [
+                                s.name
+                                for s in samples
+                                if getattr(s, by_attribute) == attr
+                            ]
+                        ]
+                    ),
+                    var_name="Sample name",
+                    value_name="Raw counts (log2)",
                 )
                 sns.violinplot(
-                    "Raw counts (log2)", "Sample name",
-                    orient="horizontal", palette="tab20", data=cov, ax=axis[i])
+                    "Raw counts (log2)",
+                    "Sample name",
+                    orient="horizontal",
+                    palette="tab20",
+                    data=cov,
+                    ax=axis[i],
+                )
                 axis[i].set_title(attr)
                 axis[i].set_xticklabels(axis[i].get_xticklabels(), rotation=90)
             sns.despine(fig)
             fig.savefig(
-                os.path.join(self.results_dir, self.name + ".raw_counts.violinplot.by_{}.svg"
-                             .format(by_attribute)),
-                bbox_inches="tight")
+                os.path.join(
+                    self.results_dir,
+                    self.name + ".raw_counts.violinplot.by_{}.svg".format(by_attribute),
+                ),
+                bbox_inches="tight",
+            )
 
     def plot_coverage(self):
 
@@ -1846,94 +2230,200 @@ class ATACSeqAnalysis(Analysis):
 
         data = self.matrix_norm.copy()
         # (rewrite to avoid putting them there in the first place)
-        variables = ['gene_name', 'genomic_region', 'chromatin_state']
+        variables = ["gene_name", "genomic_region", "chromatin_state"]
 
         for variable in variables:
-            d = data[variable].str.split(',').apply(pd.Series).stack()  # separate comma-delimited fields
-            d.index = d.index.droplevel(1)  # returned a multiindex Series, so get rid of second index level (first is from original row)
-            data = data.drop([variable], axis=1)  # drop original column so there are no conflicts
+            d = (
+                data[variable].str.split(",").apply(pd.Series).stack()
+            )  # separate comma-delimited fields
+            d.index = d.index.droplevel(
+                1
+            )  # returned a multiindex Series, so get rid of second index level (first is from original row)
+            data = data.drop(
+                [variable], axis=1
+            )  # drop original column so there are no conflicts
             d.name = variable
             data = data.join(d)  # joins on index
 
         variables = [
-            'chrom', 'start', 'end',
-            'ensembl_transcript_id', 'distance', 'ensembl_gene_id', 'support',
-            'mean', 'variance', 'std_deviation', 'dispersion', 'qv2',
-            'amplitude', 'gene_name', 'genomic_region', 'chromatin_state']
+            "chrom",
+            "start",
+            "end",
+            "ensembl_transcript_id",
+            "distance",
+            "ensembl_gene_id",
+            "support",
+            "mean",
+            "variance",
+            "std_deviation",
+            "dispersion",
+            "qv2",
+            "amplitude",
+            "gene_name",
+            "genomic_region",
+            "chromatin_state",
+        ]
         # Plot
         data_melted = pd.melt(
-            data,
-            id_vars=variables, var_name="sample", value_name="norm_counts")
+            data, id_vars=variables, var_name="sample", value_name="norm_counts"
+        )
 
         # transform dispersion
-        data_melted['dispersion'] = np.log2(1 + data_melted['dispersion'])
+        data_melted["dispersion"] = np.log2(1 + data_melted["dispersion"])
 
         # Together in same violin plot
         fig, axis = plt.subplots(1)
         sns.violinplot("genomic_region", "norm_counts", data=data_melted, ax=axis)
-        fig.savefig(os.path.join(self.results_dir, self.name + ".norm_counts.per_genomic_region.violinplot.svg"), bbox_inches="tight")
+        fig.savefig(
+            os.path.join(
+                self.results_dir,
+                self.name + ".norm_counts.per_genomic_region.violinplot.svg",
+            ),
+            bbox_inches="tight",
+        )
 
         # dispersion
         fig, axis = plt.subplots(1)
         sns.violinplot("genomic_region", "dispersion", data=data_melted, ax=axis)
-        fig.savefig(os.path.join(self.results_dir, self.name + ".norm_counts.dispersion.per_genomic_region.violinplot.svg"), bbox_inches="tight")
+        fig.savefig(
+            os.path.join(
+                self.results_dir,
+                self.name + ".norm_counts.dispersion.per_genomic_region.violinplot.svg",
+            ),
+            bbox_inches="tight",
+        )
 
         # dispersion
         fig, axis = plt.subplots(1)
         sns.violinplot("genomic_region", "qv2", data=data_melted, ax=axis)
-        fig.savefig(os.path.join(self.results_dir, self.name + ".norm_counts.qv2.per_genomic_region.violinplot.svg"), bbox_inches="tight")
+        fig.savefig(
+            os.path.join(
+                self.results_dir,
+                self.name + ".norm_counts.qv2.per_genomic_region.violinplot.svg",
+            ),
+            bbox_inches="tight",
+        )
 
         fig, axis = plt.subplots(1)
         sns.violinplot("chromatin_state", "norm_counts", data=data_melted, ax=axis)
-        fig.savefig(os.path.join(self.results_dir, self.name + ".norm_counts.chromatin_state.violinplot.svg"), bbox_inches="tight")
+        fig.savefig(
+            os.path.join(
+                self.results_dir,
+                self.name + ".norm_counts.chromatin_state.violinplot.svg",
+            ),
+            bbox_inches="tight",
+        )
 
         fig, axis = plt.subplots(1)
         sns.violinplot("chromatin_state", "dispersion", data=data_melted, ax=axis)
-        fig.savefig(os.path.join(self.results_dir, self.name + ".norm_counts.dispersion.chromatin_state.violinplot.svg"), bbox_inches="tight")
+        fig.savefig(
+            os.path.join(
+                self.results_dir,
+                self.name + ".norm_counts.dispersion.chromatin_state.violinplot.svg",
+            ),
+            bbox_inches="tight",
+        )
 
         fig, axis = plt.subplots(1)
         sns.violinplot("chromatin_state", "qv2", data=data_melted, ax=axis)
-        fig.savefig(os.path.join(self.results_dir, self.name + ".norm_counts.qv2.chromatin_state.violinplot.svg"), bbox_inches="tight")
+        fig.savefig(
+            os.path.join(
+                self.results_dir,
+                self.name + ".norm_counts.qv2.chromatin_state.violinplot.svg",
+            ),
+            bbox_inches="tight",
+        )
 
         # separated by variable in one grid
         g = sns.FacetGrid(data_melted, col="genomic_region", col_wrap=3)
         g.map(sns.distplot, "mean", hist=False, rug=False)
-        g.fig.savefig(os.path.join(self.results_dir, self.name + ".norm_counts.mean.per_genomic_region.distplot.svg"), bbox_inches="tight")
+        g.fig.savefig(
+            os.path.join(
+                self.results_dir,
+                self.name + ".norm_counts.mean.per_genomic_region.distplot.svg",
+            ),
+            bbox_inches="tight",
+        )
 
         g = sns.FacetGrid(data_melted, col="genomic_region", col_wrap=3)
         g.map(sns.distplot, "dispersion", hist=False, rug=False)
-        g.fig.savefig(os.path.join(self.results_dir, self.name + ".norm_counts.dispersion.per_genomic_region.distplot.svg"), bbox_inches="tight")
+        g.fig.savefig(
+            os.path.join(
+                self.results_dir,
+                self.name + ".norm_counts.dispersion.per_genomic_region.distplot.svg",
+            ),
+            bbox_inches="tight",
+        )
 
         g = sns.FacetGrid(data_melted, col="genomic_region", col_wrap=3)
         g.map(sns.distplot, "qv2", hist=False, rug=False)
-        g.fig.savefig(os.path.join(self.results_dir, self.name + ".norm_counts.qv2.per_genomic_region.distplot.svg"), bbox_inches="tight")
+        g.fig.savefig(
+            os.path.join(
+                self.results_dir,
+                self.name + ".norm_counts.qv2.per_genomic_region.distplot.svg",
+            ),
+            bbox_inches="tight",
+        )
 
         g = sns.FacetGrid(data_melted, col="genomic_region", col_wrap=3)
         g.map(sns.distplot, "support", hist=False, rug=False)
-        g.fig.savefig(os.path.join(self.results_dir, self.name + ".norm_counts.support.per_genomic_region.distplot.svg"), bbox_inches="tight")
+        g.fig.savefig(
+            os.path.join(
+                self.results_dir,
+                self.name + ".norm_counts.support.per_genomic_region.distplot.svg",
+            ),
+            bbox_inches="tight",
+        )
 
         g = sns.FacetGrid(data_melted, col="chromatin_state", col_wrap=3)
         g.map(sns.distplot, "mean", hist=False, rug=False)
-        g.fig.savefig(os.path.join(self.results_dir, self.name + ".norm_counts.mean.chromatin_state.distplot.svg"), bbox_inches="tight")
+        g.fig.savefig(
+            os.path.join(
+                self.results_dir,
+                self.name + ".norm_counts.mean.chromatin_state.distplot.svg",
+            ),
+            bbox_inches="tight",
+        )
 
         g = sns.FacetGrid(data_melted, col="chromatin_state", col_wrap=3)
         g.map(sns.distplot, "dispersion", hist=False, rug=False)
-        g.fig.savefig(os.path.join(self.results_dir, self.name + ".norm_counts.dispersion.chromatin_state.distplot.svg"), bbox_inches="tight")
+        g.fig.savefig(
+            os.path.join(
+                self.results_dir,
+                self.name + ".norm_counts.dispersion.chromatin_state.distplot.svg",
+            ),
+            bbox_inches="tight",
+        )
 
         g = sns.FacetGrid(data_melted, col="chromatin_state", col_wrap=3)
         g.map(sns.distplot, "qv2", hist=False, rug=False)
-        g.fig.savefig(os.path.join(self.results_dir, self.name + ".norm_counts.qv2.chromatin_state.distplot.svg"), bbox_inches="tight")
+        g.fig.savefig(
+            os.path.join(
+                self.results_dir,
+                self.name + ".norm_counts.qv2.chromatin_state.distplot.svg",
+            ),
+            bbox_inches="tight",
+        )
 
         g = sns.FacetGrid(data_melted, col="chromatin_state", col_wrap=3)
         g.map(sns.distplot, "support", hist=False, rug=False)
-        g.fig.savefig(os.path.join(self.results_dir, self.name + ".norm_counts.support.chromatin_state.distplot.svg"), bbox_inches="tight")
+        g.fig.savefig(
+            os.path.join(
+                self.results_dir,
+                self.name + ".norm_counts.support.chromatin_state.distplot.svg",
+            ),
+            bbox_inches="tight",
+        )
         plt.close("all")
 
     def region_context_enrichment(
-            self, regions,
-            steps=['genomic_region', 'chromatin_state'],
-            background="region_set",
-            prefix="region_type_enrichment", output_dir="{results_dir}"):
+        self,
+        regions,
+        steps=["genomic_region", "chromatin_state"],
+        background="region_set",
+        prefix="region_type_enrichment",
+        output_dir="{results_dir}",
+    ):
         """
         Characterize a subset of the regions (e.g. differential regions) in terms of their genomic context.
 
@@ -1980,9 +2470,11 @@ class ATACSeqAnalysis(Analysis):
             _LOGGER.error(msg)
             raise ValueError(msg)
 
-        options = ['region_set', "genome"]
+        options = ["region_set", "genome"]
         if background not in options:
-            msg = "Option `background` must be one of '{}'.".format("', '".join(options))
+            msg = "Option `background` must be one of '{}'.".format(
+                "', '".join(options)
+            )
             raise ValueError(msg)
 
         # compare genomic regions and chromatin_states
@@ -1990,8 +2482,16 @@ class ATACSeqAnalysis(Analysis):
         msg = "'{}' step selected, but analysis does not have '{}'."
         msg2 = "'genome' selected, but analysis does not have '{}'."
         for step, matrix, matrix_b in [
-            ("genomic_region", "region_annotation_mapping", "region_annotation_b_mapping"),
-            ("chromatin_state", "chrom_state_annotation_mapping", "chrom_state_annotation_b_mapping"),
+            (
+                "genomic_region",
+                "region_annotation_mapping",
+                "region_annotation_b_mapping",
+            ),
+            (
+                "chromatin_state",
+                "chrom_state_annotation_mapping",
+                "chrom_state_annotation_b_mapping",
+            ),
         ]:
             if step not in steps:
                 continue
@@ -2003,7 +2503,7 @@ class ATACSeqAnalysis(Analysis):
 
             # Count foreground occurences
             annot = getattr(self, matrix)
-            res = annot.loc[set(regions), step].value_counts().to_frame('foreground')
+            res = annot.loc[set(regions), step].value_counts().to_frame("foreground")
 
             # Count background occurences
             # # in case of background == 'genome', we simply replace the dataframes
@@ -2017,8 +2517,9 @@ class ATACSeqAnalysis(Analysis):
             res_b = annot.loc[:, step].value_counts().to_frame(name="universe")
             if not all([x in res_b.index for x in res.index]):
                 m = res.index[~res.index.isin(res_b.index)]
-                msg3 = ("Foreground regions contains type of {} not in background: {}"
-                        .format(step, "', '".join(m)))
+                msg3 = "Foreground regions contains type of {} not in background: {}".format(
+                    step, "', '".join(m)
+                )
                 msg3 += " Continuing without those."
                 _LOGGER.warning(msg3)
             res = res.reindex(res_b.index)
@@ -2028,20 +2529,32 @@ class ATACSeqAnalysis(Analysis):
 
             # Calculate log fold enrichment:
             # # normalize to total:
-            res.loc[:, 'foreground_fraction'] = res['foreground'] / res['foreground'].sum()
-            res.loc[:, 'universe_fraction'] = res['universe'] / res['universe'].sum()
-            res.loc[:, 'log2_fold_change'] = np.log2(res['foreground_fraction'] / res['universe_fraction'])
+            res.loc[:, "foreground_fraction"] = (
+                res["foreground"] / res["foreground"].sum()
+            )
+            res.loc[:, "universe_fraction"] = res["universe"] / res["universe"].sum()
+            res.loc[:, "log2_fold_change"] = np.log2(
+                res["foreground_fraction"] / res["universe_fraction"]
+            )
             # Calculate overlap p-value:
-            for feature in res['foreground'].index:
-                a = res.loc[feature, 'foreground']
-                b = res.loc[:, 'foreground'].drop(feature).sum()
-                c = annot.loc[(~annot.index.isin(regions)), step].value_counts()[feature]
-                d = annot.loc[(~annot.index.isin(regions)), step].value_counts().drop(feature).sum()
-                res.loc[feature, 'odds_ratio'], res.loc[feature, 'p_value'] = fisher_exact(
-                    [[a, c], [b, d]], alternative="two-sided")
-            res.loc[:, 'log2_odds_ratio'] = np.log2(res['odds_ratio'])
-            res.loc[:, '-log10(p-value)'] = log_pvalues(res['p_value'])
-            res.loc[:, 'region_type'] = step
+            for feature in res["foreground"].index:
+                a = res.loc[feature, "foreground"]
+                b = res.loc[:, "foreground"].drop(feature).sum()
+                c = annot.loc[(~annot.index.isin(regions)), step].value_counts()[
+                    feature
+                ]
+                d = (
+                    annot.loc[(~annot.index.isin(regions)), step]
+                    .value_counts()
+                    .drop(feature)
+                    .sum()
+                )
+                res.loc[feature, "odds_ratio"], res.loc[
+                    feature, "p_value"
+                ] = fisher_exact([[a, c], [b, d]], alternative="two-sided")
+            res.loc[:, "log2_odds_ratio"] = np.log2(res["odds_ratio"])
+            res.loc[:, "-log10(p-value)"] = log_pvalues(res["p_value"])
+            res.loc[:, "region_type"] = step
             # Append
             enr.append(res)
 
@@ -2052,9 +2565,15 @@ class ATACSeqAnalysis(Analysis):
         return enr
 
     def characterize_regions_function(
-            self, differential, output_dir, prefix, universe_file=None,
-            run=True, genome=None,
-            steps=['region', 'lola', 'meme', 'homer', 'enrichr']):
+        self,
+        differential,
+        output_dir,
+        prefix,
+        universe_file=None,
+        run=True,
+        genome=None,
+        steps=["region", "lola", "meme", "homer", "enrichr"],
+    ):
         """
         Performs a range of functional enrichments of a set of regions given in `differential`
         (a dataframe which is typically a subset of an annotated coverage dataframe).
@@ -2096,14 +2615,20 @@ class ATACSeqAnalysis(Analysis):
             Default is all: ['region', 'lola', 'meme', 'homer', 'enrichr']
         """
         from ngs_toolkit.utils import location_index_to_bed
+
         # use all sites as universe
         if universe_file is None:
             try:
                 universe_file = getattr(self, "sites").fn
-                _LOGGER.info("Using default background region set from 'analysis.sites': {}'."
-                             .format(universe_file))
+                _LOGGER.info(
+                    "Using default background region set from 'analysis.sites': {}'.".format(
+                        universe_file
+                    )
+                )
             except AttributeError as e:
-                _LOGGER.error("Background region set 'analysis.sites' is not set! Cannot run LOLA!")
+                _LOGGER.error(
+                    "Background region set 'analysis.sites' is not set! Cannot run LOLA!"
+                )
                 raise e
 
         if genome is None:
@@ -2116,56 +2641,79 @@ class ATACSeqAnalysis(Analysis):
         bed = location_index_to_bed(differential.index)
         # save to bed
         bed_file = os.path.join(output_dir, "{}_regions.bed".format(prefix))
-        bed.to_csv(
-            bed_file, sep="\t", header=False, index=False)
+        bed.to_csv(bed_file, sep="\t", header=False, index=False)
         # save as tsv
         tsv_file = os.path.join(output_dir, "{}_regions.tsv".format(prefix))
-        bed.reset_index().to_csv(
-            tsv_file, sep="\t", header=False, index=False)
+        bed.reset_index().to_csv(tsv_file, sep="\t", header=False, index=False)
 
         # export gene names
-        clean_gene = differential['gene_name'].str.split(",").apply(pd.Series, 1).stack().drop_duplicates()
-        clean_gene = clean_gene[~clean_gene.isin(['.', 'nan', ''])]
+        clean_gene = (
+            differential["gene_name"]
+            .str.split(",")
+            .apply(pd.Series, 1)
+            .stack()
+            .drop_duplicates()
+        )
+        clean_gene = clean_gene[~clean_gene.isin([".", "nan", ""])]
         clean_gene.to_csv(
-                os.path.join(output_dir, "{}.gene_symbols.txt".format(prefix)),
-                header=False, index=False)
+            os.path.join(output_dir, "{}.gene_symbols.txt".format(prefix)),
+            header=False,
+            index=False,
+        )
         if "ensembl_gene_id" in differential.columns:
             # export ensembl gene names
-            clean = differential['ensembl_gene_id'].str.split(",").apply(pd.Series, 1).stack().drop_duplicates()
+            clean = (
+                differential["ensembl_gene_id"]
+                .str.split(",")
+                .apply(pd.Series, 1)
+                .stack()
+                .drop_duplicates()
+            )
             clean.to_csv(
                 os.path.join(output_dir, "{}_genes.ensembl.txt".format(prefix)),
-                header=False, index=False)
+                header=False,
+                index=False,
+            )
 
         # export gene symbols with scaled absolute fold change
         if "log2FoldChange" in differential.columns:
             differential["score"] = standard_score(abs(differential["log2FoldChange"]))
             differential["abs_fc"] = abs(differential["log2FoldChange"])
 
-            d = differential[['gene_name', 'score']].sort_values('score', ascending=False)
+            d = differential[["gene_name", "score"]].sort_values(
+                "score", ascending=False
+            )
 
             # split gene names from score if a reg.element was assigned to more than one gene
-            a = d['gene_name'].str.split(",").apply(pd.Series, 1).stack()
+            a = d["gene_name"].str.split(",").apply(pd.Series, 1).stack()
             a.index = a.index.droplevel(1)
-            a.name = 'gene_name'
-            d = d[['score']].join(a)
+            a.name = "gene_name"
+            d = d[["score"]].join(a)
             # reduce various ranks to mean per gene
-            d = d.groupby('gene_name').mean().reset_index()
+            d = d.groupby("gene_name").mean().reset_index()
             d.to_csv(
                 os.path.join(output_dir, "{}.gene_symbols.score.csv".format(prefix)),
-                index=False)
+                index=False,
+            )
 
         # get fasta file with sequence underlying region
-        if ('meme' in steps) or ('homer' in steps):
+        if ("meme" in steps) or ("homer" in steps):
             hint = " Will not do motif enrichment analysis."
             fasta_file = os.path.join(output_dir, "{}_regions.fa".format(prefix))
 
-            resources = self.get_resources(steps=['genome'])['genome_file']
+            resources = self.get_resources(steps=["genome"])["genome_file"]
             if "fasta" not in resources:
-                reason = "Could not get genome sequence file in either FASTA or 2bit format."
+                reason = (
+                    "Could not get genome sequence file in either FASTA or 2bit format."
+                )
                 _LOGGER.warning(reason + hint)
             else:
                 try:
-                    bed_to_fasta(input_bed=bed_file, output_fasta=fasta_file, genome_file=resources['fasta'])
+                    bed_to_fasta(
+                        input_bed=bed_file,
+                        output_fasta=fasta_file,
+                        genome_file=resources["fasta"],
+                    )
                 except EnvironmentError:
                     reason = "Could not get FASTA sequence for regions."
                     _LOGGER.warning(reason + hint)
@@ -2173,9 +2721,8 @@ class ATACSeqAnalysis(Analysis):
         if not run:
             return
 
-        if 'region' in steps:
-            self.region_context_enrichment(
-                differential, output_dir=output_dir)
+        if "region" in steps:
+            self.region_context_enrichment(differential, output_dir=output_dir)
 
         # MEME
         if "meme" in steps:
@@ -2189,7 +2736,7 @@ class ATACSeqAnalysis(Analysis):
             homer_motifs(bed_file, output_dir, genome=genome)
 
         # LOLA
-        if 'lola' in steps:
+        if "lola" in steps:
             _LOGGER.info("Running LOLA for '{}'".format(prefix))
             try:
                 lola(bed_file, universe_file, output_dir, genome=genome)
@@ -2197,9 +2744,11 @@ class ATACSeqAnalysis(Analysis):
                 _LOGGER.error("LOLA analysis for '{}' failed!".format(prefix))
 
         # Enrichr
-        if 'enrichr' in steps:
+        if "enrichr" in steps:
             _LOGGER.info("Running Enrichr for '{}'".format(prefix))
             results = enrichr(clean_gene.to_frame(name="gene_name"))
             results.to_csv(
                 os.path.join(output_dir, "{}_regions.enrichr.csv".format(prefix)),
-                index=False, encoding='utf-8')
+                index=False,
+                encoding="utf-8",
+            )

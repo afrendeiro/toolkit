@@ -13,6 +13,7 @@ import pandas as pd
 import scipy
 from scipy.stats import zscore
 import seaborn as sns
+
 # import requests
 
 
@@ -63,17 +64,19 @@ class RNASeqAnalysis(Analysis):
         Additional keyword arguments will be passed to parent class `ngs_toolkit.analysis.Analysis`.
 
     """
+
     def __init__(
-            self,
-            name=None,
-            from_pep=False,
-            from_pickle=False,
-            root_dir=None,
-            data_dir="data",
-            results_dir="results",
-            prj=None,
-            samples=None,
-            **kwargs):
+        self,
+        name=None,
+        from_pep=False,
+        from_pickle=False,
+        root_dir=None,
+        data_dir="data",
+        results_dir="results",
+        prj=None,
+        samples=None,
+        **kwargs
+    ):
         self.data_type = self.__data_type__ = "RNA-seq"
         self.var_unit_name = "gene"
         self.quantity = "expression"
@@ -88,9 +91,12 @@ class RNASeqAnalysis(Analysis):
             results_dir=results_dir,
             prj=prj,
             samples=samples,
-            **kwargs)
+            **kwargs
+        )
 
-    def collect_bitseq_output(self, samples=None, permissive=True, expression_type="counts"):
+    def collect_bitseq_output(
+        self, samples=None, permissive=True, expression_type="counts"
+    ):
         """
         Collect gene expression (read counts, transcript-level) output from Bitseq
         into expression matrix for `samples`.
@@ -105,18 +111,31 @@ class RNASeqAnalysis(Analysis):
 
         expr = list()
         for i, sample in enumerate(samples):
-            _LOGGER.debug("Reading transcriptome files for sample '{}'.".format(sample.name))
+            _LOGGER.debug(
+                "Reading transcriptome files for sample '{}'.".format(sample.name)
+            )
             tr_file = os.path.join(
-                sample.paths.sample_root, "bowtie1_{}".format(sample.transcriptome),
-                "bitSeq", sample.name + ".tr")
+                sample.paths.sample_root,
+                "bowtie1_{}".format(sample.transcriptome),
+                "bitSeq",
+                sample.name + ".tr",
+            )
             counts_file = os.path.join(
-                sample.paths.sample_root, "bowtie1_{}".format(sample.transcriptome),
-                "bitSeq", sample.name + ".counts")
+                sample.paths.sample_root,
+                "bowtie1_{}".format(sample.transcriptome),
+                "bitSeq",
+                sample.name + ".counts",
+            )
 
             # read the "tr" file of one sample to get indexes
             try:
-                tr = pd.read_csv(tr_file, sep=" ", header=None, skiprows=1,
-                                 names=["ensembl_gene_id", "ensembl_transcript_id", "v1", "v2"])
+                tr = pd.read_csv(
+                    tr_file,
+                    sep=" ",
+                    header=None,
+                    skiprows=1,
+                    names=["ensembl_gene_id", "ensembl_transcript_id", "v1", "v2"],
+                )
             except IOError:
                 msg = "Could not open file '{}'' is missing.".format(tr_file)
                 if permissive:
@@ -136,7 +155,7 @@ class RNASeqAnalysis(Analysis):
                 else:
                     raise
 
-            e = tr.drop(['v1', 'v2'], axis=1).join(e)
+            e = tr.drop(["v1", "v2"], axis=1).join(e)
             e.loc[:, "sample_name"] = sample.name
             expr.append(e)
 
@@ -151,10 +170,15 @@ class RNASeqAnalysis(Analysis):
 
         expr = (
             pd.concat(expr, axis=0, sort=False)
-            .melt(id_vars=['ensembl_gene_id', 'ensembl_transcript_id', 'sample_name'])
-            .pivot_table(index=['ensembl_gene_id', 'ensembl_transcript_id'],
-                         columns="sample_name", values="value", fill_value=0)
-            .astype(int, downcast=True))
+            .melt(id_vars=["ensembl_gene_id", "ensembl_transcript_id", "sample_name"])
+            .pivot_table(
+                index=["ensembl_gene_id", "ensembl_transcript_id"],
+                columns="sample_name",
+                values="value",
+                fill_value=0,
+            )
+            .astype(int, downcast=True)
+        )
 
         return expr
 
@@ -175,7 +199,10 @@ class RNASeqAnalysis(Analysis):
                     os.path.join(
                         sample.paths.sample_root,
                         "ESAT_{}".format(sample.genome),
-                        sample.name + ".gene.txt"), sep="\t")
+                        sample.name + ".gene.txt",
+                    ),
+                    sep="\t",
+                )
             except IOError(msg) as e:
                 if permissive:
                     _LOGGER.warning(e)
@@ -185,7 +212,8 @@ class RNASeqAnalysis(Analysis):
             # extract only gene ID and counts
             c = c[["Symbol", "Exp1"]]
             c = c.rename(
-                columns={"Symbol": "gene_symbol", "Exp1": sample.name}).set_index("gene_symbol")
+                columns={"Symbol": "gene_symbol", "Exp1": sample.name}
+            ).set_index("gene_symbol")
 
             # Append
             if first:
@@ -236,11 +264,18 @@ class RNASeqAnalysis(Analysis):
     #     return expr.sort_index()
 
     def get_gene_expression(
-            self,
-            expression_type="counts", expression_level="gene",
-            samples=None, sample_attributes=None,
-            genome_assembly=None, species=None, pseudocount=1, mul_factor=1e6,
-            save=True, assign=True):
+        self,
+        expression_type="counts",
+        expression_level="gene",
+        samples=None,
+        sample_attributes=None,
+        genome_assembly=None,
+        species=None,
+        pseudocount=1,
+        mul_factor=1e6,
+        save=True,
+        assign=True,
+    ):
         """
         Collect gene expression (read counts, transcript level) for all samples,
         annotates ensembl IDs with gene names, reduces gene expression to gene-level,
@@ -272,7 +307,9 @@ class RNASeqAnalysis(Analysis):
             raise NotImplementedError("`expression_type` must be 'counts'!")
 
         if expression_level not in ["gene", "transcript"]:
-            raise NotImplementedError("`expression_level` must be one of 'gene' or 'transcript'!")
+            raise NotImplementedError(
+                "`expression_level` must be one of 'gene' or 'transcript'!"
+            )
 
         if samples is None:
             samples = [s for s in self.samples if s.library == "RNA-seq"]
@@ -282,19 +319,24 @@ class RNASeqAnalysis(Analysis):
                 sample_attributes = self.sample_attributes
 
         transcript_counts = self.collect_bitseq_output(
-            samples=samples, expression_type=expression_type)
+            samples=samples, expression_type=expression_type
+        )
 
         # Map ensembl gene IDs to gene names
-        mapping = query_biomart(attributes=["ensembl_transcript_id", "external_gene_name"])
+        mapping = query_biomart(
+            attributes=["ensembl_transcript_id", "external_gene_name"]
+        )
         mapping.columns = ["ensembl_transcript_id", "gene_name"]
 
         # Join gene names to existing Ensembl
-        transcript_counts = transcript_counts.reset_index(drop=True, level="ensembl_gene_id")
+        transcript_counts = transcript_counts.reset_index(
+            drop=True, level="ensembl_gene_id"
+        )
         transcript_counts = (
-            transcript_counts
-            .join(mapping.set_index("ensembl_transcript_id"))
+            transcript_counts.join(mapping.set_index("ensembl_transcript_id"))
             .set_index(["gene_name"], append=True)
-            .sort_index(axis=0))
+            .sort_index(axis=0)
+        )
 
         gene_counts = transcript_counts.groupby("gene_name").max()
 
@@ -342,28 +384,44 @@ class RNASeqAnalysis(Analysis):
             self.expression_annotated = expression_annotated
         if save:
             transcript_counts.to_csv(
-                os.path.join(self.results_dir, self.name + ".expression_{}.transcript_level.csv"
-                             .format(expression_type)), index=True)
+                os.path.join(
+                    self.results_dir,
+                    self.name
+                    + ".expression_{}.transcript_level.csv".format(expression_type),
+                ),
+                index=True,
+            )
             gene_counts.to_csv(
-                os.path.join(self.results_dir, self.name + ".expression_{}.gene_level.csv"
-                             .format(expression_type)), index=True)
+                os.path.join(
+                    self.results_dir,
+                    self.name + ".expression_{}.gene_level.csv".format(expression_type),
+                ),
+                index=True,
+            )
             matrix_qnorm_log.to_csv(
                 os.path.join(
-                    self.results_dir, self.name +
-                    ".expression_{}.{}_level.quantile_normalized.log2_tpm.csv"
-                    .format(expression_type, expression_level)),
-                index=True)
+                    self.results_dir,
+                    self.name
+                    + ".expression_{}.{}_level.quantile_normalized.log2_tpm.csv".format(
+                        expression_type, expression_level
+                    ),
+                ),
+                index=True,
+            )
             expression_annotated.to_csv(
                 os.path.join(
-                    self.results_dir, self.name +
-                    ".expression_{}.{}_level.quantile_normalized.log2_tpm.annotated_metadata.csv"
-                    .format(expression_type, expression_level)),
-                index=True)
+                    self.results_dir,
+                    self.name
+                    + ".expression_{}.{}_level.quantile_normalized.log2_tpm.annotated_metadata.csv".format(
+                        expression_type, expression_level
+                    ),
+                ),
+                index=True,
+            )
 
     def plot_expression_characteristics(
-            self,
-            output_dir="{results_dir}/expression_qc",
-            output_prefix="expression_qc"):
+        self, output_dir="{results_dir}/expression_qc", output_prefix="expression_qc"
+    ):
         """
         Plot general characteristics of the gene expression distributions within and across samples.
         """
@@ -373,19 +431,36 @@ class RNASeqAnalysis(Analysis):
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
 
-        to_drop = [v for v in ['gene_name', 'ensembl_gene_id', 'ensembl_transcript_id']
-                   if v in self.count_matrix.columns.tolist()]
+        to_drop = [
+            v
+            for v in ["gene_name", "ensembl_gene_id", "ensembl_transcript_id"]
+            if v in self.count_matrix.columns.tolist()
+        ]
 
-        fig, axis = plt.subplots(figsize=(4, 4 * np.log10(len(self.expression_matrix_counts.columns))))
+        fig, axis = plt.subplots(
+            figsize=(4, 4 * np.log10(len(self.expression_matrix_counts.columns)))
+        )
         sns.barplot(
-            data=self.count_matrix.drop(to_drop, axis=1).sum().sort_values().reset_index(),
-            y="index", x=0, orient="horiz", color=sns.color_palette("colorblind")[0], ax=axis)
+            data=self.count_matrix.drop(to_drop, axis=1)
+            .sum()
+            .sort_values()
+            .reset_index(),
+            y="index",
+            x=0,
+            orient="horiz",
+            color=sns.color_palette("colorblind")[0],
+            ax=axis,
+        )
         axis.set_xlabel("Transcriptome reads")
         axis.set_ylabel("Samples")
         sns.despine(fig)
         fig.savefig(
-            os.path.join(output_dir, self.name + "{}.expression.reads_per_sample.svg"
-                         .format(output_prefix)), bbox_inches="tight")
+            os.path.join(
+                output_dir,
+                self.name + "{}.expression.reads_per_sample.svg".format(output_prefix),
+            ),
+            bbox_inches="tight",
+        )
 
         cov = pd.DataFrame()
         for i in [1, 2, 3, 6, 12, 24, 48, 96, 200, 300, 400, 500, 1000]:
@@ -393,11 +468,16 @@ class RNASeqAnalysis(Analysis):
 
         fig, axis = plt.subplots(1, 2, figsize=(6 * 2, 6))
         sns.heatmap(
-            cov.drop([1, 2], axis=1), ax=axis[0],
-            cmap="GnBu", cbar_kws={"label": "Genes covered"})
+            cov.drop([1, 2], axis=1),
+            ax=axis[0],
+            cmap="GnBu",
+            cbar_kws={"label": "Genes covered"},
+        )
         sns.heatmap(
             cov.drop([1, 2], axis=1).apply(lambda x: (x - x.mean()) / x.std(), axis=0),
-            ax=axis[1], cbar_kws={"label": "Z-score"})
+            ax=axis[1],
+            cbar_kws={"label": "Z-score"},
+        )
         for ax in axis:
             ax.set_xticklabels(ax.get_xticklabels(), rotation=90)
             ax.set_yticklabels(ax.get_yticklabels(), rotation=0)
@@ -406,12 +486,17 @@ class RNASeqAnalysis(Analysis):
         axis[1].set_yticklabels(ax.get_yticklabels(), visible=False)
         sns.despine(fig)
         fig.savefig(
-            os.path.join(output_dir, self.name +
-                         "{}.expression.genes_with_reads.svg".format(output_prefix)),
-            bbox_inches="tight")
+            os.path.join(
+                output_dir,
+                self.name + "{}.expression.genes_with_reads.svg".format(output_prefix),
+            ),
+            bbox_inches="tight",
+        )
 
         for name, matrix in [
-                ("counts", self.expression_matrix_counts), ("qnorm_TPM", self.expression)]:
+            ("counts", self.expression_matrix_counts),
+            ("qnorm_TPM", self.expression),
+        ]:
             # Boxplot with values per sample
             if name == "counts":
                 matrix = np.log2(1 + matrix)
@@ -422,9 +507,16 @@ class RNASeqAnalysis(Analysis):
             axis.set_xlabel("log2({})".format(name))
             axis.set_ylabel("Samples")
             sns.despine(fig)
-            fig.savefig(os.path.join(output_dir, self.name +
-                        "{}.expression.boxplot_per_sample.{}.svg".format(output_prefix, name)),
-                        bbox_inches="tight")
+            fig.savefig(
+                os.path.join(
+                    output_dir,
+                    self.name
+                    + "{}.expression.boxplot_per_sample.{}.svg".format(
+                        output_prefix, name
+                    ),
+                ),
+                bbox_inches="tight",
+            )
 
         # # Plot gene expression along chromossomes
         # url_query = "".join([
@@ -454,36 +546,41 @@ class RNASeqAnalysis(Analysis):
         # data2 = data.rolling(int(3e4), axis=0).mean().dropna()
         # plt.pcolor(data2)
 
-    def unsupervised(
-            self, args, **kwargs):
+    def unsupervised(self, args, **kwargs):
         """
         RNASeqAnalysis.unsupervised is provided for backward compatibility only and will be removed
         in the future.
         Please use ngs_toolkit.general.unsupervised_analysis(RNASeqAnalysis) in the future.
         """
 
-        _LOGGER.warning(PendingDeprecationWarning(
-            "RNASeqAnalysis.unsupervised is provided for backward compatibility "
-            "only and will be removed. Please use "
-            "RNASeqAnalysis.unsupervised_analysis in the future."))
+        _LOGGER.warning(
+            PendingDeprecationWarning(
+                "RNASeqAnalysis.unsupervised is provided for backward compatibility "
+                "only and will be removed. Please use "
+                "RNASeqAnalysis.unsupervised_analysis in the future."
+            )
+        )
 
         self.unsupervised_analysis(args, **kwargs)
 
 
 def knockout_plot(
-        analysis=None,
-        knockout_genes=None,
-        expression_matrix=None,
-        comparison_results=None,
-        output_dir=None,
-        output_prefix="knockout_expression",
-        square=True,
-        rasterized=True):
+    analysis=None,
+    knockout_genes=None,
+    expression_matrix=None,
+    comparison_results=None,
+    output_dir=None,
+    output_prefix="knockout_expression",
+    square=True,
+    rasterized=True,
+):
     """
     Plot expression of knocked-out genes in all samples.
     """
     if (analysis is None) and (expression_matrix is None):
-        raise AssertionError("One of `analysis` or `expression_matrix` must be provided.")
+        raise AssertionError(
+            "One of `analysis` or `expression_matrix` must be provided."
+        )
 
     msg = "If an `analysis` object is not provided, you must provide a list of `knockout_genes`."
     if (analysis is None) and (knockout_genes is None):
@@ -507,8 +604,9 @@ def knockout_plot(
     knockout_genes = sorted(knockout_genes)
 
     missing = [k for k in knockout_genes if k not in expression_matrix.index]
-    msg = ("The following `knockout_genes` were not found in the expression matrix: '{}'"
-           .format(", ".join(missing)))
+    msg = "The following `knockout_genes` were not found in the expression matrix: '{}'".format(
+        ", ".join(missing)
+    )
     if len(missing) > 0:
         _LOGGER.warning(msg)
     knockout_genes = [k for k in knockout_genes if k in expression_matrix.index]
@@ -519,38 +617,76 @@ def knockout_plot(
         _LOGGER.warning(msg)
         return
     v = np.absolute(scipy.stats.zscore(ko, axis=1)).flatten().max()
-    v += (v / 10.)
+    v += v / 10.0
 
     g = sns.clustermap(
-        ko, cbar_kws={"label": "Expression"}, robust=True,
-        xticklabels=True, yticklabels=True, square=square, rasterized=rasterized)
+        ko,
+        cbar_kws={"label": "Expression"},
+        robust=True,
+        xticklabels=True,
+        yticklabels=True,
+        square=square,
+        rasterized=rasterized,
+    )
     g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90)
     g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0)
     g.savefig(os.path.join(output_dir, output_prefix + ".svg"), bbox_inches="tight")
 
     g = sns.clustermap(
         ko,
-        z_score=0, cmap="RdBu_r", vmin=-v, vmax=v, cbar_kws={"label": "Expression Z-score"},
-        rasterized=rasterized, xticklabels=True, yticklabels=True, square=square)
+        z_score=0,
+        cmap="RdBu_r",
+        vmin=-v,
+        vmax=v,
+        cbar_kws={"label": "Expression Z-score"},
+        rasterized=rasterized,
+        xticklabels=True,
+        yticklabels=True,
+        square=square,
+    )
     g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90)
     g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0)
-    g.savefig(os.path.join(output_dir, output_prefix + ".z_score.svg"), bbox_inches="tight")
-
-    g = sns.clustermap(
-        ko, cbar_kws={"label": "Expression"}, row_cluster=False, col_cluster=False, robust=True,
-        xticklabels=True, yticklabels=True, square=square, rasterized=rasterized)
-    g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90)
-    g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0)
-    g.savefig(os.path.join(output_dir, output_prefix + ".sorted.svg"), bbox_inches="tight")
+    g.savefig(
+        os.path.join(output_dir, output_prefix + ".z_score.svg"), bbox_inches="tight"
+    )
 
     g = sns.clustermap(
         ko,
-        z_score=0, cmap="RdBu_r", vmin=-v, vmax=v, cbar_kws={"label": "Expression Z-score"},
-        row_cluster=False, col_cluster=False, rasterized=rasterized,
-        xticklabels=True, yticklabels=True, square=square)
+        cbar_kws={"label": "Expression"},
+        row_cluster=False,
+        col_cluster=False,
+        robust=True,
+        xticklabels=True,
+        yticklabels=True,
+        square=square,
+        rasterized=rasterized,
+    )
     g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90)
     g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0)
-    g.savefig(os.path.join(output_dir, output_prefix + ".z_score.sorted.svg"), bbox_inches="tight")
+    g.savefig(
+        os.path.join(output_dir, output_prefix + ".sorted.svg"), bbox_inches="tight"
+    )
+
+    g = sns.clustermap(
+        ko,
+        z_score=0,
+        cmap="RdBu_r",
+        vmin=-v,
+        vmax=v,
+        cbar_kws={"label": "Expression Z-score"},
+        row_cluster=False,
+        col_cluster=False,
+        rasterized=rasterized,
+        xticklabels=True,
+        yticklabels=True,
+        square=square,
+    )
+    g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90)
+    g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0)
+    g.savefig(
+        os.path.join(output_dir, output_prefix + ".z_score.sorted.svg"),
+        bbox_inches="tight",
+    )
 
     # p-values and fold-changes for knockout genes
     if comparison_results is None:
@@ -559,96 +695,174 @@ def knockout_plot(
     # p-values
     p_table = pd.pivot_table(
         comparison_results.loc[knockout_genes, :].reset_index(),
-        index="comparison_name", columns="index", values="padj")
+        index="comparison_name",
+        columns="index",
+        values="padj",
+    )
     p_table.index.name = "Knockout gene"
     p_table.columns.name = "Gene"
-    p_table = (-np.log10(p_table.loc[knockout_genes, knockout_genes].dropna()))
+    p_table = -np.log10(p_table.loc[knockout_genes, knockout_genes].dropna())
     p_table = p_table.replace(np.inf, p_table[p_table != np.inf].max().max())
     p_table = p_table.replace(-np.inf, 0)
 
     v = np.absolute(scipy.stats.zscore(p_table, axis=1)).flatten().max()
-    v += (v / 10.)
-
-    g = sns.clustermap(
-        p_table, cbar_kws={"label": "-log10(FDR p-value)"},
-        xticklabels=True, yticklabels=True, square=square)
-    g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90)
-    g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0)
-    g.savefig(os.path.join(output_dir, output_prefix + ".p_value.svg"), bbox_inches="tight")
+    v += v / 10.0
 
     g = sns.clustermap(
         p_table,
-        z_score=0, center=0, cmap="RdBu_r", vmax=v, cbar_kws={"label": "-log10(FDR p-value)\nZ-score"},
-        xticklabels=True, yticklabels=True, square=square)
+        cbar_kws={"label": "-log10(FDR p-value)"},
+        xticklabels=True,
+        yticklabels=True,
+        square=square,
+    )
     g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90)
     g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0)
-    g.savefig(os.path.join(output_dir, output_prefix + ".p_value.z_score.svg"), bbox_inches="tight")
-
-    g = sns.clustermap(
-        p_table, cbar_kws={"label": "-log10(FDR p-value)"}, row_cluster=False, col_cluster=False,
-        xticklabels=True, yticklabels=True, square=square)
-    g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90)
-    g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0)
-    g.savefig(os.path.join(output_dir, output_prefix + ".p_value.sorted.svg"), bbox_inches="tight")
+    g.savefig(
+        os.path.join(output_dir, output_prefix + ".p_value.svg"), bbox_inches="tight"
+    )
 
     g = sns.clustermap(
         p_table,
-        z_score=0, cmap="RdBu_r", center=0, vmax=v, cbar_kws={"label": "-log10(FDR p-value)\nZ-score"}, row_cluster=False, col_cluster=False,
-        xticklabels=True, yticklabels=True, square=square)
+        z_score=0,
+        center=0,
+        cmap="RdBu_r",
+        vmax=v,
+        cbar_kws={"label": "-log10(FDR p-value)\nZ-score"},
+        xticklabels=True,
+        yticklabels=True,
+        square=square,
+    )
+    g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90)
+    g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0)
+    g.savefig(
+        os.path.join(output_dir, output_prefix + ".p_value.z_score.svg"),
+        bbox_inches="tight",
+    )
+
+    g = sns.clustermap(
+        p_table,
+        cbar_kws={"label": "-log10(FDR p-value)"},
+        row_cluster=False,
+        col_cluster=False,
+        xticklabels=True,
+        yticklabels=True,
+        square=square,
+    )
+    g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90)
+    g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0)
+    g.savefig(
+        os.path.join(output_dir, output_prefix + ".p_value.sorted.svg"),
+        bbox_inches="tight",
+    )
+
+    g = sns.clustermap(
+        p_table,
+        z_score=0,
+        cmap="RdBu_r",
+        center=0,
+        vmax=v,
+        cbar_kws={"label": "-log10(FDR p-value)\nZ-score"},
+        row_cluster=False,
+        col_cluster=False,
+        xticklabels=True,
+        yticklabels=True,
+        square=square,
+    )
     g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90)
     g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0)
     g.savefig(
         os.path.join(output_dir, output_prefix + ".p_value.z_score.sorted.svg"),
-        bbox_inches="tight")
+        bbox_inches="tight",
+    )
 
     g = sns.clustermap(
-        p_table, cbar_kws={"label": "-log10(FDR p-value)"},
-        row_cluster=False, col_cluster=False,
-        xticklabels=True, yticklabels=True, square=square, vmax=1.3 * 5)
+        p_table,
+        cbar_kws={"label": "-log10(FDR p-value)"},
+        row_cluster=False,
+        col_cluster=False,
+        xticklabels=True,
+        yticklabels=True,
+        square=square,
+        vmax=1.3 * 5,
+    )
     g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90)
     g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0)
     g.savefig(
         os.path.join(output_dir, output_prefix + ".p_value.thresholded.svg"),
-        bbox_inches="tight")
+        bbox_inches="tight",
+    )
 
     # logfoldchanges
     fc_table = pd.pivot_table(
         comparison_results.loc[knockout_genes, :].reset_index(),
-        index="comparison_name", columns="index", values="log2FoldChange")
+        index="comparison_name",
+        columns="index",
+        values="log2FoldChange",
+    )
     fc_table.index.name = "Knockout gene"
     fc_table.columns.name = "Gene"
     fc_table = fc_table.loc[knockout_genes, knockout_genes].dropna()
 
     v = np.absolute(scipy.stats.zscore(fc_table, axis=1)).flatten().max()
-    v += (v / 10.)
+    v += v / 10.0
 
     g = sns.clustermap(
-        fc_table, center=0, cmap="RdBu_r", cbar_kws={"label": "log2(fold-change)"},
-        xticklabels=True, yticklabels=True, square=square)
+        fc_table,
+        center=0,
+        cmap="RdBu_r",
+        cbar_kws={"label": "log2(fold-change)"},
+        xticklabels=True,
+        yticklabels=True,
+        square=square,
+    )
     g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90)
     g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0)
-    g.savefig(os.path.join(output_dir, output_prefix + ".log_fc.svg"), bbox_inches="tight")
+    g.savefig(
+        os.path.join(output_dir, output_prefix + ".log_fc.svg"), bbox_inches="tight"
+    )
 
     g = sns.clustermap(
-        fc_table, center=0, cmap="RdBu_r", cbar_kws={"label": "log2(fold-change)"},
-        row_cluster=False, col_cluster=False,
-        xticklabels=True, yticklabels=True, square=square)
+        fc_table,
+        center=0,
+        cmap="RdBu_r",
+        cbar_kws={"label": "log2(fold-change)"},
+        row_cluster=False,
+        col_cluster=False,
+        xticklabels=True,
+        yticklabels=True,
+        square=square,
+    )
     g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90)
     g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0)
-    g.savefig(os.path.join(output_dir, output_prefix + ".log_fc.sorted.svg"), bbox_inches="tight")
+    g.savefig(
+        os.path.join(output_dir, output_prefix + ".log_fc.sorted.svg"),
+        bbox_inches="tight",
+    )
 
     g = sns.clustermap(
-        fc_table, center=0, vmin=-2, vmax=2, cmap="RdBu_r", cbar_kws={"label": "log2(fold-change)"},
-        row_cluster=False, col_cluster=False,
-        xticklabels=True, yticklabels=True, square=square)
+        fc_table,
+        center=0,
+        vmin=-2,
+        vmax=2,
+        cmap="RdBu_r",
+        cbar_kws={"label": "log2(fold-change)"},
+        row_cluster=False,
+        col_cluster=False,
+        xticklabels=True,
+        yticklabels=True,
+        square=square,
+    )
     g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90)
     g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0)
     g.savefig(
         os.path.join(output_dir, output_prefix + ".log_fc.thresholded.sorted.svg"),
-        bbox_inches="tight")
+        bbox_inches="tight",
+    )
 
 
-def assess_cell_cycle(analysis, matrix=None, output_dir=None, output_prefix="cell_cycle_assessment"):
+def assess_cell_cycle(
+    analysis, matrix=None, output_dir=None, output_prefix="cell_cycle_assessment"
+):
     """
     Predict cell cycle phase from expression data.
 
@@ -674,8 +888,8 @@ def assess_cell_cycle(analysis, matrix=None, output_dir=None, output_prefix="cel
     #         "arid1a_rnaseq.expression_counts.gene_level.quantile_normalized.log2_tpm.csv"),
     #     index_col=0)
     exp_z = pd.DataFrame(
-        zscore(matrix, axis=0),
-        index=matrix.index, columns=matrix.columns)
+        zscore(matrix, axis=0), index=matrix.index, columns=matrix.columns
+    )
 
     # Score samples for cell cycle
     cl = "https://raw.githubusercontent.com/theislab/scanpy_usage/master/"
@@ -688,7 +902,8 @@ def assess_cell_cycle(analysis, matrix=None, output_dir=None, output_prefix="cel
     knockout_plot(
         knockout_genes=cc_prots,
         output_prefix=output_prefix + ".gene_expression.zscore0",
-        expression_matrix=exp_z)
+        expression_matrix=exp_z,
+    )
 
     adata = anndata.AnnData(exp_z.T)
     sc.pp.scale(adata)
@@ -696,30 +911,47 @@ def assess_cell_cycle(analysis, matrix=None, output_dir=None, output_prefix="cel
 
     preds = adata.obs
 
-    fig, axis = plt.subplots(
-        1, 2, figsize=(4 * 2, 4), sharex=True, sharey=True)
+    fig, axis = plt.subplots(1, 2, figsize=(4 * 2, 4), sharex=True, sharey=True)
     for ax in axis:
         ax.axhline(0, alpha=0.5, linestyle="--", color="black")
         ax.axvline(0, alpha=0.5, linestyle="--", color="black")
         ax.set_xlabel("S-phase score")
         ax.set_ylabel("G2/M-phase score")
-    for phase in preds['phase']:
+    for phase in preds["phase"]:
         axis[0].scatter(
-            preds.loc[preds['phase'] == phase, 'S_score'],
-            preds.loc[preds['phase'] == phase, 'G2M_score'],
-            label=phase, alpha=0.5, s=5)
+            preds.loc[preds["phase"] == phase, "S_score"],
+            preds.loc[preds["phase"] == phase, "G2M_score"],
+            label=phase,
+            alpha=0.5,
+            s=5,
+        )
         axis[1].scatter(
-            preds.loc[(preds['phase'] == phase) & (preds.index.str.contains("HAP1")), 'S_score'],
-            preds.loc[(preds['phase'] == phase) & (preds.index.str.contains("HAP1")), 'G2M_score'],
-            label=phase, alpha=0.5, s=5)
+            preds.loc[
+                (preds["phase"] == phase) & (preds.index.str.contains("HAP1")),
+                "S_score",
+            ],
+            preds.loc[
+                (preds["phase"] == phase) & (preds.index.str.contains("HAP1")),
+                "G2M_score",
+            ],
+            label=phase,
+            alpha=0.5,
+            s=5,
+        )
     for s in preds.index:
-        axis[0].text(preds.loc[s, "S_score"], preds.loc[s, "G2M_score"], s=s, fontsize=6)
+        axis[0].text(
+            preds.loc[s, "S_score"], preds.loc[s, "G2M_score"], s=s, fontsize=6
+        )
     for s in preds.index[preds.index.str.contains("HAP1")]:
-        axis[1].text(preds.loc[s, "S_score"], preds.loc[s, "G2M_score"], s=s, fontsize=6)
+        axis[1].text(
+            preds.loc[s, "S_score"], preds.loc[s, "G2M_score"], s=s, fontsize=6
+        )
     axis[0].set_title("All samples")
     axis[1].set_title("HAP1 samples")
-    fig.savefig(os.path.join(
-            output_dir, output_prefix + ".cell_cycle_prediction.svg"),
-        dpi=300, bbox_inches="tight")
+    fig.savefig(
+        os.path.join(output_dir, output_prefix + ".cell_cycle_prediction.svg"),
+        dpi=300,
+        bbox_inches="tight",
+    )
 
     return preds

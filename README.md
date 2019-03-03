@@ -6,6 +6,8 @@
 
 [![PEP compatible](http://pepkit.github.io/img/PEP-compatible-green.svg)](http://pepkit.github.io)
 
+[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/ambv/black)
+
 # ngs-toolkit
 
 This is my NGS analysis toolkit: ``ngs_toolkit``.

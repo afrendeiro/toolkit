@@ -30,7 +30,7 @@ def chunks(l, n):
         Size of chunks to generate.
     """
     n = max(1, n)
-    return list(l[i:i + n] for i in range(0, len(l), n))
+    return list(l[i : i + n] for i in range(0, len(l), n))
 
 
 def sorted_nicely(l):
@@ -47,9 +47,13 @@ def sorted_nicely(l):
     iterable
         Sorted interable
     """
-    def convert(text): return int(text) if text.isdigit() else text
 
-    def alphanum_key(key): return [convert(c) for c in re.split('([0-9]+)', key)]
+    def convert(text):
+        return int(text) if text.isdigit() else text
+
+    def alphanum_key(key):
+        return [convert(c) for c in re.split("([0-9]+)", key)]
+
     return sorted(l, key=alphanum_key)
 
 
@@ -91,11 +95,11 @@ def count_dataframe_values(x):
 
 def location_index_to_bed(index):
     bed = pd.DataFrame(index=index)
-    index = index.to_series(name='region')
-    bed['chrom'] = index.str.split(":").str[0]
+    index = index.to_series(name="region")
+    bed["chrom"] = index.str.split(":").str[0]
     index2 = index.str.split(":").str[1]
-    bed['start'] = index2.str.split("-").str[0]
-    bed['end'] = index2.str.split("-").str[1]
+    bed["start"] = index2.str.split("-").str[0]
+    bed["end"] = index2.str.split("-").str[1]
     return bed
 
 
@@ -109,16 +113,18 @@ def bed_to_index(df):
     df : pandas.DataFrame
         DataFrame with columns 'chr', 'start' and 'end'.
     """
-    cols = ['chrom', 'start', 'end']
+    cols = ["chrom", "start", "end"]
     if not all([x in df.columns for x in cols]):
-        raise AttributeError("DataFrame does not have '{}' columns."
-                             .format("', '".join(cols)))
+        raise AttributeError(
+            "DataFrame does not have '{}' columns.".format("', '".join(cols))
+        )
     index = (
-        df['chrom'] +
-        ":" +
-        df['start'].astype(int).astype(str) +
-        "-" +
-        df['end'].astype(int).astype(str))
+        df["chrom"]
+        + ":"
+        + df["start"].astype(int).astype(str)
+        + "-"
+        + df["end"].astype(int).astype(str)
+    )
     return pd.Index(index, name="region")
 
 
@@ -131,7 +137,7 @@ def timedelta_to_years(x):
     :returns: [description]
     :rtype: {[type]}
     """
-    return x / np.timedelta64(60 * 60 * 24 * 365, 's')
+    return x / np.timedelta64(60 * 60 * 24 * 365, "s")
 
 
 def signed_max(x, f=0.66, axis=0):
@@ -201,7 +207,7 @@ def log_pvalues(x, f=0.1):
     pandas.Series
         Transformed values
     """
-    ll = (-np.log10(x))
+    ll = -np.log10(x)
     rmax = ll[ll != np.inf].max()
     return ll.replace(np.inf, rmax + rmax * f)
 
@@ -400,7 +406,7 @@ def collect_md5_sums(df):
     for col in cols:
         for i, path in df.loc[:, col].iteritems():
             if not pd.isnull(path):
-                cont = open(path, 'r').read().strip()
+                cont = open(path, "r").read().strip()
                 if any([x.isspace() for x in cont]):
                     cont = cont.split(" ")[0]
                 df.loc[i, col] = cont
@@ -424,7 +430,9 @@ def sra_id2geo_id(sra_ids):
 def sra2fastq(input_sra, output_dir):
     cmd = """
 \t\tfastq-dump --split-3 --outdir {} {}
-    """.format(output_dir, input_sra)
+    """.format(
+        output_dir, input_sra
+    )
 
     return cmd
 
@@ -450,6 +458,7 @@ def decompress_file(file, output_file=None):
     file = "file.bed.gz"
     """
     import shutil
+
     if output_file is None:
         if not file.endswith(".gz"):
             msg = "`output_file` not given and input_file does not end in '.gz'."
@@ -457,8 +466,8 @@ def decompress_file(file, output_file=None):
             raise ValueError(msg)
         output_file = file.replace(".gz", "")
     # decompress
-    with gzip.open(file, 'rb') as _in:
-        with open(output_file, 'wb') as _out:
+    with gzip.open(file, "rb") as _in:
+        with open(output_file, "wb") as _out:
             shutil.copyfileobj(_in, _out)
             # for line in _in.readlines():
             # _out.write(line.decode('utf-8'))
@@ -473,11 +482,12 @@ def compress_file(file, output_file=None):
     file = "file.bed.gz"
     """
     import shutil
+
     if output_file is None:
         output_file = file + ".gz"
     # compress
-    with open(file, 'rb') as _in:
-        with gzip.open(output_file, 'wb') as _out:
+    with open(file, "rb") as _in:
+        with gzip.open(output_file, "wb") as _out:
             shutil.copyfileobj(_in, _out)
             # for line in _in.readlines():
             # _out.write(line.decode('utf-8'))
@@ -495,19 +505,16 @@ def download_file(url, output_file, chunk_size=1024):
     chunk_size = 1024
     """
     response = requests.get(url, stream=True)
-    with open(output_file, 'wb') as outfile:
-        outfile.writelines(
-            response.iter_content(chunk_size=chunk_size))
+    with open(output_file, "wb") as outfile:
+        outfile.writelines(response.iter_content(chunk_size=chunk_size))
 
 
 def download_gzip_file(url, output_file):
     if not output_file.endswith(".gz"):
-        output_file += '.gz'
+        output_file += ".gz"
     download_file(url, output_file)
     decompress_file(output_file)
-    if (
-            os.path.exists(output_file) and
-            os.path.exists(output_file.replace(".gz", ""))):
+    if os.path.exists(output_file) and os.path.exists(output_file.replace(".gz", "")):
         os.remove(output_file)
 
 
@@ -516,7 +523,9 @@ def download_cram(link, output_dir):
     cd {}
     wget '{}'
     cd -
-    """.format(output_dir, link)
+    """.format(
+        output_dir, link
+    )
 
     return cmd
 
@@ -524,7 +533,9 @@ def download_cram(link, output_dir):
 def cram2bam(input_cram, output_bam):
     cmd = """
     samtools view -b -o {} {}
-    """.format(output_bam, input_cram)
+    """.format(
+        output_bam, input_cram
+    )
 
     return cmd
 
@@ -534,7 +545,9 @@ def download_sra(link, output_dir):
     cd {}
     wget '{}'
     cd -
-    """.format(output_dir, link)
+    """.format(
+        output_dir, link
+    )
 
     return cmd
 
@@ -556,7 +569,8 @@ def sra2bam_job(sra_id, base_path):
         os.path.join(base_path, sra_id + "_1.fastq"),
         os.path.join(base_path, sra_id + ".bam"),
         sra_id,
-        os.path.join(base_path, sra_id + "_2.fastq"))
+        os.path.join(base_path, sra_id + "_2.fastq"),
+    )
 
     # Slurm footer
     cmd += tk.slurm_footer() + "\n"
@@ -577,17 +591,18 @@ def link2bam_job(sample_name, link, base_path):
     job_file = os.path.join(base_path, "%s_link2bam.sh" % sample_name)
     log_file = os.path.join(base_path, "%s_link2bam.log" % sample_name)
 
-    cmd = tk.slurm_header("-".join(["link2bam", sample_name]), log_file, cpus_per_task=2)
+    cmd = tk.slurm_header(
+        "-".join(["link2bam", sample_name]), log_file, cpus_per_task=2
+    )
 
     # Download CRAM
-    cmd += download_cram(
-        link,
-        base_path)
+    cmd += download_cram(link, base_path)
 
     # CRAM to BAM
     cmd += cram2bam(
         os.path.join(base_path, sample_name + ".cram"),
-        os.path.join(base_path, sample_name + ".bam"))
+        os.path.join(base_path, sample_name + ".bam"),
+    )
 
     # Slurm footer
     cmd += tk.slurm_footer() + "\n"
@@ -618,7 +633,8 @@ def sralink2bam_job(sra_id, base_path):
         os.path.join(base_path, sra_id + "_1.fastq"),
         os.path.join(base_path, sra_id + ".bam"),
         sra_id,
-        os.path.join(base_path, sra_id + "_2.fastq"))
+        os.path.join(base_path, sra_id + "_2.fastq"),
+    )
 
     # Slurm footer
     cmd += tk.slurm_footer() + "\n"
@@ -641,7 +657,7 @@ def series_matrix2csv(matrix_url, prefix=None):
     subprocess.call("wget {}".format(matrix_url).split(" "))
     filename = matrix_url.split("/")[-1]
 
-    with gzip.open(filename, 'rb') as f:
+    with gzip.open(filename, "rb") as f:
         file_content = f.read()
 
     # separate lines with only one field (project-related)
@@ -652,9 +668,11 @@ def series_matrix2csv(matrix_url, prefix=None):
     for line in file_content.decode("utf-8").strip().split("\n"):
         line = line.strip().split("\t")
         if len(line) == 2:
-            prj_lines[line[0].replace("\"", "")] = line[1].replace("\"", "")
+            prj_lines[line[0].replace('"', "")] = line[1].replace('"', "")
         elif len(line) > 2:
-            sample_lines[line[0].replace("\"", "")] = [x.replace("\"", "") for x in line[1:]]
+            sample_lines[line[0].replace('"', "")] = [
+                x.replace('"', "") for x in line[1:]
+            ]
 
     prj = pd.Series(prj_lines)
     prj.index = prj.index.str.replace("!Series_", "")
@@ -670,8 +688,15 @@ def series_matrix2csv(matrix_url, prefix=None):
 
 
 def deseq_results_to_bed_file(
-        deseq_result_file, bed_file, sort=True, ascending=False, normalize=False,
-        significant_only=False, alpha=0.05, abs_fold_change=1.):
+    deseq_result_file,
+    bed_file,
+    sort=True,
+    ascending=False,
+    normalize=False,
+    significant_only=False,
+    alpha=0.05,
+    abs_fold_change=1.0,
+):
     """
     Write BED file with fold changes from DESeq2 as score value.
     """
@@ -686,19 +711,23 @@ def deseq_results_to_bed_file(
         df = df.sort_values("log2FoldChange", ascending=ascending)
 
     if significant_only is True:
-        df = df.loc[(df['padj'] < alpha) & (df['log2FoldChange'].abs() > abs_fold_change), :]
+        df = df.loc[
+            (df["padj"] < alpha) & (df["log2FoldChange"].abs() > abs_fold_change), :
+        ]
 
     # decompose index string (chrom:start-end) into columns
-    df['chrom'] = map(lambda x: x[0], df.index.str.split(":"))
+    df["chrom"] = map(lambda x: x[0], df.index.str.split(":"))
     r = pd.Series(map(lambda x: x[1], df.index.str.split(":")))
-    df['start'] = map(lambda x: x[0], r.str.split("-"))
-    df['end'] = map(lambda x: x[1], r.str.split("-"))
-    df['name'] = df.index
+    df["start"] = map(lambda x: x[0], r.str.split("-"))
+    df["end"] = map(lambda x: x[1], r.str.split("-"))
+    df["name"] = df.index
     if normalize:
         MinMaxScaler(feature_range=(0, 1000)).fit_transform(df["log2FoldChange"])
-    df['score'] = df["log2FoldChange"]
+    df["score"] = df["log2FoldChange"]
 
-    df[["chrom", "start", "end", "name", "score"]].to_csv(bed_file, sep="\t", header=False, index=False)
+    df[["chrom", "start", "end", "name", "score"]].to_csv(
+        bed_file, sep="\t", header=False, index=False
+    )
 
 
 def homer_peaks_to_bed(homer_peaks, output_bed):
@@ -712,16 +741,19 @@ def homer_peaks_to_bed(homer_peaks, output_bed):
         Output BED file.
     """
     df = pd.read_csv(homer_peaks, sep="\t", comment="#", header=None)
-    df['-log_pvalue'] = (-np.log10(df.iloc[:, -2])).replace(pd.np.inf, 1000)
-    df['name'] = df[1] + ":" + df[2].astype(str) + "-" + df[3].astype(str)
+    df["-log_pvalue"] = (-np.log10(df.iloc[:, -2])).replace(pd.np.inf, 1000)
+    df["name"] = df[1] + ":" + df[2].astype(str) + "-" + df[3].astype(str)
 
     (
-        df[[1, 2, 3, 'name', '-log_pvalue']]
+        df[[1, 2, 3, "name", "-log_pvalue"]]
         .sort_values([1, 2, 3], ascending=True)
-        .to_csv(output_bed, header=False, index=False, sep="\t"))
+        .to_csv(output_bed, header=False, index=False, sep="\t")
+    )
 
 
-def macs2_call_chipseq_peak(signal_samples, control_samples, output_dir, name, as_job=True):
+def macs2_call_chipseq_peak(
+    signal_samples, control_samples, output_dir, name, as_job=True
+):
     """
     Call ChIP-seq peaks with MACS2 in a slurm job.
 
@@ -746,19 +778,19 @@ def macs2_call_chipseq_peak(signal_samples, control_samples, output_dir, name, a
     if not os.path.exists(output_path):
         os.mkdir(output_path)
 
-    runnable = (
-        """macs2 callpeak -t {0} -c {1} -n {2} --outdir {3}"""
-        .format(
-            " ".join([s.filtered for s in signal_samples]),
-            " ".join([s.filtered for s in control_samples]), name, output_path))
+    runnable = """macs2 callpeak -t {0} -c {1} -n {2} --outdir {3}""".format(
+        " ".join([s.filtered for s in signal_samples]),
+        " ".join([s.filtered for s in control_samples]),
+        name,
+        output_path,
+    )
 
     if as_job:
         tk = NGSTk()
         job_name = "macs2_{}".format(name)
         cmd = tk.slurm_header(
-            job_name,
-            os.path.join(output_path, job_name + ".log"),
-            cpus_per_task=4)
+            job_name, os.path.join(output_path, job_name + ".log"), cpus_per_task=4
+        )
         cmd += "\t\t" + runnable
         cmd += "\t\t" + tk.slurm_footer() + "\n"
         job_file = os.path.join(output_path, name + ".macs2.sh")
@@ -769,7 +801,9 @@ def macs2_call_chipseq_peak(signal_samples, control_samples, output_dir, name, a
         return runnable
 
 
-def homer_call_chipseq_peak_job(signal_samples, control_samples, output_dir, name, as_job=True):
+def homer_call_chipseq_peak_job(
+    signal_samples, control_samples, output_dir, name, as_job=True
+):
     """
     Call ChIP-seq peaks with MACS2 in a slurm job.
 
@@ -795,25 +829,36 @@ def homer_call_chipseq_peak_job(signal_samples, control_samples, output_dir, nam
     signal_tag_directory = os.path.join(output_dir, "homer_tag_dir_" + name + "_signal")
     fs = " ".join([s.filtered for s in signal_samples])
     runnable = """makeTagDirectory {0} {1}\n""".format(signal_tag_directory, fs)
-    background_tag_directory = os.path.join(output_dir, "homer_tag_dir_" + name + "_background")
+    background_tag_directory = os.path.join(
+        output_dir, "homer_tag_dir_" + name + "_background"
+    )
     fs = " ".join([s.filtered for s in control_samples])
     runnable += """makeTagDirectory {0} {1}\n""".format(background_tag_directory, fs)
 
     # call peaks
-    output_file = os.path.join(output_dir, name, name + "_homer_peaks.factor.narrowPeak")
+    output_file = os.path.join(
+        output_dir, name, name + "_homer_peaks.factor.narrowPeak"
+    )
     runnable += """findPeaks {signal} -style factor -o {output_file} -i {background}\n""".format(
-        output_file=output_file, background=background_tag_directory, signal=signal_tag_directory)
-    output_file = os.path.join(output_dir, name, name + "_homer_peaks.histone.narrowPeak")
+        output_file=output_file,
+        background=background_tag_directory,
+        signal=signal_tag_directory,
+    )
+    output_file = os.path.join(
+        output_dir, name, name + "_homer_peaks.histone.narrowPeak"
+    )
     runnable += """findPeaks {signal} -style histone -o {output_file} -i {background}\n""".format(
-        output_file=output_file, background=background_tag_directory, signal=signal_tag_directory)
+        output_file=output_file,
+        background=background_tag_directory,
+        signal=signal_tag_directory,
+    )
 
     if as_job:
         tk = NGSTk()
         job_name = "homer_findPeaks_{}".format(name)
         cmd = tk.slurm_header(
-            job_name,
-            os.path.join(output_path, job_name + ".log"),
-            cpus_per_task=4)
+            job_name, os.path.join(output_path, job_name + ".log"), cpus_per_task=4
+        )
         cmd += runnable.replace("\n", "\t\t\n")
         cmd += "\t\t" + tk.slurm_footer() + "\n"
         job_file = os.path.join(output_path, name + ".homer.sh")
@@ -849,7 +894,7 @@ def bed_to_fasta(input_bed, output_fasta, genome_file):
 
     if genome_file.endswith(".2bit"):
         bed_to_fasta_through_2bit(input_bed, output_fasta, genome_file)
-    elif (genome_file.endswith(".fa") or genome_file.endswith(".fasta")):
+    elif genome_file.endswith(".fa") or genome_file.endswith(".fasta"):
         bed_to_fasta_through_fasta(input_bed, output_fasta, genome_file)
     else:
         msg = "Format of `genome_file` must be one of FASTA or 2bit, "
@@ -876,11 +921,11 @@ def bed_to_fasta_through_2bit(input_bed, output_fasta, genome_2bit):
     """
     tmp_bed = input_bed + ".tmp.bed"
     # write name column
-    bed = pd.read_csv(input_bed, sep='\t', header=None)
-    bed['name'] = bed[0] + ":" + bed[1].astype(str) + "-" + bed[2].astype(str)
+    bed = pd.read_csv(input_bed, sep="\t", header=None)
+    bed["name"] = bed[0] + ":" + bed[1].astype(str) + "-" + bed[2].astype(str)
     bed[1] = bed[1].astype(int)
     bed[2] = bed[2].astype(int)
-    bed.to_csv(tmp_bed, sep='\t', header=None, index=False)
+    bed.to_csv(tmp_bed, sep="\t", header=None, index=False)
 
     cmd = "twoBitToFa {0} -bed={1} {2}".format(genome_2bit, tmp_bed, output_fasta)
     subprocess.call(cmd.split(" "))
@@ -904,8 +949,8 @@ def bed_to_fasta_through_fasta(input_bed, output_fasta, genome_fasta):
     genome_fasta : str
         Path to genome FASTA file.
     """
-    bed = pd.read_csv(input_bed, sep='\t', header=None)
-    bed['name'] = bed[0] + ":" + bed[1].astype(str) + "-" + bed[2].astype(str)
+    bed = pd.read_csv(input_bed, sep="\t", header=None)
+    bed["name"] = bed[0] + ":" + bed[1].astype(str) + "-" + bed[2].astype(str)
     bed[1] = bed[1].astype(int)
     bed[2] = bed[2].astype(int)
     bed = pybedtools.BedTool.from_dataframe(bed.iloc[:, [0, 1, 2]])
@@ -933,7 +978,7 @@ def count_reads_in_intervals(bam, intervals):
     """
     counts = dict()
 
-    bam = pysam.AlignmentFile(bam, mode='rb')
+    bam = pysam.AlignmentFile(bam, mode="rb")
 
     chroms = ["chr" + str(x) for x in range(1, 23)] + ["chrX", "chrY"]
 
@@ -969,11 +1014,12 @@ def normalize_quantiles_r(array):
     import rpy2.robjects.numpy2ri
     import warnings
     from rpy2.rinterface import RRuntimeWarning
+
     warnings.filterwarnings("ignore", category=RRuntimeWarning)
     rpy2.robjects.numpy2ri.activate()
 
     robjects.r('require("preprocessCore")')
-    normq = robjects.r('normalize.quantiles')
+    normq = robjects.r("normalize.quantiles")
     return np.array(normq(array))
 
 
@@ -1024,7 +1070,7 @@ def get_total_region_area(bed_file):
 
 def get_region_lengths(bed_file):
     peaks = pd.read_csv(bed_file, sep="\t", header=None)
-    return (peaks.iloc[:, 2] - peaks.iloc[:, 1])
+    return peaks.iloc[:, 2] - peaks.iloc[:, 1]
 
 
 def get_regions_per_chromosomes(bed_file):

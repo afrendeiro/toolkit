@@ -26,15 +26,32 @@ def test_project_creation(tmp_path):
 
     project_name = "test_project"
     annotation_vars = [
-        "sample_name", "toggle", "pass_qc", "protocol", "library",
-        "cell_line", "cell_type", "condition",
-        "experimental_batch", "experiment_name", "replicate",
-        "organism", "flowcell", "lane", "BSF_name", "data_source"]
+        "sample_name",
+        "toggle",
+        "pass_qc",
+        "protocol",
+        "library",
+        "cell_line",
+        "cell_type",
+        "condition",
+        "experimental_batch",
+        "experiment_name",
+        "replicate",
+        "organism",
+        "flowcell",
+        "lane",
+        "BSF_name",
+        "data_source",
+    ]
 
-    genome_assemblies = {k: v for x in _CONFIG["preferences"]["default_genome_assemblies"]
-                         for k, v in x.items()}
+    genome_assemblies = {
+        k: v
+        for x in _CONFIG["preferences"]["default_genome_assemblies"]
+        for k, v in x.items()
+    }
     create_project(
-        project_name, tmp_path, genome_assemblies=genome_assemblies, overwrite=True)
+        project_name, tmp_path, genome_assemblies=genome_assemblies, overwrite=True
+    )
 
     expected_files = [
         os.path.join(tmp_path, project_name, ".git"),

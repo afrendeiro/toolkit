@@ -24,24 +24,35 @@ def analysis(tmp_path):
     n_replicates = 10
 
     project_name = "{}_{}_{}_{}_{}_{}".format(
-        project_prefix_name, data_type, genome_assembly,
-        n_factors, n_variables, n_replicates)
+        project_prefix_name,
+        data_type,
+        genome_assembly,
+        n_factors,
+        n_variables,
+        n_replicates,
+    )
 
     generate_project(
         output_dir=tmp_path,
-        project_name=project_name, genome_assembly=genome_assembly, data_type=data_type,
-        n_factors=n_factors, n_replicates=n_replicates, n_variables=n_variables,
-        group_fold_differences=[20])
+        project_name=project_name,
+        genome_assembly=genome_assembly,
+        data_type=data_type,
+        n_factors=n_factors,
+        n_replicates=n_replicates,
+        n_variables=n_variables,
+        group_fold_differences=[20],
+    )
 
     # first edit the defaul path to the annotation sheet
-    config = os.path.join(
-        tmp_path, project_name, "metadata", "project_config.yaml")
-    c = yaml.safe_load(open(config, 'r'))
-    c['metadata']['output_dir'] = os.path.abspath(tmp_path)
-    c['metadata']['sample_annotation'] = os.path.abspath(
-        os.path.join(tmp_path, project_name, "metadata", "annotation.csv"))
-    c['metadata']['comparison_table'] = os.path.abspath(
-        os.path.join(tmp_path, project_name, "metadata", "comparison_table.csv"))
+    config = os.path.join(tmp_path, project_name, "metadata", "project_config.yaml")
+    c = yaml.safe_load(open(config, "r"))
+    c["metadata"]["output_dir"] = os.path.abspath(tmp_path)
+    c["metadata"]["sample_annotation"] = os.path.abspath(
+        os.path.join(tmp_path, project_name, "metadata", "annotation.csv")
+    )
+    c["metadata"]["comparison_table"] = os.path.abspath(
+        os.path.join(tmp_path, project_name, "metadata", "comparison_table.csv")
+    )
     yaml.safe_dump(c, open(config, "w"))
 
     prj_path = os.path.join(tmp_path, project_name)
@@ -51,7 +62,8 @@ def analysis(tmp_path):
     a = ATACSeqAnalysis(
         name=project_name,
         prj=Project(config),
-        results_dir=os.path.join(prj_path, "results"))
+        results_dir=os.path.join(prj_path, "results"),
+    )
     a.set_project_attributes()
     a.load_data()
 
@@ -59,9 +71,11 @@ def analysis(tmp_path):
     a.annotate(matrix="matrix_raw")
     a.differential_analysis(filter_support=False)
 
-    _CONFIG['resources']['enrichr']['gene_set_libraries'] = [
-        "GO_Biological_Process_2015", "NCI-Nature_2016"]
-    a.differential_enrichment(steps=['enrichr'])
+    _CONFIG["resources"]["enrichr"]["gene_set_libraries"] = [
+        "GO_Biological_Process_2015",
+        "NCI-Nature_2016",
+    ]
+    a.differential_enrichment(steps=["enrichr"])
 
     return a
 
@@ -69,11 +83,13 @@ def analysis(tmp_path):
 @pytest.fixture
 def outputs(analysis):
     # gene_set_libraries = _CONFIG['resources']['enrichr']['gene_set_libraries']
-    gene_set_libraries = [
-        "GO_Biological_Process_2015", "NCI-Nature_2016"]
-    prefix = os.path.join(analysis.results_dir,
-                          "differential_analysis_ATAC-seq", "enrichments",
-                          "differential_analysis.enrichr.")
+    gene_set_libraries = ["GO_Biological_Process_2015", "NCI-Nature_2016"]
+    prefix = os.path.join(
+        analysis.results_dir,
+        "differential_analysis_ATAC-seq",
+        "enrichments",
+        "differential_analysis.enrichr.",
+    )
     outputs = list()
     for g in gene_set_libraries:
         outputs += [
@@ -81,7 +97,8 @@ def outputs(analysis):
             prefix + "{}.cluster_specific.Row_z_score.svg".format(g),
             prefix + "{}.cluster_specific.svg".format(g),
             prefix + "{}.correlation.svg".format(g),
-            prefix + "{}.zscore_vs_pvalue.scatterplot.svg".format(g)]
+            prefix + "{}.zscore_vs_pvalue.scatterplot.svg".format(g),
+        ]
     return outputs
 
 

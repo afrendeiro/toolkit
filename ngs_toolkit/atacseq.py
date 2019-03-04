@@ -704,7 +704,7 @@ class ATACSeqAnalysis(Analysis):
             # count, create dataframe
             matrix_raw = pd.DataFrame(
                 map(
-                    lambda x: pd.Series(x),
+                    pd.Series,
                     parmap.map(
                         count_reads_in_intervals,
                         [sample.aligned_filtered_bam for sample in samples],

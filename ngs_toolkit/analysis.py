@@ -759,6 +759,7 @@ class Analysis(object):
                 "matrix_norm"
                 "matrix_features"
                 "differential_results"
+                "differential_enrichment"
 
         prefix : str, optional
             String prefix of files to load.
@@ -823,6 +824,17 @@ class Analysis(object):
                     raise e
                 else:
                     _LOGGER.warning(e)
+
+        # if "differential_enrichment" in output_map:
+        #     self.enrichment_results = dict()
+        #     self.enrichment_results["enrichr"] = pd.read_csv(
+        #         os.path.join(
+        #             "results",
+        #             "differential_analysis_RNA-seq",
+        #             "enrichments",
+        #             "differential_analysis.enrichr.csv",
+        #         )
+        #     )
 
     @check_organism_genome
     def get_resources(

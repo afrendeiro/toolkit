@@ -791,7 +791,7 @@ def deseq_analysis(
         Data frame with results, statistics for each feature.
     """
     import rpy2
-    from rpy2.rinterface import RRuntimeError, RRuntimeWarning
+    from rpy2.rinterface import RRuntimeWarning
     from rpy2.robjects import numpy2ri, pandas2ri
     import rpy2.robjects as robjects
 
@@ -887,7 +887,7 @@ def deseq_analysis(
                     parallel=True,
                 )
             )
-        except RRuntimeError as e:
+        except Exception as e:
             _LOGGER.warning("DESeq2 group contrast '{}' didn't work!".format(contrast))
             _LOGGER.error(e)
             contrast = ["sample_group" + a, "sample_group" + b]
@@ -906,7 +906,7 @@ def deseq_analysis(
                         ", ".join(contrast)
                     )
                 )
-            except RRuntimeError as e2:
+            except Exception as e2:
                 _LOGGER.warning(
                     "DESeq2 group contrast '{}' didn't work either!".format(
                         ", ".join(contrast)
@@ -915,7 +915,7 @@ def deseq_analysis(
                 _LOGGER.error(e2)
                 raise e2
 
-        if isinstance(res, rpy2.robjects.vectors.DataFrame):
+        if isinstance(res, robjects.vectors.DataFrame):
             # convert to pandas dataframe
             res = r2pandas_df(res)
 

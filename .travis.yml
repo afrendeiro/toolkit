@@ -19,7 +19,7 @@ before_install:
   - gpg -a --export E084DAB9 | sudo apt-key add -
   - sudo apt-get update
   - sudo apt-get -y install r-base
-  - R -e "if (!requireNamespace('BiocManager', quietly = TRUE)){install.packages('BiocManager', repos='https://CRAN.R-project.org')}; BiocManager::install(c('DESeq2', 'preprocessCore', 'cqn'), version = '3.8')"
+  - R -e "if (!requireNamespace('BiocManager', quietly = TRUE)){install.packages('BiocManager', repos='https://CRAN.R-project.org')}; BiocManager::install(c('DESeq2', 'preprocessCore', 'cqn'), version = '3.9')"
   # The following is just required to have a working DISPLAY variable in Travis and for Python2 only for some reason
   - "export DISPLAY=:99.0"
   - "sh -e /etc/init.d/xvfb start"

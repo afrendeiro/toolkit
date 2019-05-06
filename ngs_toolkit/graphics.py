@@ -1,22 +1,13 @@
 #!/usr/bin/env python
 
 
-from collections import OrderedDict
 import os
 
 import matplotlib
-from matplotlib.path import Path
-from matplotlib.projections import register_projection
-from matplotlib.projections.polar import PolarAxes
 import matplotlib.pyplot as plt
-from matplotlib.spines import Spine
-from mpl_toolkits.axes_grid1 import make_axes_locatable
-from ngs_toolkit import _CONFIG
-from ngs_toolkit import _LOGGER
+from ngs_toolkit import _CONFIG, _LOGGER
 import numpy as np
 import pandas as pd
-import scipy
-from scipy.stats import zscore
 import seaborn as sns
 
 
@@ -48,6 +39,8 @@ def barmap(x, figsize=None, square=False, row_colors=None, z_score=None, ylims=N
     AssertionError:
         if length of `row_colors` does not match size of provided Y axis from matrix `x`.
     """
+    from scipy.stats import zscore
+
     y_size, x_size = x.shape
 
     # Check provided row_colors match provided matrix
@@ -152,6 +145,11 @@ def radar_plot(
 
     Heavy inspiration from here: https://matplotlib.org/examples/api/radar_chart.html
     """
+    from matplotlib.projections.polar import PolarAxes
+    from matplotlib.path import Path
+    from matplotlib.projections import register_projection
+    import matplotlib.pyplot as plt
+    from matplotlib.spines import Spine
 
     def radar_factory(num_vars, frame="circle"):
         """Create a radar chart with `num_vars` axes.
@@ -289,6 +287,8 @@ def radar_plot(
 
 
 def add_colorbar_to_axis(collection, label=None, position="right", size="5%", pad=0.05):
+    from mpl_toolkits.axes_grid1 import make_axes_locatable
+
     divider = make_axes_locatable(collection.axes)
     cax = divider.append_axes(position, size=size, pad=pad)
     plt.colorbar(mappable=collection, cax=cax, label=label, alpha=1)
@@ -383,6 +383,8 @@ def plot_projection(
         If False, will plot just on first/last figure panel.
         Defaults to False.
     """
+    from collections import OrderedDict
+
     n_attr = len(attributes_to_plot)
     fig, axis = plt.subplots(dims, n_attr, figsize=(4 * n_attr, 4 * dims))
     if n_attr == dims == 1:
@@ -593,6 +595,8 @@ def plot_comparison_correlations(
         Prefix for plots.
         Defaults to "comparison_correlations"
     """
+    import scipy
+
     comps = diff["comparison_name"].unique()
     n = len(comps)
     rows = cols = int(np.ceil(np.sqrt(n)))

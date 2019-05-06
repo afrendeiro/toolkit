@@ -2,21 +2,12 @@
 
 
 import os
-import re
-import subprocess
+
+import numpy as np
+import pandas as pd
 
 from ngs_toolkit import _LOGGER
 from ngs_toolkit.atacseq import ATACSeqAnalysis
-from ngs_toolkit.general import get_blacklist_annotations
-from ngs_toolkit.utils import (
-    homer_peaks_to_bed,
-    macs2_call_chipseq_peak,
-    homer_call_chipseq_peak_job,
-)
-import numpy as np
-import pandas as pd
-import pybedtools
-from tqdm import tqdm
 
 
 class ChIPSeqAnalysis(ATACSeqAnalysis):
@@ -132,6 +123,14 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
         ValueError
             Will be raised if not `permissive` and incomplete/incoherent comparisons are detected.
         """
+        import subprocess
+
+        from ngs_toolkit.utils import (
+            macs2_call_chipseq_peak,
+            homer_call_chipseq_peak_job,
+        )
+        from tqdm import tqdm
+
         req_columns = [
             "comparison_name",
             "sample_name",
@@ -291,6 +290,9 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
         output_bed : str
             Output BED file.
         """
+        import pybedtools
+        from ngs_toolkit.utils import homer_peaks_to_bed
+
         if filter_bed == "blacklist.mm10_liftOver.bed":
             _LOGGER.warning("Using blacklist features of mm10 genome!")
 
@@ -363,6 +365,8 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
         ValueError
             Will be raised if not `permissive` and incomplete/incoherent comparisons are detected.
         """
+        from ngs_toolkit.utils import homer_peaks_to_bed
+
         req_columns = [
             "comparison_name",
             "sample_name",
@@ -493,6 +497,11 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
         sites : pybedtools.BedTool
             Bedtool with consensus sites
         """
+        import re
+        from ngs_toolkit.general import get_blacklist_annotations
+        import pybedtools
+        from tqdm import tqdm
+
         msg = "Function needs a `comparison_table` keyword argument."
         if "comparison_table" not in kwargs:
             _LOGGER(msg)
@@ -611,6 +620,8 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
         Set consensus (union) sites across samples.
         Will be stored in a `sites` attribute.
         """
+        import pybedtools
+
         self.sites = pybedtools.BedTool(bed_file)
         if overwrite:
             self.sites.saveas(
@@ -636,6 +647,9 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
         support : pandas.DataFrame
             DataFrame with signal/background combinations used to call peaks
         """
+        import pybedtools
+        from tqdm import tqdm
+
         msg = "Function needs a `comparison_table` keyword argument."
         if "comparison_table" not in kwargs:
             _LOGGER(msg)

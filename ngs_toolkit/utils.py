@@ -1,20 +1,10 @@
 #!/usr/bin/env python
 
-import gzip
-import os
-import re
-import subprocess
-import textwrap
-import time
 
-from ngs_toolkit import _LOGGER
+import os
+
 import numpy as np
 import pandas as pd
-import pybedtools
-from pypiper import NGSTk
-import pysam
-import requests
-from sklearn.preprocessing import MinMaxScaler
 
 
 def chunks(l, n):
@@ -30,7 +20,7 @@ def chunks(l, n):
         Size of chunks to generate.
     """
     n = max(1, n)
-    return list(l[i : i + n] for i in range(0, len(l), n))
+    return list(l[i: i + n] for i in range(0, len(l), n))
 
 
 def sorted_nicely(l):
@@ -47,6 +37,7 @@ def sorted_nicely(l):
     iterable
         Sorted interable
     """
+    import re
 
     def convert(text):
         return int(text) if text.isdigit() else text
@@ -373,10 +364,14 @@ def count_jobs_running(cmd="squeue", sep="\n"):
     """
     Count running jobs on a cluster by invoquing a command that lists the jobs.
     """
+    import subprocess
     return subprocess.check_output(cmd).split(sep).__len__()
 
 
 def submit_job_if_possible(cmd, total_job_lim=800, refresh_time=10, in_between_time=5):
+    import time
+    import subprocess
+
     submit = count_jobs_running() < total_job_lim
     while not submit:
         time.sleep(refresh_time)
@@ -415,6 +410,7 @@ def collect_md5_sums(df):
 
 def sra_id2geo_id(sra_ids):
     """Query SRA ID from GEO ID"""
+    import subprocess
 
     cmd = "esearch -db sra -query {}"
     cmd += " | efetch -format docsum"
@@ -458,6 +454,9 @@ def decompress_file(file, output_file=None):
     file = "file.bed.gz"
     """
     import shutil
+    import gzip
+
+    from ngs_toolkit import _LOGGER
 
     if output_file is None:
         if not file.endswith(".gz"):
@@ -482,6 +481,7 @@ def compress_file(file, output_file=None):
     file = "file.bed.gz"
     """
     import shutil
+    import gzip
 
     if output_file is None:
         output_file = file + ".gz"
@@ -504,6 +504,8 @@ def download_file(url, output_file, chunk_size=1024):
     output_file = "file.bed.gz"
     chunk_size = 1024
     """
+    import requests
+
     response = requests.get(url, stream=True)
     with open(output_file, "wb") as outfile:
         outfile.writelines(response.iter_content(chunk_size=chunk_size))
@@ -553,6 +555,10 @@ def download_sra(link, output_dir):
 
 
 def sra2bam_job(sra_id, base_path):
+    import textwrap
+
+    from pypiper import NGSTk
+
     tk = NGSTk()
 
     # Slurm header
@@ -585,6 +591,10 @@ def sra2bam_job(sra_id, base_path):
 
 
 def link2bam_job(sample_name, link, base_path):
+    import textwrap
+
+    from pypiper import NGSTk
+
     tk = NGSTk()
 
     # Slurm header
@@ -617,6 +627,11 @@ def link2bam_job(sample_name, link, base_path):
 
 
 def sralink2bam_job(sra_id, base_path):
+    import textwrap
+
+    from pypiper import NGSTk
+    from ngs_toolkit import _LOGGER
+
     tk = NGSTk()
 
     # Slurm header
@@ -653,6 +668,8 @@ def series_matrix2csv(matrix_url, prefix=None):
     """
     matrix_url: gziped URL with GEO series matrix.
     """
+    import gzip
+    import subprocess
 
     subprocess.call("wget {}".format(matrix_url).split(" "))
     filename = matrix_url.split("/")[-1]
@@ -700,6 +717,9 @@ def deseq_results_to_bed_file(
     """
     Write BED file with fold changes from DESeq2 as score value.
     """
+    from ngs_toolkit import _LOGGER
+    from sklearn.preprocessing import MinMaxScaler
+
     df = pd.read_csv(deseq_result_file, index_col=0)
 
     msg = "DESeq2 results do not have a 'log2FoldChange' column."
@@ -774,6 +794,9 @@ def macs2_call_chipseq_peak(
     as_job : bool
         Whether to submit a SLURM job or to return a string with the runnable.
     """
+    import textwrap
+    from pypiper import NGSTk
+
     output_path = os.path.join(output_dir, name)
     if not os.path.exists(output_path):
         os.mkdir(output_path)
@@ -821,6 +844,10 @@ def homer_call_chipseq_peak_job(
     name : str
         Name of the MACS2 comparison being performed.
     """
+    import textwrap
+
+    from pypiper import NGSTk
+
     output_path = os.path.join(output_dir, name)
     if not os.path.exists(output_path):
         os.mkdir(output_path)
@@ -919,6 +946,8 @@ def bed_to_fasta_through_2bit(input_bed, output_fasta, genome_2bit):
     genome_2bit : str
         Path to genome 2bit file.
     """
+    import subprocess
+
     tmp_bed = input_bed + ".tmp.bed"
     # write name column
     bed = pd.read_csv(input_bed, sep="\t", header=None)
@@ -949,6 +978,8 @@ def bed_to_fasta_through_fasta(input_bed, output_fasta, genome_fasta):
     genome_fasta : str
         Path to genome FASTA file.
     """
+    import pybedtools
+
     bed = pd.read_csv(input_bed, sep="\t", header=None)
     bed["name"] = bed[0] + ":" + bed[1].astype(str) + "-" + bed[2].astype(str)
     bed[1] = bed[1].astype(int)
@@ -976,6 +1007,8 @@ def count_reads_in_intervals(bam, intervals):
     dict
         Dict of read counts for each interval.
     """
+    import pysam
+
     counts = dict()
 
     bam = pysam.AlignmentFile(bam, mode="rb")
@@ -1053,6 +1086,7 @@ def normalize_quantiles_p(df_input):
 
 
 def count_bam_file_length(bam_file):
+    import pysam
     return pysam.AlignmentFile(bam_file).count()
 
 

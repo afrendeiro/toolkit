@@ -1,8 +1,6 @@
 #!/usr/bin/env python
 
-import glob
 import os
-import re
 
 import pandas as pd
 
@@ -65,6 +63,9 @@ def parse_homer(homer_dir):
     -------
     IOError
     """
+    import glob
+    import re
+
     motif_htmls = sorted(glob.glob(os.path.join(homer_dir, "motif*.info.html")))
 
     if len(motif_htmls) < 1:

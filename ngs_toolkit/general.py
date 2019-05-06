@@ -1,33 +1,11 @@
 #!/usr/bin/env python
 
 
-from glob import glob
-import json
 import os
-import subprocess
-import textwrap
-import warnings
 
-import distutils.spawn
-import matplotlib.pyplot as plt
 from ngs_toolkit import _CONFIG, _LOGGER
-from ngs_toolkit.graphics import savefig
-from ngs_toolkit.utils import download_gzip_file, download_file, r2pandas_df
 import numpy as np
 import pandas as pd
-import patsy
-from pybedtools import BedTool
-import pybedtools
-from pypiper.ngstk import NGSTk
-import requests
-from scipy import stats
-from scipy.linalg import lstsq
-from scipy.stats import gaussian_kde
-import seaborn as sns
-from sklearn.decomposition import PCA
-from sklearn.preprocessing import StandardScaler
-from statsmodels.sandbox.stats.multicomp import multipletests
-from tqdm import tqdm
 
 
 def get_genome_reference(
@@ -78,6 +56,11 @@ def get_genome_reference(
         If arguments are not in possible options or if desired combination
         is not available.
     """
+    import pybedtools
+    import subprocess
+    import distutils.spawn
+
+    from ngs_toolkit.utils import download_gzip_file, download_file
 
     def index_fasta(fasta):
         """
@@ -287,6 +270,8 @@ def get_blacklist_annotations(
     str
         Path to blacklist BED file
     """
+    from ngs_toolkit.utils import download_gzip_file
+
     if output_dir is None:
         output_dir = os.path.join(os.path.abspath(os.path.curdir), "reference")
     if not os.path.exists(output_dir):
@@ -550,6 +535,9 @@ def get_genomic_context(
     pandas.DataFrame
         DataFrame with genome annotations
     """
+    from pybedtools import BedTool
+    import pybedtools
+
     organisms = {
         "human": {
             "species": "hsapiens",
@@ -790,10 +778,15 @@ def deseq_analysis(
     pandas.DataFrame
         Data frame with results, statistics for each feature.
     """
+    import warnings
+
     import rpy2
     from rpy2.rinterface import RRuntimeWarning
     from rpy2.robjects import numpy2ri, pandas2ri
     import rpy2.robjects as robjects
+    from tqdm import tqdm
+
+    from ngs_toolkit.utils import r2pandas_df
 
     numpy2ri.activate()
     pandas2ri.activate()
@@ -990,6 +983,12 @@ def least_squares_fit(
     res.head()
 
     """
+    import patsy
+    from scipy import stats
+    from scipy.linalg import lstsq
+    from sklearn.preprocessing import StandardScaler
+    from statsmodels.sandbox.stats.multicomp import multipletests
+
     if standardize_data:
         norm = StandardScaler()
         matrix = pd.DataFrame(
@@ -1087,6 +1086,12 @@ def differential_from_bivariate_fit(
     pandas.DataFrame
         Results of fitting and comparison between groups for each feature.
     """
+    import matplotlib.pyplot as plt
+    from ngs_toolkit.graphics import savefig
+    from scipy.stats import gaussian_kde
+    import seaborn as sns
+    from statsmodels.sandbox.stats.multicomp import multipletests
+
     comparisons = comparison_table["comparison_name"].drop_duplicates().sort_values()
     if plot:
         fig, axis = plt.subplots(
@@ -1329,9 +1334,13 @@ def lola(bed_files, universe_file, output_folder, genome, output_prefixes=None, 
         Number of CPUs/threads to use.
         Defaults to 8
     """
+    import warnings
+
     from rpy2.rinterface import RRuntimeWarning
     from rpy2.robjects import numpy2ri, pandas2ri
     import rpy2.robjects as robjects
+
+    from ngs_toolkit.utils import r2pandas_df
 
     numpy2ri.activate()
     pandas2ri.activate()
@@ -1418,6 +1427,8 @@ def meme_ame(
     organism="human",
     motif_database_file=None,
 ):
+    import subprocess
+
     if motif_database_file is None:
         # Get region databases from config
         _LOGGER.info(
@@ -1467,6 +1478,8 @@ def meme_ame(
 
 
 def homer_motifs(bed_file, output_dir, genome="hg19"):
+    import subprocess
+
     cmd = "findMotifsGenome.pl {bed} {genome}r {out_dir} \
     -size 1000 -h -p 2 -len 8,10,12,14 -noknown".format(
         bed=bed_file, genome=genome, out_dir=output_dir
@@ -1529,6 +1542,9 @@ def homer_combine_motifs(
     {str,None}
         If `run` is `False`, returns path to consensus motif file. Otherwise `None`.
     """
+    from glob import glob
+    import subprocess
+
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
@@ -1640,6 +1656,11 @@ def enrichr(dataframe, gene_set_libraries=None, kind="genes", max_attempts=5):
     Exception
         If `max_attempts` is exceeded
     """
+    import json
+    import requests
+
+    from tqdm import tqdm
+
     ENRICHR_ADD = "http://amp.pharm.mssm.edu/Enrichr/addList"
     ENRICHR_RETRIEVE = "http://amp.pharm.mssm.edu/Enrichr/enrich"
     query_string = "?userListId={}&backgroundType={}"
@@ -1782,6 +1803,10 @@ def run_enrichment_jobs(
     # TODO: replace hardcoded paths with info from resources
     # TODO: make required scripts into recipes or scripts distributed with package
     # TODO: remove pickle_file requirement to "region_enrichment"
+    from glob import glob
+    import textwrap
+
+    from pypiper.ngstk import NGSTk
 
     tk = NGSTk()
     dbs = {
@@ -1959,6 +1984,12 @@ def project_to_geo(
     pandas.DataFrame
         Annotation of samples and their BAM, BigWig, narrowPeak files and respective md5sums.
     """
+    import os
+    import subprocess
+    import textwrap
+
+    from pypiper.ngstk import NGSTk
+
     output_dir = os.path.abspath(output_dir)
     if samples is None:
         samples = project.samples
@@ -2110,6 +2141,8 @@ def rename_sample_files(
     dry_run : bool, optional
         Whether to print commands instead of running them. Defaults to False
     """
+    import subprocess
+
     # TODO: test
     cmds = list()
     # 1) move to tmp name
@@ -2201,6 +2234,8 @@ def query_biomart(attributes=None, species="hsapiens", ensembl_version="grch37")
     pandas.DataFrame
         Dataframe with required attributes for each entry.
     """
+    import requests
+
     supported = ["grch37", "grch38", "grcm38"]
     if ensembl_version not in supported:
         msg = "Ensembl version might not be supported."
@@ -2287,6 +2322,10 @@ def subtract_principal_component(
     """
     Given a matrix (n_samples, n_variables), remove `pc` (1-based) from matrix.
     """
+    import matplotlib.pyplot as plt
+    from sklearn.decomposition import PCA
+    from sklearn.preprocessing import StandardScaler
+
     pc -= 1
 
     # All regions
@@ -2328,6 +2367,8 @@ def subtract_principal_component_by_attribute(df, attributes, pc=1):
     """
     Given a matrix (n_samples, n_variables), remove `pc` (1-based) from matrix.
     """
+    from sklearn.decomposition import PCA
+
     pc -= 1
 
     x2 = pd.DataFrame(index=df.index, columns=df.columns)
@@ -2370,6 +2411,9 @@ def fix_batch_effect_limma(matrix, batch_variable="batch", covariates=None):
     pandas.DataFrame
         Regressed out matrix
     """
+    import warnings
+
+    import patsy
     from rpy2.rinterface import RRuntimeWarning
     from rpy2.robjects import numpy2ri, pandas2ri
     import rpy2.robjects as robjects

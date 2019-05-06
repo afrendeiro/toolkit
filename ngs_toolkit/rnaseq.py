@@ -3,18 +3,10 @@
 
 import os
 
-import matplotlib.pyplot as plt
-from ngs_toolkit import _LOGGER
-from ngs_toolkit.analysis import Analysis
-from ngs_toolkit.general import query_biomart
-from ngs_toolkit.utils import normalize_quantiles_p
 import numpy as np
 import pandas as pd
-import scipy
-from scipy.stats import zscore
-import seaborn as sns
-
-# import requests
+from ngs_toolkit import _LOGGER
+from ngs_toolkit.analysis import Analysis
 
 
 class RNASeqAnalysis(Analysis):
@@ -309,6 +301,9 @@ class RNASeqAnalysis(Analysis):
         # TODO: Declare saved files and outputs in docstring
         # TODO: Pass correct organism, genome to query_biomart
         """
+        from ngs_toolkit.general import query_biomart
+        from ngs_toolkit.utils import normalize_quantiles_p
+
         if expression_type != "counts":
             raise NotImplementedError("`expression_type` must be 'counts'!")
 
@@ -431,6 +426,9 @@ class RNASeqAnalysis(Analysis):
         """
         Plot general characteristics of the gene expression distributions within and across samples.
         """
+        import matplotlib.pyplot as plt
+        import seaborn as sns
+
         if "{results_dir}" in output_dir:
             output_dir = output_dir.format(results_dir=self.results_dir)
 
@@ -583,6 +581,9 @@ def knockout_plot(
     """
     Plot expression of knocked-out genes in all samples.
     """
+    import scipy
+    import seaborn as sns
+
     if (analysis is None) and (expression_matrix is None):
         raise AssertionError(
             "One of `analysis` or `expression_matrix` must be provided."
@@ -885,6 +886,8 @@ def assess_cell_cycle(
     """
     import anndata
     import scanpy.api as sc
+    import matplotlib.pyplot as plt
+    from scipy.stats import zscore
 
     if matrix is None:
         matrix = analysis.expression

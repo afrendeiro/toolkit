@@ -1,45 +1,16 @@
 #!/usr/bin/env python
 
-
-from collections import Counter, defaultdict
-import datetime
-import itertools
 import os
-import pickle
-import textwrap
-import time
-import matplotlib
-import matplotlib.pyplot as plt
-
-from ngs_toolkit import _CONFIG, _LOGGER
-from ngs_toolkit.decorators import check_organism_genome
-from ngs_toolkit.graphics import add_colorbar_to_axis, savefig, plot_projection
-from ngs_toolkit.parsers import parse_ame, parse_homer
-from ngs_toolkit.general import (
-    deseq_analysis,
-    enrichr,
-    run_enrichment_jobs,
-    get_genome_reference,
-    get_blacklist_annotations,
-    get_tss_annotations,
-    get_genomic_context,
-)
-from ngs_toolkit.utils import log_pvalues, normalize_quantiles_r, normalize_quantiles_p
 
 import numpy as np
 import pandas as pd
-from peppy import Project, Sample
-from pypiper.ngstk import NGSTk
-from scipy.stats import fisher_exact, kruskal, pearsonr, zscore
-import seaborn as sns
-from sklearn import manifold
-from sklearn.decomposition import PCA
-from sklearn.preprocessing import StandardScaler
-from statsmodels.sandbox.stats.multicomp import multipletests
-from tqdm import tqdm
+
+from ngs_toolkit import _CONFIG, _LOGGER
+from ngs_toolkit.decorators import check_organism_genome
 
 
 # TODO: Add combat as normalization method
+# TODO: Add PAGE as enrichment method
 # TODO: Idea: merging analysis. If same type, merge matrices, otherwise use dicts?
 
 
@@ -224,6 +195,7 @@ class Analysis(object):
         """
         Make peppy.Sample objects have a more pretty representation.
         """
+        from peppy import Sample
 
         def r(self):
             return self.name
@@ -483,6 +455,8 @@ class Analysis(object):
         prj : peppy.Project
             peppy.Project from given PEP configuration file.
         """
+        from peppy import Project
+
         self.prj = Project(pep_config)
 
     def update(self, pickle_file=None):
@@ -708,6 +682,10 @@ class Analysis(object):
         timestamp : bool, optional
             Whether to timestamp the file.
         """
+        import datetime
+        import time
+        import pickle
+
         if timestamp:
             ts = datetime.datetime.fromtimestamp(time.time()).strftime("%Y%m%d-%H%M%S")
             p = self.pickle_file.replace(".pickle", ".{}.pickle".format(ts))
@@ -730,6 +708,8 @@ class Analysis(object):
         Analysis
             The analysis serialized in the pickle file.
         """
+        import pickle
+
         if pickle_file is None:
             pickle_file = self.pickle_file
         return pickle.load(open(pickle_file, "rb"))
@@ -840,7 +820,8 @@ class Analysis(object):
         matrix_name,
         csv_file,
         prefix="{results_dir}/{name}",
-        **kwargs):
+        **kwargs
+    ):
         """
         Set an existing CSV file as the value of the analysis' matrix.
         Valid `matrix_name` values are "matrix_raw" and "matrix_norm".
@@ -848,7 +829,7 @@ class Analysis(object):
         Parameters
         ----------
         matrix_name : str
-            The attribute name of the matrix. 
+            The attribute name of the matrix.
             Options are "matrix_raw" and "matrix_norm".
 
         csv_file : str
@@ -883,7 +864,6 @@ class Analysis(object):
         setattr(self, matrix_name, df)
         _LOGGER.info("Saving '{}' attribute to {}.".format(matrix_name, output_file))
         df.to_csv(output_file, index=True)
-
 
     @check_organism_genome
     def get_resources(
@@ -934,6 +914,8 @@ class Analysis(object):
             The values of the 'genome' step are also a dictionary with keys "2bit" and "fasta" for
             each file type respectively.
         """
+        from ngs_toolkit.general import get_genome_reference, get_blacklist_annotations, get_tss_annotations, get_genomic_context
+
         if organism is None:
             organism = self.organism
         if genome_assembly is None:
@@ -1119,6 +1101,8 @@ class Analysis(object):
         pd.DataFrame
             Normalized pandas DataFrame.
         """
+        from ngs_toolkit.utils import normalize_quantiles_r, normalize_quantiles_p
+
         to_norm = self.get_matrix(matrix=matrix, samples=samples)
 
         if implementation == "R":
@@ -1574,6 +1558,10 @@ class Analysis(object):
             Matrix of shape (level, sample) with rgb values of each of the variable.
             If as_dataframe, this will be a pandas.DataFrame otherwise, list of lists.
         """
+        from collections import Counter
+        import matplotlib
+        import matplotlib.pyplot as plt
+
         if index is None:
             if matrix is None:
                 msg = "One of `index` or `matrix` must be provided."
@@ -1757,6 +1745,18 @@ class Analysis(object):
         **kwargs: optional
             kwargs are passed to ngs_toolkit.graphics.plot_projection
         """
+
+        from collections import defaultdict
+        import itertools
+        import matplotlib.pyplot as plt
+        from ngs_toolkit.graphics import savefig, plot_projection
+        import seaborn as sns
+        from sklearn import manifold
+        from sklearn.decomposition import PCA
+        from sklearn.preprocessing import StandardScaler
+        from statsmodels.sandbox.stats.multicomp import multipletests
+        from scipy.stats import kruskal, pearsonr
+
         matrix = self.get_matrix(matrix)
 
         if plot_prefix is None:
@@ -2262,6 +2262,10 @@ class Analysis(object):
             Pandas dataframe with results.
         """
         # TODO: for complex designs (one sample is in multiple groups/comparisons) implement running one comparison after the other
+        import textwrap
+        from ngs_toolkit.general import deseq_analysis
+        from pypiper.ngstk import NGSTk
+
         if comparison_table is None:
             msg = "`comparison_table` was not given and is not set in analysis object."
             hint = "Add a `comparison_table` attribute to the analysis object."
@@ -2533,6 +2537,8 @@ class Analysis(object):
         """
         # TODO: Add "input_dir" and input_prefix"
         # TODO: Restrict to comparisons of same type as analysis
+        from tqdm import tqdm
+
         if comparison_table is None:
             msg = "`comparison_table` was not given and is not set in analysis object."
             hint = "Add a `comparison_table` attribute to the analysis object."
@@ -2775,6 +2781,10 @@ class Analysis(object):
             Will be passed to `analysis.get_level_colors`.
         """
         # TODO: split plotting into smaller parts
+        import matplotlib.pyplot as plt
+        from ngs_toolkit.graphics import add_colorbar_to_axis, savefig
+        import seaborn as sns
+
         if results is None:
             msg = (
                 "Differential results dataframe not given and Analysis object does not"
@@ -3978,6 +3988,16 @@ class Analysis(object):
         """
         # TODO: use global thresholds to subset differential
         # Make output dir
+        import itertools
+        import matplotlib
+        import matplotlib.pyplot as plt
+        from ngs_toolkit.graphics import savefig
+        from ngs_toolkit.utils import log_pvalues
+        from scipy.stats import fisher_exact
+        import seaborn as sns
+        from statsmodels.sandbox.stats.multicomp import multipletests
+        from tqdm import tqdm
+
         output_dir = self._format_string_with_attributes(output_dir)
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
@@ -4419,6 +4439,10 @@ class Analysis(object):
         # TODO: separate and fix mouse TF ids
         # TODO: separate homer_consensus output processing
         # TODO: add overwrite function when distributed==False
+        from ngs_toolkit.parsers import parse_ame, parse_homer
+        from ngs_toolkit.general import enrichr, run_enrichment_jobs
+        from tqdm import tqdm
+
         serial = not distributed
 
         if differential is None:
@@ -4698,6 +4722,9 @@ class Analysis(object):
         """
         # TODO: separate and fix mouse TF ids
         # TODO: separate homer_consensus output processing
+        from ngs_toolkit.parsers import parse_ame, parse_homer
+        from tqdm import tqdm
+
         output_dir = self._format_string_with_attributes(output_dir)
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
@@ -4948,6 +4975,13 @@ class Analysis(object):
             Default None.
         """
         # TODO: split function in its smaller parts and call them appropriately.
+        import matplotlib
+        import matplotlib.pyplot as plt
+        from ngs_toolkit.graphics import savefig
+        from ngs_toolkit.utils import log_pvalues
+        from scipy.stats import zscore
+        import seaborn as sns
+
         def enrichment_barplot(input_df, x, y, group_variable, top_n, output_file):
             n = len(input_df[group_variable].drop_duplicates())
             n_side = int(np.ceil(np.sqrt(n)))

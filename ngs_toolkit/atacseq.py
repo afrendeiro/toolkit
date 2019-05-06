@@ -1,28 +1,14 @@
 #!/usr/bin/env python
 
 
-import multiprocessing
 import os
 
-import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+
 from ngs_toolkit import _LOGGER
 from ngs_toolkit.analysis import Analysis
 from ngs_toolkit.decorators import check_organism_genome, check_has_sites
-from ngs_toolkit.general import meme_ame, homer_motifs, lola, enrichr
-from ngs_toolkit.utils import (
-    bed_to_index,
-    bed_to_fasta,
-    log_pvalues,
-    standard_score,
-    count_reads_in_intervals,
-)
-import numpy as np
-import pandas as pd
-import parmap
-import pybedtools
-from scipy.stats import fisher_exact
-import seaborn as sns
-from tqdm import tqdm
 
 
 # TODO: rename annotate() to annotate_regions()
@@ -194,6 +180,8 @@ class ATACSeqAnalysis(Analysis):
         IOError
             If not permissive and a file is not found
         """
+        import pybedtools
+
         prefix = self._format_string_with_attributes(prefix)
 
         if output_map is None:
@@ -357,6 +345,9 @@ class ATACSeqAnalysis(Analysis):
         sites : pybedtools.BedTool
             Sets a `sites` variable with consensus peak set.
         """
+        from tqdm import tqdm
+        import pybedtools
+
         if region_type not in ["summits", "peaks"]:
             msg = "`region_type` attribute must be one of 'summits' or 'peaks'!"
             _LOGGER.error(msg)
@@ -463,6 +454,8 @@ class ATACSeqAnalysis(Analysis):
         sites : pybedtools.BedTool
             Sets a `sites` variable with consensus peak set.
         """
+        import pybedtools
+
         self.sites = pybedtools.BedTool(bed_file)
         if overwrite:
             default_sites = os.path.join(self.results_dir, self.name + ".peak_set.bed")
@@ -515,6 +508,9 @@ class ATACSeqAnalysis(Analysis):
             Sets a `support` variable with peak set overlap.
         """
         # TODO: Implement distributed
+        from tqdm import tqdm
+        import pybedtools
+
         if samples is None:
             samples = self.samples
 
@@ -668,7 +664,13 @@ class ATACSeqAnalysis(Analysis):
         pd.DataFrame
             Pandas DataFrame with read counts of shape (n_sites, m_samples).
         """
+        import multiprocessing
+        import parmap
+        import pybedtools
+
         from pypiper.ngstk import NGSTk
+        from ngs_toolkit.utils import count_reads_in_intervals
+
 
         if samples is None:
             samples = self.samples
@@ -826,6 +828,10 @@ class ATACSeqAnalysis(Analysis):
         pd.DataFrame
             Pandas DataFrame with read counts of shape (n_sites, m_samples).
         """
+        from tqdm import tqdm
+
+        from ngs_toolkit.utils import bed_to_index
+
         if samples is None:
             samples = self.samples
 
@@ -919,6 +925,8 @@ class ATACSeqAnalysis(Analysis):
         pandas.DataFrame
             DataFrame with nucleotide content and length of each region.
         """
+        import pybedtools
+
         if bed_file is None:
             sites = self.sites
         else:
@@ -1065,6 +1073,10 @@ class ATACSeqAnalysis(Analysis):
         pandas.DataFrame
             A dataframe with genes annotated for the peak set.
         """
+        import pybedtools
+
+        from ngs_toolkit.utils import bed_to_index
+
         cols = [6, 8, 9]
 
         if tss_file is None:
@@ -1166,6 +1178,9 @@ class ATACSeqAnalysis(Analysis):
         pandas.DataFrame
             The genomic context annotation for the peak set.
         """
+        import pybedtools
+
+        from ngs_toolkit.utils import bed_to_index
 
         if genomic_context_file is None:
             _LOGGER.info(
@@ -1267,6 +1282,10 @@ class ATACSeqAnalysis(Analysis):
             A DataFrame with one row for each chromatin state-region mapping
             or for the genome background.
         """
+        import pybedtools
+
+        from ngs_toolkit.utils import bed_to_index
+
         states = pybedtools.BedTool(chrom_state_file)
 
         if isinstance(self.sites, str):
@@ -1499,6 +1518,8 @@ class ATACSeqAnalysis(Analysis):
             Ratio of sex chromosomes defined as
             `sex_chroms[1] - sex_chroms[0]`.
         """
+        import matplotlib.pyplot as plt
+        import seaborn as sns
         from natsort import natsorted
         from ngs_toolkit.graphics import savefig
 
@@ -1684,6 +1705,11 @@ class ATACSeqAnalysis(Analysis):
         genome_space : int
             Length of genome.
         """
+        import multiprocessing
+        import parmap
+        import matplotlib.pyplot as plt
+        import seaborn as sns
+
         from ngs_toolkit.utils import (
             count_bam_file_length,
             count_lines,
@@ -2172,6 +2198,9 @@ class ATACSeqAnalysis(Analysis):
             Values will be aggregated across samples by that attribute.
         """
         # TODO: get matrix as input, move to graphics
+        import matplotlib.pyplot as plt
+        import seaborn as sns
+
         if samples is None:
             samples = self.samples
 
@@ -2236,6 +2265,8 @@ class ATACSeqAnalysis(Analysis):
             )
 
     def plot_coverage(self):
+        import matplotlib.pyplot as plt
+        import seaborn as sns
 
         # TODO: add plots for overal genome
         # TODO: add raw counts too
@@ -2467,6 +2498,9 @@ class ATACSeqAnalysis(Analysis):
         pandas.DataFrame
             Enrichment results
         """
+        from ngs_toolkit.utils import log_pvalues
+        from scipy.stats import fisher_exact
+
         output_dir = self._format_string_with_attributes(output_dir)
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
@@ -2626,6 +2660,8 @@ class ATACSeqAnalysis(Analysis):
             Which steps of the analysis to perform.
             Default is all: ['region', 'lola', 'meme', 'homer', 'enrichr']
         """
+        from ngs_toolkit.general import meme_ame, homer_motifs, lola, enrichr
+        from ngs_toolkit.utils import bed_to_fasta, standard_score
         from ngs_toolkit.utils import location_index_to_bed
 
         # use all sites as universe

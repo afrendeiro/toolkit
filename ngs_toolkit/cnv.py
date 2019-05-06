@@ -1,19 +1,13 @@
 #!/usr/bin/env python
 
-import os
-import string
-import warnings
 
-import matplotlib.pyplot as plt
-from ngs_toolkit import _LOGGER
-from ngs_toolkit.analysis import Analysis
-from ngs_toolkit.general import query_biomart
-from ngs_toolkit.general import subtract_principal_component
+import os
+
 import numpy as np
 import pandas as pd
-import pybedtools
-import seaborn as sns
-from tqdm import tqdm
+
+from ngs_toolkit import _LOGGER
+from ngs_toolkit.analysis import Analysis
 
 
 class CNVAnalysis(Analysis):
@@ -266,6 +260,8 @@ class CNVAnalysis(Analysis):
         matrix : dict
             Sets a `matrix` dictionary with CNV matrices for each resolution.
         """
+        from tqdm import tqdm
+
         if resolutions is None:
             resolutions = self.resolutions
 
@@ -494,6 +490,10 @@ class CNVAnalysis(Analysis):
             Defaults to True
         """
         # TODO: add support for group colours
+        from tqdm import tqdm
+        import matplotlib.pyplot as plt
+        import seaborn as sns
+
         if matrix is None:
             matrix = self.matrix_norm
         if resolutions is None:
@@ -619,6 +619,9 @@ class CNVAnalysis(Analysis):
             Whether to label samples with their name.
             Defaults to True
         """
+        import seaborn as sns
+        from tqdm import tqdm
+
         matrix = self.get_matrix(matrix, samples=samples)
         if resolutions is None:
             resolutions = self.resolutions
@@ -776,6 +779,9 @@ class CNVAnalysis(Analysis):
             Dictionary with CNV matrices for each resolution.
         """
         # TODO: implement as_job
+        import warnings
+
+        from tqdm import tqdm
         from rpy2.rinterface import RRuntimeWarning
         from rpy2.robjects import numpy2ri, pandas2ri
         import rpy2.robjects as robjects
@@ -911,6 +917,12 @@ class CNVAnalysis(Analysis):
         segmentation_annot : dict
             Dictionary with CNV matrices for each resolution.
         """
+        import os
+        import string
+
+        from ngs_toolkit.general import query_biomart
+        import pybedtools
+
         if resolutions is None:
             resolutions = self.resolutions
 
@@ -1009,6 +1021,8 @@ class CNVAnalysis(Analysis):
             Defaults to "{resolution}.segmentation_metrics"
         """
         # TODO: plot stats per sample too
+        import seaborn as sns
+
         if segmentation is None:
             segmentation = self.segmentation
 
@@ -1072,6 +1086,8 @@ def all_to_igv(matrix, output_prefix, **kwargs):
     dict
         Dictionary of CNV data in IGV format for each resolution.
     """
+    from tqdm import tqdm
+
     igvs = dict()
     resolutions = matrix.keys()
     for resolution in tqdm(resolutions, total=len(resolutions), desc="Resolution"):

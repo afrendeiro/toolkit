@@ -40,7 +40,6 @@ from tqdm import tqdm
 
 
 # TODO: Add combat as normalization method
-
 # TODO: Idea: merging analysis. If same type, merge matrices, otherwise use dicts?
 
 
@@ -835,6 +834,56 @@ class Analysis(object):
         #             "differential_analysis.enrichr.csv",
         #         )
         #     )
+
+    def set_matrix(
+        self,
+        matrix_name,
+        csv_file,
+        prefix="{results_dir}/{name}",
+        **kwargs):
+        """
+        Set an existing CSV file as the value of the analysis' matrix.
+        Valid `matrix_name` values are "matrix_raw" and "matrix_norm".
+
+        Parameters
+        ----------
+        matrix_name : str
+            The attribute name of the matrix. 
+            Options are "matrix_raw" and "matrix_norm".
+
+        csv_file : str
+            Path to valid CSV file to be used as matrix.
+            Assumes header and index column.
+            Customize additional overwriding options to read CSV by passing kwargs.
+
+        prefix : str, optional
+            String prefix of paths to save files.
+            Variables in curly braces will be formated with attributes of analysis.
+            Defaults to "{results_dir}/{name}".
+
+        **kwargs : dict
+            Additional keyword arguments will be passed to pandas.read_csv
+
+        Attributes
+        ----------
+        matrix_name : pandas.DataFrame
+            An attribute named `matrix_name` holding the respecive matrix.
+        """
+        from ngs_toolkit.utils import fix_dataframe_header
+
+        prefix = self._format_string_with_attributes(prefix)
+        output_file = prefix + "." + matrix_name + ".csv"
+
+        options = {"index_col": 0}
+        options.update(kwargs)
+        df = pd.read_csv(csv_file, **options)
+        if isinstance(df.columns, pd.MultiIndex):
+            df = fix_dataframe_header(df)
+        _LOGGER.info("Set {} as '{}' attribute.".format(csv_file, matrix_name))
+        setattr(self, matrix_name, df)
+        _LOGGER.info("Saving '{}' attribute to {}.".format(matrix_name, output_file))
+        df.to_csv(output_file, index=True)
+
 
     @check_organism_genome
     def get_resources(

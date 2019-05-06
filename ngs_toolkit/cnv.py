@@ -102,10 +102,16 @@ class CNVAnalysis(Analysis):
         samples=None,
         **kwargs
     ):
-        self.data_type = self.__data_type__ = "CNV"
-        self.var_unit_name = "bin"
-        self.quantity = "copy_number"
-        self.norm_units = "log2(ratio)"
+        # The check for existance is to make sure other classes can inherit from this
+        default_args = {
+            "data_type": "CNV",
+            "__data_type__": "CNV",
+            "var_unit_name": "bin",
+            "quantity": "copy_number",
+            "norm_units": "log2(ratio)"}
+        for k, v in default_args.items():
+            if not hasattr(self, k):
+                setattr(self, k, v)
 
         super(CNVAnalysis, self).__init__(
             name=name,

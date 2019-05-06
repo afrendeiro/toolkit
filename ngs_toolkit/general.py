@@ -2046,7 +2046,7 @@ def project_to_geo(
             job_file = os.path.join(output_dir, job_name + ".sh")
 
             job = textwrap.dedent(
-                tk.slurm_header(
+                " " + tk.slurm_header(
                     job_name=job_name,
                     output=log_file,
                     cpus_per_task=1,

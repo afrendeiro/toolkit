@@ -79,10 +79,16 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
         samples=None,
         **kwargs
     ):
-        self.data_type = self.__data_type__ = "ChIP-seq"
-        self.var_names = "region"
-        self.quantity = "binding"
-        self.norm_units = "RPM"
+        # The check for existance is to make sure other classes can inherit from this
+        default_args = {
+            "data_type": "ChIP-seq",
+            "__data_type__": "ChIP-seq",
+            "var_unit_name": "region",
+            "quantity": "binding",
+            "norm_units": "RPM"}
+        for k, v in default_args.items():
+            if not hasattr(self, k):
+                setattr(self, k, v)
 
         super(ChIPSeqAnalysis, self).__init__(
             name=name,

@@ -77,10 +77,16 @@ class RNASeqAnalysis(Analysis):
         samples=None,
         **kwargs
     ):
-        self.data_type = self.__data_type__ = "RNA-seq"
-        self.var_unit_name = "gene"
-        self.quantity = "expression"
-        self.norm_units = "RPM"
+        # The check for existance is to make sure other classes can inherit from this
+        default_args = {
+            "data_type": "RNA-seq",
+            "__data_type__": "RNA-seq",
+            "var_unit_name": "gene",
+            "quantity": "expression",
+            "norm_units": "RPM"}
+        for k, v in default_args.items():
+            if not hasattr(self, k):
+                setattr(self, k, v)
 
         super(RNASeqAnalysis, self).__init__(
             name=name,

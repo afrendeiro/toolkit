@@ -122,10 +122,16 @@ class ATACSeqAnalysis(Analysis):
         samples=None,
         **kwargs
     ):
-        self.data_type = self.__data_type__ = "ATAC-seq"
-        self.var_unit_name = "region"
-        self.quantity = "accessibility"
-        self.norm_units = "RPM"
+        # The check for existance is to make sure other classes can inherit from this
+        default_args = {
+            "data_type": "ATAC-seq",
+            "__data_type__": "ATAC-seq",
+            "var_unit_name": "region",
+            "quantity": "accessibility",
+            "norm_units": "RPM"}
+        for k, v in default_args.items():
+            if not hasattr(self, k):
+                setattr(self, k, v)
 
         super(ATACSeqAnalysis, self).__init__(
             name=name,
@@ -1578,27 +1584,28 @@ class ATACSeqAnalysis(Analysis):
         pandas.DataFrame
             Chromatin accessibility values reduced per gene.
         """
-        msg = "Analysis object lacks 'gene_annotation' dataframe."
+        msg = "Analysis object lacks a 'gene_annotation' or 'closest_tss_distances' dataframe."
         hint = " Call 'analysis.get_peak_gene_annotation' to have region-gene associations."
-        if not hasattr(self, "gene_annotation"):
+        if not (hasattr(self, "gene_annotation") or hasattr(self, "closest_tss_distances")):
             _LOGGER.error(msg + hint)
             raise AssertionError(msg)
 
         matrix = self.get_matrix(matrix).copy()
 
-        # if isinstance(matrix.columns, pd.MultiIndex):
-        #     matrix.columns = matrix.columns.get_level_values("sample_name")
+        if hasattr(self, "closest_tss_distances"):
+            matrix2 = matrix.join(self.closest_tss_distances[['gene_name']])
+            matrix2 = matrix2.set_index('gene_name', append=True)
+        else:
+            g = self.gene_annotation["gene_name"].str.split(",").apply(pd.Series).stack()
+            g.index = g.index.droplevel(1)
+            g.name = "gene_name"
+            matrix2 = matrix.join(g).drop("gene_name", axis=1)
+            matrix2.index = (
+                matrix.join(g).reset_index().set_index(["index", "gene_name"]).index
+            )
 
-        g = self.gene_annotation["gene_name"].str.split(",").apply(pd.Series).stack()
-        g.index = g.index.droplevel(1)
-        g.name = "gene_name"
-
-        matrix2 = matrix.join(g).drop("gene_name", axis=1)
-        matrix2.index = (
-            matrix.join(g).reset_index().set_index(["index", "gene_name"]).index
-        )
         matrix2.columns = matrix.columns
-        matrix3 = matrix2.groupby(level=["gene_name"]).apply(reduce_func)
+        matrix3 = matrix2.groupby(level="gene_name").apply(reduce_func)
 
         return matrix3.loc[:, ~matrix3.isnull().all()]
 
@@ -1622,26 +1629,31 @@ class ATACSeqAnalysis(Analysis):
         pandas.DataFrame
             Changes in chromatin accessibility (log2FoldChanges) reduced per gene.
         """
-        msg = "Analysis object lacks 'gene_annotation' dataframe."
+        msg = "Analysis object lacks a 'gene_annotation' or 'closest_tss_distances' dataframe."
         hint = " Call 'analysis.get_peak_gene_annotation' to have region-gene associations."
-        if not hasattr(self, "gene_annotation"):
+        if not (hasattr(self, "gene_annotation") or hasattr(self, "closest_tss_distances")):
             _LOGGER.error(msg + hint)
             raise AssertionError(msg)
 
         if differential_results is None:
             differential_results = self.differential_results
 
-        g = self.gene_annotation["gene_name"].str.split(",").apply(pd.Series).stack()
-        g.index = g.index.droplevel(1)
-        g.name = "gene_name"
+        if hasattr(self, "closest_tss_distances"):
+            dr2 = differential_results.join(self.closest_tss_distances[['gene_name']])
+            dr2 = dr2.set_index("gene_name", append=True)
+        else:
+            g = self.gene_annotation["gene_name"].str.split(",").apply(pd.Series).stack()
+            g.index = g.index.droplevel(1)
+            g.name = "gene_name"
 
-        dr2 = differential_results.join(g).drop("gene_name", axis=1)
-        dr2.index = (
-            differential_results.join(g)
-            .reset_index()
-            .set_index(["index", "gene_name"])
-            .index
-        )
+            dr2 = differential_results.join(g).drop("gene_name", axis=1)
+            dr2.index = (
+                differential_results.join(g)
+                .reset_index()
+                .set_index(["index", "gene_name"])
+                .index
+            )
+
         dr2.columns = differential_results.columns
         dr3 = (
             dr2.reset_index()

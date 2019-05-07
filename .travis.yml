@@ -2,7 +2,6 @@ language: python
 
 python:
   - "3.6"
-  - "2.7"
 
 env:
   R_LIBS=$HOME/R_libs/

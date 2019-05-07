@@ -144,9 +144,9 @@ def generate_project(
     # Create project with projectmanager
     create_project(
         project_name,
-        output_dir,
         genome_assemblies={organism: genome_assembly},
         overwrite=True,
+        root_projects_dir=output_dir,
     )
 
     # Generate random data

@@ -9,7 +9,7 @@ supported_data_types:
 preferences:
   # For the next item, environment variables are formatted if they are of the form ${VAR}
   root_reference_dir: /home/${USER}/reference/
-  root_projects_dir: /scratch/lab_bock/shared/projects/
+  root_projects_dir: /home/${USER}/projects/
   default_genome_assemblies:
     - human: hg19
     - mouse: mm10
@@ -54,7 +54,7 @@ sample_input_files:
     aligned_filtered_bam: "{data_dir}/{sample_name}/mapped/{sample_name}.trimmed.bowtie2.filtered.bam"
   RNA-seq:
     aligned_filtered_bam: "{data_dir}/{sample_name}/mapped/{sample_name}.trimmed.bowtie2.filtered.bam"
-    bitseq_counts: "{data_dir}/{sample_name}/bowtie1_{transcriptome}/bitSeq/{sample_name}.counts"
+    bitseq_counts: "{data_dir}/{sample_name}/bowtie1_{genome}/bitSeq/{sample_name}.counts"
 
 resources:
   lola:

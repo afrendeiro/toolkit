@@ -50,7 +50,7 @@ def test_project_creation(tmp_path):
         for k, v in x.items()
     }
     create_project(
-        project_name, tmp_path, genome_assemblies=genome_assemblies, overwrite=True
+        project_name, genome_assemblies=genome_assemblies, overwrite=True, root_projects_dir=tmp_path,
     )
 
     expected_files = [
@@ -58,7 +58,7 @@ def test_project_creation(tmp_path):
         os.path.join(tmp_path, project_name, "metadata"),
         os.path.join(tmp_path, project_name, "metadata", "project_config.yaml"),
         os.path.join(tmp_path, project_name, "metadata", "annotation.csv"),
-        os.path.join(tmp_path, project_name, "metadata", "merge_table.csv"),
+        os.path.join(tmp_path, project_name, "metadata", "sample_subannotation.csv"),
         os.path.join(tmp_path, project_name, "metadata", "comparison_table.csv"),
     ]
     for f in expected_files:

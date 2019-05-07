@@ -99,9 +99,9 @@ def parse_arguments(cli_string=None):
 
 def create_project(
     project_name,
-    root_dir,
     genome_assemblies,
     overwrite=False,
+    root_projects_dir=None,
     username=None,
     email=None,
     url=None,
@@ -111,7 +111,14 @@ def create_project(
     """
     import subprocess
 
-    project_dir = os.path.join(root_dir, project_name)
+    from ngs_toolkit.analysis import Analysis
+
+    # Get defaults from config
+    if root_projects_dir is None:
+        root_projects_dir = _CONFIG["preferences"]["root_projects_dir"]
+
+    root_projects_dir = Analysis._format_string_with_environment_variables(root_projects_dir)
+    project_dir = os.path.join(root_projects_dir, project_name)
 
     if os.path.exists(project_dir):
         if not overwrite:
@@ -134,33 +141,40 @@ def create_project(
     metadata_dir = os.path.join(project_dir, "metadata")
     project_config = os.path.join(metadata_dir, "project_config.yaml")
     annotation_table = os.path.join(metadata_dir, "annotation.csv")
-    merge_table = os.path.join(metadata_dir, "merge_table.csv")
+    sample_subannotation = os.path.join(metadata_dir, "sample_subannotation.csv")
     comparison_table = os.path.join(metadata_dir, "comparison_table.csv")
     src_dir = os.path.join(project_dir, "src")
+
+    genome_assemblies = "\n".join(
+            [
+                "'{}':\n                genome: '{}'".format(s, g)
+                for s, g in genome_assemblies.items()
+            ]
+        )
 
     # make dirs
     for d in [project_dir, metadata_dir, src_dir]:
         if not os.path.exists(d):
             os.makedirs(d)
 
-    project_config_template = """    project_name: {project_name}
+    project_config_template = f"""    project_name: {project_name}
     project_description: {project_name}
     username: {username}
     email: {email}
     metadata:
-        output_dir: /scratch/lab_bock/shared/projects/{project_name}
+        output_dir: {project_dir}
         results_subdir: data
         submission_subdir: submission
         pipeline_interfaces: /home/{username}/workspace/open_pipelines/pipeline_interface.yaml
-        sample_annotation: /scratch/lab_bock/shared/projects/{project_name}/metadata/annotation.csv
-        sample_subannotation: /scratch/lab_bock/shared/projects/{project_name}/metadata/merge_table.csv
-        comparison_table: /scratch/lab_bock/shared/projects/{project_name}/metadata/comparison_table.csv
+        sample_annotation: {annotation_table}
+        sample_subannotation: {sample_subannotation}
+        comparison_table: {comparison_table}
     sample_attributes:
         - sample_name
     group_attributes:
         - sample_name
     data_sources:
-        local: "/scratch/users/{username}/data/external/atac-seq/{{sample_name}}.bam"
+        local: "{project_dir}/data/{{sample_name}}.bam"
         bsf: /scratch/lab_bsf/samples/{{flowcell}}/{{flowcell}}_{{lane}}_samples/{{flowcell}}_{{lane}}#{{BSF_name}}.bam
     implied_columns:
         organism:
@@ -172,18 +186,7 @@ def create_project(
         submission_command: sbatch
     trackhubs:
         trackhub_dir: /data/groups/lab_bock/public_html/{username}/{project_name}/
-        url: {url}""".format(
-        project_name=project_name,
-        username=username,
-        email=email,
-        url=url,
-        genome_assemblies="\n".join(
-            [
-                "'{}':\n                genome: '{}'".format(s, g)
-                for s, g in genome_assemblies.items()
-            ]
-        ),
-    )
+        url: {url}"""
 
     merge_table_template = ",".join(
         ["sample_name", "flowcell", "lane", "BSF_name", "data_source"]
@@ -224,7 +227,7 @@ def create_project(
     # write config and tables
     with open(project_config, "w") as handle:
         handle.write(textwrap.dedent(project_config_template + "\n"))
-    with open(merge_table, "w") as handle:
+    with open(sample_subannotation, "w") as handle:
         handle.write(merge_table_template)
     with open(annotation_table, "w") as handle:
         handle.write(annotation_table_template)
@@ -288,7 +291,7 @@ def create_makefile(project_name, project_dir, overwrite=False):
             print("Detected existing, skipping.")
             return
 
-    makefile_content = """    .DEFAULT_GOAL := analysis_job
+    makefile_content = f"""    .DEFAULT_GOAL := analysis_job
 
     requirements:
         pip install -r requirements.txt
@@ -313,9 +316,7 @@ def create_makefile(project_name, project_dir, overwrite=False):
 
     all: requirements process analysis
 
-    .PHONY: requirements process summarize mklog analysis all""".format(
-        project_config=project_config, project_name=project_name, log_dir=log_dir
-    ).replace(
+    .PHONY: requirements process summarize mklog analysis all""".replace(
         "    ", "\t"
     )
 
@@ -353,9 +354,9 @@ def main():
         # Create project.
         git_ok = create_project(
             project_name=args.project_name,
-            root_dir=args.root_dir,
             genome_assemblies=genome_assemblies,
             overwrite=args.overwrite,
+            root_projects_dir=args.root_dir,
         )
         if git_ok != 0:
             _LOGGER.error("Initialization of project failed.")

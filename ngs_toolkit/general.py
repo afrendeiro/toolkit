@@ -786,7 +786,7 @@ def deseq_analysis(
     import rpy2.robjects as robjects
     from tqdm import tqdm
 
-    from ngs_toolkit.utils import r2pandas_df
+    from ngs_toolkit.utils import r2pandas_df, recarray2pandas_df
 
     numpy2ri.activate()
     pandas2ri.activate()
@@ -833,7 +833,7 @@ def deseq_analysis(
     dds = _DESeq(dds, parallel=True)
     # _save(dds, file=os.path.join(output_dir, output_prefix + ".deseq_dds_object.Rdata"))
 
-    results = pd.DataFrame()
+    results = list()
     comps = comparison_table["comparison_name"].drop_duplicates().sort_values()
     for comp in tqdm(comps, total=len(comps), desc="Comparison"):
         if create_subdirectories:
@@ -908,6 +908,10 @@ def deseq_analysis(
                 _LOGGER.error(e2)
                 raise e2
 
+        if isinstance(res, np.recarray):
+            res = recarray2pandas_df(res)
+            res.index = count_matrix.index
+
         if not isinstance(res, pd.DataFrame):
             # convert to pandas dataframe
             res = r2pandas_df(res)
@@ -918,9 +922,10 @@ def deseq_analysis(
         # save
         res.sort_values("pvalue").to_csv(out_file)
         # append
-        results = results.append(res.reset_index(), ignore_index=True)
+        results.append(res)
 
     # save all
+    results = pd.concat(results)
     results.index.name = "index"
     results.to_csv(
         os.path.join(output_dir, output_prefix + ".deseq_result.all_comparisons.csv"),

@@ -232,6 +232,12 @@ def r2pandas_df(r_df):
     return df
 
 
+def recarray2pandas_df(recarray):
+    df = pd.DataFrame.from_records(
+        recarray, index=list(range(recarray.shape[0])))
+    return df
+
+
 # def detect_peaks(x, mph=None, mpd=1, threshold=0, edge='rising',
 #                  kpsh=False, valley=False):
 #     """Detect peaks in data based on their amplitude and other features.

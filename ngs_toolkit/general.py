@@ -908,7 +908,7 @@ def deseq_analysis(
                 _LOGGER.error(e2)
                 raise e2
 
-        if isinstance(res, robjects.vectors.DataFrame):
+        if not isinstance(res, pd.DataFrame):
             # convert to pandas dataframe
             res = r2pandas_df(res)
 

@@ -1,1 +1,2 @@
 rpy2
+tzlocal  # undocumented requirement for rpy2

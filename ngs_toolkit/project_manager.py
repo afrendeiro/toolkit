@@ -189,7 +189,7 @@ def create_project(
         url: {url}""".format(
             project_name=project_name, username=username, email=email, project_dir=project_dir,
             annotation_table=annotation_table, sample_subannotation=sample_subannotation, comparison_table=comparison_table,
-            genome_assemblies=genome_assemblies)
+            genome_assemblies=genome_assemblies, url=url)
 
     merge_table_template = ",".join(
         ["sample_name", "flowcell", "lane", "BSF_name", "data_source"]

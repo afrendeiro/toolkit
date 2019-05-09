@@ -24,12 +24,7 @@ def parse_arguments(cli_string=None):
         epilog=epilog,
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
-
-    parser.add_argument(
-        "-V", "--version", action="version", version=ngs_toolkit.__version__
-    )
-
-    subparsers = parser.add_subparsers(dest="command")
+    subparsers = parser.add_subparsers(dest="command", required=True)
 
     # Create command
     create_subparser = subparsers.add_parser(
@@ -81,6 +76,14 @@ def parse_arguments(cli_string=None):
     recipe_subparser.add_argument(
         dest="project_config", help="Project configuration file."
     )
+    recipe_subparser.add_argument(
+        "-l",
+        "--list",
+        dest="list_only",
+        action="store_true",
+        default=False,
+        help="List available recipes and don't do anything else.",
+    )
 
     for p in [create_subparser, recipe_subparser]:
         p.add_argument(
@@ -117,7 +120,9 @@ def create_project(
     if root_projects_dir is None:
         root_projects_dir = _CONFIG["preferences"]["root_projects_dir"]
 
-    root_projects_dir = Analysis._format_string_with_environment_variables(root_projects_dir)
+    root_projects_dir = Analysis._format_string_with_environment_variables(
+        root_projects_dir
+    )
     project_dir = os.path.join(root_projects_dir, project_name)
 
     if os.path.exists(project_dir):
@@ -146,11 +151,11 @@ def create_project(
     src_dir = os.path.join(project_dir, "src")
 
     genome_assemblies = "\n".join(
-            [
-                "'{}':\n                genome: '{}'".format(s, g)
-                for s, g in genome_assemblies.items()
-            ]
-        )
+        [
+            "'{}':\n                genome: '{}'".format(s, g)
+            for s, g in genome_assemblies.items()
+        ]
+    )
 
     # make dirs
     for d in [project_dir, metadata_dir, src_dir]:
@@ -187,9 +192,16 @@ def create_project(
     trackhubs:
         trackhub_dir: /data/groups/lab_bock/public_html/{username}/{project_name}/
         url: {url}""".format(
-            project_name=project_name, username=username, email=email, project_dir=project_dir,
-            annotation_table=annotation_table, sample_subannotation=sample_subannotation, comparison_table=comparison_table,
-            genome_assemblies=genome_assemblies, url=url)
+        project_name=project_name,
+        username=username,
+        email=email,
+        project_dir=project_dir,
+        annotation_table=annotation_table,
+        sample_subannotation=sample_subannotation,
+        comparison_table=comparison_table,
+        genome_assemblies=genome_assemblies,
+        url=url,
+    )
 
     merge_table_template = ",".join(
         ["sample_name", "flowcell", "lane", "BSF_name", "data_source"]
@@ -320,7 +332,8 @@ def create_makefile(project_name, project_dir, overwrite=False):
     all: requirements process analysis
 
     .PHONY: requirements process summarize mklog analysis all""".format(
-        project_config=project_config, project_name=project_name, log_dir=log_dir).replace(
+        project_config=project_config, project_name=project_name, log_dir=log_dir
+    ).replace(
         "    ", "\t"
     )
 
@@ -333,7 +346,7 @@ def run_recipe(recipe_name, project_config):
     import subprocess
 
     return subprocess.call(
-        "python -m ngs_toolkit.recipes.{} {}".format(recipe_name, project_config).split(
+        "{} -m ngs_toolkit.recipes.{} {}".format(sys.executable, recipe_name, project_config).split(
             " "
         )
     )
@@ -387,10 +400,22 @@ def main():
         )
 
     elif args.command == "recipe":
-        _LOGGER.info("Running recipe '{}'.".format(args.recipe_name))
-        run_recipe(recipe_name=args.recipe_name, project_config=args.project_config)
 
-    _LOGGER.info("Completed.")
+        if args.list_only:
+            import pkgutil
+            import ngs_toolkit.recipes
+
+            n = pkgutil.iter_modules(ngs_toolkit.recipes.__path__)
+            _LOGGER.info(
+                "Available ngs_toolkit recipes: '{}'.".format(
+                    "', '".join([x[1] for x in n])
+                )
+            )
+        else:
+            _LOGGER.info("Running recipe '{}'.".format(args.recipe_name))
+            run_recipe(recipe_name=args.recipe_name, project_config=args.project_config)
+
+    _LOGGER.debug("Completed.")
 
 
 if __name__ == "__main__":

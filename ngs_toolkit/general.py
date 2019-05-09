@@ -1808,6 +1808,7 @@ def run_enrichment_jobs(
     # TODO: replace hardcoded paths with info from resources
     # TODO: make required scripts into recipes or scripts distributed with package
     # TODO: remove pickle_file requirement to "region_enrichment"
+    import sys
     from glob import glob
 
     from ngs_toolkit.utils import submit_job
@@ -1836,8 +1837,8 @@ def run_enrichment_jobs(
                     os.path.join(dir_, name + ".region.log"),
                     os.path.join(dir_, name + ".region.sh"),
                     ("shortq", 1, 8000),
-                    "python ~/region_enrichment.py --output-file {} {} {}".format(
-                        output_, file, pickle_file
+                    "{} ~/region_enrichment.py --output-file {} {} {}".format(
+                        sys.executable, output_, file, pickle_file
                     ),
                 ]
             )
@@ -1924,8 +1925,8 @@ def run_enrichment_jobs(
                     os.path.join(dir_, name + ".enrichr.log"),
                     os.path.join(dir_, name + ".enrichr.sh"),
                     ("shortq", 1, 4000),
-                    "python -u ~/jobs/run_Enrichr.py --input-file {f} --output-file {o}".format(
-                        f=file, o=output_
+                    "{e} -u ~/jobs/run_Enrichr.py --input-file {f} --output-file {o}".format(
+                        e=sys.executable, f=file, o=output_
                     ),
                 ]
             )

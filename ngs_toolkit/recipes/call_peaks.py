@@ -15,25 +15,10 @@ import pandas as pd
 
 from peppy import Project
 from ngs_toolkit.chipseq import ChIPSeqAnalysis
+from ngs_toolkit.utils import have_unbuffered_output
 
 
-class Unbuffered(object):
-    def __init__(self, stream):
-        self.stream = stream
-
-    def write(self, data):
-        self.stream.write(data)
-        self.stream.flush()
-
-    def writelines(self, datas):
-        self.stream.writelines(datas)
-        self.stream.flush()
-
-    def __getattr__(self, attr):
-        return getattr(self.stream, attr)
-
-
-sys.stdout = Unbuffered(sys.stdout)
+have_unbuffered_output()
 
 
 def add_args(parser):

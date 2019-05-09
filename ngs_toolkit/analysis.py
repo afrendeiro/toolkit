@@ -455,9 +455,10 @@ class Analysis(object):
         prj : peppy.Project
             peppy.Project from given PEP configuration file.
         """
-        from peppy import Project
+        import peppy
 
-        self.prj = Project(pep_config)
+        peppy.project.logging.disable()
+        self.prj = peppy.Project(pep_config)
 
     def update(self, pickle_file=None):
         """
@@ -816,11 +817,7 @@ class Analysis(object):
         #     )
 
     def set_matrix(
-        self,
-        matrix_name,
-        csv_file,
-        prefix="{results_dir}/{name}",
-        **kwargs
+        self, matrix_name, csv_file, prefix="{results_dir}/{name}", **kwargs
     ):
         """
         Set an existing CSV file as the value of the analysis' matrix.
@@ -914,7 +911,12 @@ class Analysis(object):
             The values of the 'genome' step are also a dictionary with keys "2bit" and "fasta" for
             each file type respectively.
         """
-        from ngs_toolkit.general import get_genome_reference, get_blacklist_annotations, get_tss_annotations, get_genomic_context
+        from ngs_toolkit.general import (
+            get_genome_reference,
+            get_blacklist_annotations,
+            get_tss_annotations,
+            get_genomic_context,
+        )
 
         if organism is None:
             organism = self.organism
@@ -1745,7 +1747,6 @@ class Analysis(object):
         **kwargs: optional
             kwargs are passed to ngs_toolkit.graphics.plot_projection
         """
-
         from collections import defaultdict
         import itertools
         import matplotlib.pyplot as plt
@@ -2263,6 +2264,8 @@ class Analysis(object):
         """
         # TODO: add DESeq2 script to toolkit and make path configurable
         # TODO: for complex designs (one sample is in multiple groups/comparisons) implement running one comparison after the other
+        import sys
+
         from ngs_toolkit.general import deseq_analysis
         from ngs_toolkit.utils import submit_job
 
@@ -2455,16 +2458,24 @@ class Analysis(object):
                 log_file = os.path.join(out, job_name + ".log")
                 job_file = os.path.join(out, job_name + ".sh")
                 cmd = (
-                    "date\npython -u ~/deseq_parallel.py --output_prefix "
-                    "{output_prefix} --formula '{formula}' {overwrite} {out}\ndate"
-                    .format(
-                        output_prefix=output_prefix, formula=formula,
-                        overwrite=" --overwrite" if overwrite else "", out=out))
+                    "date\n{executable} -u ~/deseq_parallel.py --output_prefix "
+                    "{output_prefix} --formula '{formula}' {overwrite} {out}\ndate".format(
+                        executable=sys.executable,
+                        output_prefix=output_prefix,
+                        formula=formula,
+                        overwrite=" --overwrite" if overwrite else "",
+                        out=out,
+                    )
+                )
                 submit_job(
-                    cmd, job_file, log_file=log_file,
-                    dry_run=False, cores=cpus, mem=memory,
-                    job_name=job_name)
-
+                    cmd,
+                    job_file,
+                    log_file=log_file,
+                    dry_run=False,
+                    cores=cpus,
+                    mem=memory,
+                    job_name=job_name,
+                )
 
     def collect_differential_analysis(
         self,

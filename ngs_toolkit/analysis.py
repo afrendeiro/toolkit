@@ -2033,7 +2033,7 @@ class Analysis(object):
                     _LOGGER.debug("PC {}; Attribute {}.".format(pc + 1, attr))
 
                     # Get all values of samples for this attr
-                    groups = x_new.index.get_level_values(attr)
+                    groups = x_new.index.get_level_values(attr).unique()
 
                     # Determine if attr is categorical or continuous
                     if (

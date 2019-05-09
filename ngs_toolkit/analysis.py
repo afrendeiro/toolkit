@@ -1659,7 +1659,6 @@ class Analysis(object):
         pallete="tab20",
         cmap="RdBu_r",
         nan_color=(0.662745, 0.662745, 0.662745, 1.0),
-        # TODO: test dataframe return
         as_dataframe=False,
     ):
         """
@@ -1784,7 +1783,7 @@ class Analysis(object):
                 colors.append(col)
 
         if as_dataframe:
-            colors = pd.DataFrame(colors, index=index.levels, columns=index).T
+            colors = pd.DataFrame(colors, index=index.names, columns=index).T
 
         return colors
 

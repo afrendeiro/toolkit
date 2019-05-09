@@ -17,6 +17,7 @@ from ngs_toolkit.decorators import check_organism_genome
 # TODO: Idea: if genome of analysis is set, get required static files for that genome assembly automatically
 # TODO: Idea: Analysis.load_data: get default output_map by having functions declare what they output perhaps also with a dict of kwargs to pass to pandas.read_csv
 
+
 class Analysis(object):
     """
     Generic class holding functions and data from a typical NGS analysis.
@@ -1444,7 +1445,9 @@ class Analysis(object):
         self.stats = matrix
         return self.stats
 
-    def annotate_features(self, samples=None, matrix=None, feature_tables=None, permissive=True):
+    def annotate_features(
+        self, samples=None, matrix=None, feature_tables=None, permissive=True
+    ):
         """
         Annotates analysis features (i.e. regions/genes) by aggregating annotations
         per feature (e.g. genomic context, chromatin state, gene annotations and statistics)
@@ -1499,9 +1502,10 @@ class Analysis(object):
                     "region_annotation",
                     "chrom_state_annotation",
                     "support",
-                    "stats"]
+                    "stats",
+                ]
             else:
-                feature_tables = ['stats']
+                feature_tables = ["stats"]
 
         for matrix_name in feature_tables:
             if hasattr(self, matrix_name):
@@ -1924,9 +1928,7 @@ class Analysis(object):
             msg = "Provided quantification matrix must have columns with MultiIndex."
             hint = " Will try to use `analysis.annotate_samples` to do that."
             _LOGGER.info(msg + hint)
-            matrix = self.annotate_samples(
-                matrix=matrix, save=False, assign=False
-            )
+            matrix = self.annotate_samples(matrix=matrix, save=False, assign=False)
 
         if samples is None:
             samples = [
@@ -2003,13 +2005,6 @@ class Analysis(object):
             sample_display_names = x.columns.get_level_values("sample_name")
         else:
             sample_display_names = x.columns
-        # TODO: Re-implement to accomodate multiindex
-        # if prettier_sample_names:
-        #     x.columns = (
-        #         color_dataframe.columns
-        #         .str.replace("ATAC-seq_", "")
-        #         .str.replace("RNA-seq_", "")
-        #         .str.replace("ChIP-seq_", ""))
 
         if "correlation" in steps:
             # Pairwise correlations
@@ -2415,7 +2410,6 @@ class Analysis(object):
         differential_results : pandas.DataFrame
             Pandas dataframe with results.
         """
-        # TODO: add DESeq2 script to toolkit and make path configurable
         # TODO: for complex designs (one sample is in multiple groups/comparisons) implement running one comparison after the other
         import sys
 
@@ -2689,7 +2683,6 @@ class Analysis(object):
             Pandas dataframe with results.
         """
         # TODO: Add "input_dir" and input_prefix"
-        # TODO: Restrict to comparisons of same type as analysis
         from tqdm import tqdm
 
         if comparison_table is None:
@@ -2717,7 +2710,13 @@ class Analysis(object):
             _LOGGER.warning(msg.format(results_file) + hint)
             return
 
-        comps = comparison_table["comparison_name"].drop_duplicates().sort_values()
+        comps = (
+            comparison_table.loc[
+                comparison_table["data_type"] == self.data_type, "comparison_name"
+            ]
+            .drop_duplicates()
+            .sort_values()
+        )
         results = list()
         for comp in tqdm(comps, total=len(comps), desc="Comparison"):
             res_file = os.path.join(
@@ -4160,7 +4159,8 @@ class Analysis(object):
 
         if differential is None:
             differential = self.differential_results.loc[
-                (self.differential_results['alpha'] < 0.05)]
+                (self.differential_results["alpha"] < 0.05)
+            ]
 
         if "direction" not in differential.columns:
             differential.loc[:, "direction"] = differential["log2FoldChange"].apply(

@@ -157,7 +157,7 @@ def create_project(
         if not os.path.exists(d):
             os.makedirs(d)
 
-    project_config_template = f"""    project_name: {project_name}
+    project_config_template = """    project_name: {project_name}
     project_description: {project_name}
     username: {username}
     email: {email}
@@ -186,7 +186,10 @@ def create_project(
         submission_command: sbatch
     trackhubs:
         trackhub_dir: /data/groups/lab_bock/public_html/{username}/{project_name}/
-        url: {url}"""
+        url: {url}""".format(
+            project_name=project_name, username=username, email=email, project_dir=project_dir,
+            annotation_table=annotation_table, sample_subannotation=sample_subannotation, comparison_table=comparison_table,
+            genome_assemblies=genome_assemblies)
 
     merge_table_template = ",".join(
         ["sample_name", "flowcell", "lane", "BSF_name", "data_source"]
@@ -291,7 +294,7 @@ def create_makefile(project_name, project_dir, overwrite=False):
             print("Detected existing, skipping.")
             return
 
-    makefile_content = f"""    .DEFAULT_GOAL := analysis_job
+    makefile_content = """    .DEFAULT_GOAL := analysis_job
 
     requirements:
         pip install -r requirements.txt
@@ -316,7 +319,8 @@ def create_makefile(project_name, project_dir, overwrite=False):
 
     all: requirements process analysis
 
-    .PHONY: requirements process summarize mklog analysis all""".replace(
+    .PHONY: requirements process summarize mklog analysis all""".format(
+        project_config=project_config, project_name=project_name, log_dir=log_dir).replace(
         "    ", "\t"
     )
 

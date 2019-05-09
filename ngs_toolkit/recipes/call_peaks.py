@@ -1,24 +1,17 @@
 #!/usr/bin/env python
 
 """
-This is the "call_peaks" recipe for ngs_toolkit.
-
-This will call peaks for ChIP-seq samples given a comparison table mapping relationships between samples.
+Call peaks for ChIP-seq samples given a comparison table
+mapping foreground-background relationships between samples.
 """
 
 
 from argparse import ArgumentParser
-import os
 import sys
 
 import pandas as pd
 
-from peppy import Project
 from ngs_toolkit.chipseq import ChIPSeqAnalysis
-from ngs_toolkit.utils import have_unbuffered_output
-
-
-have_unbuffered_output()
 
 
 def add_args(parser):
@@ -42,8 +35,7 @@ def add_args(parser):
         "--only-toggle",
         action="store_true",
         dest="only_toggle",
-        help="Whether only comparisons with 'toggle' value of '1' "
-        "in the should be performed.",
+        help="Whether only comparisons with 'toggle' value of '1' or 'True' should be performed.",
     )
     parser.add_argument(
         "-qc",
@@ -74,77 +66,56 @@ def add_args(parser):
 
 
 def main():
-    parser = ArgumentParser(prog="call_peaks_recipe", description="Call peaks recipe.")
+    parser = ArgumentParser(prog="call_peaks_recipe", description=__doc__)
     parser = add_args(parser)
     args = parser.parse_args()
-    # args = parser.parse_args('-t ATAC-seq metadata/project_config.yaml'.split(" "))
+    # args = parser.parse_args('-t metadata/project_config.yaml'.split(" "))
 
-    # Start project
+    # Analysis
     print(
-        "Starting peppy project with project configuration file: '{}'".format(
-            args.config_file
-        )
+        "Starting Analysis from PEP configuration file: '{}'".format(args.config_file)
     )
-    prj = Project(args.config_file)
-    print(
-        "Changing directory to project root directory: '{}'.".format(
-            prj.metadata.output_dir
-        )
+    analysis = ChIPSeqAnalysis(
+        from_pep=args.config_file, results_dir=args.results_dir
     )
-    os.chdir(prj.metadata.output_dir)
+    chip_data_types = ["ChIP-seq", "ChIPmentation"]
+    analysis.samples = [s for s in analysis.samples if (s.protocol == chip_data_types)]
+
+    # Samples
+    # # filter QC if needed
     if args.pass_qc:
-        print(
-            "Filtering samples out which didn't pass QC as specified in sample annotation in column 'pass_qc'"
-        )
-        prj._samples = [
-            s for s in prj._samples if s.pass_qc not in ["0", 0, "False", False]
+        analysis.samples = [
+            s for s in analysis.samples if s.pass_qc not in ["0", 0, "False", False]
         ]
-    print("Setting location of sample files dependent on sample types.")
-    for sample in prj.samples:
-        if hasattr(sample, "protocol"):
-            sample.library = sample.protocol
-
-        if sample.library in ["ATAC-seq", "ChIP-seq", "ChIPmentation"]:
-            sample.mapped = os.path.join(
-                sample.paths.sample_root, "mapped", sample.name + ".trimmed.bowtie2.bam"
-            )
-            sample.filtered = os.path.join(
-                sample.paths.sample_root,
-                "mapped",
-                sample.name + ".trimmed.bowtie2.filtered.bam",
-            )
-            sample.peaks = os.path.join(
-                sample.paths.sample_root, "peaks", sample.name + "_peaks.narrowPeak"
-            )
-
-    # ANALYSIS
-    data_types = sorted(list(set([s.library for s in prj.samples])))
-    print("Sample data types: '{}'.".format(",".join(data_types)))
-
-    if args.comparison_table is None:
+    if len(analysis.samples) > 0:
         print(
-            "Comparison table not specified, will use name in project configuration file: '{}'.".format(
-                prj.project_name
+            "Samples under consideration: '{}'. ".format(
+                ",".join([s.name for s in analysis.samples])
             )
+            + "Total of {} samples.".format(len([s.name for s in analysis.samples]))
         )
-        args.comparison_table = os.path.join(
-            os.path.dirname(args.config_file), "comparison_table.csv"
-        )
+    else:
+        raise ValueError("There were no valid samples for this analysis type!")
 
-    # Read comparison table
-    try:
-        comparison_table = pd.read_csv(args.comparison_table)
-    except IOError as e:
-        print("Comparison table could not be opened: {}".format(args.comparison_table))
-        raise e
+    # Comparison table
+    # # add provided
+    if args.comparison_table is not None:
+        analysis.comparison_table = pd.read_csv(args.comparison_table)
+    # # or make sure analysis has one
+    else:
+        if not hasattr(analysis, "comparison_table"):
+            raise ValueError(
+                "Analysis doesn't have a 'comparison_table' and this was not provided."
+            )
 
-    comparison_table = comparison_table[comparison_table["comparison_type"] == "peaks"]
-
+    # # filter comparisons if needed
     if args.only_toggle:
         print("Filtering out comparisons marked with toggle != 1")
-        comparison_table = comparison_table[comparison_table["toggle"] == 1]
+        analysis.comparison_table = analysis.comparison_table[
+            analysis.comparison_table["toggle"] == 1
+        ]
 
-    comps = comparison_table["comparison_name"].unique()
+    comps = analysis.comparison_table["comparison_name"].unique()
     if len(comps) > 0:
         print(
             "comparisons under consideration: '{}'. ".format(",".join(comps))
@@ -153,37 +124,12 @@ def main():
     else:
         raise ValueError("There were no valid comparisons in the comparison table!")
 
-    for data_type in [dt for dt in data_types if dt in ["ChIP-seq", "ChIPmentation"]]:
-        print("Starting analysis for samples of type: '{}'.".format(data_type))
-        samples = [s for s in prj.samples if (s.library == data_type)]
-        if len(samples) > 0:
-            print(
-                "Samples under consideration: '{}'. ".format(
-                    ",".join([s.name for s in samples])
-                )
-                + "Total of {} samples.".format(len([s.name for s in samples]))
-            )
-        else:
-            raise ValueError("There were no valid samples for this analysis type!")
+    # Call peaks
+    analysis.call_peaks_from_comparisons(as_jobs=args.as_jobs)
 
-        print("Initializing ChIP-seq analysis")
-        if hasattr(prj, "project_name"):
-            name = prj.project_name
-        else:
-            name = os.path.basename(os.path.abspath(os.curdir))
-        analysis = ChIPSeqAnalysis(
-            name=name + "_chipseq",
-            prj=prj,
-            samples=samples,
-            results_dir=args.results_dir,
-        )
-
-        # Call peaks
-        analysis.call_peaks_from_comparisons(comparison_table, as_jobs=args.as_jobs)
-
-        # # Get summary of peak calls
-        # peak_counts = analysis.summarize_peaks_from_comparisons(comparison_table)
-        # peak_counts.to_csv(os.path.join("results_pipeline", "chipseq_peaks", "peak_count_summary.csv"), index=False)
+    # # Get summary of peak calls
+    # peak_counts = analysis.summarize_peaks_from_comparisons(comparison_table)
+    # peak_counts.to_csv(os.path.join("results_pipeline", "chipseq_peaks", "peak_count_summary.csv"), index=False)
 
 
 if __name__ == "__main__":

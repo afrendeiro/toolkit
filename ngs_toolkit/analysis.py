@@ -110,7 +110,8 @@ class Analysis(object):
         _LOGGER.debug("Setting data type-specific attributes to None.")
         attrs = [
             "data_type",
-            "var_names",
+            "__data_type__",
+            "var_unit_name",
             "quantity",
             "norm_units",
             "raw_matrix_name",
@@ -2458,7 +2459,7 @@ class Analysis(object):
                 log_file = os.path.join(out, job_name + ".log")
                 job_file = os.path.join(out, job_name + ".sh")
                 cmd = (
-                    "date\n{executable} -u ~/deseq_parallel.py --output_prefix "
+                    "date\n{executable} ngs_toolkit.recipes.deseq --output_prefix "
                     "{output_prefix} --formula '{formula}' {overwrite} {out}\ndate".format(
                         executable=sys.executable,
                         output_prefix=output_prefix,
@@ -4004,6 +4005,10 @@ class Analysis(object):
 
         total = self.matrix_raw.shape[0]
         unit = self.var_unit_name
+
+        if differential is None:
+            differential = self.differential_results.loc[
+                (self.differential_results['alpha'] < 0.05)]
 
         if "direction" not in differential.columns:
             differential.loc[:, "direction"] = differential["log2FoldChange"].apply(

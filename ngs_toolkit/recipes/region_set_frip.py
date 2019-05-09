@@ -1,7 +1,9 @@
 #!/usr/bin/env python
 
 """
-This is the "region_set_frip" recipe for ngs_toolkit.
+Compute fraction of reads in peaks (FRiP)
+based on a consensus set of regions derived
+from several samples.
 """
 
 
@@ -12,25 +14,6 @@ import sys
 from peppy import Project
 from ngs_toolkit.atacseq import ATACSeqAnalysis
 from ngs_toolkit.chipseq import ChIPSeqAnalysis
-
-
-class Unbuffered(object):
-    def __init__(self, stream):
-        self.stream = stream
-
-    def write(self, data):
-        self.stream.write(data)
-        self.stream.flush()
-
-    def writelines(self, datas):
-        self.stream.writelines(datas)
-        self.stream.flush()
-
-    def __getattr__(self, attr):
-        return getattr(self.stream, attr)
-
-
-sys.stdout = Unbuffered(sys.stdout)
 
 
 def add_args(parser):
@@ -104,7 +87,7 @@ def add_args(parser):
 
 def main():
     parser = ArgumentParser(
-        prog="region_set_frip", description="Region set FRiP recipe."
+        prog="region_set_frip", description=__doc__
     )
     parser = add_args(parser)
     args = parser.parse_args()

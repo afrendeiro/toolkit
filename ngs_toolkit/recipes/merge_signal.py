@@ -1,7 +1,14 @@
 #!/usr/bin/env python
 
 """
-This is the "merge_signal" recipe for ngs_toolkit.
+Merge signal from various ATAC-seq or ChIP-seq samples
+given a set of attributes to group samples by.
+
+It produces merged BAM and bigWig files for all signal in the samples but
+is also capable of producing this for nucleosomal/nucleosomal free signal
+based on fragment length distribution if data is paired-end sequenced.
+This signal may optionally be normalized for each group.
+It is also capable of parallelizing work in jobs.
 """
 
 
@@ -13,25 +20,6 @@ import pandas as pd
 
 from peppy import Project
 from ngs_toolkit import _LOGGER, _CONFIG, __version__
-
-
-class Unbuffered(object):
-    def __init__(self, stream):
-        self.stream = stream
-
-    def write(self, data):
-        self.stream.write(data)
-        self.stream.flush()
-
-    def writelines(self, datas):
-        self.stream.writelines(datas)
-        self.stream.flush()
-
-    def __getattr__(self, attr):
-        return getattr(self.stream, attr)
-
-
-sys.stdout = Unbuffered(sys.stdout)
 
 
 def add_args(parser):
@@ -110,18 +98,7 @@ def add_args(parser):
 
 
 def main():
-    desc = """
-    Merge signal recipe.
-    This recipe will merge signal from various ATAC-seq or ChIP-seq samples \
-    given a set of attributes to group samples by.
-
-    It produces merged BAM and bigWig files for all signal in the samples but \
-    is also capable of producing this for nucleosomal/nucleosomal free signal \
-    based on fragment length distribution if data is paired-end sequenced. \
-    This signal may optionally be normalized for each group. \
-    It is also capable of parallelizing work in jobs if a SLURM cluster is available."""
-
-    parser = ArgumentParser(prog="merge_signal", description=desc)
+    parser = ArgumentParser(prog="merge_signal", description=__doc__)
     parser = add_args(parser)
     args = parser.parse_args()
     # args = parser.parse_args('-t ATAC-seq metadata/project_config.yaml'.split(" "))

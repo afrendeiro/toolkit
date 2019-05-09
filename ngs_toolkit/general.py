@@ -1837,7 +1837,7 @@ def run_enrichment_jobs(
                     os.path.join(dir_, name + ".region.log"),
                     os.path.join(dir_, name + ".region.sh"),
                     ("shortq", 1, 8000),
-                    "{} ~/region_enrichment.py --output-file {} {} {}".format(
+                    "{} -m ngs_toolkit.recipes.region_enrichment --output-file {} {} {}".format(
                         sys.executable, output_, file, pickle_file
                     ),
                 ]
@@ -1858,8 +1858,8 @@ def run_enrichment_jobs(
                     os.path.join(dir_, name + ".lola.log"),
                     os.path.join(dir_, name + ".lola.sh"),
                     ("shortq", 2, 12000),
-                    "Rscript ~/jobs/run_LOLA.R {} {} {}".format(
-                        file, background_bed, genome
+                    "{} -m ngs_toolkit.recipes.lola {} {} {} {} -c 2".format(
+                        file, background_bed, dir_, genome
                     ),
                 ]
             )
@@ -1925,7 +1925,7 @@ def run_enrichment_jobs(
                     os.path.join(dir_, name + ".enrichr.log"),
                     os.path.join(dir_, name + ".enrichr.sh"),
                     ("shortq", 1, 4000),
-                    "{e} -u ~/jobs/run_Enrichr.py --input-file {f} --output-file {o}".format(
+                    "{e} -m ngs_toolkit.recipes.enrichr {f} {o}".format(
                         e=sys.executable, f=file, o=output_
                     ),
                 ]

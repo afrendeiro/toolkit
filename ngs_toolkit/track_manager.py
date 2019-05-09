@@ -1,5 +1,8 @@
 #!/usr/bin/env python
 
+"""
+Produce UCSC trackHubs and links to IGV browser tracks from bigwig files.
+"""
 
 import argparse
 import os
@@ -11,14 +14,14 @@ import textwrap
 import matplotlib.pyplot as plt
 import ngs_toolkit
 import pandas as pd
-from peppy import Project
+import peppy
+
+
+peppy.project.logging.disable()
 
 
 def parse_arguments():
-    """
-    Argument Parsing.
-    """
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(dest="project_config_file")
     parser.add_argument(
         "-a",
@@ -403,7 +406,7 @@ def main():
     args = parse_arguments()
 
     # Start project object
-    prj = Project(args.project_config_file)
+    prj = peppy.Project(args.project_config_file)
 
     if "trackhubs" not in prj:
         raise ValueError("Project configuration does not have a trackhub section.")

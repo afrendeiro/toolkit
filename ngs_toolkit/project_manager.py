@@ -18,7 +18,7 @@ def parse_arguments(cli_string=None):
     parser = argparse.ArgumentParser(
         description=__doc__
     )
-    subparsers = parser.add_subparsers(dest="command")  # , required=True <- not supported in Python 3.5
+    subparsers = parser.add_subparsers(dest="command")  # , required=True <- not supported in Python < 3.7
 
     # Create command
     create_subparser = subparsers.add_parser(

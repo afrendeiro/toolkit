@@ -645,7 +645,7 @@ class Analysis(object):
                 return string.format(**sample.__dict__)
 
         if self.samples is None:
-            _LOGGER.error(
+            _LOGGER.warning(
                 "Analysis object does not have attached Samples. "
                 + "Will not add special attributes to samples such as "
                 + "input file locations."

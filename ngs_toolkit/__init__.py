@@ -8,12 +8,12 @@ def setup_logger(level="INFO", logfile=None):
     Parameters
     ----------
 
-    optional level : str, optional
+    level : str, optional
         Level of logging to display.
         See possible levels here: https://docs.python.org/2/library/logging.html#levels
         Defaults to "INFO".
 
-    optional logfile : str, optional
+    logfile : str, optional
         File to write log to.
         Defaults to ``~/ngs_toolkit.log.txt``
 
@@ -24,8 +24,6 @@ def setup_logger(level="INFO", logfile=None):
     """
     import logging
     import os
-
-    global _LOGGER
 
     _LOGGER = logging.getLogger("ngs_toolkit")
     _LOGGER.setLevel(logging.DEBUG)
@@ -70,7 +68,7 @@ def setup_config(custom_yaml_config=None):
 
     Parameters
     ----------
-    optional custom_yaml_config : str, optional
+    custom_yaml_config : str, optional
         Path to YAML file with configuration.
         To see the structure of the YAML file, see
         https://github.com/afrendeiro/toolkit/blob/master/ngs_toolkit/config/default.yaml
@@ -84,8 +82,6 @@ def setup_config(custom_yaml_config=None):
     import pkg_resources
     import os
     import yaml
-
-    global _CONFIG
 
     default_config_path = "config/default.yaml"
     default_config_path = pkg_resources.resource_filename(__name__, default_config_path)
@@ -183,10 +179,13 @@ def clear_log():
     open(logfile, "w")
 
 
-setup_logger()
-setup_config()
+_LOGGER = setup_logger()
+_CONFIG = setup_config()
 setup_graphic_preferences()
 
 
-_LOGGER
-_CONFIG
+from ngs_toolkit.analysis import Analysis
+from ngs_toolkit.atacseq import ATACSeqAnalysis
+from ngs_toolkit.chipseq import ChIPSeqAnalysis
+from ngs_toolkit.cnv import CNVAnalysis
+from ngs_toolkit.rnaseq import RNASeqAnalysis

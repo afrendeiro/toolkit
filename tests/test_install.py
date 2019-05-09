@@ -43,8 +43,6 @@ def test_pypi_requirements_are_importable():
     requirements = [
         x.split(" ")[0] for x in data["info"]["requires_dist"] if "extra" not in x
     ]
-    # versions = [x.split(" ")[1] if len(x.split(" ")) > 1 else "" for x in data['info']['requires_dist']]
-
     for req in requirements:
         if req in replace:
             requirements.pop(requirements.index(req))
@@ -60,8 +58,12 @@ def test_pypi_requirements_are_importable():
 def test_all_requirements_are_importable():
     import importlib
 
-    # not extra requirements
-    data = open("requirements/requirements.txt").read().split()
+    # test only basic requirements (not extras)
+    if travis:
+        path = os.path.join(os.environ['TRAVIS_BUILD_DIR'], "requirements", "requirements.txt")
+    else:
+        path = os.path.join(os.path.curdir, "requirements", "requirements.txt")
+    data = open(path).read().split()
 
     replace = {"scikit-learn": "sklearn"}
 

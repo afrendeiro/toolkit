@@ -126,6 +126,10 @@ class Analysis(object):
         for attr in attrs:
             if not hasattr(self, attr):
                 setattr(self, attr, None)
+        if not hasattr(self, "thresholds"):
+            self.thresholds = {
+                "alpha": 0.05,
+                "log2_fold_change": 0}
 
         # Generate from PEP configuration file
         if from_pep is not False:
@@ -2682,7 +2686,6 @@ class Analysis(object):
         differential_results : pandas.DataFrame
             Pandas dataframe with results.
         """
-        # TODO: Add "input_dir" and input_prefix"
         from tqdm import tqdm
 
         if comparison_table is None:
@@ -4138,7 +4141,6 @@ class Analysis(object):
             Prefix to use when creating output files.
             Defaults to "differential_analysis".
         """
-        # TODO: use global thresholds to subset differential
         # Make output dir
         import itertools
         import matplotlib
@@ -4159,7 +4161,7 @@ class Analysis(object):
 
         if differential is None:
             differential = self.differential_results.loc[
-                (self.differential_results["alpha"] < 0.05)
+                (self.differential_results["padj"] < self.thresholds['alpha'])
             ]
 
         if "direction" not in differential.columns:

@@ -62,7 +62,7 @@ def test_all_requirements_are_importable():
     if travis:
         path = os.path.join(os.environ['TRAVIS_BUILD_DIR'], "requirements", "requirements.txt")
     else:
-        path = os.path.join(os.path.curdir, "requirements", "requirements.txt")
+        path = os.path.join(os.path.abspath(os.path.curdir), "requirements", "requirements.txt")
     data = open(path).read().split()
 
     replace = {"scikit-learn": "sklearn"}

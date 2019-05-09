@@ -11,7 +11,6 @@ from ngs_toolkit.atacseq import ATACSeqAnalysis
 import numpy as np
 from peppy import Project
 import pytest
-import yaml
 
 
 @pytest.fixture
@@ -46,18 +45,7 @@ def analysis(tmp_path):
         n_variables=n_variables,
     )
 
-    # first edit the defaul path to the annotation sheet
     config = os.path.join(tmp_path, project_name, "metadata", "project_config.yaml")
-    c = yaml.safe_load(open(config, "r"))
-    c["metadata"]["output_dir"] = os.path.abspath(tmp_path)
-    c["metadata"]["sample_annotation"] = os.path.abspath(
-        os.path.join(tmp_path, project_name, "metadata", "annotation.csv")
-    )
-    c["metadata"]["comparison_table"] = os.path.abspath(
-        os.path.join(tmp_path, project_name, "metadata", "comparison_table.csv")
-    )
-    yaml.safe_dump(c, open(config, "w"))
-
     prj_path = os.path.join(tmp_path, project_name)
     os.chdir(prj_path)
 
@@ -137,18 +125,6 @@ class TestAnalysis:
                 config = os.path.join(
                     tmp_path, project_name, "metadata", "project_config.yaml"
                 )
-                c = yaml.safe_load(open(config, "r"))
-                c["metadata"]["output_dir"] = os.path.abspath(tmp_path)
-                c["metadata"]["sample_annotation"] = os.path.abspath(
-                    os.path.join(tmp_path, project_name, "metadata", "annotation.csv")
-                )
-                c["metadata"]["comparison_table"] = os.path.abspath(
-                    os.path.join(
-                        tmp_path, project_name, "metadata", "comparison_table.csv"
-                    )
-                )
-                yaml.safe_dump(c, open(config, "w"))
-
                 # project and associated analysis
                 prj = Project(config)
                 a = Analysis(name=project_name, prj=prj)

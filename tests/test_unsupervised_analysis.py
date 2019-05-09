@@ -3,7 +3,6 @@
 import pytest
 from .data_generator import generate_project
 import os
-import yaml
 from peppy import Project
 from ngs_toolkit.atacseq import ATACSeqAnalysis
 import shutil
@@ -46,16 +45,6 @@ def analysis(tmp_path):
 
         # first edit the defaul path to the annotation sheet
         config = os.path.join(tmp_path, project_name, "metadata", "project_config.yaml")
-        c = yaml.safe_load(open(config, "r"))
-        c["metadata"]["output_dir"] = os.path.abspath(tmp_path)
-        c["metadata"]["sample_annotation"] = os.path.abspath(
-            os.path.join(tmp_path, project_name, "metadata", "annotation.csv")
-        )
-        c["metadata"]["comparison_table"] = os.path.abspath(
-            os.path.join(tmp_path, project_name, "metadata", "comparison_table.csv")
-        )
-        yaml.safe_dump(c, open(config, "w"))
-
         prj_path = os.path.join(tmp_path, project_name)
         os.chdir(prj_path)
 
@@ -165,7 +154,9 @@ class TestUnsupervisedAnalysis:
             prefix + "locallylinearembedding.svg",
             prefix + "spectralembedding.svg",
         ]
-        analysis.unsupervised_analysis(samples=analysis.samples[:2])
+        # here I'm picking the first and last samples just to make sure
+        # they are from different values of attributes `a` and `b`
+        analysis.unsupervised_analysis(samples=[analysis.samples[0]] + [analysis.samples[-1]])
         for output in outputs2:
             assert os.path.exists(output)
             assert os.stat(output).st_size > 0

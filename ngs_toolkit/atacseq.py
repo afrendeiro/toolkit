@@ -11,12 +11,6 @@ from ngs_toolkit.analysis import Analysis
 from ngs_toolkit.decorators import check_organism_genome, check_has_sites
 
 
-# TODO: rename annotate() to annotate_regions()
-# TODO: make this new annotate_regions() call get_peak_gene_annotation() and get_peak_genomic_location()
-# TODO: rename_with_sample_metadata() to annotate_samples()
-# TODO: make new annotate() in Analysis that calls both annotate_regions() and annotate_samples() with `steps`
-
-
 class ATACSeqAnalysis(Analysis):
     """
     Class to model analysis of ATAC-seq data.
@@ -87,10 +81,10 @@ class ATACSeqAnalysis(Analysis):
         a.normalize(method="gc_content")
 
         # Annotate quantified peaks with previously calculated metrics and features
-        a.annotate()
+        a.annotate_features()
 
         # Annotate with sample metadata
-        a.accessibility = a.annotate_with_sample_attributes()
+        a.accessibility = a.annotate_samples()
 
         # Save object
         a.to_pickle()
@@ -230,7 +224,7 @@ class ATACSeqAnalysis(Analysis):
                     prefix + ".chrom_state_annotation_background_mapping.csv",
                     kwargs,
                 ),
-                "stats": (prefix + ".stats_per_region.csv", kwargs),
+                "stats": (prefix + ".stats_per_feature.csv", kwargs),
                 "differential_results": (
                     os.path.join(
                         self.results_dir,
@@ -1319,148 +1313,6 @@ class ATACSeqAnalysis(Analysis):
             setattr(self, attr, annot_comp)
             setattr(self, attr + "_mapping", annot)
         return self.chrom_state_annotation
-
-    def get_matrix_stats(self, matrix=None, samples=None):
-        """
-        Gets a matrix of feature-wise (i.e. for every reg. element) statistics such
-        across samples such as mean, variance, deviation, dispersion and amplitude.
-
-        Parameters
-        ----------
-        matrix : str
-            Attribute name of matrix to normalize.
-            Defaults to 'matrix_raw'.
-
-        Returns
-        -------
-        pandas.DataFrame
-            Statistics for each feature.
-
-        Attributes
-        ----------
-        stats : pd.DataFrame
-            A DataFrame with statistics for each feature.
-        """
-        if samples is None:
-            samples = self.samples
-        if matrix is None:
-            matrix = "matrix_raw"
-        matrix = getattr(self, matrix)
-
-        matrix = matrix.loc[:, [s.name for s in samples]]
-
-        matrix = pd.DataFrame(index=pd.Index(matrix.index, name="region"))
-        # calculate mean coverage
-        matrix.loc[:, "mean"] = matrix.mean(axis=1)
-        # calculate coverage variance
-        matrix.loc[:, "variance"] = matrix.var(axis=1)
-        # calculate std deviation (sqrt(variance))
-        matrix.loc[:, "std_deviation"] = np.sqrt(matrix.loc[:, "variance"])
-        # calculate dispersion (variance / mean)
-        matrix.loc[:, "dispersion"] = matrix.loc[:, "variance"] / matrix.loc[:, "mean"]
-        # calculate qv2 (std / mean) ** 2
-        matrix.loc[:, "qv2"] = (
-            matrix.loc[:, "std_deviation"] / matrix.loc[:, "mean"]
-        ) ** 2
-        # calculate "amplitude" (max - min)
-        matrix.loc[:, "amplitude"] = matrix.max(axis=1) - matrix.min(axis=1)
-        # calculate interquantile range
-        matrix.loc[:, "iqr"] = matrix.quantile(0.75, axis=1) - matrix.quantile(
-            0.25, axis=1
-        )
-        matrix.index.name = "index"
-        matrix.to_csv(
-            os.path.join(self.results_dir, self.name + ".stats_per_region.csv"),
-            index=True,
-        )
-
-        self.stats = matrix
-        return self.stats
-
-    def annotate(self, samples=None, matrix=None, permissive=True):
-        """
-        Annotates analysis regions by aggregating region-wise annotations
-        (region, chromatin state, gene annotations and statistics - if present).
-
-        The numeric matrix to be used is specified in `matrix`.
-        If two annotation dataframes have equally named columns (e.g. chrom, start, end),
-        the value of the first is kept.
-
-        Parameters
-        ----------
-        samples : list
-            Iterable of peppy.Sample objects to restrict matrix to.
-            If not provided (`None` is passed) the matrix will not be subsetted.
-            Calculated metrics will be restricted to these samples.
-
-        matrix : str
-            Attribute name of matrix to annotate.
-
-        permissive : bool
-            Whether DataFrames that do not exist should be simply skipped or an error will be thrown.
-
-        Raises
-        ----------
-        AttributeError
-            If not `permissive` a required DataFrame does not exist as an object attribute.
-
-        Attributes
-        ----------
-        matrix_features : pd.DataFrame
-            A pandas DataFrame containing annotations of the region features.
-        """
-        if samples is None:
-            samples = self.samples
-        if matrix is None:
-            matrix = "matrix_norm"
-        matrix = getattr(self, matrix)
-
-        next_matrix = matrix
-        # add closest gene
-        msg = "`{}` attribute does not exist."
-
-        # TODO: decide if this function should call the others to produce the annotations first
-
-        for matrix_name in [
-            "gene_annotation",
-            "region_annotation",
-            "chrom_state_annotation",
-            "support",
-            "stats",
-        ]:
-            if hasattr(self, matrix_name):
-                matrix = getattr(self, matrix_name)
-                self.matrix_features = pd.merge(
-                    next_matrix,
-                    matrix[matrix.columns.difference(next_matrix.columns)],
-                    left_index=True,
-                    right_index=True,
-                    how="left",
-                )
-                next_matrix = self.matrix_features
-            else:
-                if not permissive:
-                    _LOGGER.error(msg.format(matrix_name))
-                    raise AttributeError(msg.format(matrix_name))
-                else:
-                    _LOGGER.debug(msg.format(matrix_name) + " Proceeding anyway.")
-
-        if not hasattr(self, "matrix_features"):
-            self.matrix_features = next_matrix
-
-        # Pair indexes
-        msg = "Annotated matrix does not have same feature length as matrix_raw matrix."
-        if not self.matrix_raw.shape[0] == self.matrix_features.shape[0]:
-            _LOGGER.error(msg)
-            raise AssertionError(msg)
-        self.matrix_features.index = self.matrix_raw.index
-        self.matrix_features.index.name = "index"
-
-        # Save
-        self.matrix_features.to_csv(
-            os.path.join(self.results_dir, self.name + ".matrix_features.csv"),
-            index=True,
-        )
 
     def get_sex_chrom_ratio(
         self,

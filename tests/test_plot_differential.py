@@ -68,7 +68,7 @@ def analysis(tmp_path):
         a.load_data()
 
         a.normalize(method="rpm")
-        a.annotate_with_sample_attributes()
+        a.annotate_samples()
         a.differential_analysis(filter_support=False)
         # # Sometimes the DESeq2 call fails, but it often works if repeated
         # i = 1

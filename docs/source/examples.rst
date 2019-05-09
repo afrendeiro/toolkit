@@ -112,7 +112,7 @@ ATAC-seq example
 
     # Annotate normalized accessibility with sample and region info
     # annotate matrix with peak metadata
-    atac_analysis.annotate()
+    atac_analysis.annotate_features()
     # annotate matrix with sample metadata
     atac_analysis.accessibility = atac_analysis.annotate_with_sample_metadata(
         quant_matrix="coverage_annotated",

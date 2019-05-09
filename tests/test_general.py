@@ -55,15 +55,15 @@ def analysis(tmp_path):
         a.load_data()
 
         a.normalize(method="rpm")
-        a.annotate_with_sample_attributes()
+        a.annotate_samples()
 
         to_test.append(a)
     return to_test[0]
 
 
-class Test_annotate_with_sample_attributes:
+class Test_annotate_samples:
     def test_no_arguments(self, analysis):
-        analysis.annotate_with_sample_attributes()
+        analysis.annotate_samples()
 
 
 def test_get_matrix(analysis):

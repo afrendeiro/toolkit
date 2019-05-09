@@ -266,7 +266,7 @@ def test_get_matrix_stats(various_analysis):
     for analysis in various_analysis:
         annot = analysis.get_matrix_stats(matrix="matrix_raw")
         output = os.path.join(
-            analysis.results_dir, analysis.name + ".stats_per_region.csv"
+            analysis.results_dir, analysis.name + ".stats_per_feature.csv"
         )
         assert os.path.exists(output)
         assert os.stat(output).st_size > 0

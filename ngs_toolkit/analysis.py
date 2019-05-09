@@ -11,8 +11,11 @@ from ngs_toolkit.decorators import check_organism_genome
 
 # TODO: Add combat as normalization method
 # TODO: Add PAGE as enrichment method
+# TODO: Analysis.annotate_samples: reimplement to support CNV dict of resolutions
+# TODO: idea: make Analysis.annotate() call both annotate_features(), annotate_samples() and their ancestors with `steps`
 # TODO: Idea: merging analysis. If same type, merge matrices, otherwise use dicts?
-
+# TODO: Idea: if genome of analysis is set, get required static files for that genome assembly automatically
+# TODO: Idea: Analysis.load_data: get default output_map by having functions declare what they output perhaps also with a dict of kwargs to pass to pandas.read_csv
 
 class Analysis(object):
     """
@@ -139,7 +142,6 @@ class Analysis(object):
         self.organism, self.genome = (None, None)
         _LOGGER.debug("Trying to get analysis genome.")
         self.set_organism_genome()
-        # TODO: if genome is set, get required static files for that genome assembly
 
         # Add sample input file locations
         _LOGGER.debug("Trying to set sample input file attributes.")
@@ -542,7 +544,6 @@ class Analysis(object):
         comparison_table : pandas.DataFrame
             Comparison table if specified in the PEP configuration
         """
-        # TODO: Restrict comparison_table comparisons of same type as analysis
         hint = " Adding a '{}' section to your project configuration file allows the analysis"
         hint += " object to use those attributes during the analysis."
         if self.prj is not None:
@@ -762,8 +763,6 @@ class Analysis(object):
         IOError
             If not permissive and a file is not found
         """
-        # TODO: get default output_map by having functions declare what they output
-        # perhaps also with a dict of kwargs to pass to pandas.read_csv
         from ngs_toolkit.utils import fix_dataframe_header
 
         prefix = self._format_string_with_attributes(prefix)
@@ -1388,7 +1387,158 @@ class Analysis(object):
             # subset to requested samples
             return matrix.loc[:, [s.name for s in samples]]
 
-    def annotate_with_sample_attributes(
+    def get_matrix_stats(self, matrix=None, samples=None):
+        """
+        Gets a matrix of feature-wise (i.e. for every gene or region) statistics such
+        across samples such as mean, variance, deviation, dispersion and amplitude.
+
+        Parameters
+        ----------
+        matrix : str
+            Attribute name of matrix to normalize.
+            Defaults to 'matrix_raw'.
+
+        Returns
+        -------
+        pandas.DataFrame
+            Statistics for each feature.
+
+        Attributes
+        ----------
+        stats : pd.DataFrame
+            A DataFrame with statistics for each feature.
+        """
+        if samples is None:
+            samples = self.samples
+        if matrix is None:
+            matrix = "matrix_raw"
+        matrix = getattr(self, matrix)
+
+        matrix = matrix.loc[:, [s.name for s in samples]]
+
+        matrix = pd.DataFrame(index=pd.Index(matrix.index, name=self.var_unit_name))
+        # calculate mean coverage
+        matrix.loc[:, "mean"] = matrix.mean(axis=1)
+        # calculate coverage variance
+        matrix.loc[:, "variance"] = matrix.var(axis=1)
+        # calculate std deviation (sqrt(variance))
+        matrix.loc[:, "std_deviation"] = np.sqrt(matrix.loc[:, "variance"])
+        # calculate dispersion (variance / mean)
+        matrix.loc[:, "dispersion"] = matrix.loc[:, "variance"] / matrix.loc[:, "mean"]
+        # calculate qv2 (std / mean) ** 2
+        matrix.loc[:, "qv2"] = (
+            matrix.loc[:, "std_deviation"] / matrix.loc[:, "mean"]
+        ) ** 2
+        # calculate "amplitude" (max - min)
+        matrix.loc[:, "amplitude"] = matrix.max(axis=1) - matrix.min(axis=1)
+        # calculate interquantile range
+        matrix.loc[:, "iqr"] = matrix.quantile(0.75, axis=1) - matrix.quantile(
+            0.25, axis=1
+        )
+        matrix.index.name = "index"
+        matrix.to_csv(
+            os.path.join(self.results_dir, self.name + ".stats_per_feature.csv"),
+            index=True,
+        )
+
+        self.stats = matrix
+        return self.stats
+
+    def annotate_features(self, samples=None, matrix=None, feature_tables=None, permissive=True):
+        """
+        Annotates analysis features (i.e. regions/genes) by aggregating annotations
+        per feature (e.g. genomic context, chromatin state, gene annotations and statistics)
+        if present and relevant depending on the data type of the Analysis.
+
+        The numeric matrix to be used is specified in `matrix`.
+        If any two two annotation dataframes have equally named columns (e.g. chrom, start, end),
+        the value of the first is kept.
+
+        Parameters
+        ----------
+        samples : list
+            Iterable of peppy.Sample objects to restrict matrix to.
+            If not provided (`None` is passed) the matrix will not be subsetted.
+            Calculated metrics will be restricted to these samples.
+
+        matrix : str
+            Attribute name of matrix to annotate.
+
+        feature_tables : list
+            Attribute names of dataframes used to annotate the numeric dataframe.
+            The default is ["gene_annotation","region_annotation","chrom_state_annotation","support","stats"]
+            for ATAC-seq and ChIP-seq and ["stats"] for all others.
+
+        permissive : bool
+            Whether DataFrames that do not exist should be simply skipped or an error will be thrown.
+
+        Raises
+        ----------
+        AttributeError
+            If not `permissive` a required DataFrame does not exist as an object attribute.
+
+        Attributes
+        ----------
+        matrix_features : pd.DataFrame
+            A pandas DataFrame containing annotations of the region features.
+        """
+        if samples is None:
+            samples = self.samples
+        if matrix is None:
+            matrix = "matrix_norm"
+        matrix = getattr(self, matrix)
+
+        next_matrix = matrix
+        # add closest gene
+        msg = "`{}` attribute does not exist."
+
+        if feature_tables is None:
+            if self.data_type in ["ATAC-seq", "ChIP-seq"]:
+                feature_tables = [
+                    "gene_annotation",
+                    "region_annotation",
+                    "chrom_state_annotation",
+                    "support",
+                    "stats"]
+            else:
+                feature_tables = ['stats']
+
+        for matrix_name in feature_tables:
+            if hasattr(self, matrix_name):
+                matrix = getattr(self, matrix_name)
+                self.matrix_features = pd.merge(
+                    next_matrix,
+                    matrix[matrix.columns.difference(next_matrix.columns)],
+                    left_index=True,
+                    right_index=True,
+                    how="left",
+                )
+                next_matrix = self.matrix_features
+            else:
+                if not permissive:
+                    _LOGGER.error(msg.format(matrix_name))
+                    raise AttributeError(msg.format(matrix_name))
+                else:
+                    _LOGGER.debug(msg.format(matrix_name) + " Proceeding anyway.")
+
+        if not hasattr(self, "matrix_features"):
+            self.matrix_features = next_matrix
+
+        # Pair indexes
+        msg = "Annotated matrix does not have same feature length as matrix_raw matrix."
+        if not self.matrix_raw.shape[0] == self.matrix_features.shape[0]:
+            _LOGGER.error(msg)
+            raise AssertionError(msg)
+        self.matrix_features.index = self.matrix_raw.index
+        self.matrix_features.index.name = "index"
+
+        # Save
+        self.matrix_features.to_csv(
+            os.path.join(self.results_dir, self.name + ".matrix_features.csv"),
+            index=True,
+        )
+
+    def annotate_samples(
         self,
         matrix="matrix_norm",
         attributes=None,
@@ -1397,7 +1547,7 @@ class Analysis(object):
         assign=True,
     ):
         """
-        Annotate matrix ``(n_regions, n_samples)`` with sample metadata
+        Annotate matrix ``(n_features, n_samples)`` with sample metadata
         (creates MultiIndex on columns). Numerical attributes can be pass as a iterable
         to ``numerical_attributes`` to be converted.
 
@@ -1433,7 +1583,6 @@ class Analysis(object):
         matrix_norm : pandas.DataFrame
             A pandas DataFrame with  MultiIndex column index containing the sample's attributes specified.
         """
-        # TODO: reimplement for CNV (dict)
         if (attributes is None) and hasattr(self, "sample_attributes"):
             _LOGGER.info(
                 "Using 'sample_attributes' from analysis to annotate matrix: {}".format(
@@ -1497,6 +1646,10 @@ class Analysis(object):
         if assign:
             self.matrix_norm = df
         return df
+
+    def annotate_matrix(self, **kwargs):
+        self.annotate_features(**kwargs)
+        self.annotate_samples(**kwargs)
 
     def get_level_colors(
         self,
@@ -1770,9 +1923,9 @@ class Analysis(object):
 
         if not isinstance(matrix.columns, pd.core.indexes.multi.MultiIndex):
             msg = "Provided quantification matrix must have columns with MultiIndex."
-            hint = " Will try to use `analysis.annotate_with_sample_attributes` to do that."
+            hint = " Will try to use `analysis.annotate_samples` to do that."
             _LOGGER.info(msg + hint)
-            matrix = self.annotate_with_sample_attributes(
+            matrix = self.annotate_samples(
                 matrix=matrix, save=False, assign=False
             )
 

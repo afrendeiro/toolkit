@@ -223,22 +223,15 @@ def main_analysis_pipeline(
         a.get_peak_genomic_location()
         # Annotate peaks with chromatin state
 
-        # Annotate peaks with closest gene, chromatin state,
-        # genomic location, mean and variance measurements across samples
-        a.annotate()
-        a.annotate_with_sample_attributes()
-        a.to_pickle()
-
-        # QC plots
-        # plot general peak set features
-        # analysis.plot_peak_characteristics()
-        # plot coverage features across peaks/samples
-        # analysis.plot_coverage()
-        # analysis.plot_variance()
-
     if isinstance(a, RNASeqAnalysis):
         # Get gene expression
         a.get_gene_expression()
+
+    # Annotate peaks with closest gene, chromatin state,
+    # genomic location, mean and variance measurements across samples
+    a.annotate_features()
+    a.annotate_samples()
+    a.to_pickle()
 
     # Unsupervised analysis
     a.unsupervised_analysis(

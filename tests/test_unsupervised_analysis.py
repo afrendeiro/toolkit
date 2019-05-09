@@ -58,7 +58,7 @@ def analysis(tmp_path):
         a.load_data()
 
         a.normalize(method="rpm")
-        a.annotate_with_sample_attributes()
+        a.annotate_samples()
 
         to_test.append(a)
     return to_test[0]
@@ -107,7 +107,7 @@ class TestUnsupervisedAnalysis:
 
     def test_various_matrices(self, analysis, outputs):
         for matrix in ["matrix_raw", "matrix_norm"]:
-            analysis.annotate_with_sample_attributes(matrix=matrix)
+            analysis.annotate_samples(matrix=matrix)
             analysis.unsupervised_analysis()
             for output in outputs:
                 assert os.path.exists(output)
@@ -115,7 +115,7 @@ class TestUnsupervisedAnalysis:
             shutil.rmtree(
                 os.path.join(analysis.results_dir, "unsupervised_analysis_ATAC-seq")
             )
-        # analysis.annotate_with_sample_attributes(matrix="coverage_qnorm")
+        # analysis.annotate_samples(matrix="coverage_qnorm")
 
     def test_too_low_numbers_of_samples_error(self, analysis):
         for i in range(2):

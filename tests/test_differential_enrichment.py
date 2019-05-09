@@ -58,8 +58,8 @@ def analysis(tmp_path):
 
         a.normalize(method="rpm")
         a.get_peak_gene_annotation()
-        a.annotate()
-        a.annotate_with_sample_attributes()
+        a.annotate_features()
+        a.annotate_samples()
         a.differential_analysis(filter_support=False)
         to_test.append(a)
     return to_test[0]

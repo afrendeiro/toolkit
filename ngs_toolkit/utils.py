@@ -7,6 +7,121 @@ import numpy as np
 import pandas as pd
 
 
+def submit_job(
+        code, job_file, log_file=None,
+        computing_configuration=None,
+        dry_run=False,
+        limited_number=False, total_job_lim=500, refresh_time=10, in_between_time=5,
+        **kwargs):
+    """
+    Submit a job
+
+    Parameters
+    ----------
+    code : str
+        Job file to write to.
+
+    job_file : str
+        Log file to write job output to.
+
+    log_file : str
+        Log file to write job output to.
+        Defaults to `job_file` with ".log" ending.
+
+    computing_configuration : str
+        Name of `divvy` computing configuration to use.
+        Defaults to 'default' which is to run job in localhost.
+
+    dry_run : bool
+        Whether not to actually run job.
+        Defaults to False
+
+    limited_number : bool
+        Whether to restrict jobs to a maximum number.
+        Currently only possible if using "slurm".
+        Defaults to False
+
+    total_job_lim : int
+        Maximum number of jobs to restrict to.
+        Defaults to 500
+
+    refresh_time : int
+        Time in between checking number of jobs in seconds.
+        Defaults to 10.
+
+    in_between_time : int
+        Time in between job submission in seconds.
+        Defaults to 5.
+
+    **kwargs : dict
+        Additional keyword arguments will be passed to the chosen submission template according to `computing_configuration`.
+        Pass for example "jobname", "cores", "mem", "partition".
+    """
+    import time
+    import subprocess
+
+    import divvy
+    from ngs_toolkit import _CONFIG, _LOGGER
+
+    def count_jobs_running(check_cmd="squeue", sep="\n"):
+        """
+        Count running jobs on a cluster by invoquing a command that lists the jobs.
+        """
+        return subprocess.check_output(check_cmd).split(sep).__len__()
+
+    def submit_job_if_possible(cmd, check_cmd="squeue", total_job_lim=800, refresh_time=10, in_between_time=5):
+        submit = count_jobs_running(check_cmd) < total_job_lim
+        while not submit:
+            time.sleep(refresh_time)
+            submit = count_jobs_running(check_cmd) < total_job_lim
+        subprocess.call(cmd)
+        time.sleep(in_between_time)
+
+    if log_file is None:
+        log_file = "".join(job_file.split(".")[:-1]) + ".log"
+
+    # Get computing configuration from config
+    if computing_configuration is None:
+        try:
+            computing_configuration = \
+                _CONFIG['preferences']['computing_configuration']
+        except KeyError:
+            msg = "'computing_configuration' was not given"
+            msg += " and default could not be get from config."
+            hint = " Pass a value or add one to the section"
+            hint += " preferences:computing_configuration'"
+            hint += " in the ngs_toolkit config file."
+            _LOGGER.error(msg + hint)
+            raise
+
+    dcc = divvy.ComputingConfiguration()
+    if computing_configuration is not None:
+        dcc.activate_package(computing_configuration)
+
+    # Generate job script
+    d = {"code": code, "logfile": log_file}
+    d.update(kwargs)
+    dcc.write_script(job_file, d)
+
+    # Submit job
+    if not dry_run:
+        scmd = dcc['compute']['submission_command']
+        cmd = [scmd, job_file]
+
+        # simply submit if not limiting submission to the number of already running jobs
+        if not limited_number:
+            subprocess.call(cmd)
+        else:
+            # otherwise, submit only after `total_job_lim` is less than number of runnning jobs
+            # this is only possible for slurm now though
+            if scmd != "slurm":
+                msg = "Submission of jobs depending on job load is only available for 'slurm' jobs."
+                _LOGGER.error(msg)
+                raise ValueError(msg)
+            else:
+                submit_job_if_possible(cmd, check_cmd="slurm")
+
+
 def chunks(l, n):
     """
     Partition iterable in chunks of size `n`.
@@ -366,26 +481,6 @@ def recarray2pandas_df(recarray):
 #     return ind
 
 
-def count_jobs_running(cmd="squeue", sep="\n"):
-    """
-    Count running jobs on a cluster by invoquing a command that lists the jobs.
-    """
-    import subprocess
-    return subprocess.check_output(cmd).split(sep).__len__()
-
-
-def submit_job_if_possible(cmd, total_job_lim=800, refresh_time=10, in_between_time=5):
-    import time
-    import subprocess
-
-    submit = count_jobs_running() < total_job_lim
-    while not submit:
-        time.sleep(refresh_time)
-        submit = count_jobs_running() < total_job_lim
-    subprocess.call(cmd.split(" "))
-    time.sleep(in_between_time)
-
-
 def collect_md5_sums(df):
     """
     Given a dataframe with columns with paths to md5sum files ending in '_md5sum',
@@ -412,43 +507,6 @@ def collect_md5_sums(df):
                     cont = cont.split(" ")[0]
                 df.loc[i, col] = cont
     return df
-
-
-def sra_id2geo_id(sra_ids):
-    """Query SRA ID from GEO ID"""
-    import subprocess
-
-    cmd = "esearch -db sra -query {}"
-    cmd += " | efetch -format docsum"
-    cmd += " | xtract -pattern DocumentSummary -element Runs"
-    cmd += """ |  perl -ne '@mt = ($_ =~ /SRR\\d+/g); print "@mt"'"""
-
-    geo_ids = list()
-    for id_ in sra_ids:
-        geo_ids.append(subprocess.call(cmd.format(id_).split(" ")).read())
-    return
-
-
-def sra2fastq(input_sra, output_dir):
-    cmd = """
-\t\tfastq-dump --split-3 --outdir {} {}
-    """.format(
-        output_dir, input_sra
-    )
-
-    return cmd
-
-
-def fastq2bam(input_fastq, output_bam, sample_name, input_fastq2=None):
-    cmd = """
-\t\tjava -Xmx4g -jar /cm/shared/apps/picard-tools/1.118/FastqToSam.jar"""
-    cmd += " FASTQ={0}".format(input_fastq)
-    cmd += " SAMPLE_NAME={0}".format(sample_name)
-    if input_fastq2 is not None:
-        cmd += " FASTQ2={0}".format(input_fastq2)
-    cmd += """ OUTPUT={0}""".format(output_bam)
-
-    return cmd
 
 
 def decompress_file(file, output_file=None):
@@ -524,150 +582,6 @@ def download_gzip_file(url, output_file):
     decompress_file(output_file)
     if os.path.exists(output_file) and os.path.exists(output_file.replace(".gz", "")):
         os.remove(output_file)
-
-
-def download_cram(link, output_dir):
-    cmd = """
-    cd {}
-    wget '{}'
-    cd -
-    """.format(
-        output_dir, link
-    )
-
-    return cmd
-
-
-def cram2bam(input_cram, output_bam):
-    cmd = """
-    samtools view -b -o {} {}
-    """.format(
-        output_bam, input_cram
-    )
-
-    return cmd
-
-
-def download_sra(link, output_dir):
-    cmd = """
-    cd {}
-    wget '{}'
-    cd -
-    """.format(
-        output_dir, link
-    )
-
-    return cmd
-
-
-def sra2bam_job(sra_id, base_path):
-    import textwrap
-
-    from pypiper import NGSTk
-
-    tk = NGSTk()
-
-    # Slurm header
-    job_file = os.path.join(base_path, "%s_sra2bam.sh" % sra_id)
-    log_file = os.path.join(base_path, "%s_sra2bam.log" % sra_id)
-
-    cmd = tk.slurm_header("-".join(["sra2bam", sra_id]), log_file, cpus_per_task=2)
-
-    # SRA to FASTQ
-    cmd += sra2fastq(os.path.join(base_path, sra_id + ".sra"), base_path)
-
-    # FASTQ to BAM
-    cmd += fastq2bam(
-        os.path.join(base_path, sra_id + "_1.fastq"),
-        os.path.join(base_path, sra_id + ".bam"),
-        sra_id,
-        os.path.join(base_path, sra_id + "_2.fastq"),
-    )
-
-    # Slurm footer
-    cmd += tk.slurm_footer() + "\n"
-
-    # Write job to file
-
-    with open(job_file, "w") as handle:
-        handle.write(textwrap.dedent(cmd))
-
-    # Submit
-    tk.slurm_submit_job(job_file)
-
-
-def link2bam_job(sample_name, link, base_path):
-    import textwrap
-
-    from pypiper import NGSTk
-
-    tk = NGSTk()
-
-    # Slurm header
-    job_file = os.path.join(base_path, "%s_link2bam.sh" % sample_name)
-    log_file = os.path.join(base_path, "%s_link2bam.log" % sample_name)
-
-    cmd = tk.slurm_header(
-        "-".join(["link2bam", sample_name]), log_file, cpus_per_task=2
-    )
-
-    # Download CRAM
-    cmd += download_cram(link, base_path)
-
-    # CRAM to BAM
-    cmd += cram2bam(
-        os.path.join(base_path, sample_name + ".cram"),
-        os.path.join(base_path, sample_name + ".bam"),
-    )
-
-    # Slurm footer
-    cmd += tk.slurm_footer() + "\n"
-
-    # Write job to file
-
-    with open(job_file, "w") as handle:
-        handle.write(textwrap.dedent(cmd))
-
-    # Submit
-    tk.slurm_submit_job(job_file)
-
-
-def sralink2bam_job(sra_id, base_path):
-    import textwrap
-
-    from pypiper import NGSTk
-    from ngs_toolkit import _LOGGER
-
-    tk = NGSTk()
-
-    # Slurm header
-    job_file = os.path.join(base_path, "%s_sra2bam.sh" % sra_id)
-    log_file = os.path.join(base_path, "%s_sra2bam.log" % sra_id)
-
-    cmd = tk.slurm_header("-".join(["sra2bam", sra_id]), log_file, cpus_per_task=2)
-
-    # SRA to FASTQ
-    cmd += sra2fastq(sra_id, base_path)
-
-    # FASTQ to BAM
-    cmd += fastq2bam(
-        os.path.join(base_path, sra_id + "_1.fastq"),
-        os.path.join(base_path, sra_id + ".bam"),
-        sra_id,
-        os.path.join(base_path, sra_id + "_2.fastq"),
-    )
-
-    # Slurm footer
-    cmd += tk.slurm_footer() + "\n"
-
-    # Write job to file
-
-    with open(job_file, "w") as handle:
-        handle.write(textwrap.dedent(cmd))
-
-    # Submit
-    tk.slurm_submit_job(job_file)
-    _LOGGER.info(job_file)
 
 
 def series_matrix2csv(matrix_url, prefix=None):
@@ -800,14 +714,11 @@ def macs2_call_chipseq_peak(
     as_job : bool
         Whether to submit a SLURM job or to return a string with the runnable.
     """
-    import textwrap
-    from pypiper import NGSTk
-
     output_path = os.path.join(output_dir, name)
     if not os.path.exists(output_path):
         os.mkdir(output_path)
 
-    runnable = """macs2 callpeak -t {0} -c {1} -n {2} --outdir {3}""".format(
+    runnable = """date\nmacs2 callpeak -t {0} -c {1} -n {2} --outdir {3}\ndate""".format(
         " ".join([s.filtered for s in signal_samples]),
         " ".join([s.filtered for s in control_samples]),
         name,
@@ -815,17 +726,9 @@ def macs2_call_chipseq_peak(
     )
 
     if as_job:
-        tk = NGSTk()
         job_name = "macs2_{}".format(name)
-        cmd = tk.slurm_header(
-            job_name, os.path.join(output_path, job_name + ".log"), cpus_per_task=4
-        )
-        cmd += "\t\t" + runnable
-        cmd += "\t\t" + tk.slurm_footer() + "\n"
         job_file = os.path.join(output_path, name + ".macs2.sh")
-        with open(job_file, "w") as handle:
-            handle.write(textwrap.dedent(cmd))
-        tk.slurm_submit_job(job_file)
+        submit_job(runnable, job_file, cores=4, jobname=job_name)
     else:
         return runnable
 
@@ -850,10 +753,6 @@ def homer_call_chipseq_peak_job(
     name : str
         Name of the MACS2 comparison being performed.
     """
-    import textwrap
-
-    from pypiper import NGSTk
-
     output_path = os.path.join(output_dir, name)
     if not os.path.exists(output_path):
         os.mkdir(output_path)
@@ -861,7 +760,7 @@ def homer_call_chipseq_peak_job(
     # make tag directory for the signal and background samples separately
     signal_tag_directory = os.path.join(output_dir, "homer_tag_dir_" + name + "_signal")
     fs = " ".join([s.filtered for s in signal_samples])
-    runnable = """makeTagDirectory {0} {1}\n""".format(signal_tag_directory, fs)
+    runnable = """date\nmakeTagDirectory {0} {1}\n""".format(signal_tag_directory, fs)
     background_tag_directory = os.path.join(
         output_dir, "homer_tag_dir_" + name + "_background"
     )
@@ -880,24 +779,16 @@ def homer_call_chipseq_peak_job(
     output_file = os.path.join(
         output_dir, name, name + "_homer_peaks.histone.narrowPeak"
     )
-    runnable += """findPeaks {signal} -style histone -o {output_file} -i {background}\n""".format(
+    runnable += """findPeaks {signal} -style histone -o {output_file} -i {background}\ndate\n""".format(
         output_file=output_file,
         background=background_tag_directory,
         signal=signal_tag_directory,
     )
 
     if as_job:
-        tk = NGSTk()
         job_name = "homer_findPeaks_{}".format(name)
-        cmd = tk.slurm_header(
-            job_name, os.path.join(output_path, job_name + ".log"), cpus_per_task=4
-        )
-        cmd += runnable.replace("\n", "\t\t\n")
-        cmd += "\t\t" + tk.slurm_footer() + "\n"
         job_file = os.path.join(output_path, name + ".homer.sh")
-        with open(job_file, "w") as handle:
-            handle.write(textwrap.dedent(cmd))
-        tk.slurm_submit_job(job_file)
+        submit_job(runnable, job_file, cores=4, jobname=job_name)
     else:
         return runnable
 

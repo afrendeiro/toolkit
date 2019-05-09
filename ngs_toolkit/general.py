@@ -1809,11 +1809,9 @@ def run_enrichment_jobs(
     # TODO: make required scripts into recipes or scripts distributed with package
     # TODO: remove pickle_file requirement to "region_enrichment"
     from glob import glob
-    import textwrap
 
-    from pypiper.ngstk import NGSTk
+    from ngs_toolkit.utils import submit_job
 
-    tk = NGSTk()
     dbs = {
         "human": "~/resources/motifs/motif_databases/HUMAN/HOCOMOCOv10.meme",
         "mouse": "~/resources/motifs/motif_databases/MOUSE/uniprobe_mouse.meme",
@@ -1932,21 +1930,10 @@ def run_enrichment_jobs(
                 ]
             )
 
-    for job_name, log_file, job_file, (queue, cpu, mem), task in jobs:
-        cmd = tk.slurm_header(
-            job_name=job_name,
-            output=log_file,
-            queue=queue,
-            cpus_per_task=cpu,
-            mem_per_cpu=mem,
-        )
-        cmd += task
-        cmd += " \n"
-        cmd += tk.slurm_footer() + "\n"
-        with open(job_file, "w") as handle:
-            handle.write(textwrap.dedent(cmd).replace("\n ", "\n").replace("  ", ""))
-
-        tk.slurm_submit_job(job_file)
+    for jobname, log_file, job_file, (partition, cores, mem), task in jobs:
+        submit_job(
+            task, job_file, log_file=log_file,
+            jobname=jobname, partition=partition, cores=cores, mem=mem)
 
 
 def project_to_geo(
@@ -1990,10 +1977,8 @@ def project_to_geo(
         Annotation of samples and their BAM, BigWig, narrowPeak files and respective md5sums.
     """
     import os
-    import subprocess
-    import textwrap
 
-    from pypiper.ngstk import NGSTk
+    from ngs_toolkit.utils import submit_job
 
     output_dir = os.path.abspath(output_dir)
     if samples is None:
@@ -2001,7 +1986,6 @@ def project_to_geo(
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
-    cmds = list()
     annot = pd.DataFrame(index=pd.Index([], name="sample_name"))
     for sample in samples:
         various = len(sample.data_path.split(" ")) > 1
@@ -2074,35 +2058,15 @@ def project_to_geo(
                     )
                     + " Skipping peaks file."
                 )
-        if distributed:
-            tk = NGSTk()
 
-            job_name = "project_to_geo.{}".format(sample.name)
-            log_file = os.path.join(output_dir, job_name + ".log")
-            job_file = os.path.join(output_dir, job_name + ".sh")
-
-            job = textwrap.dedent(
-                " " + tk.slurm_header(
-                    job_name=job_name,
-                    output=log_file,
-                    cpus_per_task=1,
-                    mem_per_cpu=8000,
-                )
-            )
-            job += "\n" + "\n".join(cmd.split("; ")) + "\n"
-            job += textwrap.dedent(tk.slurm_footer())
-
-            with open(job_file, "w") as handle:
-                handle.write(textwrap.dedent(job))
-            if not dry_run:
-                tk.slurm_submit_job(job_file)
-        else:
-            cmds.append(cmd)
-
-    if not distributed and not dry_run:
-        for i, cmd in enumerate(cmds):
-            _LOGGER.info(i, cmd)
-            subprocess.call(cmd.split(" "))
+        # Assemble job
+        job_name = "project_to_geo.{}".format(sample.name)
+        log_file = os.path.join(output_dir, job_name + ".log")
+        job_file = os.path.join(output_dir, job_name + ".sh")
+        submit_job(
+            cmd, job_file, log_file=log_file,
+            jobname=job_name, cores=1, mem=8000,
+            dry_run=dry_run)
 
     return annot
 

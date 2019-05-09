@@ -2261,10 +2261,10 @@ class Analysis(object):
         differential_results : pandas.DataFrame
             Pandas dataframe with results.
         """
+        # TODO: add DESeq2 script to toolkit and make path configurable
         # TODO: for complex designs (one sample is in multiple groups/comparisons) implement running one comparison after the other
-        import textwrap
         from ngs_toolkit.general import deseq_analysis
-        from pypiper.ngstk import NGSTk
+        from ngs_toolkit.utils import submit_job
 
         if comparison_table is None:
             msg = "`comparison_table` was not given and is not set in analysis object."
@@ -2401,7 +2401,6 @@ class Analysis(object):
             return results
 
         else:
-            tk = NGSTk()
             for comparison_name in comparison_table[
                 "comparison_name"
             ].drop_duplicates():
@@ -2451,31 +2450,21 @@ class Analysis(object):
                     count = count.reindex(sup[(sup > 0).any(axis=1)].index)
                 count.to_csv(os.path.join(out, "count_matrix.csv"), index=True)
 
+                # Assemble job and submit
                 job_name = "deseq_job.{}".format(comparison_name)
                 log_file = os.path.join(out, job_name + ".log")
                 job_file = os.path.join(out, job_name + ".sh")
+                cmd = (
+                    "date\npython -u ~/deseq_parallel.py --output_prefix "
+                    "{output_prefix} --formula '{formula}' {overwrite} {out}\ndate"
+                    .format(
+                        output_prefix=output_prefix, formula=formula,
+                        overwrite=" --overwrite" if overwrite else "", out=out))
+                submit_job(
+                    cmd, job_file, log_file=log_file,
+                    dry_run=False, cores=cpus, mem=memory,
+                    job_name=job_name)
 
-                cmd = tk.slurm_header(
-                    job_name=job_name,
-                    output=log_file,
-                    cpus_per_task=2,
-                    mem_per_cpu=32000,
-                )
-                # TODO: add DESeq2 script to toolkit and make path configurable
-                cmd += "python -u ~/deseq_parallel.py"
-                cmd += " --output_prefix {}".format(output_prefix)
-                cmd += " --formula '{}'".format(formula)
-                if overwrite:
-                    cmd += " --overwrite"
-                cmd += " {}\n".format(out)
-                cmd += tk.slurm_footer()
-
-                with open(job_file, "w") as handle:
-                    handle.write(
-                        textwrap.dedent(cmd).replace("\n ", "\n").replace("  ", "")
-                    )
-
-                tk.slurm_submit_job(job_file)
 
     def collect_differential_analysis(
         self,

@@ -11,8 +11,12 @@ preferences:
   root_reference_dir:
   root_projects_dir:
   default_genome_assemblies:
-    - human: hg19
+    - human: hg38
     - mouse: mm10
+  # The next item is the default computing configuration to use from divvy
+  # options are: 'default' (localhost), 'slurm', lsf', 'sge'
+  # see more here: http://code.databio.org/divvy/
+  computing_configuration:
   graphics:
     matplotlib:
       backend: TkAgg # Agg

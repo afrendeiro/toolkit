@@ -668,9 +668,7 @@ class ATACSeqAnalysis(Analysis):
         import parmap
         import pybedtools
 
-        from pypiper.ngstk import NGSTk
-        from ngs_toolkit.utils import count_reads_in_intervals
-
+        from ngs_toolkit.utils import count_reads_in_intervals, submit_job
 
         if samples is None:
             samples = self.samples
@@ -736,9 +734,6 @@ class ATACSeqAnalysis(Analysis):
             return matrix_raw
 
         else:
-            import textwrap
-
-            tk = NGSTk()
             for s in samples:
                 output_dir = os.path.join(s.paths.sample_root, "coverage")
                 if not os.path.exists(output_dir):
@@ -754,26 +749,11 @@ class ATACSeqAnalysis(Analysis):
                 job_file = os.path.join(
                     output_dir, s.name + ".{}_coverage.sh".format(peak_set_name)
                 )
+                cmd = (
+                    "date\nbedtools coverage -counts -abam {bam} -b {bed} > {out}\ndate"
+                    .format(bam=s.aligned_filtered_bam, bed=sites.fn, out=output_file))
 
-                cmd = tk.slurm_header(
-                    job_name=job_name,
-                    output=log_file,
-                    cpus_per_task=1,
-                    mem_per_cpu=8000,
-                )
-                cmd += "bedtools coverage -counts"
-                cmd += " -abam {}".format(s.aligned_filtered_bam)
-                cmd += " -b {}".format(sites.fn)
-                cmd += " > {}".format(output_file)
-                cmd += " \n"
-                cmd += tk.slurm_footer()
-
-                with open(job_file, "w") as handle:
-                    handle.write(
-                        textwrap.dedent(cmd).replace("\n ", "\n").replace("  ", "")
-                    )
-
-                tk.slurm_submit_job(job_file)
+                submit_job(cmd, job_file, job_name=job_name, logfile=log_file, cores=1, mem=8000)
 
     def collect_coverage(
         self,

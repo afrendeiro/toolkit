@@ -13,6 +13,10 @@ preferences:
   default_genome_assemblies:
     - human: hg19
     - mouse: mm10
+  # The next item is the default computing configuration to use from divvy
+  # options are: 'default', 'slurm', lsf', 'sge'
+  # see more here: http://code.databio.org/divvy/
+  computing_configuration: 'default'
   graphics:
     matplotlib:
       backend: TkAgg # Agg

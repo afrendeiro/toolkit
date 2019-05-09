@@ -368,7 +368,7 @@ def test_peak_chromatin_state(analysis, chrom_file):
         assert hasattr(analysis, attr)
 
 
-def test_annotate(analysis, chrom_file):
+def test_annotate_features(analysis, chrom_file):
     analysis.get_peak_chromatin_state(chrom_state_file=chrom_file)
     analysis.get_matrix_stats(matrix="matrix_raw")
     analysis.get_peak_gene_annotation(max_dist=1e10)
@@ -384,7 +384,7 @@ def test_annotate(analysis, chrom_file):
             failed = True
         else:
             raise
-    analysis.annotate(matrix="matrix_raw")
+    analysis.annotate_features(matrix="matrix_raw")
     f = os.path.join(analysis.results_dir, analysis.name + ".matrix_features.csv")
     assert hasattr(analysis, "matrix_features")
     assert os.path.exists(f)

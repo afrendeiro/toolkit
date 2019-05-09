@@ -1,7 +1,9 @@
 #!/usr/bin/env python
 
 """
-A project creator. https://github.com/afrendeiro/tookit
+The project manager from ngs_toolkit.
+
+Create and run NGS-based projects with the PEP specification and run analysis using 'ngs_toolkit'.
 """
 
 import argparse
@@ -13,18 +15,10 @@ from ngs_toolkit import _CONFIG, _LOGGER
 
 
 def parse_arguments(cli_string=None):
-    """
-    Argument Parsing.
-    """
-    description = "%(prog)s - A project manager."
-    epilog = "https://github.com/afrendeiro/toolkit"
-
     parser = argparse.ArgumentParser(
-        description=description,
-        epilog=epilog,
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+        description=__doc__
     )
-    subparsers = parser.add_subparsers(dest="command", required=True)
+    subparsers = parser.add_subparsers(dest="command")  # , required=True <- not supported in Python 3.5
 
     # Create command
     create_subparser = subparsers.add_parser(
@@ -94,6 +88,10 @@ def parse_arguments(cli_string=None):
         args = parser.parse_args()
     else:
         args = parser.parse_args(cli_string.split(" "))
+
+    if args.command is None:
+        parser.print_help(sys.stderr)
+        sys.exit(1)
     if args.command == "create":
         args.root_dir = os.path.abspath(args.root_dir)
 

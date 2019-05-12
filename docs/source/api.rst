@@ -1,13 +1,11 @@
 API
 ===
 
-``ngs_toolkit`` is above all an API.
+The great flexibility of ``ngs_toolkit`` comes from the ability to compose workflows using the API.
 
-It is organized in around the type of data under analysis in the various modules.
+It provides a rich but abstract ``Analysis`` object and implements various modules building on it depending on the data type.
 
-The ``general`` module provides a generic ``Analysis`` model from which the more specific ones inherit. It also contains sevral methods common to other methods (under consideration to be moved to a ``utils`` module).
-
-More documentation on each method will hopefully come soon. For now I hope the docstring is descriptive enough.
+In addition, the ``general`` module contains several analysis-independent methods and the ``utils`` module provides low-level functions of general use.
 
 ngs_toolkit
 -----------------------

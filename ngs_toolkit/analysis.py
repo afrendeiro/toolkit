@@ -37,44 +37,43 @@ class Analysis(object):
     ----------
     name : str, optional
         Name of the analysis.
-        Defaults to ``analysis``.
 
+        Defaults to ``analysis``.
     from_pep : str, optional
         PEP configuration file to initialize analysis from.
         The analysis will adopt as much attributes from the PEP as possible
         but keyword arguments passed at initialization will still have priority.
-        Defaults to None (no PEP used).
 
+        Defaults to ``None`` (no PEP used).
     from_pickle : str, optional
         Pickle file of an existing serialized analysis object
         from which the analysis should be loaded.
-        Defaults to None (will not load).
 
+        Defaults to ``None`` (will not load from pickle).
     root_dir : str, optional
         Base directory for the project.
-        Defaults to current directory or to what is specified in PEP if `from_pep`.
 
+        Defaults to current directory or to what is specified in PEP if `from_pep`.
     data_dir : str, optional
         Directory containing processed data (e.g. by looper) that will
         be input to the analysis. This is in principle not required.
-        Defaults to ``data``.
 
+        Defaults to 'data'.
     results_dir : str, optional
         Directory to contain outputs produced by the analysis.
-        Defaults to ``results``.
 
+        Defaults to 'results'.
     prj : peppy.Project, optional
         A ``peppy.Project`` object that this analysis is tied to.
-        Defaults to ``None``.
 
+        Defaults to ``None``.
     samples : list, optional
         List of ``peppy.Sample`` objects that this analysis is tied to.
-        Defaults to ``None``.
 
+        Defaults to ``None``.
     kwargs : dict, optional
         Additional keyword arguments will simply be stored as object attributes.
     """
-
     def __init__(
         self,
         name=None,
@@ -127,9 +126,7 @@ class Analysis(object):
             if not hasattr(self, attr):
                 setattr(self, attr, None)
         if not hasattr(self, "thresholds"):
-            self.thresholds = {
-                "alpha": 0.05,
-                "log2_fold_change": 0}
+            self.thresholds = {"alpha": 0.05, "log2_fold_change": 0}
 
         # Generate from PEP configuration file
         if from_pep is not False:
@@ -272,19 +269,19 @@ class Analysis(object):
         ----------
         attr : str
             An attribute of the analysis' samples to check existence of files.
-
         f : function, optional
             Function to reduce output across samples.
-            Defaults to `all`.
 
+            Defaults to `all`.
         samples : list, optional
             Samples to consider.
-            Defaults to all in analysis
+
+            Defaults to all in analysis.
 
         Returns
         ----------
         bool
-            Whether samples have file
+            Whether samples have file.
         """
         if samples is None:
             samples = self.samples
@@ -298,15 +295,15 @@ class Analysis(object):
         ----------
         attr : str
             Attribute to check
-
         samples : list, optional
             Samples to consider.
-            Defaults to all in analysis
+
+            Defaults to all in analysis.
 
         Returns
         -------
         list
-            List of peppy.Sample objects
+            List of peppy.Sample objects.
         """
         if samples is None:
             samples = self.samples
@@ -325,7 +322,8 @@ class Analysis(object):
 
         samples : list, optional
             Samples to consider.
-            Defaults to all in analysis
+
+            Defaults to all in analysis.
 
         Returns
         -------
@@ -350,20 +348,20 @@ class Analysis(object):
         Parameters
         ----------
         input_file : str
-            Attribute to check
-
+            Attribute to check.
         permissive : bool, optional
             Whether to allow returning a subset of samples if not all have file.
-            Defaults to False
 
+            Defaults to ``False``.
         samples : list, optional
             Samples to consider.
-            Defaults to all in analysis
+
+            Defaults to all in analysis.
 
         Returns
         -------
         list
-            List of peppy.Sample objects
+            List of peppy.Sample objects.
 
         Raises
         -------
@@ -458,7 +456,7 @@ class Analysis(object):
         pep_config : str
             PEP configuration file.
 
-        Attributes:
+        Attributes
         ----------
         prj : peppy.Project
             peppy.Project from given PEP configuration file.
@@ -471,12 +469,13 @@ class Analysis(object):
     def update(self, pickle_file=None):
         """
         Update all of the object"s attributes with the attributes from a serialized
-        object (i.e. object stored in a file) object.
+        object (ie object stored in a file) object.
 
         Parameters
         ----------
         pickle_file : str, optional
             Pickle file to load.
+
             Defaults to the analysis' `pickle_file`.
         """
         self.__dict__.update(self.from_pickle(pickle_file=pickle_file).__dict__)
@@ -532,22 +531,21 @@ class Analysis(object):
         ----------
         overwrite : bool, optional
             Whether to overwrite attribute values if existing.
-            Defaults to True
 
+            Defaults to ``True``.
         subset_to_data_type : bool, optional
             Whether to subset samples and comparison_table to entries of same data_type as analysis.
-            Defaults to True
+
+            Defaults to ``True``.
 
         Attributes
         ----------
         samples : list
-            List of peppy.Samples if contained in the PEP configuration
-
+            List of peppy.Samples if contained in the PEP configuration.
         sample_attributes, group_attributes : list
-            Sample attributes if specified in the PEP configuration
-
+            Sample attributes if specified in the PEP configuration.
         comparison_table : pandas.DataFrame
-            Comparison table if specified in the PEP configuration
+            Comparison table if specified in the PEP configuration.
         """
         hint = " Adding a '{}' section to your project configuration file allows the analysis"
         hint += " object to use those attributes during the analysis."
@@ -630,7 +628,7 @@ class Analysis(object):
         ----------
         overwrite : bool, optional
             Whether to overwrite attribute values if existing.
-            Defaults to True
+            Defaults to ``True``.
         """
 
         def _format_string_with_sample_attributes(sample, string):
@@ -683,7 +681,7 @@ class Analysis(object):
 
     def to_pickle(self, timestamp=False):
         """
-        Serialize object (i.e. save to disk) to pickle format.
+        Serialize object (ie save to disk) to pickle format.
 
         Parameters
         ----------
@@ -709,7 +707,8 @@ class Analysis(object):
         ----------
         pickle_file : str, optional
             Pickle file to load.
-            By default this is the object"s attribute `pickle_file`.
+
+            Default is the object"s attribute ``pickle_file``.
 
         Returns
         -------
@@ -737,8 +736,8 @@ class Analysis(object):
         output_map : dict
             Dictionary with {attribute_name: (file_path, kwargs)} to load the files.
             The kwargs in the tuple will be passed to pandas.read_csv.
-            The default is the required to read the keys in `only_these_keys`.
 
+            Default is the required to read the keys in ``only_these_keys``.
         only_these_keys : list, optional
             Iterable of analysis attributes to load up.
             Possible attributes:
@@ -748,25 +747,27 @@ class Analysis(object):
                 "differential_results"
                 "differential_enrichment"
 
+            Default is all of the above.
         prefix : str, optional
             String prefix of files to load.
             Variables in curly braces will be formated with attributes of analysis.
-            Defaults to "{results_dir}/{name}".
 
+            Default is "{results_dir}/{name}".
         bool : permissive, optional
             Whether an error should be ignored if reading a file causes IOError.
-            Default is True.
+
+            Default is ``True``.
 
         Attributes
         ----------
         pandas.DataFrame
             Dataframes holding the respective data, available as attributes described
-            in the `only_these_keys` parameter.
+            in the ``only_these_keys`` parameter.
 
         Raises
         ----------
         IOError
-            If not permissive and a file is not found
+            If not permissive and a file is not found.
         """
         from ngs_toolkit.utils import fix_dataframe_header
 
@@ -826,26 +827,23 @@ class Analysis(object):
     ):
         """
         Set an existing CSV file as the value of the analysis' matrix.
-        Valid `matrix_name` values are "matrix_raw" and "matrix_norm".
 
         Parameters
         ----------
         matrix_name : str
             The attribute name of the matrix.
             Options are "matrix_raw" and "matrix_norm".
-
         csv_file : str
             Path to valid CSV file to be used as matrix.
             Assumes header and index column.
             Customize additional overwriding options to read CSV by passing kwargs.
-
         prefix : str, optional
             String prefix of paths to save files.
             Variables in curly braces will be formated with attributes of analysis.
-            Defaults to "{results_dir}/{name}".
 
+            Defaults to "{results_dir}/{name}".
         **kwargs : dict
-            Additional keyword arguments will be passed to pandas.read_csv
+            Additional keyword arguments will be passed to ``pandas.read_csv``.
 
         Attributes
         ----------
@@ -888,26 +886,27 @@ class Analysis(object):
                  - "blacklist": Locations of blacklisted regions for genome
                  - "tss": Locations of gene"s TSSs
                  - "genomic_context": Genomic context of genome
-            Defaults to ["blacklist", "tss", "genomic_context"]
 
+            Defaults to ["blacklist", "tss", "genomic_context"].
         organism : str, optional
             Organism to get for. Currently supported are "human" and "mouse".
-            Defaults to analysis' own organism.
 
+            Defaults to analysis' own organism.
         genome_assembly : str, optional
             Genome assembly to get for.
             Currently supported are "hg19", "hg38" and "mm10".
-            Defaults to analysis' own genome assembly.
 
+            Defaults to analysis' own genome assembly.
         output_dir : str, optional
             Directory to save results to.
-            Defaults to the value of "preferences:root_reference_dir" in the configuration,
-            if that is not set, to a directory called "reference" in the analysis root directory.
 
+            Defaults to the value of ``preferences:root_reference_dir`` in the configuration,
+            if that is not set, to a directory called "reference" in the analysis root directory.
         overwrite : bool, optional
             Whether existing files should be overwritten by new ones.
             Otherwise they will be kept and no action is made.
-            Defaults to False.
+
+            Defaults to ``False``.
 
         Returns
         -------
@@ -991,31 +990,32 @@ class Analysis(object):
         ----------
         matrix : str, optional
             Attribute name of matrix to normalize.
-            Defaults to 'matrix_raw'.
 
+            Defaults to "matrix_raw".
         samples : list, optional
             Iterable of peppy.Sample objects to restrict matrix to.
-            Defaults to all samples in matrix.
 
+            Defaults to all samples in matrix.
         mult_factor : float, optional
             A constant to multiply values for.
-            Defaults to 1e6.
 
+            Defaults to 1e6.
         log_transform : bool, optional
             Whether to log transform values or not.
-            Defaults to True.
 
-        pseudocount : int|float, optional
+            Defaults to ``True``.
+        pseudocount : {int, float}, optional
             A constant to add to values.
-            Defaults to 1.
 
+            Defaults to 1.
         save : bool, optional
             Whether to write normalized DataFrame to disk.
-            Defaults to True.
 
+            Defaults to ``True``.
         assign : bool, optional
             Whether to assign the normalized DataFrame to an attribute ``.
-            Defaults to True.
+
+            Defaults to ``True``.
 
         Attributes
         ----------
@@ -1024,7 +1024,7 @@ class Analysis(object):
 
         Returns
         -------
-        pd.DataFrame
+        pandas.DataFrame
             Normalized pandas DataFrame.
         """
         to_norm = self.get_matrix(matrix=matrix, samples=samples)
@@ -1068,35 +1068,36 @@ class Analysis(object):
         ----------
         matrix : str
             Attribute name of matrix to normalize.
-            Defaults to 'matrix_raw'.
 
+            Defaults to "matrix_raw".
         samples : list, optional
             Iterable of peppy.Sample objects to restrict matrix to.
-            Defaults to all in matrix.
 
+            Defaults to all in matrix.
         implementation : str, optional
             One of `"Python"` or `"R"`.
             Dictates which implementation is to be used.
             The R implementation comes from the `preprocessCore` package,
             and the Python one is from https://github.com/ShawnLYU/Quantile_Normalize.
             They give very similar results.
-            Default is "Python".
 
+            Default is "Python".
         log_transform : bool, optional
             Whether to log transform values or not.
-            Default is True.
 
+            Default is ``True``.
         pseudocount : float, optional
             A constant to add before log transformation.
-            Default is 1.
 
+            Default is 1.
         save : bool, optional
             Whether to write normalized DataFrame to disk.
-            Default is True.
 
+            Default is ``True``.
         assign : bool, optional
             Whether to assign the normalized DataFrame to an attribute `matrix_norm`.
-            Default is True.
+
+            Default is ``True``.
 
         Attributes
         ----------
@@ -1162,27 +1163,28 @@ class Analysis(object):
         ----------
         matrix : str, optional
             Attribute name of dictionary of matrices to normalize.
-            Defaults to `matrix_raw`.
 
+            Defaults to "matrix_raw".
         samples : list, optional
             Samples to restrict analysis to.
-            Defaults to samples in Analysis object.
 
+            Defaults to all samples in Analysis object.
         function : function, optional
             An alternative function to calculate across samples. Data will be subtracted by this.
-            Defaults to numpy.nanmedian
 
+            Defaults to ``numpy.nanmedian``.
         fillna : bool, optional
             Whether to fill NaN with zero.
-            Defaults to True
 
+            Defaults to ``True``.
         save : bool, optional
             Whether results should be saved to disc.
-            Defaults to True
 
+            Defaults to ``True``.
         assign : bool, optional
             Whether results should be assigned to Analysis object.
-            Defaults to True
+
+            Defaults to ``True``.
 
         Attributes
         ----------
@@ -1227,19 +1229,20 @@ class Analysis(object):
 
         matrix : str, optional
             Attribute name of dictionary of matrices to normalize.
-            Defaults to `matrix_raw`.
 
+            Defaults to `matrix_raw`.
         samples : list, optional
             Samples to restrict analysis to.
-            Defaults to all samples.
 
+            Defaults to all samples.
         save : bool, optional
             Whether results should be saved to disc.
-            Defaults to True
 
+            Defaults to ``True``.
         assign : bool, optional
             Whether results should be assigned to Analysis object.
-            Defaults to True
+
+            Defaults to ``True``.
 
         Attributes
         ----------
@@ -1300,23 +1303,24 @@ class Analysis(object):
                       Only useful for CNV.
              - `pca`: Subtraction of Principal Component from matrix.
                       Requires which PC to subtract. `pc` must be passed as kwarg.
-            Defaults to "quantile".
 
+            Defaults to "quantile".
         matrix : str, optional
             Attribute name of matrix to normalize.
-            Defaults to "matrix_raw".
 
+            Defaults to "matrix_raw".
         samples : list, optional
             Iterable of peppy.Sample objects to restrict matrix to.
-            Default is all samples in matrix.
 
+            Default is all samples in matrix.
         save : bool, optional
             Whether to write normalized DataFrame to disk.
-            Defaults to True.
 
+            Defaults to ``True``.
         assign : bool
             Whether to assign the result to "matrix_norm".
-            Defaults to True.
+
+            Defaults to ``True``.
 
         Attributes
         ----------
@@ -1373,10 +1377,10 @@ class Analysis(object):
         ----------
         matrix : {str, pandas.DataFrame}
             The name of the attribute with the matrix or a DataFrame already.
-
         samples : list
             Iterable of peppy.Sample objects to restrict matrix to.
-            If not provided (`None` is passed) the matrix will not be subsetted.
+
+            Default (``None`` is passed) is not to subset matrix.
 
         Returns
         -------
@@ -1392,16 +1396,17 @@ class Analysis(object):
             # subset to requested samples
             return matrix.loc[:, [s.name for s in samples]]
 
-    def get_matrix_stats(self, matrix=None, samples=None):
+    def get_matrix_stats(self, matrix="matrix_raw", samples=None):
         """
-        Gets a matrix of feature-wise (i.e. for every gene or region) statistics such
+        Gets a matrix of feature-wise (ie for every gene or region) statistics such
         across samples such as mean, variance, deviation, dispersion and amplitude.
 
         Parameters
         ----------
         matrix : str
             Attribute name of matrix to normalize.
-            Defaults to 'matrix_raw'.
+
+            Defaults to "matrix_raw".
 
         Returns
         -------
@@ -1415,8 +1420,6 @@ class Analysis(object):
         """
         if samples is None:
             samples = self.samples
-        if matrix is None:
-            matrix = "matrix_raw"
         matrix = getattr(self, matrix)
 
         matrix = matrix.loc[:, [s.name for s in samples]]
@@ -1450,11 +1453,11 @@ class Analysis(object):
         return self.stats
 
     def annotate_features(
-        self, samples=None, matrix=None, feature_tables=None, permissive=True
+        self, samples=None, matrix="matrix_norm", feature_tables=None, permissive=True
     ):
         """
-        Annotates analysis features (i.e. regions/genes) by aggregating annotations
-        per feature (e.g. genomic context, chromatin state, gene annotations and statistics)
+        Annotates analysis features (regions/genes) by aggregating annotations
+        per feature (genomic context, chromatin state, gene annotations and statistics)
         if present and relevant depending on the data type of the Analysis.
 
         The numeric matrix to be used is specified in `matrix`.
@@ -1465,19 +1468,23 @@ class Analysis(object):
         ----------
         samples : list
             Iterable of peppy.Sample objects to restrict matrix to.
-            If not provided (`None` is passed) the matrix will not be subsetted.
             Calculated metrics will be restricted to these samples.
 
+            Defaults to all in analysis (the matrix will not be subsetted).
         matrix : str
             Attribute name of matrix to annotate.
 
+            Defaults to "matrix_norm".
         feature_tables : list
             Attribute names of dataframes used to annotate the numeric dataframe.
-            The default is ["gene_annotation","region_annotation","chrom_state_annotation","support","stats"]
+
+            Default is ["gene_annotation", "region_annotation", "chrom_state_annotation", "support", "stats"]
             for ATAC-seq and ChIP-seq and ["stats"] for all others.
 
         permissive : bool
             Whether DataFrames that do not exist should be simply skipped or an error will be thrown.
+
+            Defaults to ``True``.
 
         Raises
         ----------
@@ -1491,8 +1498,6 @@ class Analysis(object):
         """
         if samples is None:
             samples = self.samples
-        if matrix is None:
-            matrix = "matrix_norm"
         matrix = getattr(self, matrix)
 
         next_matrix = matrix
@@ -1567,7 +1572,7 @@ class Analysis(object):
 
         attributes : list, optional
             Desired attributes to be annotated.
-            Defaults to all attributes in the original sample annotation sheet of the analysis" Project.
+            Defaults to all attributes in the original sample annotation sheet of the analysis' Project.
 
         numerical_attributes : list, optional
             Attributes which are numeric even though they
@@ -1576,7 +1581,7 @@ class Analysis(object):
 
         save : bool, optional
             Whether to write normalized DataFrame to disk.
-            Default is True.
+            Default is ``True``.
 
         assign : bool, optional
             Whether to assign the normalized DataFrame to "matrix_norm".
@@ -1656,6 +1661,16 @@ class Analysis(object):
         return df
 
     def annotate_matrix(self, **kwargs):
+        """
+        Convinience function to create dataframes annotated with feature and samples attributes.
+
+        Simply calls ``Analysis.annotate_features`` and ``analysis.annotate_samples``.
+
+        Parameters
+        ----------
+        kwargs : dict
+            Additional keyword arguments are passed to the above mentioned functions.
+        """
         self.annotate_features(**kwargs)
         self.annotate_samples(**kwargs)
 
@@ -1686,34 +1701,34 @@ class Analysis(object):
 
         index : pandas.Index, optional
             Pandas Index to use.
-            If not provided will use the column Index of the provided ``matrix``.
 
+            Default is to use the column Index of the provided ``matrix``.
         matrix : str, optional
             Name of analysis attribute containing a dataframe with pandas.MultiIndex columns to use.
-            If not provided will use the provided ``index``.
 
+            Default is to use the provided ``index``.
         levels : list, optional
             Levels of multiindex to restrict to.
-            Defaults to all in index under use.
 
+            Defaults to all in index under use.
         pallete : str, optional
             Name of matplotlib color palete to use with categorical levels.
             See matplotlib.org/examples/color/colormaps_reference.html.
-            Defaults to "tab20".
 
+            Defaults to "tab20".
         cmap : str, optional
             Name of matplotlib color palete to use with numerical levels.
             See matplotlib.org/examples/color/colormaps_reference.html.
-            Defaults to "RdBu_r".
 
+            Defaults to "RdBu_r".
         nan_color : tuple, optional
             Color for missing (i.e. NA) values.
-            Defaults to ``(0.662745, 0.662745, 0.662745, 0.5)`` == ``grey``.
 
+            Defaults to ``(0.662745, 0.662745, 0.662745, 0.5)`` == ``grey``.
         as_dataframe : bool, optional
             Whether a dataframe should be return.
+
             Defaults to False.
-            Not implemented yet.
 
         Returns
         -------
@@ -1849,62 +1864,61 @@ class Analysis(object):
         ----------
         steps : list, optional
             List of step keywords to be performed as described above.
-            Defaults to all available.
 
+            Defaults to all available.
         matrix : str, optional
             Name of analysis attribute contatining the numeric dataframe to perform analysis on.
             Must have a pandas.MultiIndex as column index.
-            Defaults to "matrix_norm".
 
+            Defaults to "matrix_norm".
         samples : list, optional
             List of sample objects to restrict analysis to.
-            Defaults to all in analysis.
 
+            Defaults to all in analysis.
         attributes_to_plot : list, optional
             List of attributes shared between sample groups should be plotted.
-            Defaults to attributes in analysis.group_attributes.
 
+            Defaults to attributes in analysis.group_attributes.
         plot_prefix : str, optional
             Prefix for output files.
-            Defaults to "all_regions" if data_type is ATAC-seq and "all_genes" if data_type is RNA-seq.
 
+            Defaults to "all_regions" if data_type is ATAC-seq and "all_genes" if data_type is RNA-seq.
         standardize_matrix : bool, optional
             Whether to standardize variables in `matrix` by removing the mean and scaling to unit variance.
             It is not applied to the "correlation" step.
-            Default is True.
 
+            Default is ``True``.
         manifold_algorithms : list, optional
             List of manifold algorithms to use. See available algorithms here:
             http://scikit-learn.org/stable/modules/classes.html#module-sklearn.manifold
 
+            Defaults to ['MDS', 'Isomap', 'LocallyLinearEmbedding', 'SpectralEmbedding', 'TSNE'],
         display_corr_values : bool, optional
-            Whether values in heatmap of sample correlations should be
-            displayed overlaid on top of colours. Defaults to False.
+            Whether values in heatmap of sample correlations should be displayed overlaid on top of colours.
 
+            Defaults to ``False``.
         prettier_sample_names : bool, optional
             Whether it should attempt to prettify sample names by removing the data type from plots.
-            Defaults to True.
 
+            Defaults to ``True``.
         pallete : str
             Color pallete to use in levels of `attributes_to_plot`. Will be passed to
             `analysis.get_level_colors`.
-
         cmap : str
             Color map to use in numerical levels of `attributes_to_plot`.
             Will be passed to `analysis.get_level_colors`.
-
         rasterized : bool, optional
             Whether elements with many objects should be rasterized.
-            Defaults to False.
 
+            Defaults to ``False``.
         dpi : int, optional
             Definition of rasterized image in dots per inch (dpi).
-            Defaults to 300.
 
+            Defaults to 300.
         output_dir : str, optional
             Directory for generated files and plots.
-            Defaults to "{results_dir}/unsupervised_analysis_{data_type}".
 
+            Defaults to "{results_dir}/unsupervised_analysis_{data_type}".
         **kwargs: optional
             kwargs are passed to ngs_toolkit.graphics.plot_projection
         """
@@ -2350,8 +2364,9 @@ class Analysis(object):
         This implies the rpy2 library and the respective R library are installed.
 
         Requires the R package "DESeq2" to be installed:
-            >>> source("http://bioconductor.org/biocLite.R")
-            >>> biocLite("DESeq2")
+            >>> if (!requireNamespace("BiocManager", quietly = TRUE))
+            >>>     install.packages("BiocManager")
+            >>> BiocManager::install("DESeq2")
 
         For other implementations of differential analysis see `ngs_toolkit.general.least_squares_fit`
         and `ngs_toolkit.general.differential_from_bivariate_fit`.
@@ -2360,54 +2375,55 @@ class Analysis(object):
         ----------
         comparison_table : pandas.DataFrame
             A dataframe with "comparison_name", "comparison_side" and "sample_name", "sample_group" columns.
-            Defaults to the analysis' own "comparison_table" attribute.
 
+            Defaults to the analysis' own "comparison_table" attribute.
         samples : list, optional
             Samples to limit analysis to.
-            Defaults to all samples in analysis object.
 
+            Defaults to all samples in analysis object.
         covariates : list, optional
             Additional variables to take into account in the model fitting.
-            Defaults to None.
 
+            Defaults to None.
         output_dir : str, optional
             Output directory for analysis.
             Variables in curly braces will be formated with attributes from analysis.
-            Defaults to "{results_dir}/differential_analysis_{data_type}".
 
+            Defaults to "{results_dir}/differential_analysis_{data_type}".
         output_prefix : str, optional
             Prefix for output files.
-            Defaults to "differential_analysis".
 
+            Defaults to "differential_analysis".
         overwrite : bool, optional
             Whether results should be overwritten in case they already exist.
-            Defaults to True.
 
+            Defaults to ``True``.
         distributed : bool, optional
             Whether analysis should be distributed in a computing cluster for each comparison.
             Currently, only a SLURM implementation is available.
             If `True`, will not return results.
-            Defaults to False.
 
+            Defaults to ``False``.
         cpus : int, optional
             Number of CPUS to use when using distributed jobs.
-            Default: 2.
 
+            Default is 2.
         memory : int, optional
             Memory to use when using distributed jobs.
-            Default: 16000 (16Gb).
 
+            Default is 16000 (16Gb).
         filter_support : bool, optional
             Whether features not supported in a given comparison should be removed
             (i.e. regions with no peaks in any sample in a comparison are not tested)
             Applies only to ATAC-/ChIP-seq data.
-            Default is True.
+
+            Default is ``True``.
 
         Returns
         -------
         pandas.DataFrame
             Results for all comparisons.
-            Will be `None` if `distributed` is `True`.
+            Will be ``None`` if `distributed` is `True`.
 
         Attributes
         ----------
@@ -2642,44 +2658,45 @@ class Analysis(object):
     ):
         """
         Collect results from DESeq2 differential analysis.
-        Particularly useful when runing `differential_analysis` with in distributed mode.
+        Particularly useful when runing ``differential_analysis`` in distributed mode.
 
         Parameters
         ----------
         comparison_table : pandas.DataFrame
             A dataframe with "comparison_name", "comparison_side" and "sample_name", "sample_group" columns.
-            Defaults to the analysis's own "comparison_table" attribute.
 
+            Defaults to the analysis's own "comparison_table" attribute.
         input_dir, output_dir : str, optional
             In-/Output directory of files.
             Values within curly brackets "{data_type}", will be formated with attributes from analysis.
-            Defaults to "{results_dir}/differential_analysis_{data_type}".
 
+            Defaults to "{results_dir}/differential_analysis_{data_type}".
         input_prefix, output_prefix : str, optional
             Prefix of the in-/output files.
-            Defaults for both is "differential_analysis".
 
+            Defaults for both is "differential_analysis".
         permissive : bool, optional
             Whether non-existing files should be skipped or an error be thrown.
-            Defaults to True.
 
+            Defaults to ``True``.
         assign : bool, optional
             Whether to add results to a `differential_results` attribute.
-            Defaults to True.
 
+            Defaults to ``True``.
         save : bool, optional
             Whether to save results to disk.
-            Defaults to True.
 
+            Defaults to ``True``.
         overwrite : bool, optional
             Whether results should be overwritten in case they already exist.
-            Defaults to False.
+
+            Defaults to ``False``.
 
         Returns
         -------
         pandas.DataFrame
             Results for all comparisons.
-            Will be `None` if `overwrite` is `False` and a results file already exists.
+            Will be ``None`` if ``overwrite`` is ``False`` and a results file already exists.
 
         Attributes
         ----------
@@ -2709,7 +2726,7 @@ class Analysis(object):
         )
         if not overwrite and os.path.exists(results_file):
             msg = "Differential analysis results '{}' already exist and argument `overwrite` is False."
-            hint = " Will not do anything."
+            hint = " Will not do ``anything``."
             _LOGGER.warning(msg.format(results_file) + hint)
             return
 
@@ -2803,7 +2820,7 @@ class Analysis(object):
         cmap="RdBu_r",
     ):
         """
-        Plot differential features (e.g. chromatin region, genes) discovered with supervised
+        Plot differential features (eg chromatin region, genes) discovered with supervised
         group comparisons by ``ngs_toolkit.general.differential_analysis``.
         This will plot number and direction of discovered features, scatter, MA and volcano
         plots for each comparison and joint heatmaps of log fold changes, normalized values
@@ -2821,116 +2838,114 @@ class Analysis(object):
                 - "stats_heatmap" - Heatmap of p-values and fold-changes for comparisons.
                 - "correlation" - Correlation of samples or sample groups in differential features.
                 - "heatmap" - Heatmaps of samples or sample groups in differential features.
-            Defaults to all of the above.
 
+            Defaults to all of the above.
         results : pandas.DataFrame, optional
             Data frame with differential analysis results.
             See ``ngs_toolkit.general.differential_analysis`` for more information.
-
         comparison_table : pandas.DataFrame, optional
             Comparison table. If provided, group-wise plots will be produced.
-            Defaults to the analysis' "comparison_table" attribute.
 
+            Defaults to the analysis' "comparison_table" attribute.
         samples : list, optional
             List of sample objects to restrict analysis to.
-            Defaults to all samples in analysis.
 
+            Defaults to all samples in analysis.
         matrix : str, optional
             Matrix of quantification to use for plotting feature values across samples/groups.
-            Defaults to "matrix_norm".
 
+            Defaults to "matrix_norm".
         only_comparison_samples : bool, optional
             Whether to use only samples present in the `comparison_table` and `results` table.
-            Defaults to False.
 
+            Defaults to ``False``.
         alpha : float, optional
             Significance level to consider a feature differential.
-            Defaults to 0.05.
 
+            Defaults to 0.05.
         corrected_p_value : bool, optional
             Whether to use a corrected p-valueto consider a feature differential.
-            Defaults to True.
 
+            Defaults to ``True``.
         fold_change : float, optional
             Effect size (log2 fold change) to consider a feature differential. Considers absolute values.
-            Default is no log2 fold change threshold.
 
+            Default is no log2 fold change threshold.
         diff_based_on_rank : bool, optional
             Whether a feature should be considered differential based on its rank.
             Use in combination with `max_rank`, `ranking_variable` and `respect_stat_thresholds`.
-            Defaults to False.
 
+            Defaults to ``False``.
         max_rank : int, optional
             Rank to use when using `diff_based_on_rank`.
-            Defaults to 1000.
 
+            Defaults to 1000.
         ranking_variable : str, optional
             Which variable to use for ranking when using `diff_based_on_rank`.
-            Defaults to "pvalue".
 
+            Defaults to "pvalue".
         respect_stat_thresholds : bool, optional
             Whether the statistical thresholds from `alpha` and `fold_change` should still be
             respected when using `diff_based_on_rank`.
-            Defaults to True
 
+            Defaults to ``True``.
         output_dir : str, optional
             Directory to create output files.
-            Defaults to "{results_dir}/differential_analysis_{data_type}"
 
+            Defaults to "{results_dir}/differential_analysis_{data_type}"
         output_prefix : str, optional
             Prefix to use when creating output files.
-            Defaults to "differential_analysis".
 
+            Defaults to "differential_analysis".
         plot_each_comparison : bool, optional
             Whether each comparison should be plotted in scatter, MA and volcano plots.
             Useful to turn off with many comparisons.
-            Defaults to True.
 
+            Defaults to ``True``.
         mean_column : str, optional
             Column  in `results` data frame containing values for mean values across samples.
-            Defaults to "baseMean".
 
+            Defaults to "baseMean".
         log_fold_change_column : str, optional
             Column in `results` data frame containing values for log2FoldChange values across samples.
-            Defaults to "log2FoldChange".
 
+            Defaults to "log2FoldChange".
         p_value_column : str, optional
             Column  in `results` data frame containing values for p-values across samples.
-            Defaults to "pvalue".
 
+            Defaults to "pvalue".
         adjusted_p_value_column : str, optional
             Column  in `results` data frame containing values for adjusted p-values across samples.
-            Defaults to "padj".
 
+            Defaults to "padj".
         comparison_column : str, optional
             Column  in `results` data frame containing the name of the comparison.
-            Defaults to "comparison_name".
 
+            Defaults to "comparison_name".
         rasterized : bool, optional
             Whether plots with many objects should be rasterized.
-            Defaults to True.
 
+            Defaults to ``True``.
         robust : bool, optional
             Whether heatmap color scale ranges should be robust (using quantiles) rather than extreme values.
             Useful for noisy/extreme data.
-            Defaults to False.
 
+            Defaults to ``False``.
         feature_labels : bool, optional
             Whether features (regions/genes) should be labeled in heatmaps.
-            Defaults to False.
 
+            Defaults to ``False``.
         group_colours : bool, optional
             Whether groups of samples should be coloured in heatmaps.
-            Defaults to True.
 
+            Defaults to ``True``.
         group_attributes : list, optional
-            Which variables to colour if `group_colours` if True.
-            Defaults to all of analysis.group_attributes.
+            Which variables to colour if `group_colours` if ``True``.
 
+            Defaults to all of analysis.group_attributes.
         pallete : str
             Color pallete to use in levels of `group_attributes`.
             Will be passed to `analysis.get_level_colors`.
-
         cmap : str
             Color map to use in numerical levels of `group_attributes`.
             Will be passed to `analysis.get_level_colors`.
@@ -4133,12 +4148,14 @@ class Analysis(object):
         differential : pandas.DataFrame, optional
             DataFrame containing result of comparisons filtered for features considered as differential.
 
+            Defaults to the ``differential_results`` attribute, subset by the object's ``thresholds``.
         output_dir : str, optional
             Directory to create output files.
-            Defaults to "{results_dir}/differential_analysis_{data_type}".
 
+            Defaults to "{results_dir}/differential_analysis_{data_type}".
         output_prefix : str, optional
             Prefix to use when creating output files.
+
             Defaults to "differential_analysis".
         """
         # Make output dir
@@ -4161,7 +4178,7 @@ class Analysis(object):
 
         if differential is None:
             differential = self.differential_results.loc[
-                (self.differential_results["padj"] < self.thresholds['alpha'])
+                (self.differential_results["padj"] < self.thresholds["alpha"])
             ]
 
         if "direction" not in differential.columns:
@@ -4548,45 +4565,46 @@ class Analysis(object):
             Data frame with differential results as produced by ``differential_analysis``,
             but filtered by some threshold for the relevant (significant regions).
             Must contain a "comparison_name" column.
-            Defaults to `analysis.differential_results`.
 
+            Defaults to ``analysis.differential_results``.
         output_dir : str, optional
             Directory to create output files.
-            Defaults to "{results_dir}/differential_analysis_{data_type}".
 
+            Defaults to "{results_dir}/differential_analysis_{data_type}".
         output_prefix : str, optional
             Prefix to use when creating output files.
-            Defaults to "differential_analysis".
 
+            Defaults to "differential_analysis".
         genome : str, optional
             Genome assembly of the analysis.
-            Defaults to Analysis's `genome` attribute.
 
+            Defaults to Analysis's ``genome`` attribute.
         steps : list, optional
             Steps of the analysis to perform.
-            Defaults to all possible: ["region", lola", "meme", "homer", "enrichr"].
 
+            Defaults to all possible: ["region", lola", "meme", "homer", "enrichr"].
         directional : bool, optional
             Whether enrichments should be performed in a direction-dependent way
             (up-regulated and down-regulated features separately).
             This requires a column named "log2FoldChange" to exist.
-            Defaults to True.
 
+            Defaults to ``True``.
         max_diff : int, optional
             Number of maximum features to perform enrichment for ranked by variable in `max_diff`.
-            Defaults to 1000.
 
+            Defaults to 1000.
         sort_var : str, optional
             Variable to sort for when setting `max_diff`.
-            Defaults to "pvalue".
 
+            Defaults to "pvalue".
         distributed : bool, optional
             Whether work should be submitted as jobs in a computing cluster.
-            Defaults to False.
 
-        overwrite : bool, optional
-            Whether output files should be overwritten when `distributed` is True.
             Defaults to False.
+        overwrite : bool, ``op``tional
+            Whether output files should be overwritten when `distributed` is ``True``.
+
+            Defaults to ``False``.
 
         Attributes
         ----------
@@ -4848,35 +4866,36 @@ class Analysis(object):
         ----------
         steps : list, optional
             Steps of the enrichment analysis to collect results for.
-            Defaults to ["region", "lola", "meme", "homer", "enrichr"].
 
+            Defaults to ["region", "lola", "meme", "homer", "enrichr"].
         directional : bool, optional
             Whether enrichments were made in a direction-dependent way
             (up-regulated and down-regulated features separately).
             This implies a column named "direction" exists".
-            Defaults to True.
 
+            Defaults to ``True``.
         differential : pandas.DataFrame, optional
             Data frame with differential results to select which comparisons to collect
             enrichments for. Usually produced by ``ngs_toolkit.general.differential_analysis``.
-            Defaults to analysis `differential_results`.
 
+            Defaults to analysis's ``differential_results`` attributes.
         output_dir : str, optional
             Directory to create output files.
-            Defaults to "{results_dir}/differential_analysis_{data_type}".
 
+            Defaults to "{results_dir}/differential_analysis_{data_type}".
         input_prefix, output_prefix : str, optional
             File prefix of input/output files.
-            Defaults to "differential_analysis".
 
+            Defaults to "differential_analysis".
         permissive : bool, optional
             Whether to skip non-existing files, giving a warning.
-            Defaults to True.
+
+            Defaults to ``True``.
 
         Attributes
         ----------
         enrichment_results : dict
-            Dictionary with keys as in `steps` and values with pandas.DataFrame
+            Dictionary with keys as in ``steps`` and values with pandas.DataFrame
             of enrichment results.
         """
         # TODO: separate and fix mouse TF ids
@@ -5073,65 +5092,66 @@ class Analysis(object):
         steps : list, optional
             Types of the enrichment analysis to plot.
             Options are ["region", "lola", "motif", "great", "enrichr"].
-            Defaults to all keys present in analysis.enrichment_results.
 
+            Defaults to all keys present in analysis.enrichment_results.
         plot_types : list, optional
             Types of plots to do for each enrichment type.
             One of ["barplot", "scatter", "correlation", "heatmap"].
-            Defaults to all of the above.
 
+            Defaults to all of the above.
         enrichment_type : str, optional
             Type of enrichment if run for a single type of enrichment.
             In this case `enrichment_table` must be given.
             One of {"region", "lola", "motif", "great", "enrichr"}.
-            Default (None) is to run all keys present in analysis.enrichment_results.
 
+            Default (``None``) is to run all keys present in analysis.enrichment_results.
         enrichment_table : pandas.DataFrame, optional
             Data frame with enrichment results as produced by
             ``differential_enrichment`` or ``collect_differential_enrichment``.
             If given, `enrichment_type` must be given too.
-            Default (None) is the dataframes in all values present in analysis.enrichment_results.
 
+            Default (``None``) is the dataframes in all values present in analysis.enrichment_results.
         direction_dependent : bool, optional
             Whether enrichments were made in a direction-dependent way (up-regulated and down-regulated features separately).
             This implies a column named "direction" exists".
-            Defaults to True.
 
+            Defaults to ``True``.
         output_dir : str, optional
             Directory to create output files.
-            Defaults to "{results_dir}/differential_analysis_{data_type}/enrichments".
 
+            Defaults to "{results_dir}/differential_analysis_{data_type}/enrichments".
         comp_variable : str, optional
             Column defining which comparison enrichment terms belong to.
-            Defaults to "comparison_name".
 
+            Defaults to "comparison_name".
         output_prefix : str, optional
             Prefix to use when creating output files.
-            Defaults to "differential_analysis".
 
+            Defaults to "differential_analysis".
         rasterized : bool, optional
             Whether or not to rasterize heatmaps for efficient plotting.
-            Defaults to True.
 
+            Defaults to ``True``.
         clustermap_metric : str, optional
             Distance metric to use for clustermap clustering,
             See https://docs.scipy.org/doc/scipy/reference/spatial.distance.html for valid values.
-            Default to "correlation" (Pearson's).
 
+            Default to "correlation" (Pearson's).
         top_n : int, optional
             Top terms to use to display in plots.
-            Defaults to 5
 
+            Defaults to 5.
         z_score : {bool, int}, optional
             Which dimention/axis to perform Z-score transformation for.
-            Pass `False` to skip plotting Z-score heatmaps.
+            Pass ``False`` to skip plotting Z-score heatmaps.
             Numpy/Pandas conventions are used:
             `0` is row-wise (in this case across comparisons) and `1` is column-wise (across terms).
-            Defaults to 0.
 
+            Defaults to 0.
         cmap : str, optional
             Colormap to use in heatmaps.
-            Default None.
+
+            Defaults to ``None``.
         """
         # TODO: split function in its smaller parts and call them appropriately.
         import matplotlib

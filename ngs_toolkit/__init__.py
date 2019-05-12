@@ -11,16 +11,18 @@ def setup_logger(level="INFO", logfile=None):
     level : str, optional
         Level of logging to display.
         See possible levels here: https://docs.python.org/2/library/logging.html#levels
+
         Defaults to "INFO".
 
     logfile : str, optional
         File to write log to.
-        Defaults to ``~/ngs_toolkit.log.txt``
+
+        Defaults to ``~/ngs_toolkit.log.txt``.
 
     Returns
     -------
     logging.Logger
-        The logger
+        The logger.
     """
     import logging
     import os
@@ -72,12 +74,13 @@ def setup_config(custom_yaml_config=None):
         Path to YAML file with configuration.
         To see the structure of the YAML file, see
         https://github.com/afrendeiro/toolkit/blob/master/ngs_toolkit/config/default.yaml
-        Defaults to None
+
+        Defaults to None.
 
     Returns
     -------
     dict
-        Dictionary with configurations
+        Dictionary with configurations.
     """
     import pkg_resources
     import os

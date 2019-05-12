@@ -23,7 +23,8 @@ We have the following `PEP project <https://peppy.readthedocs.io>`_ config YAML 
       submission_subdir: submission
       pipeline_interfaces: /home/user/workspace/open_pipelines/pipeline_interface.yaml
       sample_annotation: /scratch/lab_bock/shared/projects/example_project/metadata/annotation.csv
-      sample_subannotation: /scratch/lab_bock/shared/projects/example_project/metadata/merge_table.csv
+      sample_subannotation: /scratch/lab_bock/shared/projects/example_project/metadata/sample_subannotation.csv
+      comparison_table: /scratch/lab_bock/shared/projects/example_project/metadata/comparison_table.csv
     data_sources:
       bsf: /path/to/samples/{flowcell}/{flowcell}_{lane}#{sample_name}.bam
     genomes:
@@ -63,140 +64,80 @@ And the following comparison table:
 
 
 
-ATAC-seq example
+ATAC-seq analysis example
 -------------------------------
 
 .. code-block:: python
 
     import os
-    from looper.models import Project
-    from ngs_toolkit.atacseq import ATACSeqAnalysis    
-    from ngs_toolkit.general import (differential_analysis,
-                                 plot_differential,
-                                 differential_enrichment,
-                                 plot_differential_enrichment)
-
+    from ngs_toolkit.atacseq import ATACSeqAnalysis
 
     # Start project and analysis objects
-    prj = Project(
-        os.path.join("metadata", "project_config.yaml"))
-    prj.samples = [sample for sample in prj.samples if sample.library == "ATAC-seq"]
-    atac_analysis = ATACSeqAnalysis(
-        name="example.atac_analysis",
-        prj=prj,
-        samples=prj.samples)
-    data_type = "ATAC-seq"
+    analysis = ATACSeqAnalysis(
+        from_pep=os.path.join("metadata", "project_config.yaml"))
 
     # Generate consensus peak set and annotate it
     ## get consensus peak set from all samples
-    atac_analysis.get_consensus_sites()
-    ## calculate peak support (what fraction of samples has which peak)
-    atac_analysis.calculate_peak_support()
-    ## annotate peak set with genes
-    atac_analysis.get_peak_gene_annotation()
+    analysis.get_consensus_sites()
     ## annotate peak set with genomic context
-    atac_analysis.get_peak_genomic_location()
+    analysis.get_peak_genomic_location()
     ## annotate peak set with chromatin context
-    atac_analysis.get_peak_chromatin_state(
+    analysis.get_peak_chromatin_state(
         os.path.join(
-            atac_analysis.data_dir,
+            analysis.data_dir,
             "external",
             "E032_15_coreMarks_mnemonics.bed"))
+    ## annotate peak set with genes
+    analysis.get_peak_gene_annotation()
 
     # Use accessibility quantitatively
     ## get coverage values for each peak in each sample of ATAC-seq
-    atac_analysis.measure_coverage()
+    analysis.measure_coverage()
 
     # Normalize accessibility (quantile normalization + GC correction)
-    atac_analysis.normalize(method="gc_content")
+    analysis.normalize(method="gc_content")
 
     # Annotate normalized accessibility with sample and region info
-    # annotate matrix with peak metadata
-    atac_analysis.annotate_features()
-    # annotate matrix with sample metadata
-    atac_analysis.accessibility = atac_analysis.annotate_with_sample_metadata(
-        quant_matrix="coverage_annotated",
-        attributes=prj.sample_attributes)
-
-    # Save analysis object
-    atac_analysis.to_pickle()
-
-
-    # UNSUPERVISED ANALYSIS
-
-    # plot pairwise sample correlations, 
-    # perform dimensionality reduction (MDS, PCA)
-    # and plot samples in this spaces, annotated with their attributes
-    atac_analysis.unsupervised(
-        quant_matrix="accessibility", samples=None,
-        attributes_to_plot=attributes_to_plot, plot_prefix="accessibility")
-
-
-    # SUPERVISED ANALYSIS
-
-    # read in comparison table, subset if needed
-    comparison_table = pd.read_csv(os.path.join("metadata", "comparison_table.csv"))
-    comparison_table = comparison_table[
-        (comparison_table['data_type'] == data_type) &
-        (comparison_table['comparison_type'] == 'differential')]
-
-    # differential analysis with DESeq2
-    analysis.differential_results = differential_analysis(
-        analysis,
-        comparison_table,
-        data_type=data_type,
-        output_dir="{}/differential_analysis_{}".format(analysis.results_dir, data_type),
-        covariates=None,
-        overwrite=True)
+    # # annotate dataframe with peak metadata
+    analysis.annotate_features()
+    # # annotate dataframe with sample metadata
+    analysis.accessibility = analysis.annotate_samples()
 
     # Save analysis object
     analysis.to_pickle()
 
-    # plot scatter, volcano, MA, heatmaps on the differential regions
-    # by groups and with individual samples, with normalized values
-    # and scalled values (Z-score).
-    plot_differential(
-        analysis,
-        analysis.differential_results,
-        matrix=getattr(analysis, quant_matrix),
-        comparison_table=comparison_table,
-        output_dir="{}/differential_analysis_{}".format(analysis.results_dir, data_type),
-        output_prefix="differential_analysis",
-        data_type=data_type,
-        alpha=alpha,
-        corrected_p_value=True,
-        fold_change=abs_fold_change,
-        rasterized=True,
-        robust=True,
-        group_wise_colours=True,
-        group_variables=group_variables)
 
-    # perform enrichment analysis on differnetial region sets
-    # using LOLA, MEME-AME, HOMER and Enrichr
-    differential_enrichment(
-        analysis,
-        diff,
-        data_type=data_type,
-        output_dir=output_dir,
+    # UNSUPERVISED ANALYSIS
+    # # plot pairwise sample correlations, 
+    # # perform dimensionality reduction (MDS, PCA)
+    # # and plot samples in this spaces, annotated with their attributes
+    analysis.unsupervised_analysis()
+
+
+    # SUPERVISED ANALYSIS
+    # # differential analysis with DESeq2
+    analysis.differential_analysis()
+
+    # # Save analysis object
+    analysis.to_pickle()
+
+    # # plot scatter, volcano, MA, heatmaps on the differential regions
+    # # by groups and with individual samples, with normalized values
+    # # and scalled values (Z-score).
+    analysis.plot_differential(
+        alpha=0.05,
+        corrected_p_value=True,
+        fold_change=1)
+
+    # # perform enrichment analysis on differnetial region sets
+    # # using LOLA, MEME-AME, HOMER and Enrichr
+    analysis.differential_enrichment(
         directional=True,
         max_diff=n_top,
-        sort_var="pvalue",
-        as_jobs=False)
+        sort_var="pvalue")
 
-    # for each type of enrichment results,
-    # plot bar and scatter plots of odds ratio vs p-value,
-    # heatmaps of enrichment across terms for each comparison
-    # and comparison correlation in enrichment terms
-    for enrichment_name, enrichment_type in [
-            ('motif', 'meme_ame'), ('homer_consensus', 'homer_consensus'),
-            ('lola', 'lola'), ('enrichr', 'enrichr')]:
-        enrichment_table = pd.read_csv(
-                os.path.join(output_dir, "differential_analysis" + ".{}.csv".format(enrichment_type)))
-
-        plot_differential_enrichment(
-            enrichment_table,
-            enrichment_name,
-            data_type=data_type,
-            output_dir=output_dir,
-            direction_dependent=True, barplots=False,
-            top_n=10 if enrichment_name not in ["motif", "homer_consensus"] else 50)
+    # # for each type of enrichment results,
+    # # plot bar and scatter plots of odds ratio vs p-value,
+    # # heatmaps of enrichment across terms for each comparison
+    # # and comparison correlation in enrichment terms
+    analysis.plot_differential_enrichment()

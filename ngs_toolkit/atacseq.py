@@ -57,37 +57,29 @@ class ATACSeqAnalysis(Analysis):
     kwargs : dict, optional
         Additional keyword arguments will be passed to parent class `ngs_toolkit.analysis.Analysis`.
 
-    :Example:
+    Examples
+    --------
+    >>> from ngs_toolkit.atacseq import ATACSeqAnalysis
 
-    .. code-block:: python
-        from ngs_toolkit.atacseq import ATACSeqAnalysis
+    This is an example of the beginning of an ATAC-seq analysis:
 
-        pep = "metadata/project_config.yaml"
-        a = ATACSeqAnalysis(from_pep=pep)
-
-        # Get consensus peak set from all samples
-        a.get_consensus_sites(a.samples)
-
-        # Annotate regions
-        a.calculate_peak_support(a.samples)
-        a.get_peak_gene_annotation()
-        a.get_peak_genomic_location()
-        a.get_peak_chromatin_state("E032_15_coreMarks_mnemonics.bed")
-
-        # Get coverage values for each peak in each sample of ATAC-seq
-        a.measure_coverage()
-
-        # Normalize jointly (quantile normalization + GC correction)
-        a.normalize(method="gc_content")
-
-        # Annotate quantified peaks with previously calculated metrics and features
-        a.annotate_features()
-
-        # Annotate with sample metadata
-        a.accessibility = a.annotate_samples()
-
-        # Save object
-        a.to_pickle()
+    >>> pep = "metadata/project_config.yaml"
+    >>> a = ATACSeqAnalysis(from_pep=pep)
+    >>> # Get consensus peak set from all samples
+    >>> a.get_consensus_sites(a.samples)
+    >>> # Annotate regions
+    >>> a.get_peak_gene_annotation()
+    >>> a.get_peak_genomic_location()
+    >>> # Get coverage values for each peak in each sample of ATAC-seq
+    >>> a.measure_coverage()
+    >>> # Normalize jointly (quantile normalization + GC correction)
+    >>> a.normalize(method="gc_content")
+    >>> # Annotate quantified peaks with previously calculated metrics and features
+    >>> a.annotate_features()
+    >>> # Annotate with sample metadata
+    >>> a.annotate_samples()
+    >>> # Save object
+    >>> a.to_pickle()
     """
 
     def __init__(

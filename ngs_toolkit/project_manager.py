@@ -66,9 +66,9 @@ def parse_arguments(cli_string=None):
         description="Run recipe.",
         help="Run ngs_toolkit recipe for a given project.",
     )
-    recipe_subparser.add_argument(dest="recipe_name", help="Recipe name.")
+    recipe_subparser.add_argument(dest="recipe_name", help="Recipe name.", nargs='?')
     recipe_subparser.add_argument(
-        dest="project_config", help="Project configuration file."
+        dest="project_config", help="Project configuration file.", nargs='?'
     )
     recipe_subparser.add_argument(
         "-l",
@@ -92,8 +92,12 @@ def parse_arguments(cli_string=None):
     if args.command is None:
         parser.print_help(sys.stderr)
         sys.exit(1)
-    if args.command == "create":
+    elif args.command == "create":
         args.root_dir = os.path.abspath(args.root_dir)
+    elif args.command == "recipe":
+        if not args.list_only and ((args.recipe_name is None) or (args.project_config is None)):
+            parser.print_help(sys.stderr)
+            sys.exit(1)
 
     return args
 
@@ -404,7 +408,7 @@ def main():
             import ngs_toolkit.recipes
 
             n = pkgutil.iter_modules(ngs_toolkit.recipes.__path__)
-            _LOGGER.info(
+            print(
                 "Available ngs_toolkit recipes: '{}'.".format(
                     "', '".join([x[1] for x in n])
                 )

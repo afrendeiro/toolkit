@@ -1511,8 +1511,7 @@ class Analysis(object):
                     "region_annotation",
                     "chrom_state_annotation",
                     "support",
-                    "stats",
-                ]
+                    "stats"]
             else:
                 feature_tables = ["stats"]
 
@@ -2457,7 +2456,7 @@ class Analysis(object):
         if not all([x in comparison_table.columns for x in req_attrs]):
             raise AssertionError(
                 "Given comparison table does not have all of '{}' columns.".format(
-                    "".join(req_attrs)
+                    "', '".join(req_attrs)
                 )
             )
         # check all comparisons have samples in two sides
@@ -2625,7 +2624,7 @@ class Analysis(object):
                 log_file = os.path.join(out, job_name + ".log")
                 job_file = os.path.join(out, job_name + ".sh")
                 cmd = (
-                    "date\n{executable} ngs_toolkit.recipes.deseq --output_prefix "
+                    "date\n{executable} -m ngs_toolkit.recipes.deseq2 --output_prefix "
                     "{output_prefix} --formula '{formula}' {overwrite} {out}\ndate".format(
                         executable=sys.executable,
                         output_prefix=output_prefix,

@@ -36,48 +36,40 @@ def submit_job(
         limited_number=False, total_job_lim=500, refresh_time=10, in_between_time=5,
         **kwargs):
     """
-    Submit a job
+    Submit a job to be run.
+    Uses divvy to allow running on a local computer or distributed computing resources.
 
     Parameters
     ----------
     code : str
-        Job file to write to.
-
+        String of command(s) to be run.
     job_file : str
-        Log file to write job output to.
-
+        File to write job ``code`` to.
     log_file : str
         Log file to write job output to.
         Defaults to `job_file` with ".log" ending.
-
     computing_configuration : str
         Name of `divvy` computing configuration to use.
         Defaults to 'default' which is to run job in localhost.
-
     dry_run : bool
         Whether not to actually run job.
         Defaults to False
-
     limited_number : bool
         Whether to restrict jobs to a maximum number.
         Currently only possible if using "slurm".
         Defaults to False
-
     total_job_lim : int
         Maximum number of jobs to restrict to.
         Defaults to 500
-
     refresh_time : int
         Time in between checking number of jobs in seconds.
         Defaults to 10.
-
     in_between_time : int
         Time in between job submission in seconds.
         Defaults to 5.
-
     **kwargs : dict
         Additional keyword arguments will be passed to the chosen submission template according to `computing_configuration`.
-        Pass for example "jobname", "cores", "mem", "partition".
+        Pass afor example "jobname"="job", "cores"=2, "mem"=8000, "partition"="longq".
     """
     import time
     import subprocess
@@ -128,7 +120,7 @@ def submit_job(
     # Submit job
     if not dry_run:
         scmd = dcc['compute']['submission_command']
-        cmd = [scmd, job_file]
+        cmd = scmd.split(" ") + [job_file]
 
         # simply submit if not limiting submission to the number of already running jobs
         if not limited_number:
@@ -152,7 +144,6 @@ def chunks(l, n):
     ----------
     l : iterable
         Iterable (e.g. list or numpy array).
-
     n : int
         Size of chunks to generate.
     """
@@ -172,7 +163,7 @@ def sorted_nicely(l):
     Returns
     -------
     iterable
-        Sorted interable
+        Sorted iterable
     """
     import re
 
@@ -191,7 +182,8 @@ def standard_score(x):
 
     Parameters
     ----------
-    x : numpy.array Numeric array.
+    x : numpy.array
+        Numeric array.
     """
     return (x - x.min()) / (x.max() - x.min())
 
@@ -202,7 +194,8 @@ def z_score(x):
 
     Parameters
     ----------
-    x : numpy.array Numeric array.
+    x : numpy.array
+        Numeric array.
     """
     return (x - x.mean()) / x.std()
 
@@ -213,10 +206,13 @@ def count_dataframe_values(x):
 
     Parameters
     ----------
-    :param x: Pandas DataFrame
-    :type x: pandas.DataFrame
-    :returns: Number of non-null values.
-    :rtype: int
+    x : pandas.DataFrame
+        Pandas DataFrame
+
+    Returns
+    -------
+    int
+        Number of non-null values.
     """
     return np.multiply(*x.shape) - x.isnull().sum().sum()
 
@@ -260,10 +256,10 @@ def timedelta_to_years(x):
     """
     Convert a timedelta to years.
 
-    :param x: A timedelta.
-    :type x:
-    :returns: [description]
-    :rtype: {[type]}
+    Parameters
+    ----------
+    x : pandas.TimeDelta
+        A timedelta.
     """
     return x / np.timedelta64(60 * 60 * 24 * 365, "s")
 
@@ -324,11 +320,15 @@ def log_pvalues(x, f=0.1):
     """
     Calculate -log10(p-value) replacing infinite values with:
         ``max(x) + max(x) * f``
+        (`f` % more than the maximum)
 
     Parameters
     ----------
     x : pandas.Series
         Series with numeric values
+    f : float
+        Fraction to augment the maximum value by if ``x``
+        contains infinite values
 
     Returns
     -------

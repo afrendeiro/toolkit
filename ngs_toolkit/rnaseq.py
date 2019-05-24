@@ -15,7 +15,7 @@ from ngs_toolkit.analysis import Analysis
 class RNASeqAnalysis(Analysis):
     """
     Class to model analysis of RNA-seq data.
-    Inherits from the `ngs_toolkit.analysis.Analysis` class.
+    Inherits from the :class:`~ngs_toolkit.analysis.Analysis` class.
 
     Parameters
     ----------
@@ -33,11 +33,11 @@ class RNASeqAnalysis(Analysis):
         Pickle file of an existing serialized analysis object
         from which the analysis should be loaded.
 
-        Defaults to :obj:`None` (will not load).
+        Defaults to :obj:`None` (will not load from pickle).
     root_dir : :obj:`str`, optional
         Base directory for the project.
 
-        Defaults to current directory or to what is specified in PEP if `from_pep`.
+        Defaults to current directory or to what is specified in PEP if :attr:`~ngs_toolkit.analysis.Analysis.from_pep`.
     data_dir : :obj:`str`, optional
         Directory containing processed data (e.g. by looper) that will
         be input to the analysis. This is in principle not required.
@@ -47,16 +47,16 @@ class RNASeqAnalysis(Analysis):
         Directory to contain outputs produced by the analysis.
 
         Defaults to "results".
-    prj : :class:`~peppy.Project`, optional
-        A ``peppy.Project`` object that this analysis is tied to.
+    prj : :class:`peppy.Project`, optional
+        A :class:`peppy.Project` object that this analysis is tied to.
 
         Defaults to :obj:`None`.
     samples : :obj:`list`, optional
-        List of ``peppy.Sample`` objects that this analysis is tied to.
+        List of :class:`peppy.Sample` objects that this analysis is tied to.
 
         Defaults to :obj:`None`.
     kwargs : :obj:`dict`, optional
-        Additional keyword arguments will be passed to parent class `ngs_toolkit.analysis.Analysis`.
+        Additional keyword arguments will be passed to parent class :class:`~ngs_toolkit.analysis.Analysis`.
     """
     def __init__(
         self,
@@ -370,7 +370,7 @@ class RNASeqAnalysis(Analysis):
         mapping = query_biomart(
             attributes=["ensembl_transcript_id", "external_gene_name"],
             species=species or constants.organism_to_species_mapping[self.organism],
-            ensembl_version=ensembl_version or constants.genome_to_ensembl_mapping(self.genome)
+            ensembl_version=ensembl_version or constants.genome_to_ensembl_mapping[self.genome]
         )
         mapping.columns = ["ensembl_transcript_id", "gene_name"]
 

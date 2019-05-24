@@ -191,6 +191,11 @@ def standard_score(x):
     ----------
     x : :class:`numpy.array`
         Numeric array.
+
+    Returns
+    -------
+    :class:`numpy.array`
+        Transformed array.
     """
     return (x - x.min()) / (x.max() - x.min())
 
@@ -203,6 +208,11 @@ def z_score(x):
     ----------
     x : :class:`numpy.array`
         Numeric array.
+
+    Returns
+    -------
+    :class:`numpy.array`
+        Transformed array.
     """
     return (x - x.mean()) / x.std()
 
@@ -243,6 +253,11 @@ def bed_to_index(df):
     ----------
     df : :class:`pandas.DataFrame`
         DataFrame with columns 'chr', 'start' and 'end'.
+
+    Returns
+    -------
+    :class:`pandas.Index
+        Pandas index.
     """
     cols = ["chrom", "start", "end"]
     if not all([x in df.columns for x in cols]):
@@ -265,8 +280,13 @@ def timedelta_to_years(x):
 
     Parameters
     ----------
-    x : :class:`pandas.TimeDelta`
-        A timedelta.
+    x : :class:`pandas.Timedelta`
+        A Timedelta object.
+
+    Returns
+    -------
+    float
+        Years.
     """
     return x / np.timedelta64(60 * 60 * 24 * 365, "s")
 

@@ -14,7 +14,7 @@ from ngs_toolkit.decorators import check_organism_genome, check_has_sites
 class ATACSeqAnalysis(Analysis):
     """
     Class to model analysis of ATAC-seq data.
-    Inherits from the `ngs_toolkit.analysis.Analysis` class.
+    Inherits from the :class:`~ngs_toolkit.analysis.Analysis` class.
 
     Parameters
     ----------
@@ -27,35 +27,35 @@ class ATACSeqAnalysis(Analysis):
         The analysis will adopt as much attributes from the PEP as possible
         but keyword arguments passed at initialization will still have priority.
 
-        Defaults to None (no PEP used).
+        Defaults to :obj:`None` (no PEP used).
     from_pickle : :obj:`str`, optional
         Pickle file of an existing serialized analysis object
         from which the analysis should be loaded.
 
-        Defaults to None (will not load).
+        Defaults to :obj:`None` (will not load from pickle).
     root_dir : :obj:`str`, optional
         Base directory for the project.
 
-        Defaults to current directory or to what is specified in PEP if `from_pep`.
+        Defaults to current directory or to what is specified in PEP if :attr:`~ngs_toolkit.analysis.Analysis.from_pep`.
     data_dir : :obj:`str`, optional
         Directory containing processed data (e.g. by looper) that will
         be input to the analysis. This is in principle not required.
 
-        Defaults to ``data``.
+        Defaults to "data".
     results_dir : :obj:`str`, optional
         Directory to contain outputs produced by the analysis.
 
-        Defaults to ``results``.
-    prj : :obj:`peppy.Project`, optional
-        A ``peppy.Project`` object that this analysis is tied to.
+        Defaults to "results".
+    prj : :class:`peppy.Project`, optional
+        A :class:`peppy.Project` object that this analysis is tied to.
 
         Defaults to :obj:`None`.
     samples : :obj:`list`, optional
-        List of ``peppy.Sample`` objects that this analysis is tied to.
+        List of :class:`peppy.Sample` objects that this analysis is tied to.
 
         Defaults to :obj:`None`.
     kwargs : :obj:`dict`, optional
-        Additional keyword arguments will be passed to parent class `ngs_toolkit.analysis.Analysis`.
+        Additional keyword arguments will be passed to parent class :class:`~ngs_toolkit.analysis.Analysis`.
 
     Examples
     --------

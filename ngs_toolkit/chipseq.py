@@ -13,7 +13,7 @@ from ngs_toolkit.atacseq import ATACSeqAnalysis
 class ChIPSeqAnalysis(ATACSeqAnalysis):
     """
     Class to model analysis of ChIP-seq data.
-    Inherits from the `ngs_toolkit.atacseq.ATACSeqAnalysis` class.
+    Inherits from the :class:`~ngs_toolkit.atacseq.ATACSeqAnalysis` class.
 
     Parameters
     ----------
@@ -31,11 +31,11 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
         Pickle file of an existing serialized analysis object
         from which the analysis should be loaded.
 
-        Defaults to :obj:`None` (will not load).
+        Defaults to :obj:`None` (will not load from pickle).
     root_dir : :obj:`str`, optional
         Base directory for the project.
 
-        Defaults to current directory or to what is specified in PEP if `from_pep`.
+        Defaults to current directory or to what is specified in PEP if :attr:`~ngs_toolkit.analysis.Analysis.from_pep`.
     data_dir : :obj:`str`, optional
         Directory containing processed data (e.g. by looper) that will
         be input to the analysis. This is in principle not required.
@@ -45,16 +45,16 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
         Directory to contain outputs produced by the analysis.
 
         Defaults to "results".
-    prj : :obj:`peppy.Project`, optional
-        A ``peppy.Project`` object that this analysis is tied to.
+    prj : :class:`peppy.Project`, optional
+        A :class:`peppy.Project` object that this analysis is tied to.
 
         Defaults to :obj:`None`.
     samples : :obj:`list`, optional
-        List of ``peppy.Sample`` objects that this analysis is tied to.
+        List of :class:`peppy.Sample` objects that this analysis is tied to.
 
         Defaults to :obj:`None`.
     kwargs : :obj:`dict`, optional
-        Additional keyword arguments will be passed to parent class `ngs_toolkit.analysis.Analysis`.
+        Additional keyword arguments will be passed to parent class :class:`~ngs_toolkit.atacseq.ATACSeqAnalysis`.
     """
     def __init__(
         self,

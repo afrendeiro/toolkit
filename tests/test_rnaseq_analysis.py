@@ -194,4 +194,4 @@ def test_plot_expression_characteristics(various_analysis):
     for analysis in various_analysis:
         analysis.normalize()
         analysis.plot_expression_characteristics()
-        assert os.path.exists(f"{analysis.results_dir}/quality_control")
+        assert os.path.exists(os.path.join(analysis.results_dir, "quality_control"))

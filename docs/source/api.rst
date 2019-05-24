@@ -3,9 +3,9 @@ API
 
 The great flexibility of ``ngs_toolkit`` comes from the ability to compose workflows using the API.
 
-It provides a rich but abstract ``Analysis`` object and implements various modules building on it depending on the data type.
+It provides a rich but abstract :class:`~ngs_toolkit.analysis.Analysis` object and implements various modules building on it depending on the data type.
 
-In addition, the ``general`` module contains several analysis-independent methods and the ``utils`` module provides low-level functions of general use.
+In addition, the :mod:`~ngs_toolkit.general` module contains several analysis-independent methods and the :mod:`~ngs_toolkit.utils` module provides low-level functions of general use.
 
 ngs_toolkit
 -----------------------

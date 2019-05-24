@@ -26,22 +26,22 @@ class Analysis(object):
     Generic class holding functions and data from a typical NGS analysis.
 
     Other modules implement classes inheriting from this that in general contain
-    data type-specific functions (e.g. ``ngs_toolkit.atacseq.ATACSeqAnalysis``
-    has a ``get_consensus_sites`` function to generate a peak consensus map).
+    data type-specific functions (e.g. :class:`~ngs_toolkit.atacseq.ATACSeqAnalysis`
+    has a :func:`~ngs_toolkit.atacseq.ATACSeqAnalysis.get_consensus_sites` function to generate a peak consensus map).
 
     Objects of this type can be used to store data (e.g. dataframes), variables
     (e.g. paths to files or configurations) and are easily serializable (saved
     to a file as an object) for rapid loading and cross-environment portability.
-    See the ``ngs_toolkit.analysis.Analysis.to_pickle``,
-    ``ngs_toolkit.analysis.Analysis.from_pickle`` and
-    ``ngs_toolkit.analysis.Analysis.update`` functions for this.
+    See the :func:`~ngs_toolkit.analysis.Analysis.to_pickle`,
+    :func:`~ngs_toolkit.analysis.Analysis.from_pickle` and
+    :func:`~ngs_toolkit.analysis.Analysis.update` functions for this.
 
     Parameters
     ----------
     name : :obj:`str`, optional
         Name of the analysis.
 
-        Defaults to ``analysis``.
+        Defaults to "analysis".
     from_pep : :obj:`str`, optional
         PEP configuration file to initialize analysis from.
         The analysis will adopt as much attributes from the PEP as possible
@@ -56,22 +56,22 @@ class Analysis(object):
     root_dir : :obj:`str`, optional
         Base directory for the project.
 
-        Defaults to current directory or to what is specified in PEP if `from_pep`.
+        Defaults to current directory or to what is specified in PEP if :attr:`~ngs_toolkit.analysis.Analysis.from_pep`.
     data_dir : :obj:`str`, optional
         Directory containing processed data (e.g. by looper) that will
         be input to the analysis. This is in principle not required.
 
-        Defaults to 'data'.
+        Defaults to "data".
     results_dir : :obj:`str`, optional
         Directory to contain outputs produced by the analysis.
 
-        Defaults to 'results'.
-    prj : :obj:`peppy.Project`, optional
-        A ``peppy.Project`` object that this analysis is tied to.
+        Defaults to "results".
+    prj : :class:`peppy.Project`, optional
+        A :class:`peppy.Project` object that this analysis is tied to.
 
         Defaults to :obj:`None`.
     samples : :obj:`list`, optional
-        List of ``peppy.Sample`` objects that this analysis is tied to.
+        List of :class:`peppy.Sample` objects that this analysis is tied to.
 
         Defaults to :obj:`None`.
     kwargs : :obj:`dict`, optional

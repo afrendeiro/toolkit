@@ -365,4 +365,12 @@ epub_exclude_files = ["search.html"]
 
 
 # Example configuration for intersphinx: refer to the Python standard library.
-intersphinx_mapping = {"http://docs.python.org/": None}
+intersphinx_mapping = {
+    'python': ('http://docs.python.org/3', None),
+    'urllib3': ('http://urllib3.readthedocs.org/en/latest', None),
+    # 'numpy': ('https://docs.scipy.org/doc/numpy-1.16.1/reference/', None),
+    'scipy': ('https://docs.scipy.org/doc/scipy-1.3.0/reference/', None),
+    'pandas': ('http://pandas.pydata.org/pandas-docs/stable/', None),
+    'pybedtools': ('https://daler.github.io/pybedtools/', None),
+    'peppy': ('http://peppy.databio.org/en/latest/', None)
+}

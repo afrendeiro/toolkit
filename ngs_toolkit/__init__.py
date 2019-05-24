@@ -1,4 +1,5 @@
 from ._version import __version__
+import divvy as _divvy
 
 
 def setup_logger(level="INFO", logfile=None):
@@ -8,16 +9,16 @@ def setup_logger(level="INFO", logfile=None):
     Parameters
     ----------
 
-    level : str, optional
+    level : :obj:`str`, optional
         Level of logging to display.
         See possible levels here: https://docs.python.org/2/library/logging.html#levels
 
         Defaults to "INFO".
 
-    logfile : str, optional
+    logfile : :obj:`str`, optional
         File to write log to.
 
-        Defaults to ``~/ngs_toolkit.log.txt``.
+        Defaults to ``~/.ngs_toolkit.log.txt``.
 
     Returns
     -------
@@ -70,12 +71,12 @@ def setup_config(custom_yaml_config=None):
 
     Parameters
     ----------
-    custom_yaml_config : str, optional
+    custom_yaml_config : :obj:`str`, optional
         Path to YAML file with configuration.
         To see the structure of the YAML file, see
         https://github.com/afrendeiro/toolkit/blob/master/ngs_toolkit/config/default.yaml
 
-        Defaults to None.
+        Defaults to :obj:`None`.
 
     Returns
     -------
@@ -182,11 +183,17 @@ def clear_log():
     open(logfile, "w")
 
 
+# setup
 _LOGGER = setup_logger()
 _CONFIG = setup_config()
 setup_graphic_preferences()
 
 
+# reduce level of logging from divvy
+_divvy.logging.getLogger("divvy").setLevel("ERROR")
+
+
+# easier API
 from ngs_toolkit.analysis import Analysis
 from ngs_toolkit.atacseq import ATACSeqAnalysis
 from ngs_toolkit.chipseq import ChIPSeqAnalysis

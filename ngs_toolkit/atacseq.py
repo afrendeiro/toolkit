@@ -18,43 +18,43 @@ class ATACSeqAnalysis(Analysis):
 
     Parameters
     ----------
-    name : str, optional
+    name : :obj:`str`, optional
         Name of the analysis.
-        Defaults to ``analysis``.
 
-    from_pep : str, optional
+        Defaults to "analysis".
+    from_pep : :obj:`str`, optional
         PEP configuration file to initialize analysis from.
         The analysis will adopt as much attributes from the PEP as possible
         but keyword arguments passed at initialization will still have priority.
-        Defaults to None (no PEP used).
 
-    from_pickle : str, optional
+        Defaults to None (no PEP used).
+    from_pickle : :obj:`str`, optional
         Pickle file of an existing serialized analysis object
         from which the analysis should be loaded.
+
         Defaults to None (will not load).
-
-    root_dir : str, optional
+    root_dir : :obj:`str`, optional
         Base directory for the project.
-        Defaults to current directory or to what is specified in PEP if `from_pep`.
 
-    data_dir : str, optional
+        Defaults to current directory or to what is specified in PEP if `from_pep`.
+    data_dir : :obj:`str`, optional
         Directory containing processed data (e.g. by looper) that will
         be input to the analysis. This is in principle not required.
+
         Defaults to ``data``.
-
-    results_dir : str, optional
+    results_dir : :obj:`str`, optional
         Directory to contain outputs produced by the analysis.
+
         Defaults to ``results``.
-
-    prj : peppy.Project, optional
+    prj : :obj:`peppy.Project`, optional
         A ``peppy.Project`` object that this analysis is tied to.
-        Defaults to ``None``.
 
-    samples : list, optional
+        Defaults to :obj:`None`.
+    samples : :obj:`list`, optional
         List of ``peppy.Sample`` objects that this analysis is tied to.
-        Defaults to ``None``.
 
-    kwargs : dict, optional
+        Defaults to :obj:`None`.
+    kwargs : :obj:`dict`, optional
         Additional keyword arguments will be passed to parent class `ngs_toolkit.analysis.Analysis`.
 
     Examples
@@ -81,7 +81,6 @@ class ATACSeqAnalysis(Analysis):
     >>> # Save object
     >>> a.to_pickle()
     """
-
     def __init__(
         self,
         name=None,
@@ -129,32 +128,28 @@ class ATACSeqAnalysis(Analysis):
 
         Parameters
         ----------
-        output_map : dict
+        output_map : :obj:`dict`
             Dictionary with "attribute name": "path prefix" to load the files.
 
-        only_these_keys : list, optional
+        only_these_keys : :obj:`list`, optional
             Iterable of analysis attributes to load up.
             Possible attributes:
-                "matrix_raw", "matrix_norm", "matrix_features",
+                "matrix_raw", "matrix_norm", "matrix_features", "sites", "support", "nuc", "coverage_gc_corrected", "gene_annotation", "region_annotation", "region_annotation_b", "chrom_state_annotation", "chrom_state_annotation_b", "stats", differential_results".
 
-                "sites", "support",
-                "nuc", "coverage_gc_corrected", "gene_annotation",
-                "region_annotation", "region_annotation_b",
-                "chrom_state_annotation", "chrom_state_annotation_b",
-                "stats", differential_results".
-
-        prefix : str, optional
+            Default is all of the above.
+        prefix : :obj:`str`, optional
             String prefix of files to load.
             Variables in curly braces will be formated with attributes of analysis.
-            Defaults to "{results_dir}/{name}".
 
+            Defaults to "{results_dir}/{name}".
         bool : permissive, optional
             Whether an error should be ignored if reading a file causes IOError.
-            Default is True.
+
+            Default is :obj:`True`.
 
         Attributes
         ----------
-        sites : pybedtools.BedTool
+        sites : :class:`pybedtools.BedTool`
             Sets a `sites` variable.
 
         pandas.DataFrame
@@ -293,26 +288,26 @@ class ATACSeqAnalysis(Analysis):
 
         Parameters
         ----------
-        samples : list
+        samples : :obj:`list`
             Iterable of peppy.Sample objects to restrict to.
             Must have a `peaks` attribute set.
             Defaults to all samples in the analysis (`samples` attribute).
 
-        region_type : str
+        region_type : :obj:`str`
             The type of region to use to create the consensus region set - one of `summits` or `peaks`.
             If `summits`, peak summits will be extended by `extension` before union.
             Otherwise sample peaks will be used with no modification.
 
-        extension : int
+        extension : :obj:`int`
             Amount to extend peaks summits by in both directions.
 
-        blacklist_bed : str
+        blacklist_bed : :obj:`str`
             A (3 column) BED file with genomic positions to exclude from consensus peak set.
 
-        filter_mito_chr : bool
+        filter_mito_chr: :obj:`bool`
             Whether to exclude 'chrM' from peak set.
 
-        permissive : bool
+        permissive: :obj:`bool`
             Whether Samples that which `region_type` attribute file does not exist
             should be simply skipped or an error thrown.
 
@@ -328,7 +323,7 @@ class ATACSeqAnalysis(Analysis):
 
         Attributes
         ----------
-        sites : pybedtools.BedTool
+        sites : :class:`pybedtools.BedTool`
             Sets a `sites` variable with consensus peak set.
         """
         from tqdm import tqdm
@@ -428,7 +423,7 @@ class ATACSeqAnalysis(Analysis):
 
         Parameters
         ----------
-        bed_file : str
+        bed_file : :obj:`str`
             BED file to use as consensus sites.
 
         overwrite : book
@@ -437,7 +432,7 @@ class ATACSeqAnalysis(Analysis):
 
         Attributes
         ----------
-        sites : pybedtools.BedTool
+        sites : :class:`~pybedtools.BedTool`
             Sets a `sites` variable with consensus peak set.
         """
         import pybedtools
@@ -464,18 +459,18 @@ class ATACSeqAnalysis(Analysis):
 
         Parameters
         ----------
-        samples : list
+        samples : :obj:`list`
             Iterable of peppy.Sample objects to restrict to.
             Must have a `peaks` attribute set.
             If not provided (`None` is passed) if will default to all samples in the analysis (`samples` attribute).
 
-        region_type : str
+        region_type : :obj:`str`
             The type of region to use to create the consensus region set.
             One of `summits` or `peaks`.
             If `summits`, peak summits will be extended by `extension` before union.
             Otherwise sample peaks will be used with no modification.
 
-        permissive : bool
+        permissive: :obj:`bool`
             Whether Samples that which `region_type` attribute file does
             not exist should be simply skipped or an error thrown.
 
@@ -490,8 +485,8 @@ class ATACSeqAnalysis(Analysis):
 
         Attributes
         ----------
-        support : pandas.DataFrame
-            Sets a `support` variable with peak set overlap.
+        support : :obj:`pandas.DataFrame`
+            A dataframe with counts of peaks overlapping each feature of consensus set.
         """
         # TODO: Implement distributed
         from tqdm import tqdm
@@ -567,7 +562,7 @@ class ATACSeqAnalysis(Analysis):
 
         Parameters
         ----------
-        samples : list
+        samples : :obj:`list`
             Iterable of peppy.Sample objects to restrict to.
 
         **kwargs
@@ -601,36 +596,36 @@ class ATACSeqAnalysis(Analysis):
 
         Parameters
         ----------
-        samples : list
+        samples : :obj:`list`
             Iterable of peppy.Sample objects to restrict to. Must have a `filtered` attribute set.
             If not provided (`None` is passed) if will default to all samples in the analysis (`samples` attribute).
 
-        sites : pybedtools.BedTool,pd.DataFrame,str
+        sites : {:class:`pybedtools.BedTool`, :class:`pandas.DataFrame`, :obj:`str`}
             Sites in the genome to quantify, usually a pybedtools.BedTool from analysis.get_consensus_sites()
             If a DataFrame, will try to convert to BED format assuming first three columns are chr,start,end.
             If a string assumes a path to a BED file.
             If `None` the object's `sites` attribute will be used.
 
-        assign : bool
+        assign: :obj:`bool`
             Whether to assign the matrix to an attribute of self named `coverage`.
 
-        save : bool
+        save: :obj:`bool`
             Whether to save to disk the coverage matrix with filename `output_file`.
 
-        output_file : str
+        output_file : :obj:`str`
             A path to a CSV file with coverage output.
             Default is `self.results_dir/self.name + ".raw_coverage.csv"`.
 
-        permissive : bool
+        permissive: :obj:`bool`
             Whether Samples that which `region_type` attribute file does not exist
             should be simply skipped or an error thrown.
 
-        distributed : bool
+        distributed: :obj:`bool`
             Whether it should be run as jobs for each sample separately in parallel.
             Currently only implemented for a SLURM cluster.
             Default False.
 
-        peak_set_name : bool
+        peak_set_name: :obj:`bool`
             Suffix to files containing coverage of `distributed` is True.
             Defaults to "peak_set".
 
@@ -642,12 +637,12 @@ class ATACSeqAnalysis(Analysis):
 
         Attributes
         ----------
-        matrix_raw : pd.DataFrame
-            Sets a `matrix_raw` variable with DataFrame with read counts of shape (n_sites, m_samples).
+        matrix_raw : :class:`pandas.DataFrame`
+            The dataframe of raw coverage values (counts) of shape (n_features, m_samples).
 
         Returns
         -------
-        pd.DataFrame
+        :class:`pandas.DataFrame`
             Pandas DataFrame with read counts of shape (n_sites, m_samples).
         """
         import multiprocessing
@@ -756,26 +751,26 @@ class ATACSeqAnalysis(Analysis):
 
         Parameters
         ----------
-        samples : list
+        samples : :obj:`list`
             Iterable of peppy.Sample objects to restrict to.
             If not provided (`None` is passed) if will default to all samples in the analysis (`samples` attribute).
 
-        assign : bool
+        assign: :obj:`bool`
             Whether to assign the matrix to an attribute of self named `coverage`.
 
-        save : bool
+        save: :obj:`bool`
             Whether to save to disk the coverage matrix with filename `output_file`.
 
-        output_file : str
+        output_file : :obj:`str`
             A path to a CSV file with coverage output.
             Default is `self.results_dir/self.name + ".raw_coverage.csv"`.
 
-        permissive : bool
+        permissive: :obj:`bool`
             Whether Samples without an existing coverage file does not exist
             should be simply skipped or an error thrown.
 
-        peak_set_name : bool
-            Suffix to files containing coverage of `distributed` is True.
+        peak_set_name: :obj:`bool`
+            Suffix to files containing coverage.
             Defaults to "peak_set".
 
         Raises
@@ -786,12 +781,12 @@ class ATACSeqAnalysis(Analysis):
 
         Attributes
         ----------
-        coverage : pd.DataFrame
-            Sets a `coverage` variable with DataFrame with read counts of shape (n_sites, m_samples).
+        matrix_raw : :class:`pandas.DataFrame`
+            The dataframe of raw coverage values (counts) of shape (n_features, m_samples).
 
         Returns
         -------
-        pd.DataFrame
+        :class:`pandas.DataFrame`
             Pandas DataFrame with read counts of shape (n_sites, m_samples).
         """
         from tqdm import tqdm
@@ -873,14 +868,14 @@ class ATACSeqAnalysis(Analysis):
         """
         Get length and GC content of features in region set.
 
-        bed_file : str
+        bed_file : :obj:`str`
             A BED file with regions to calculate GC content on. Must be a 3-column BED!
             If not provided the calculation will be for the analysis `sites` attribute.
 
-        genome : str
+        genome : :obj:`str`
             Genome assembly.
 
-        fasta_file : str
+        fasta_file : :obj:`str`
             Fasta file of `genome`. Preferably indexed. If not given, will try to download.
 
         :var nuc:
@@ -890,6 +885,11 @@ class ATACSeqAnalysis(Analysis):
         -------
         pandas.DataFrame
             DataFrame with nucleotide content and length of each region.
+
+        Attributes
+        ----------
+        nuc : :class:`pandas.DataFrame`
+            Dataframe with length and GC-content of each feature.
         """
         import pybedtools
 
@@ -938,21 +938,30 @@ class ATACSeqAnalysis(Analysis):
 
         Parameters
         ----------
-        matrix : str
+        matrix : :obj:`str`
             Attribute name of matrix to normalize.
+
             Defaults to 'matrix_raw'.
-
-        samples : list
+        samples : :obj:`list`
             Iterable of peppy.Sample objects to restrict matrix to.
-            If not provided (`None` is passed) the matrix will not be subsetted.
 
-        save : bool
+            Defaults to all samples in analysis.
+        save: :obj:`bool`
             Whether to write normalized DataFrame to disk.
 
-        assign : bool
+            Default is :obj:`None`.
+        assign: :obj:`bool`
             Whether to assign the normalized DataFrame to an attribute ``.
-        """
 
+            Default is :obj:`None`.
+
+        Attributes
+        ----------
+        matrix_norm : :class:`pandas.DataFrame`
+            If `assign`, the dataframe with normalized values.
+        norm_method : :obj:`str`
+            If `assign`, it is the name of method used to normalize: "cqn".
+        """
         def cqn(cov, gc_content, lengths):
             # install R package
             # source('http://bioconductor.org/biocLite.R')
@@ -1016,21 +1025,24 @@ class ATACSeqAnalysis(Analysis):
 
         Parameters
         ----------
-        tss_file : str
+        tss_file : :obj:`str`, optional
             A valid BED file where the name field (4th column) identifies the gene
             and the strand column (6th column). Other fields will not be used.
 
-        max_dist : int
+            Default is to get gene position annotations.
+        max_dist : :obj:`int`, optional
             Maximum absolute distance allowed to perform associations.
             Regions with no genes within the range will have NaN values.
 
+            Default is 100000.
+
         Attributes
         ----------
-        gene_annotation : pd.DataFrame
+        gene_annotation : :class:`pandas.DataFrame`
             A pandas DataFrame containing the genome annotations of the region features.
             If a feature overlaps more than one gene, the two gene values will be concatenated with a comma.
 
-        closest_tss_distances : pd.DataFrame
+        closest_tss_distances : :class:`pandas.DataFrame`
             A pandas DataFrame containing unique region->gene associations.
             In contrast to gene_annotation dataframe, this contains one row per region->gene assignment.
 
@@ -1127,16 +1139,16 @@ class ATACSeqAnalysis(Analysis):
 
         Parameters
         ----------
-        genomic_context_file : str
+        genomic_context_file : :obj:`str`
             A 4 column BED file (chrom, start, end, feature), where feature is a string with the type of region.
             If not provided will be get with the get_genomic_context function.
 
         Attributes
         ----------
-        region_annotation, region_annotation_b : pd.DataFrame
+        region_annotation, region_annotation_b : :class:`pandas.DataFrame`
             A DataFrame with the genome annotations of the region features or genome background.
 
-        region_annotation_mapping, region_annotation_b_mapping : pd.DataFrame
+        region_annotation_mapping, region_annotation_b_mapping : :class:`pandas.DataFrame`
             A DataFrame with one row for each chromatin state-region mapping or genome background.
 
         Returns
@@ -1227,7 +1239,7 @@ class ATACSeqAnalysis(Analysis):
 
         Parameters
         ----------
-        chrom_state_file : str
+        chrom_state_file : :obj:`str`
             A 4 column BED file (chrom, start, end, feature), where feature is a string with the type of region.
 
         frac : float
@@ -1240,11 +1252,11 @@ class ATACSeqAnalysis(Analysis):
 
         Attributes
         ----------
-        chrom_state_annotation, chrom_state_annotation_b : pd.DataFrame
+        chrom_state_annotation, chrom_state_annotation_b : :class:`pandas.DataFrame`
             A DataFrame with the chromatin state annotations of
             the region features or of the genome background.
 
-        chrom_state_annotation_mapping, chrom_state_annotation_b_mapping : pd.DataFrame
+        chrom_state_annotation_mapping, chrom_state_annotation_b_mapping : :class:`pandas.DataFrame`
             A DataFrame with one row for each chromatin state-region mapping
             or for the genome background.
         """
@@ -1320,20 +1332,20 @@ class ATACSeqAnalysis(Analysis):
 
         Parameters
         ----------
-        matrix : pandas.DataFrame, optional
+        matrix : :obj:`pandas.DataFrame`, optional
             Matrix to use.
             Defaults to `matrix_norm`.
 
-        sex_chroms : list, optional
+        sex_chroms : :obj:`list`, optional
             Names of the two sex chromosomes to use.
 
-        output_dir : str, optional
+        output_dir : :obj:`str`, optional
             Directory to write output to.
 
-        output_prefix : str, optional
+        output_prefix : :obj:`str`, optional
             String to prefix output with.
 
-        plot : bool, optional
+        plot: :obj:`bool`, optional
             Whether to produce illustrative plots.
 
         Returns
@@ -1409,25 +1421,44 @@ class ATACSeqAnalysis(Analysis):
 
         return ratio.sort_index()
 
-    def get_gene_level_accessibility(self, matrix="matrix_norm", reduce_func=np.mean):
+    def get_gene_level_matrix(
+            self,
+            matrix="matrix_norm",
+            reduce_func=np.mean,
+            assign=True,
+            save=True,
+            output_file="{results_dir}/{name}.gene_coverage.csv"):
         """
         Get gene-level measurements of coverage.
-        Requires a 'gene_annotation' attribute to be set containing a mapping between the
-        index of `matrix` and genes (produced from `get_peak_gene_annotation`).
+
+        Requires a 'gene_annotation' or 'closest_tss_distances' attribute to be set
+        containing a mapping between the index of `matrix` and genes
+        (produced from `get_peak_gene_annotation`).
 
         Parameters
         ----------
-        matrix : str, optional
+        matrix : :obj:`str`, optional
             Quantification matrix to use (e.g. 'matrix_raw' or 'matrix_norm')
 
+            Default is "matrix_norm".
         reduce_func : func
             Function to apply to reduce values.
+
             Default is mean.
+        output_file : :obj:`str`
+            Path to save a CSV file with coverage output if `save` is `True`.
+
+            Default is `self.results_dir/self.name + ".raw_coverage.csv"`.
 
         Returns
         ---------
         pandas.DataFrame
-            Chromatin accessibility values reduced per gene.
+            Coverage values reduced per gene.
+
+        Attributes
+        ---------
+        matrix_gene : :obj:`pandas.DataFrame`
+            Coverage values reduced per gene.
         """
         msg = "Analysis object lacks a 'gene_annotation' or 'closest_tss_distances' dataframe."
         hint = " Call 'analysis.get_peak_gene_annotation' to have region-gene associations."
@@ -1451,8 +1482,12 @@ class ATACSeqAnalysis(Analysis):
 
         matrix2.columns = matrix.columns
         matrix3 = matrix2.groupby(level="gene_name").apply(reduce_func)
-
-        return matrix3.loc[:, ~matrix3.isnull().all()]
+        matrix3 = matrix3.loc[:, ~matrix3.isnull().all()]
+        if assign:
+            self.matrix_gene = matrix3
+        if save:
+            matrix3.to_csv(self._format_string_with_attributes(output_file))
+        return matrix3
 
     def get_gene_level_changes(self, differential_results=None, reduce_func=np.mean):
         """
@@ -1462,7 +1497,7 @@ class ATACSeqAnalysis(Analysis):
 
         Parameters
         ----------
-        differential_results : pandas.DataFrame
+        differential_results : :obj:`pandas.DataFrame`
             Matrix with differential results to use.
             Default is a 'differential_results' attribute of self.
 
@@ -1519,14 +1554,14 @@ class ATACSeqAnalysis(Analysis):
 
         Parameters
         ----------
-        samples : list, optional
+        samples : :obj:`list`, optional
             List of samples to restrict analysis to.
 
         by_attribute : {str, list}, optional
             Attribute or list of sample attributes to groupby samples by when plotting.
             This is done in addition to the plots with individual values per sample.
 
-        genome_space : int
+        genome_space : :obj:`int`
             Length of genome.
         """
         import multiprocessing
@@ -2014,10 +2049,10 @@ class ATACSeqAnalysis(Analysis):
 
         Parameters
         ----------
-        samples : list
+        samples : :obj:`list`
             List of peppy.Samples objects to use for plotting.
 
-        by_attribute : str, optional
+        by_attribute : :obj:`str`, optional
             Attribute of samples to group by.
             Values will be aggregated across samples by that attribute.
         """
@@ -2300,21 +2335,21 @@ class ATACSeqAnalysis(Analysis):
             Subset of regions of interest to analysis.
             Must be a subset of the universe (i.e. `sites` attribute).
 
-        steps : list, optional
+        steps : :obj:`list`, optional
             Steps of enrichment to perform.
             Defaults to all available: ['genomic_region', 'chromatin_state']
 
-        background : str, optional
+        background : :obj:`str`, optional
             Which set to consider as backgroud.
             Options are:
                 region_set: the consensus region_set of the analysis
                 genome: a randomized set of size as region_set across the genome
 
-        prefix : str, optional
+        prefix : :obj:`str`, optional
             Prefix for saved files.
             Default is `region_type_enrichment`.
 
-        output_dir : str, optional
+        output_dir : :obj:`str`, optional
             Directory to write results to.
 
         Returns
@@ -2459,30 +2494,30 @@ class ATACSeqAnalysis(Analysis):
 
         Parameters
         ----------
-        differential : pandas.DataFrame
+        differential : :obj:`pandas.DataFrame`
             Results of differential analysis for a given comparison of interest.
 
-        output_dir : str
+        output_dir : :obj:`str`
             Directory to output results to.
 
-        prefix : str
+        prefix : :obj:`str`
             Prefix to use for output files.
 
-        universe_file : str, optional
+        universe_file : :obj:`str`, optional
             Path to BED file with set of universe regions where differential were selected from.
             Default is analysis.sites.
 
-        run : bool, optional
+        run: :obj:`bool`, optional
             Whether to run enrichment commands now or to simply prepare the input files for it.
-            Default is True.
+            Default is :obj:`True`.
 
-        genome : str, optional
+        genome : :obj:`str`, optional
             Genome assembly of analysis.
             Default is analysis' genome assembly.
 
-        steps : list, optional
+        steps : :obj:`list`, optional
             Which steps of the analysis to perform.
-            Default is all: ['region', 'lola', 'meme', 'homer', 'enrichr']
+            Default is all: ['region', 'lola', 'meme', 'homer', 'enrichr'].
         """
         from ngs_toolkit.general import meme_ame, homer_motifs, lola, enrichr
         from ngs_toolkit.utils import bed_to_fasta, standard_score

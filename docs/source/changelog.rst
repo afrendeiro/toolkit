@@ -1,8 +1,47 @@
 Changelog
 ******************************
 
+- **v1.0** (*2019-06-01*):
 
-- **v0.2.0** (*2018-12-13*):
+  - New release, with new API.
+
+------------
+
+- **v0.10** (development, pre-1.0):
+
+  - revamp RNASeqAnalysis
+  - adapt ChIPSeqAnalysis to new API
+  - add ``normalize_by_background`` function to ChIPSeqAnalysis to normalize over background samples
+  - fix logger due to accidental deactivation
+
+- **v0.9** (development, pre-1.0):
+
+  - rename annotate to annotate_features and annotate_with_sample_metadata to annotate_samples
+  - add annotate_matrix to call both above.
+
+- **v0.8** (development, pre-1.0):
+
+  - usage of the same interpreter running ngs_toolkit to run jobs
+  - revamp recipes, usage of recipes for common work functions that run in distributed mode
+  - allow import of classes from root of library.
+
+- **v0.7** (development, pre-1.0):
+
+  - implement running of local or distributed jobs using ``divvy``
+
+- **v0.6** (development, pre-1.0):
+
+  - rename merge_table to sample_subannotation
+
+- **v0.5** (development, pre-1.0):
+
+  - major API changes
+  - implementing only two types of matrices: matrix_raw, matrix_norm
+  - unify normalization methods, each overwrites matrix_norm and sets flag with name of method used
+
+------------
+
+- **v0.2.1** (*2018-12-13*):
 
   - minor:
 
@@ -29,10 +68,7 @@ Changelog
     - fix mistake in requirements for peppy
     - fix some security issues
 
-
-.. |br| raw:: html
-
-   <br />
+------------
 
 - **v0.1.6.0** (*2018-12-05*):
 
@@ -63,10 +99,7 @@ Changelog
     - add verbosity to manager programs
     - reporting more info for plot_differential
 
-
-.. |br| raw:: html
-
-   <br />
+------------
 
 - **v0.1.5.1** (*2018-11-25*):
 
@@ -79,9 +112,7 @@ Changelog
   - add better colorbars
   - add serial processing of peak commands as option for ChIP-seq peak calling
 
-.. |br| raw:: html
-
-   <br />
+------------
 
 
 - **v0.1.4.2** (*2018-10-29*):
@@ -121,9 +152,7 @@ Changelog
 
     - add more descriptive labels to tqdm loops;
 
-.. |br| raw:: html
-
-   <br />
+------------
 
 - **v0.1.4** (*2018-09-25*):
 
@@ -149,9 +178,7 @@ Changelog
 
     - docs for the region_set_frip, merge_signal and call_peaks recipes
 
-.. |br| raw:: html
-
-   <br />
+------------
 
 - **v0.1.3.6** (*2018-08-05*):
 
@@ -176,9 +203,7 @@ Changelog
   - improve atacseq.get_gene_level_accessibility
   - add 2D support to general.signed_mean
 
-.. |br| raw:: html
-
-   <br />
+------------
 
 - **v0.1.3.5.3b** (*2018-06-12*):
 
@@ -186,9 +211,7 @@ Changelog
 
     - general.deseq_analysis: fix hyphen character conversion; better contrasts for DESeq2
 
-.. |br| raw:: html
-
-   <br />
+------------
 
 - **v0.1.3.5.3** (*2018-05-31*):
 
@@ -198,9 +221,7 @@ Changelog
     - ngs_analysis recipe: change selection of samples on "pass_qc"; do differential_overlap only when >1 comparison
 
 
-.. |br| raw:: html
-
-   <br />
+------------
 
 - **v0.1.3.5.2** (*2018-05-30*):
 
@@ -215,9 +236,7 @@ Changelog
     - General `ngs_analysis` recipe for general analysis of NGS projects.
 
 
-.. |br| raw:: html
-
-   <br />
+------------
 
 - Major release: **v0.1.3.5** (*2018-05-15*):
 
@@ -227,23 +246,3 @@ Changelog
     - Command-line interface (CLI) based on sub-commands for ``projectmanager``.
     - Recipes: scripts which ``projectmanager`` can run.
     - General `ngs_analysis` recipe for general analysis of NGS projects.
-
-
-------------
-
-
-- Upcoming releases:
-
-  - New:
-
-    - `ngs_toolkit.utils` to hold small helper functions.
-    - Reconstructing genome static files for various genomes through API or script
-    - Wrapper function `annotate_regions` in atacseq.ATACAnalysis to run all region annotation functions. Should get external files if needed
-
-  - Changes:
-
-    - Remove requirement to have ``pipelines`` repository installed in order to extend base Sample objects
-    - Decoupling of static files from ``data/external``
-    - Maintenance of sample attributes as provided by user by means of reading them in as strings (to be improved further)
-    - Improved serialization of Sample objects
-    - Better hg38 support.

@@ -8,6 +8,9 @@ import numpy as np
 import pandas as pd
 
 
+# TODO: revise distributed for project_to_geo
+
+
 def get_genome_reference(
     organism,
     genome_assembly=None,
@@ -23,23 +26,23 @@ def get_genome_reference(
 
     Parameters
     ----------
-    organism : str
+    organism : :obj:`str`
         Organism to get annotation for. Currently supported: "human" and "mouse".
 
-    output_dir : str, optional
+    output_dir : :obj:`str`, optional
         Directory to write output to.
         Defaults to current directory
 
-    genome_provider : str, optional
+    genome_provider : :obj:`str`, optional
         Which genome provider to use. One of 'UCSC' or 'Ensembl'.
 
-    file_format : str, optional
+    file_format : :obj:`str`, optional
         File format to get. One of 'fasta' or '2bit'.
 
-    dry_run : bool, optional
+    dry_run: :obj:`bool`, optional
         Whether to not download and just return path to file.
 
-    overwrite : bool, optional
+    overwrite: :obj:`bool`, optional
         Whether existing files should be overwritten by new ones.
         Otherwise they will be kept and no action is made.
         Defaults to True.
@@ -249,18 +252,18 @@ def get_blacklist_annotations(
 
     Parameters
     ----------
-    organism : str
+    organism : :obj:`str`
         Organism to get annotation for. Currently supported: "human" and "mouse".
 
-    genome_assembly : str, optional
+    genome_assembly : :obj:`str`, optional
         Ensembl assembly/version to use.
        Default for "human" is "hg19/grch37" and for "mouse" is "mm10/grcm38".
 
-    output_dir : str, optional
+    output_dir : :obj:`str`, optional
         Directory to write output to.
         Defaults to "reference" in current directory.
 
-    overwrite : bool, optional
+    overwrite: :obj:`bool`, optional
         Whether existing files should be overwritten by new ones.
         Otherwise they will be kept and no action is made.
         Defaults to True.
@@ -322,32 +325,32 @@ def get_tss_annotations(
 
     Parameters
     ----------
-    organism : str
+    organism : :obj:`str`
         Organism to get annotation for.
         Currently supported: "human" and "mouse".
 
-    genome_assembly : str, optional
+    genome_assembly : :obj:`str`, optional
         Ensembl assembly/version to use.
         Default for "human" is "grch37" and for "mouse" is "grcm38".
 
-    save : bool, optional
+    save: :obj:`bool`, optional
         Whether to save to disk under ``output_dir``.
         Defaults to True.
 
-    output_dir : str, optional
+    output_dir : :obj:`str`, optional
         Directory to write output to.
         Defaults to "reference" in current directory.
 
-    chr_prefix : bool, optional
+    chr_prefix: :obj:`bool`, optional
         Whether chromosome names should have the "chr" prefix.
         Defaults to True
 
-    gene_types : list, optional
+    gene_types : :obj:`list`, optional
         Subset of transcript biotypes to keep.
         See here the available biotypes https://www.ensembl.org/Help/Faq?id=468
         Defaults to 'protein_coding', 'processed_transcript', 'lincRNA', 'antisense'.
 
-    overwrite : bool, optional
+    overwrite: :obj:`bool`, optional
         Whether existing files should be overwritten by new ones.
         Otherwise they will be kept and no action is made.
         Defaults to True.
@@ -502,30 +505,30 @@ def get_genomic_context(
 
     Parameters
     ----------
-    organism : str
+    organism : :obj:`str`
         Organism to get annotation for. Currently supported: "human" and "mouse".
 
-    genome_assembly : str, optional
+    genome_assembly : :obj:`str`, optional
         Ensembl assembly/version to use.
         Default for "human" is "grch37" and for "mouse" is "grcm38".
 
-    save : bool, optional
+    save: :obj:`bool`, optional
         Whether to save to disk under ``output_dir``.
         Defaults to True.
 
-    output_dir : str, optional
+    output_dir : :obj:`str`, optional
         Directory to write output to.
         Defaults to "reference" in current directory.
 
-    chr_prefix : bool, optional
+    chr_prefix: :obj:`bool`, optional
         Whether chromosome names should have the "chr" prefix. Defaults to True
 
-    gene_types : list, optional
+    gene_types : :obj:`list`, optional
         Subset of transcript biotypes to keep.
         See here the available biotypes https://www.ensembl.org/Help/Faq?id=468
         Defaults to 'protein_coding', 'processed_transcript', 'lincRNA', 'antisense'.
 
-    overwrite : bool, optional
+    overwrite: :obj:`bool`, optional
         Whether existing files should be overwritten by new ones.
         Otherwise they will be kept and no action is made.
         Defaults to True.
@@ -744,25 +747,25 @@ def deseq_analysis(
 
     Parameters
     ----------
-    count_matrix : pandas.DataFrame
+    count_matrix : :obj:`pandas.DataFrame`
         Data frame of shape (samples, variables) with raw read counts.
 
-    experiment_matrix : pandas.DataFrame
+    experiment_matrix : :obj:`pandas.DataFrame`
         Data frame with columns "sample_name" and any other variables used in the `formula`.
 
-    comparison_table : pandas.DataFrame
+    comparison_table : :obj:`pandas.DataFrame`
         Data frame with columns "comparison_name", "sample_group" and sample_name".
 
-    formula : str
+    formula : :obj:`str`
         Formula to test in R/patsy notation. Usually something like "~ batch + group".
 
-    output_dir : str
+    output_dir : :obj:`str`
         Output directory for produced files.
 
-    output_prefix : str
+    output_prefix : :obj:`str`
         Prefix to add to produced files.
 
-    overwrite : bool, optional
+    overwrite: :obj:`bool`, optional
         Whether files existing should be overwritten. Defaults to True.
 
     alpha : number, optional
@@ -770,7 +773,7 @@ def deseq_analysis(
         This in practice has no effect as results for all features will be returned.
         Defaults to 0.05.
 
-    create_subdirectories : bool
+    create_subdirectories: :obj:`bool`
         Whether to create subdirectories for the result of each comparison.
 
     Returns
@@ -950,22 +953,22 @@ def least_squares_fit(
 
     Parameters
     ----------
-    matrix : pandas.DataFrame
+    matrix : :obj:`pandas.DataFrame`
         A Data frame of shape (samples, variables).
 
-    design_matrix : pandas.DataFrame
+    design_matrix : :obj:`pandas.DataFrame`
         A Data frame of shape (samples, variables) with all the variables in `test_model`.
 
-    test_model : str
+    test_model : :obj:`str`
         Model design to test in R/patsy notation.
 
-    null_model : str, optional
+    null_model : :obj:`str`, optional
         Null model design in R/patsy notation. Defaults to "~ 1".
 
-    standardize_data : bool, optional
+    standardize_data: :obj:`bool`, optional
         Whether data should be standardized prior to fitting. Defaults to True.
 
-    multiple_correction_method : str, optional
+    multiple_correction_method : :obj:`str`, optional
         Method to use for multiple test correction.
         See statsmodels.sandbox.stats.multicomp.multipletests. Defaults to "fdr_bh".
 
@@ -1059,31 +1062,31 @@ def differential_from_bivariate_fit(
 
     Parameters
     ----------
-    comparison_table : pandas.DataFrame
+    comparison_table : :obj:`pandas.DataFrame`
         Dataframe with 'comparison_name', 'comparison_side' and 'sample_name', 'sample_group' columns.
 
-    matrix : pandas.DataFrame
+    matrix : :obj:`pandas.DataFrame`
         Matrix of `n_features, n_samples` with normalized, log-transformed values to perform analysis on.
 
-    output_dir : str
+    output_dir : :obj:`str`
         Output directory
 
-    output_prefix : str
+    output_prefix : :obj:`str`
         Prefix for outputs.
 
-    n_bins : int
+    n_bins : :obj:`int`
         Number of bins of mean values along which to standardize fold-changes.
 
-    multiple_correction_method : str
+    multiple_correction_method : :obj:`str`
         Multiple correction method from `statsmodels.sandbox.stats.multicomp.multipletests`.
 
-    plot : bool
+    plot: :obj:`bool`
         Whether to generate plots.
 
-    palette : str
+    palette : :obj:`str`
         Color palette to use. This can be any matplotlib palette and is passed to `sns.color_palette`.
 
-    make_values_positive : bool
+    make_values_positive: :obj:`bool`
         Whether to transform `matrix` to have minimum value 0. Default False.
 
     Returns
@@ -1322,20 +1325,20 @@ def lola(bed_files, universe_file, output_folder, genome, output_prefixes=None, 
     bed_files : str,list
         A string path to a BED file or a list of paths.
 
-    universe_file : str
+    universe_file : :obj:`str`
         A path to a BED file representing the universe from where the BED file(s) come from.
 
-    output_folder : str
+    output_folder : :obj:`str`
         Output folder for resulting files.
 
-    genome : str, optional
+    genome : :obj:`str`, optional
         Genome assembly from which the BED files come from.
         This is used to get the LOLA databases from the ngs_toolkit._CONFIG parameters.
 
-    output_prefixes : list, optional
+    output_prefixes : :obj:`list`, optional
         A list of strings with prefixes to be used in case ``bed_files`` is a list.
 
-    cpus : int, optional
+    cpus : :obj:`int`, optional
         Number of CPUs/threads to use.
         Defaults to 8
     """
@@ -1503,7 +1506,7 @@ def homer_combine_motifs(
     fold_enrichment=None,
     cpus=8,
     run=True,
-    as_jobs=True,
+    distributed=True,
     genome="hg19",
     motif_database=None,
 ):
@@ -1512,11 +1515,11 @@ def homer_combine_motifs(
 
     Parameters
     ----------
-    comparison_dirs : list
+    comparison_dirs : :obj:`list`
         Iterable of comparison directories where homer was run.
         Should contain a "homerMotifs.all.motifs" file.
 
-    output_dir : str
+    output_dir : :obj:`str`
         Output directory.
 
     p_value_threshold : number, optional
@@ -1527,19 +1530,19 @@ def homer_combine_motifs(
         Number of available CPUS/threads for multithread processing.
         Defaults to 8
 
-    run : bool, optional
+    run: :obj:`bool`, optional
         Whether to run enrichment of each comparison in the consensus motifs.
         Default is True
 
-    as_jobs : bool, optional
+    distributed: :obj:`bool`, optional
         Whether to run enrichment as a cluster job.
         Default is True
 
-    genome : str
+    genome : :obj:`str`
         Genome assembly of the data.
         Default is 'hg19'.
 
-    motif_database : str
+    motif_database : :obj:`str`
         Motif database to restrict motif matching too.
 
     Returns
@@ -1615,7 +1618,7 @@ def homer_combine_motifs(
                 motif_file=combined_motifs,
             )
             # run
-            if as_jobs:
+            if distributed:
                 subprocess.call(
                     "sbatch -J homer.{d} -o {dir}.homer.log -p shortq -c 8 --mem 20000".format(
                         d=os.path.basename(dir_), dir=dir_
@@ -1634,20 +1637,20 @@ def enrichr(dataframe, gene_set_libraries=None, kind="genes", max_attempts=5):
 
     Parameters
     ----------
-    dataframe : str
+    dataframe : :obj:`str`
         DataFrame with column "gene_name".
 
-    gene_set_libraries : list, optional
+    gene_set_libraries : :obj:`list`, optional
         Gene set libraries to use.
         Defaults to values in initial configuration file.
         To see them, do: ``ngs_toolkit._CONFIG['resources']['enrichr']['gene_set_libraries']``
 
-    kind : str, optional
+    kind : :obj:`str`, optional
         Type of input.
         Right now, only "genes" is supported.
         Defaults to "genes"
 
-    max_attempts : int, optional
+    max_attempts : :obj:`int`, optional
         Number of times to try a call to Enrichr API.
         Defaults to 5
 
@@ -1788,11 +1791,11 @@ def run_enrichment_jobs(
     :param genome:
         Genome assembly of the analysis.
 
-    background_bed : str
+    background_bed : :obj:`str`
         BED file to use as background for LOLA analysis.
         Typically the analysis' own consensus region set.
 
-    steps : list, optional
+    steps : :obj:`list`, optional
         Steps of the analysis to perform.
         Defaults to ["region", lola", "meme", "homer", "enrichr"].
 
@@ -1801,12 +1804,11 @@ def run_enrichment_jobs(
         In this case no jobs will be submitted for jobs with existing output files.
         Defaults to True
 
-    :param pickle_file: str, optional
+    :param pickle_file: :obj:`str`, optional
         Pickle file of the analysis.
         Only required for "region" enrichment.
     """
     # TODO: replace hardcoded paths with info from resources
-    # TODO: make required scripts into recipes or scripts distributed with package
     # TODO: remove pickle_file requirement to "region_enrichment"
     import sys
     from glob import glob
@@ -1859,7 +1861,7 @@ def run_enrichment_jobs(
                     os.path.join(dir_, name + ".lola.sh"),
                     ("shortq", 2, 12000),
                     "{} -m ngs_toolkit.recipes.lola {} {} {} {} -c 2".format(
-                        file, background_bed, dir_, genome
+                        sys.executable, file, background_bed, dir_, genome
                     ),
                 ]
             )
@@ -1952,25 +1954,25 @@ def project_to_geo(
 
     A pandas DataFrame with info on the sample's files and md5sums will be returned.
 
-    project : peppy.Project
+    project : :obj:`peppy.Project`
         A peppy Project object to process.
 
-    output_dir : str, optional
+    output_dir : :obj:`str`, optional
         Directory to create output. Will be created/overwriten if existing.
         Defaults to "geo_submission".
 
-    samples : list, optional
+    samples : :obj:`list`, optional
         List of peppy.Sample objects in project to restrict to.
         Defaults to all samples in project.
 
-    distributed : bool, optional
+    distributed: :obj:`bool`, optional
         Whether processing should be distributed as jobs in a computing cluster for each sample.
         Currently available implementation supports a SLURM cluster only.
         Defaults to False.
 
-    dry_run : bool, optional
+    dry_run: :obj:`bool`, optional
         Whether copy/execution/submisison commands should be not be run to test.
-        Default is False.
+        Default is :obj:`False`.
 
     Returns
     -------
@@ -2089,26 +2091,26 @@ def rename_sample_files(
 
     NEEDS TESTING!
 
-    annotation_mapping : pandas.DataFrame
+    annotation_mapping : :obj:`pandas.DataFrame`
         DataFrame with mapping of old (column "previous_sample_name") vs new ("new_sample_name") sample names.
 
-    old_sample_name_column : str, optional
+    old_sample_name_column : :obj:`str`, optional
         Name of column with old sample names.
         Defaults to "old_sample_name"
 
-    new_sample_name_column : str, optional
+    new_sample_name_column : :obj:`str`, optional
         Name of column with new sample names.
         Defaults to "new_sample_name"
 
-    tmp_prefix : str, optional
+    tmp_prefix : :obj:`str`, optional
         Prefix for temporary files to avoid overlap between old and new names.
         Defaults to "rename_sample_files"
 
-    results_dir : str, optional
+    results_dir : :obj:`str`, optional
         Pipeline output directory containing sample output directories.
         Defaults to "results_pipeline"
 
-    dry_run : bool, optional
+    dry_run: :obj:`bool`, optional
         Whether to print commands instead of running them. Defaults to False
     """
     import subprocess
@@ -2187,15 +2189,15 @@ def query_biomart(attributes=None, species="hsapiens", ensembl_version="grch37")
     Query Biomart for gene attributes. Returns pandas dataframe with query results.
     If a certain field contains commas, it will attemp to return dataframe but it might fail.
 
-    attributes : list, optional
+    attributes : :obj:`list`, optional
         List of ensembl atrributes to query.
         Defaults to ["ensembl_gene_id", "external_gene_name", "hgnc_id", "hgnc_symbol"].
 
-    species : str, optional
+    species : :obj:`str`, optional
         Ensembl string of species to query. Must be vertebrate.
         Defaults to "hsapiens".
 
-    ensembl_version : str, optional
+    ensembl_version : :obj:`str`, optional
         Ensembl version to query. Currently "grch37", "grch38" and "grcm38" are tested.
         Defaults to "grch37".
 
@@ -2369,10 +2371,10 @@ def fix_batch_effect_limma(matrix, batch_variable="batch", covariates=None):
 
     Parameters
     ----------
-    matrix : pandas.DataFrame
+    matrix : :obj:`pandas.DataFrame`
         DataFrame with MultiIndex for potential covariate annotations
 
-    formula : str, optional
+    formula : :obj:`str`, optional
         Model formula to regress out
         Defaults to "~batch"
 

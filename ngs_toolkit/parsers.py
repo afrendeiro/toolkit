@@ -11,7 +11,7 @@ def parse_ame(ame_output):
 
     Parameters
     ----------
-    ame_output : str
+    ame_output : :obj:`str`
         MEME-AME results file.
 
     Returns
@@ -51,7 +51,7 @@ def parse_homer(homer_dir):
 
     Parameters
     ----------
-    homer_dir : str
+    homer_dir : :obj:`str`
         Directory with HOMER results.
 
     Returns
@@ -119,7 +119,7 @@ def parse_great_enrichment(input_tsv):
 
     Parameters
     ----------
-    input_tsv : str
+    input_tsv : :obj:`str`
         TSV file exported from GREAT through the option "All data as .tsv" in "Global Controls".
 
     Returns

@@ -93,6 +93,12 @@ class RandomDataGenerator(object):
             dnum.columns = self.get_random_genes(
                 n_variables, genome_assembly=genome_assembly
             )
+        if data_type in ["CNV"]:
+            from ngs_toolkit.utils import z_score
+            dnum.columns = self.get_genomic_bins(
+                n_variables, genome_assembly=genome_assembly
+            )
+            dnum = z_score(dnum)
 
         return dnum.T, dcat
 
@@ -102,9 +108,9 @@ class RandomDataGenerator(object):
         width_mean=500,
         width_std=400,
         min_width=300,
-        distribution="normal",
         genome_assembly="hg19",
     ):
+        from ngs_toolkit.utils import bed_to_index
         chrom = ["chr1"] * size
         start = np.array([0] * size)
         end = np.absolute(np.random.normal(width_mean, width_std, size)).astype(int)
@@ -116,18 +122,28 @@ class RandomDataGenerator(object):
             .sort()
             .to_dataframe()
         )
-        return (
-            bed["chrom"] + ":" + bed["start"].astype(str) + "-" + bed["end"].astype(str)
-        )
+        return bed_to_index(bed)
 
     @staticmethod
     def get_random_genes(size, genome_assembly="hg19"):
         m = {"hg19": "grch37", "hg38": "grch38", "mm10": "grcm38"}
+        o = {"hg19": "hsapiens", "hg38": "hsapiens", "mm10": "mmusculus"}
 
         g = query_biomart(
-            attributes=["external_gene_name"], ensembl_version=m[genome_assembly]
+            attributes=["external_gene_name"], ensembl_version=m[genome_assembly], species=o[genome_assembly]
         ).squeeze()
         return pd.Series(np.random.choice(g, size)).sort_values()
+
+    @staticmethod
+    def get_genomic_bins(
+        n_bins,
+        distribution="normal",
+        genome_assembly="hg19",
+    ):
+        from ngs_toolkit.utils import bed_to_index
+        bed = pybedtools.BedTool.from_dataframe(pd.DataFrame(dict(pybedtools.chromsizes(genome_assembly))).T.reset_index())
+        w = bed.makewindows(genome=genome_assembly, w=sum([i.length for i in bed]) / n_bins).to_dataframe()
+        return bed_to_index(w.head(n_bins))
 
 
 def generate_project(
@@ -151,7 +167,7 @@ def generate_project(
 
     # Generate random data
     g = RandomDataGenerator()
-    n, c = g.generate_random_data(genome_assembly=genome_assembly, **kwargs)
+    n, c = g.generate_random_data(genome_assembly=genome_assembly, data_type=data_type, **kwargs)
 
     # add additional sample info
     c["protocol"] = data_type

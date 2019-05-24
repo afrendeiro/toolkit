@@ -37,72 +37,32 @@ Example configuration file
 
 
 .. note:: `Not all elements are required`
-	
-	In fact none of it is required, but this allows usage of various tools for enrichment analysis for example.
+    
+    In fact none of it is required, but it is recommended to have a look at the template configuration file and set custom options.
 
 
 .. code-block:: yaml
 
-
-	username: user
-	email: user@email.com
-	metadata:
-	  root_projects_dir: /scratch/lab/shared/projects/
-	resources:
-	  genomes:
-	    2bit:
-	      hg19: /scratch/lab/shared/resources/genomes/hg19/hg19.2bit
-	      hg38: /scratch/lab/shared/resources/genomes/hg38/hg38.2bit
-	      mm10: /scratch/lab/shared/resources/genomes/mm10/mm10.2bit
-	    fasta:
-	      hg19: /scratch/lab/shared/resources/genomes/hg19/hg19.fa
-	      hg38: /scratch/lab/shared/resources/genomes/hg38/hg38.fa
-	      mm10: /scratch/lab/shared/resources/genomes/mm10/mm10.fa
-	  lola:
-	    region_databases:
-	      # under each section, there should be a list of items
-	      hg19:
-	        - /data/groups/lab/shared/resources/regions/LOLACore/hg19/
-	        - /data/groups/lab/shared/resources/regions/customRegionDB/hg19/
-	      hg38:
-	        - /data/groups/lab/shared/resources/regions/LOLACore/hg38/
-	        - /data/groups/lab/shared/resources/regions/customRegionDB/hg38/
-	      mm10:
-	        - /data/groups/lab/shared/resources/regions/LOLACore/mm10/
-	        - /data/groups/lab/shared/resources/regions/customRegionDB/mm10/
-	  meme:
-	    motif_databases:
-	      human: /scratch/lab/shared/resources/motifs/motif_databases/HUMAN/HOCOMOCOv10.meme
-	      mouse: /scratch/lab/shared/resources/motifs/motif_databases/MOUSE/uniprobe_mouse.meme
-	      vertebrate: /home/user/.local/homer_4.8/data/knownTFs/vertebrates/known.motifs
-	    motif_id_mapping:
-	      mouse: /scratch/lab/shared/resources/motifs/motif_databases/MOUSE/uniprobe_mouse.id_mapping.tsv
-	  enrichr:
-	    gene_set_libraries:
-	      # this should be a list of items
-	      - "GO_Biological_Process_2015"
-	      - "ChEA_2015"
-	      - "KEGG_2016"
-	      - "ESCAPE"
-	      - "Epigenomics_Roadmap_HM_ChIP-seq"
-	      - "ENCODE_TF_ChIP-seq_2015"
-	      - "ENCODE_and_ChEA_Consensus_TFs_from_ChIP-X"
-	      - "ENCODE_Histone_Modifications_2015"
-	      - "OMIM_Expanded"
-	      - "TF-LOF_Expression_from_GEO"
-	      - "Single_Gene_Perturbations_from_GEO_down"
-	      - "Single_Gene_Perturbations_from_GEO_up"
-	      - "Disease_Perturbations_from_GEO_down"
-	      - "Disease_Perturbations_from_GEO_up"
-	      - "Drug_Perturbations_from_GEO_down"
-	      - "Drug_Perturbations_from_GEO_up"
-	      - "WikiPathways_2016"
-	      - "Reactome_2016"
-	      - "BioCarta_2016"
-	      - "NCI-Nature_2016"
-	executables:
-	  twoBitToFa: twoBitToFa
-	  fasta-dinucleotide-shuffle: fasta-dinucleotide-shuffle
-	  ame: ame
-	  findMotifsGenome.pl: findMotifsGenome.pl
-	  compareMotifs.pl: compareMotifs.pl
+    username: user
+    email: user@mail.com
+    website_root: userwebsite.web.com
+    preferences:
+      # For the next item, environment variables are formatted if they are of the form ${VAR}
+      root_reference_dir: ${USER}/reference_data
+      root_projects_dir: ${USER}/projects
+      default_genome_assemblies:
+        - human: hg38
+        - mouse: mm10
+      computing_configuration: 'slurm'
+    sample_input_files:
+      ATAC-seq:
+        aligned_filtered_bam: "{data_dir}/{sample_name}/mapped/{sample_name}.bowtie2.filtered.bam"
+        peaks: "{data_dir}/{sample_name}/peaks/{sample_name}_peaks.narrowPeak"
+        summits: "{data_dir}/{sample_name}/peaks/{sample_name}_summits.narrowPeak"
+      ChIP-seq:
+        aligned_filtered_bam: "{data_dir}/{sample_name}/mapped/{sample_name}.bowtie2.filtered.bam"
+      CNV:
+        aligned_filtered_bam: "{data_dir}/{sample_name}/mapped/{sample_name}.bowtie2.filtered.bam"
+      RNA-seq:
+        aligned_filtered_bam: "{data_dir}/{sample_name}/mapped/{sample_name}.bowtie2.filtered.bam"
+        bitseq_counts: "{data_dir}/{sample_name}/quantification/{sample_name}_bitseq.tsv"

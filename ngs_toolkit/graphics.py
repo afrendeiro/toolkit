@@ -17,16 +17,16 @@ def barmap(x, figsize=None, square=False, row_colors=None, z_score=None, ylims=N
 
     Parameters
     ----------
-    x : pandas.DataFrame
+    x : :obj:`pandas.DataFrame`
         DataFrame with numerical values to plot.
         If DataFrame, indexes will be used as labels.
     figsize : tuple
         Size in inches (width, height) of figure to produce.
-    square : bool
+    square: :obj:`bool`
         Whether resulting figure should be square.
-    row_colors : list
+    row_colors : :obj:`list`
         Iterable of colors to use for each row.
-    z_score : int
+    z_score : :obj:`int`
         Whether input matrix `x` should be Z-score transformed row-wise (0) or column-wise (1).
 
     Returns
@@ -134,13 +134,13 @@ def radar_plot(
 ):
     """
     
-    data : pandas.DataFrame
-    subplot_var : str
-    group_var : str
-    radial_vars : list
+    data : :obj:`pandas.DataFrame`
+    subplot_var : :obj:`str`
+    group_var : :obj:`str`
+    radial_vars : :obj:`list`
     str : cmap
         Matplotlib colormap to use.
-    scale_to_max : bool
+    scale_to_max: :obj:`bool`
         Whether values will be scaled
 
     Heavy inspiration from here: https://matplotlib.org/examples/api/radar_chart.html
@@ -158,7 +158,7 @@ def radar_plot(
 
         Parameters
         ----------
-        num_vars : int
+        num_vars : :obj:`int`
             Number of variables for radar chart.
         frame : {'circle' | 'polygon'}
             Shape of frame surrounding axes.
@@ -342,43 +342,43 @@ def plot_projection(
 
     Parameters
     ----------
-    df : pandas.DataFrame
+    df : :obj:`pandas.DataFrame`
         Dataframe with sample projections.
 
-    color_dataframe : pandas.DataFrame
+    color_dataframe : :obj:`pandas.DataFrame`
         Dataframe of RGB tuples for sample i in attribute j.
 
-    dims : int
+    dims : :obj:`int`
         Number of dimentions to plot
 
-    output_file : str
+    output_file : :obj:`str`
         Path to figure output file
 
-    attributes_to_plot : list
+    attributes_to_plot : :obj:`list`
         List of levels in df.index to plot
 
     plot_max_dims : number, optional
         Maximum number of dimentions to plot.
         Defaults to 8.
 
-    plot_group_centroids : bool, optional
+    plot_group_centroids: :obj:`bool`, optional
         Whether centroids of each sample group should be plotted alongside samples.
         Will be square shaped.
         Defaults to True.
 
-    axis_ticklabels : bool, optional
+    axis_ticklabels: :obj:`bool`, optional
         Whether axis ticks and tick labels should be plotted.
         Defaults to False.
 
-    axis_lines : bool, optional
+    axis_lines: :obj:`bool`, optional
         Whether (0, 0) dashed lines should be plotted.
         Defaults to True.
 
-    legends : bool, optional
+    legends: :obj:`bool`, optional
         Whether legends for group colours should be plotted.
         Defaults to False.
 
-    always_legend : bool, optional
+    always_legend: :obj:`bool`, optional
         Whether legends for group colours should be plotted in every figure panel.
         If False, will plot just on first/last figure panel.
         Defaults to False.
@@ -483,18 +483,18 @@ def plot_region_context_enrichment(
 
     Parameters
     ----------
-    enr : pandas.DataFrame
+    enr : :obj:`pandas.DataFrame`
         Results of region_context_enrichment.
 
-    output_dir : str, optional
+    output_dir : :obj:`str`, optional
         Directory to save plots to.
         Defaults to "results".
 
-    optional output_prefix : str, optional
+    optional output_prefix : :obj:`str`, optional
         Prefix to use when saveing plots.
         Defaults to "region_type_enrichment"
 
-    across_attribute : str, optional
+    across_attribute : :obj:`str`, optional
         Column in enrichment matrix to plot results across e.g. "comparison_name"
         when results matrix contains the result of various comparisons.
         Defaults to None (not used).
@@ -503,7 +503,7 @@ def plot_region_context_enrichment(
         Value at which to plot a line marking the significant level.
         Defaults to 0.05.
 
-    top_n : int, optional
+    top_n : :obj:`int`, optional
         Number of features to label in volcano plot.
         Defaults to 5.
     """
@@ -585,13 +585,13 @@ def plot_comparison_correlations(
 
     Parameters
     ----------
-    diff : pandas.DataFrame
+    diff : :obj:`pandas.DataFrame`
         Dataframe with differential results
 
-    output_dir : str
+    output_dir : :obj:`str`
         Output directory for plots.
 
-    output_prefix : str, optional
+    output_prefix : :obj:`str`, optional
         Prefix for plots.
         Defaults to "comparison_correlations"
     """

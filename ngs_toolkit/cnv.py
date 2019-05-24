@@ -17,43 +17,43 @@ class CNVAnalysis(Analysis):
 
     Parameters
     ----------
-    name : str, optional
+    name : :obj:`str`, optional
         Name of the analysis.
-        Defaults to ``analysis``.
 
-    from_pep : str, optional
+        Defaults to "analysis".
+    from_pep : :obj:`str`, optional
         PEP configuration file to initialize analysis from.
         The analysis will adopt as much attributes from the PEP as possible
         but keyword arguments passed at initialization will still have priority.
-        Defaults to None (no PEP used).
 
-    from_pickle : str, optional
+        Defaults to :obj:`None` (no PEP used).
+    from_pickle : :obj:`str`, optional
         Pickle file of an existing serialized analysis object
         from which the analysis should be loaded.
-        Defaults to None (will not load).
 
-    root_dir : str, optional
+        Defaults to :obj:`None` (will not load).
+    root_dir : :obj:`str`, optional
         Base directory for the project.
-        Defaults to current directory or to what is specified in PEP if `from_pep`.
 
-    data_dir : str, optional
+        Defaults to current directory or to what is specified in PEP if `from_pep`.
+    data_dir : :obj:`str`, optional
         Directory containing processed data (e.g. by looper) that will
         be input to the analysis. This is in principle not required.
-        Defaults to ``data``.
 
-    results_dir : str, optional
+        Defaults to "data".
+    results_dir : :obj:`str`, optional
         Directory to contain outputs produced by the analysis.
-        Defaults to ``results``.
 
-    prj : peppy.Project, optional
+        Defaults to "results".
+    prj : :obj:`peppy.Project`, optional
         A ``peppy.Project`` object that this analysis is tied to.
-        Defaults to ``None``.
 
-    samples : list, optional
+        Defaults to :obj:`None`.
+    samples : :obj:`list`, optional
         List of ``peppy.Sample`` objects that this analysis is tied to.
-        Defaults to ``None``.
 
-    kwargs : dict, optional
+        Defaults to :obj:`None`.
+    kwargs : :obj:`dict`, optional
         Additional keyword arguments will be passed to parent class `ngs_toolkit.analysis.Analysis`.
 
     :Example:
@@ -134,12 +134,12 @@ class CNVAnalysis(Analysis):
 
         Parameters
         ----------
-        output_map : dict
+        output_map : :obj:`dict`
             Dictionary with {attribute_name: (file_path, kwargs)} to load the files.
             The kwargs in the tuple will be passed to pandas.read_csv.
             The default is the required to read the keys in `only_these_keys`.
 
-        only_these_keys : list, optional
+        only_these_keys : :obj:`list`, optional
             Iterable of analysis attributes to load up.
             Possible attributes:
                 "matrix_raw"
@@ -147,14 +147,14 @@ class CNVAnalysis(Analysis):
                 "matrix_features"
                 "differential_results"
 
-        prefix : str, optional
+        prefix : :obj:`str`, optional
             String prefix of files to load.
             Variables in curly braces will be formated with attributes of analysis.
             Defaults to "{results_dir}/{name}".
 
         bool : permissive, optional
             Whether an error should be ignored if reading a file causes IOError.
-            Default is True.
+            Default is :obj:`True`.
 
         Attributes
         ----------
@@ -225,23 +225,23 @@ class CNVAnalysis(Analysis):
 
         Parameters
         ----------
-        resolutions : list, optional
+        resolutions : :obj:`list`, optional
             Resolutions of analysis.
             Defaults to resolutions in Analysis object.
 
-        samples : list, optional
+        samples : :obj:`list`, optional
             Samples to restrict analysis to.
             Defaults to samples in Analysis object.
 
-        save : bool, optional
+        save: :obj:`bool`, optional
             Whether results should be saved to disc.
             Defaults to True
 
-        assign : bool, optional
+        assign: :obj:`bool`, optional
             Whether results should be assigned to an attribute in the Analsyis object.
             Defaults to True
 
-        permissive : bool, optional
+        permissive: :obj:`bool`, optional
             Whether missing files should be allowed.
             Defaults to False
 
@@ -257,7 +257,7 @@ class CNVAnalysis(Analysis):
 
         Attributes
         ----------
-        matrix : dict
+        matrix : :obj:`dict`
             Sets a `matrix` dictionary with CNV matrices for each resolution.
         """
         from tqdm import tqdm
@@ -346,36 +346,36 @@ class CNVAnalysis(Analysis):
 
         Parameters
         ----------
-        resolutions : list, optional
+        resolutions : :obj:`list`, optional
             Resolutions of analysis.
             Defaults to resolutions in Analysis object.
 
-        method : str
+        method : :obj:`str`
             Normalization method to apply. One of:
                 a) `median` (subtract median value across all samples;
                 b) `pca` (subtraction of principal component number `pc`).
 
-        pc : int
+        pc : :obj:`int`
             Principal Component to remove. 1-based.
             Must be specified if `method=="pca"`.
 
-        matrix : str, optional
+        matrix : :obj:`str`, optional
             Attribute name of dictionary of matrices to normalize.
             Defaults to `matrix_raw`.
 
-        samples : list
+        samples : :obj:`list`
             Iterable of peppy.Sample objects to restrict matrix to.
             Default is all in analysis.
 
-        save : bool, optional
+        save: :obj:`bool`, optional
             Whether results should be saved to disc.
             Defaults to True
 
-        assign : bool, optional
+        assign: :obj:`bool`, optional
             Whether results should be assigned to an attribute in the Analsyis object.
             Defaults to True
 
-        kwargs : dict, optional
+        kwargs : :obj:`dict`, optional
             Additional kwargs are passed to the respective normalization method.
 
         Returns
@@ -385,7 +385,7 @@ class CNVAnalysis(Analysis):
 
         Attributes
         ----------
-        matrix_norm : dict
+        matrix_norm : :obj:`dict`
             Sets a `matrix_norm` dictionary with CNV matrices for each resolution.
         """
         matrix_norm = dict()
@@ -446,27 +446,27 @@ class CNVAnalysis(Analysis):
 
         Parameters
         ----------
-        matrix : str, optional
+        matrix : :obj:`str`, optional
             Attribute name of dictionary of matrices to normalize.
             Defaults to `matrix_norm`.
 
-        resolutions : list, optional
+        resolutions : :obj:`list`, optional
             Resolutions of analysis.
             Defaults to resolutions in Analysis object.
 
-        samples : list, optional
+        samples : :obj:`list`, optional
             Samples to restrict analysis to.
             Defaults to samples in Analysis object.
 
-        output_dir : str, optional
+        output_dir : :obj:`str`, optional
             Output directory.
             Defaults to Analysis results directory.
 
-        output_prefix : str, optional
+        output_prefix : :obj:`str`, optional
             Prefix to add to plots.
             Defaults to "{analysis_name}.all_data"
 
-        robust : bool, optional
+        robust: :obj:`bool`, optional
             Whether to scale the color scale robustly (to quantiles rather than extremes).
             Defaults to True
 
@@ -477,15 +477,15 @@ class CNVAnalysis(Analysis):
             Maximum value of color scale.
             Defaults to None
 
-        rasterized : bool, optional
+        rasterized: :obj:`bool`, optional
             Whether to rasterize main heatmap.
             Defaults to True
 
-        dpi : int, optional
+        dpi : :obj:`int`, optional
             DPI resolution of rasterized image.
             Defaults to 300
 
-        sample_labels : bool, optional
+        sample_labels: :obj:`bool`, optional
             Whether to label samples with their name.
             Defaults to True
         """
@@ -583,39 +583,39 @@ class CNVAnalysis(Analysis):
 
         Parameters
         ----------
-        matrix : str, optional
+        matrix : :obj:`str`, optional
             Attribute name of dictionary of matrices to normalize.
             Defaults to `matrix_norm`.
 
-        resolutions : list, optional
+        resolutions : :obj:`list`, optional
             Resolutions of analysis.
             Defaults to resolutions in Analysis object.
 
-        samples : list, optional
+        samples : :obj:`list`, optional
             Samples to restrict analysis to.
             Defaults to samples in Analysis object.
 
-        output_dir : str, optional
+        output_dir : :obj:`str`, optional
             Output directory.
             Defaults to Analysis results directory.
 
-        output_prefix : str, optional
+        output_prefix : :obj:`str`, optional
             Prefix to add to plots.
             Defaults to "{analysis_name}.all_data"
 
-        robust : bool, optional
+        robust: :obj:`bool`, optional
             Whether to scale the color scale robustly (to quantiles rather than extremes).
             Defaults to True
 
-        rasterized : bool, optional
+        rasterized: :obj:`bool`, optional
             Whether to rasterize main heatmap.
             Defaults to True
 
-        dpi : int, optional
+        dpi : :obj:`int`, optional
             DPI resolution of rasterized image.
             Defaults to 300
 
-        sample_labels : bool, optional
+        sample_labels: :obj:`bool`, optional
             Whether to label samples with their name.
             Defaults to True
         """
@@ -748,23 +748,23 @@ class CNVAnalysis(Analysis):
 
         Parameters
         ----------
-        matrix : str, optional
+        matrix : :obj:`str`, optional
             Attribute name of dictionary of matrices to segment.
             Defaults to `matrix_norm`.
 
-        resolutions : list, optional
+        resolutions : :obj:`list`, optional
             Resolutions of analysis.
             Defaults to resolutions in Analysis object.
 
-        samples : list, optional
+        samples : :obj:`list`, optional
             Samples to restrict analysis to.
             Defaults to samples in Analysis object.
 
-        save : bool, optional
+        save: :obj:`bool`, optional
             Whether results should be saved to disc.
             Defaults to True
 
-        assign : bool, optional
+        assign: :obj:`bool`, optional
             Whether results should be assigned to an attribute in the Analsyis object.
             Defaults to True
 
@@ -775,7 +775,7 @@ class CNVAnalysis(Analysis):
 
         Attributes
         ----------
-        segmentation : dict
+        segmentation : :obj:`dict`
             Dictionary with CNV matrices for each resolution.
         """
         # TODO: implement as_job
@@ -887,23 +887,23 @@ class CNVAnalysis(Analysis):
 
         Parameters
         ----------
-        segmentation : str, optional
+        segmentation : :obj:`str`, optional
             Attribute name of dictionary of segmentation results.
             Defaults to `segmentation`.
 
-        resolutions : list, optional
+        resolutions : :obj:`list`, optional
             Resolutions of analysis.
             Defaults to resolutions in Analysis object.
 
-        samples : list, optional
+        samples : :obj:`list`, optional
             Samples to restrict analysis to.
             Defaults to samples in Analysis object.
 
-        save : bool, optional
+        save: :obj:`bool`, optional
             Whether results should be saved to disc.
             Defaults to True
 
-        assign : bool, optional
+        assign: :obj:`bool`, optional
             Whether results should be assigned to an attribute in the Analsyis object.
             Defaults to True
 
@@ -914,7 +914,7 @@ class CNVAnalysis(Analysis):
 
         Attributes
         ----------
-        segmentation_annot : dict
+        segmentation_annot : :obj:`dict`
             Dictionary with CNV matrices for each resolution.
         """
         import os
@@ -1001,22 +1001,22 @@ class CNVAnalysis(Analysis):
 
         Parameters
         ----------
-        segmentation : str, optional
+        segmentation : :obj:`str`, optional
             Dictionary of segmentation results.
             Defaults to `segmentation`.
 
-        resolutions : list, optional
+        resolutions : :obj:`list`, optional
             Resolutions of analysis. Defaults to resolutions in Analysis object.
 
-        per_sample : bool, optional
+        per_sample: :obj:`bool`, optional
             Whether plots should be made for each sample too.
             Defaults to False
 
-        output_dir : str, optional
+        output_dir : :obj:`str`, optional
             Output directory.
             Defaults to Analysis results directory.
 
-        output_prefix : str, optional
+        output_prefix : :obj:`str`, optional
             Prefix to add to plots.
             Defaults to "{resolution}.segmentation_metrics"
         """
@@ -1072,13 +1072,13 @@ def all_to_igv(matrix, output_prefix, **kwargs):
 
     Parameters
     ----------
-    matrix : pandas.DataFrame
+    matrix : :obj:`pandas.DataFrame`
         DataFrame with CNV data to convert.
 
     optional output_prefix : str,
         Prefix to add to plots.
 
-    optional kwargs : dict,
+    optional kwargs : :obj:`dict`,
         Additional parameters will be passed to ngs_toolkit.cnv.to_igv
 
     Returns
@@ -1107,14 +1107,14 @@ def to_igv(matrix, output_file=None, save=True, view_limits=(-2, 2)):
 
     Parameters
     ----------
-    matrix : pandas.DataFrame
+    matrix : :obj:`pandas.DataFrame`
         DataFrame with CNV data to convert.
 
     optional output_file : str,
         Output file.
         Required is `save` is True.
 
-    optional save : bool,
+    optional save: :obj:`bool`,
         Whether results should be saved to disc.
         Defaults to True
 

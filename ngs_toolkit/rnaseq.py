@@ -9,6 +9,9 @@ from ngs_toolkit import _LOGGER
 from ngs_toolkit.analysis import Analysis
 
 
+# TODO: add matrix_features to RNASeqAnalysis class
+# TODO: rewrite knockout_plot
+
 class RNASeqAnalysis(Analysis):
     """
     Class to model analysis of RNA-seq data.
@@ -16,47 +19,45 @@ class RNASeqAnalysis(Analysis):
 
     Parameters
     ----------
-    name : str, optional
+    name : :obj:`str`, optional
         Name of the analysis.
-        Defaults to ``analysis``.
 
-    from_pep : str, optional
+        Defaults to "analysis".
+    from_pep : :obj:`str`, optional
         PEP configuration file to initialize analysis from.
         The analysis will adopt as much attributes from the PEP as possible
         but keyword arguments passed at initialization will still have priority.
-        Defaults to None (no PEP used).
 
-    from_pickle : str, optional
+        Defaults to :obj:`None` (no PEP used).
+    from_pickle : :obj:`str`, optional
         Pickle file of an existing serialized analysis object
         from which the analysis should be loaded.
-        Defaults to None (will not load).
 
-    root_dir : str, optional
+        Defaults to :obj:`None` (will not load).
+    root_dir : :obj:`str`, optional
         Base directory for the project.
-        Defaults to current directory or to what is specified in PEP if `from_pep`.
 
-    data_dir : str, optional
+        Defaults to current directory or to what is specified in PEP if `from_pep`.
+    data_dir : :obj:`str`, optional
         Directory containing processed data (e.g. by looper) that will
         be input to the analysis. This is in principle not required.
-        Defaults to ``data``.
 
-    results_dir : str, optional
+        Defaults to "data".
+    results_dir : :obj:`str`, optional
         Directory to contain outputs produced by the analysis.
-        Defaults to ``results``.
 
-    prj : peppy.Project, optional
+        Defaults to "results".
+    prj : :class:`~peppy.Project`, optional
         A ``peppy.Project`` object that this analysis is tied to.
-        Defaults to ``None``.
 
-    samples : list, optional
+        Defaults to :obj:`None`.
+    samples : :obj:`list`, optional
         List of ``peppy.Sample`` objects that this analysis is tied to.
-        Defaults to ``None``.
 
-    kwargs : dict, optional
+        Defaults to :obj:`None`.
+    kwargs : :obj:`dict`, optional
         Additional keyword arguments will be passed to parent class `ngs_toolkit.analysis.Analysis`.
-
     """
-
     def __init__(
         self,
         name=None,
@@ -105,7 +106,9 @@ class RNASeqAnalysis(Analysis):
             samples = self.samples
 
         if expression_type != "counts":
-            raise NotImplementedError("`expression_type` must be 'counts'!")
+            msg = "`expression_type` must be 'counts'!"
+            _LOGGER.error(msg)
+            raise NotImplementedError(msg)
 
         expr = list()
         for i, sample in enumerate(samples):
@@ -265,47 +268,81 @@ class RNASeqAnalysis(Analysis):
         self,
         expression_type="counts",
         expression_level="gene",
+        reduction_func=max,
+        quantification_prog="bitseq",
         samples=None,
-        sample_attributes=None,
-        genome_assembly=None,
-        species=None,
-        pseudocount=1,
-        mul_factor=1e6,
         save=True,
         assign=True,
+        output_file=None,
+        permissive=False,
+        species=None,
+        ensembl_version=None,
     ):
         """
-        Collect gene expression (read counts, transcript level) for all samples,
-        annotates ensembl IDs with gene names, reduces gene expression to gene-level,
-        normalizes expression matrix (quantile normalization), and
-        annotates samples with given attributes (generates pandas dataframe with MultiIndex columns).
+        Collect gene expression (read counts per transcript or gene) for all samples.
+
+        If `expression_level` is "gene", then, transcripts will be reduced per gene ID
+        using `reduction_func` (defaults to `max`) and features will be named with gene symbols.
 
         Parameters
         ----------
-        samples : peppy.Sample
-            Samples to get expression for. Default all in analysis.
-
-        sample_attributes : list
-            Sample attributes to annotate expression matrix with.
-
-        expression_type : str
+        expression_type : :obj:`str`, optional
             Type of expression quantification to get. One of "counts" or "rpkm".
 
-        genome_assembly : str
-            Genome assembly to use (e.g. "grch38") or Ensembl prefix to archive ("aug2014.archive")
+            Defaults to "counts".
+        expression_level : :obj:`str`, optional
+            Type of expression quantification to get. One of "transcript" or "gene".
 
-        species : str
+            Defaults to "gene".
+        reduction_func : func, optional
+            Function to reduce gene expression between transcript and gene if `expression_level` is "gene".
+
+            Defaults to `max`.
+        quantification_prog : :obj:`str`, optional
+            Name of program used to produce the quantification of gene expression. One of "bitseq", "htseq" or "esat".
+
+            Defaults to "bitseq".
+        samples : list[peppy.Sample], optional
+            Subset of samples to get expression for.
+
+            Defaults to all in analysis.
+        save: :obj:`bool`, optional
+            Whether to save output as CSV.
+
+            Default is :obj:`None`.
+        assign: :obj:`bool`, optional
+            Whether to assign output to `matrix_raw`.
+
+            Default is :obj:`None`.
+        output_file : :obj:`str`, optional
+            Path of resulting file if `save` is `True`.
+
+            Defaults to "{results_dir}/{name}.matrix_raw.csv".
+        permissive: :obj:`bool`, optional
+            Whether to skip samples with non-existing gene expression quantification.
+
+            Default is `False`.
+        species : :obj:`str`, optional
             Ensembl species name (e.g. "hsapiens", "mmusculus")
 
-        # TODO: Save all matrices of both levels with clear, consistent naming
-        # TODO: Declare saved files and outputs in docstring
-        # TODO: Pass correct organism, genome to query_biomart
+            Defaults to analysis' organism.
+        ensembl_version : :obj:`str`, optional
+            Ensembl version of annotation to use (e.g. "grch38", "grcm38")
+
+            Defaults to analysis' genome.
+
+        Attributes
+        ----------
+        matrix_raw : :obj:`pandas.DataFrame`
+            DataFrame with gene expression.
         """
         from ngs_toolkit.general import query_biomart
-        from ngs_toolkit.utils import normalize_quantiles_p
+        from ngs_toolkit import constants
 
         if expression_type != "counts":
-            raise NotImplementedError("`expression_type` must be 'counts'!")
+            msg = "`expression_type` must be 'counts'!"
+            _LOGGER.error(msg)
+            raise NotImplementedError(msg)
 
         if expression_level not in ["gene", "transcript"]:
             raise NotImplementedError(
@@ -313,19 +350,27 @@ class RNASeqAnalysis(Analysis):
             )
 
         if samples is None:
-            samples = [s for s in self.samples if s.library == "RNA-seq"]
+            samples = self.samples
 
-        if sample_attributes is None:
-            if hasattr(self, "sample_attributes"):
-                sample_attributes = self.sample_attributes
-
-        transcript_counts = self.collect_bitseq_output(
-            samples=samples, expression_type=expression_type
+        # Check which samples to use (dependent on permissive)
+        samples = self._get_samples_with_input_file(
+            "counts", permissive=permissive, samples=samples
         )
+
+        if quantification_prog == "bitseq":
+            transcript_counts = self.collect_bitseq_output(
+                samples=samples, expression_type=expression_type
+            )
+        else:
+            msg = "Only implemented for `quantification_prog`='bitseq'"
+            _LOGGER.error(msg)
+            raise NotImplementedError(msg)
 
         # Map ensembl gene IDs to gene names
         mapping = query_biomart(
-            attributes=["ensembl_transcript_id", "external_gene_name"]
+            attributes=["ensembl_transcript_id", "external_gene_name"],
+            species=species or constants.organism_to_species_mapping[self.organism],
+            ensembl_version=ensembl_version or constants.genome_to_ensembl_mapping(self.genome)
         )
         mapping.columns = ["ensembl_transcript_id", "gene_name"]
 
@@ -338,114 +383,86 @@ class RNASeqAnalysis(Analysis):
             .set_index(["gene_name"], append=True)
             .sort_index(axis=0)
         )
+        if expression_level == "transcript":
+            matrix_raw = transcript_counts
+        elif expression_level == "gene":
+            if reduction_func is max:
+                matrix_raw = transcript_counts.groupby("gene_name").max()
+            else:
+                matrix_raw = transcript_counts.groupby("gene_name").apply(reduction_func)
 
-        gene_counts = transcript_counts.groupby("gene_name").max()
-
-        if expression_level == "gene":
-            matrix = gene_counts
-        elif expression_level == "transcript":
-            matrix = transcript_counts
-
-        # Quantile normalize
-        matrix_qnorm = normalize_quantiles_p(matrix)
-        # Log2 TPM
-        # # make matrix non-negative
-        if matrix_qnorm.min().min() <= 0:
-            matrix_qnorm += np.absolute(matrix_qnorm.min().min())
-        # # for some reason bitSeq kind of already adds a pseudocount or something :/
-        # # so, if minimum is 1, we'll skip that
-        if matrix_qnorm.min().min() == 1:
-            pseudocount = 0
-
-        # # Log2 transform
-        matrix_qnorm_log = np.log2(pseudocount + matrix_qnorm)
-
-        # Annotate with sample metadata
-        _samples = [s for s in samples if s.name in matrix_qnorm_log.columns]
-        attrs = list()
-        for attr in sample_attributes:
-            ll = list()
-            for sample in _samples:  # keep order of samples in matrix
-                try:
-                    ll.append(getattr(sample, attr))
-                except AttributeError:
-                    ll.append(np.nan)
-            attrs.append(ll)
-
-        # Generate multiindex columns
-        index = pd.MultiIndex.from_arrays(attrs, names=sample_attributes)
-        expression_annotated = matrix_qnorm_log[[s.name for s in _samples]]
-        expression_annotated.columns = index
-
-        # Save
-        if assign:
-            self.transcript_counts = transcript_counts
-            self.gene_counts = gene_counts
-            self.expression = matrix_qnorm_log
-            self.expression_annotated = expression_annotated
         if save:
-            transcript_counts.to_csv(
-                os.path.join(
-                    self.results_dir,
-                    self.name
-                    + ".expression_{}.transcript_level.csv".format(expression_type),
-                ),
-                index=True,
-            )
-            gene_counts.to_csv(
-                os.path.join(
-                    self.results_dir,
-                    self.name + ".expression_{}.gene_level.csv".format(expression_type),
-                ),
-                index=True,
-            )
-            matrix_qnorm_log.to_csv(
-                os.path.join(
-                    self.results_dir,
-                    self.name
-                    + ".expression_{}.{}_level.quantile_normalized.log2_tpm.csv".format(
-                        expression_type, expression_level
-                    ),
-                ),
-                index=True,
-            )
-            expression_annotated.to_csv(
-                os.path.join(
-                    self.results_dir,
-                    self.name
-                    + ".expression_{}.{}_level.quantile_normalized.log2_tpm.annotated_metadata.csv".format(
-                        expression_type, expression_level
-                    ),
-                ),
-                index=True,
-            )
+            if output_file is not None:
+                matrix_raw.to_csv(output_file)
+            else:
+                matrix_raw.to_csv(
+                    os.path.join(self.results_dir, self.name + ".matrix_raw.csv"),
+                    index=True,
+                )
+        if assign:
+            self.matrix_raw = matrix_raw
+        return matrix_raw
 
     def plot_expression_characteristics(
-        self, output_dir="{results_dir}/expression_qc", output_prefix="expression_qc"
+        self,
+        matrix_raw=None,
+        matrix_norm=None,
+        samples=None,
+        output_dir="{results_dir}/quality_control",
+        output_prefix="quality_control"
     ):
         """
-        Plot general characteristics of the gene expression distributions within and across samples.
+        Plot general characteristics of the gene expression
+        distributions within and across samples.
+
+        matrix_raw : {str, pandas.DataFrame}, optional
+            Name of analysis attribute with raw expression
+            values or pandas dataframe.
+
+            Defaults to analysis' `matrix_raw`.
+        matrix_norm : {str, pandas.DataFrame}, optional
+            Name of analysis attribute with normalized expression
+            values or pandas dataframe.
+
+            Defaults to analysis' `matrix_norm`.
+        samples : :obj:`list`, optional
+            List of samples to include.
+
+            Defaults to all samples in analysis
+        output_dir : :obj:`str`, optional
+            Directory for output files.
+
+            Defaults to "{results_dir}/quality_control"
+        output_prefix : :obj:`str`, optional
+            Prefix for output files.
+
+            Defaults to "quality_control"
         """
+        # TODO: Plot gene expression along chromossomes
         import matplotlib.pyplot as plt
         import seaborn as sns
 
-        if "{results_dir}" in output_dir:
-            output_dir = output_dir.format(results_dir=self.results_dir)
-
+        output_dir = self._format_string_with_attributes(output_dir)
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
 
-        to_drop = [
-            v
-            for v in ["gene_name", "ensembl_gene_id", "ensembl_transcript_id"]
-            if v in self.count_matrix.columns.tolist()
-        ]
+        if matrix_raw is None:
+            matrix_raw = self.get_matrix("matrix_raw", samples=samples)
+        else:
+            if samples is not None:
+                matrix_raw = matrix_raw.loc[:, [s.name for s in samples]]
+
+        if matrix_norm is None:
+            matrix_norm = self.get_matrix("matrix_raw", samples=samples)
+        else:
+            if samples is not None:
+                matrix_norm = matrix_norm.loc[:, [s.name for s in samples]]
 
         fig, axis = plt.subplots(
-            figsize=(4, 4 * np.log10(len(self.expression_matrix_counts.columns)))
+            figsize=(4, 4 * np.log10(len(matrix_raw.columns)))
         )
         sns.barplot(
-            data=self.count_matrix.drop(to_drop, axis=1)
+            data=matrix_raw
             .sum()
             .sort_values()
             .reset_index(),
@@ -468,7 +485,7 @@ class RNASeqAnalysis(Analysis):
 
         cov = pd.DataFrame()
         for i in [1, 2, 3, 6, 12, 24, 48, 96, 200, 300, 400, 500, 1000]:
-            cov[i] = self.expression_matrix_counts.apply(lambda x: sum(x >= i))
+            cov[i] = matrix_raw.apply(lambda x: sum(x >= i))
 
         fig, axis = plt.subplots(1, 2, figsize=(6 * 2, 6))
         sns.heatmap(
@@ -498,8 +515,8 @@ class RNASeqAnalysis(Analysis):
         )
 
         for name, matrix in [
-            ("counts", self.expression_matrix_counts),
-            ("qnorm_TPM", self.expression),
+            ("counts", matrix_raw),
+            ("normalized", self.matrix_norm),
         ]:
             # Boxplot with values per sample
             if name == "counts":
@@ -522,71 +539,64 @@ class RNASeqAnalysis(Analysis):
                 bbox_inches="tight",
             )
 
-        # # Plot gene expression along chromossomes
-        # url_query = "".join([
-        #     """http://grch37.ensembl.org/biomart/martservice?query=""",
-        #     """<?xml version="1.0" encoding="UTF-8"?>""",
-        #     """<!DOCTYPE Query>""",
-        #     """<Query  virtualSchemaName = "default" formatter = "CSV" header = "0" uniqueRows = "0" count = "" datasetConfigVersion = "0.6" >""",
-        #     """<Dataset name = "hsapiens_gene_ensembl" interface = "default" >""",
-        #     """<Attribute name = "chromosome_name" />""",
-        #     """<Attribute name = "start_position" />""",
-        #     """<Attribute name = "end_position" />""",
-        #     """<Attribute name = "external_gene_name" />""",
-        #     """</Dataset>""",
-        #     """</Query>"""])
-        # req = requests.get(url_query, stream=True)
-        # annot = pd.DataFrame((x.strip().split(",") for x in list(req.iter_lines())), columns=["chr", "start", "end", "gene_name"])
-        # gene_order = annot[annot['chr'].isin([str(x) for x in range(22)] + ['X', 'Y'])].sort_values(["chr", "start", "end"])["gene_name"]
-
-        # # sort genes by chrom order
-        # exp = self.expression.ix[gene_order].dropna()
-        # # cap expression
-        # exp[exp > np.percentile(exp, 75)] = np.percentile(exp, 75)
-        # exp[exp < np.percentile(exp, 25)] = np.percentile(exp, 25)
-
-        # data = ((exp.T - exp.T.mean()) / exp.T.std()).T
-
-        # data2 = data.rolling(int(3e4), axis=0).mean().dropna()
-        # plt.pcolor(data2)
-
-    def unsupervised(self, args, **kwargs):
-        """
-        RNASeqAnalysis.unsupervised is provided for backward compatibility only and will be removed
-        in the future.
-        Please use ngs_toolkit.general.unsupervised_analysis(RNASeqAnalysis) in the future.
-        """
-
-        _LOGGER.warning(
-            PendingDeprecationWarning(
-                "RNASeqAnalysis.unsupervised is provided for backward compatibility "
-                "only and will be removed. Please use "
-                "RNASeqAnalysis.unsupervised_analysis in the future."
-            )
-        )
-
-        self.unsupervised_analysis(args, **kwargs)
-
 
 def knockout_plot(
-    analysis=None,
-    knockout_genes=None,
-    expression_matrix=None,
-    comparison_results=None,
-    output_dir=None,
-    output_prefix="knockout_expression",
-    square=True,
-    rasterized=True,
-):
+        analysis=None,
+        knockout_genes=None,
+        matrix="matrix_norm",
+        samples=None,
+        comparison_results=None,
+        output_dir=None,
+        output_prefix="knockout_expression",
+        square=True,
+        rasterized=True):
     """
     Plot expression of knocked-out genes in all samples.
+
+    analysis : :class:`.RNASeqAnalysis`, optional
+        Analysis object.
+
+        Not required if `matrix` is given.
+    knockout_genes : :obj:`list`, optional
+        List of perturbed genes to plot.
+
+        Defaults to the set of `knockout` attributes in the analysis' samples if `analysis` is given. Otherwise must be given.
+    matrix : str, optional
+        Matrix with expression values to use.
+
+        Defaults to "matrix_norm"
+    samples : [type], optional
+        [description]
+
+        Defaults to :obj:`None`.
+    comparison_results : [type], optional
+        [description]
+
+        Defaults to :obj:`None`.
+    output_dir : [type], optional
+        [description]
+
+        Defaults to :obj:`None`.
+    output_prefix : str, optional
+        Prefix for output files.
+
+        Defaults to "knockout_expression"
+    square : bool, optional
+        Whether heatmap cells should have inforced aspect.
+
+        Defaults to :obj:`True`.
+    rasterized : bool, optional
+        Whether heatmap cells should be rasterized.
+
+        Defaults to :obj:`True`.
     """
+
     import scipy
     import seaborn as sns
 
-    if (analysis is None) and (expression_matrix is None):
+    if (analysis is None) and (matrix is None):
         raise AssertionError(
-            "One of `analysis` or `expression_matrix` must be provided."
+            "One of `analysis` or `matrix` must be provided."
         )
 
     msg = "If an `analysis` object is not provided, you must provide a list of `knockout_genes`."
@@ -599,8 +609,7 @@ def knockout_plot(
         except KeyError(msg) as e:
             raise e
 
-    if expression_matrix is None:
-        expression_matrix = analysis.expression
+    matrix = analysis.get_matrix(matrix=matrix, samples=samples)
 
     if output_dir is None:
         if analysis is not None:
@@ -610,15 +619,15 @@ def knockout_plot(
 
     knockout_genes = sorted(knockout_genes)
 
-    missing = [k for k in knockout_genes if k not in expression_matrix.index]
+    missing = [k for k in knockout_genes if k not in matrix.index]
     msg = "The following `knockout_genes` were not found in the expression matrix: '{}'".format(
         ", ".join(missing)
     )
     if len(missing) > 0:
         _LOGGER.warning(msg)
-    knockout_genes = [k for k in knockout_genes if k in expression_matrix.index]
+    knockout_genes = [k for k in knockout_genes if k in matrix.index]
 
-    ko = expression_matrix.loc[knockout_genes, :]
+    ko = matrix.loc[knockout_genes, :]
     msg = "None of the `knockout_genes` were found in the expression matrix.\nCannot proceed."
     if ko.empty:
         _LOGGER.warning(msg)
@@ -872,17 +881,6 @@ def assess_cell_cycle(
 ):
     """
     Predict cell cycle phase from expression data.
-
-    :param analysis: [description]
-    :type analysis: [type]
-    :param matrix: [description], defaults to None
-    :type matrix: [type], optional
-    :param output_dir: [description], defaults to None
-    :type output_dir: [type], optional
-    :param output_prefix: [description], defaults to "cell_cycle_assessment"
-    :type output_prefix: str, optional
-    :returns: [description]
-    :rtype: {[type]}
     """
     import anndata
     import scanpy.api as sc

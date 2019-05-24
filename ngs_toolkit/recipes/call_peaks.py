@@ -43,7 +43,7 @@ def add_args(parser):
         action="store_true",
         dest="pass_qc",
         help="Whether only samples with a 'pass_qc' attribute should be included."
-        " Default is False.",
+        " Default is :obj:`False`.",
     )
     parser.add_argument(
         "-j",

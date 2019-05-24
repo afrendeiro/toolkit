@@ -41,35 +41,42 @@ def submit_job(
 
     Parameters
     ----------
-    code : str
+    code : :obj:`str`
         String of command(s) to be run.
-    job_file : str
+    job_file : :obj:`str`
         File to write job ``code`` to.
-    log_file : str
+    log_file : :obj:`str`
         Log file to write job output to.
+
         Defaults to `job_file` with ".log" ending.
-    computing_configuration : str
+    computing_configuration : :obj:`str`
         Name of `divvy` computing configuration to use.
+
         Defaults to 'default' which is to run job in localhost.
-    dry_run : bool
+    dry_run: :obj:`bool`
         Whether not to actually run job.
-        Defaults to False
-    limited_number : bool
+
+        Defaults to False.
+    limited_number: :obj:`bool`
         Whether to restrict jobs to a maximum number.
         Currently only possible if using "slurm".
-        Defaults to False
-    total_job_lim : int
+
+        Defaults to False.
+    total_job_lim : :obj:`int`
         Maximum number of jobs to restrict to.
-        Defaults to 500
-    refresh_time : int
+
+        Defaults to 500.
+    refresh_time : :obj:`int`
         Time in between checking number of jobs in seconds.
+
         Defaults to 10.
-    in_between_time : int
+    in_between_time : :obj:`int`
         Time in between job submission in seconds.
+
         Defaults to 5.
-    **kwargs : dict
+    **kwargs : :obj:`dict`
         Additional keyword arguments will be passed to the chosen submission template according to `computing_configuration`.
-        Pass afor example "jobname"="job", "cores"=2, "mem"=8000, "partition"="longq".
+        Pass for example: jobname="job", cores=2, mem=8000, partition="longq".
     """
     import time
     import subprocess
@@ -92,7 +99,7 @@ def submit_job(
         time.sleep(in_between_time)
 
     if log_file is None:
-        log_file = "".join(job_file.split(".")[:-1]) + ".log"
+        log_file = ".".join(job_file.split(".")[:-1]) + ".log"
 
     # Get computing configuration from config
     if computing_configuration is None:
@@ -144,7 +151,7 @@ def chunks(l, n):
     ----------
     l : iterable
         Iterable (e.g. list or numpy array).
-    n : int
+    n : :obj:`int`
         Size of chunks to generate.
     """
     n = max(1, n)
@@ -182,7 +189,7 @@ def standard_score(x):
 
     Parameters
     ----------
-    x : numpy.array
+    x : :class:`numpy.array`
         Numeric array.
     """
     return (x - x.min()) / (x.max() - x.min())
@@ -194,7 +201,7 @@ def z_score(x):
 
     Parameters
     ----------
-    x : numpy.array
+    x : :class:`numpy.array`
         Numeric array.
     """
     return (x - x.mean()) / x.std()
@@ -206,7 +213,7 @@ def count_dataframe_values(x):
 
     Parameters
     ----------
-    x : pandas.DataFrame
+    x : :class:`pandas.DataFrame`
         Pandas DataFrame
 
     Returns
@@ -234,7 +241,7 @@ def bed_to_index(df):
 
     Parameters
     ----------
-    df : pandas.DataFrame
+    df : :class:`pandas.DataFrame`
         DataFrame with columns 'chr', 'start' and 'end'.
     """
     cols = ["chrom", "start", "end"]
@@ -258,7 +265,7 @@ def timedelta_to_years(x):
 
     Parameters
     ----------
-    x : pandas.TimeDelta
+    x : :class:`pandas.TimeDelta`
         A timedelta.
     """
     return x / np.timedelta64(60 * 60 * 24 * 365, "s")
@@ -272,11 +279,23 @@ def signed_max(x, f=0.66, axis=0):
     or across columns (row-wise, axis=1).
     Will return NaN for non-numeric values.
 
-    x : numpy.array Numeric array or pandas Dataframe or Series.
-    f : float Threshold fraction of majority agreement.
-    axis : int Whether to apply across rows (0, columns-wise) or across columns (1, row-wise).
-    :returns: Pandas Series with values reduced to the signed maximum.
-    :rtype: pandas.Series
+    Parameters
+    ----------
+    x : {:class:`numpy.array`, :class:`pandas.DataFrame`, :class:`pandas.Series`}
+        Input values to reduce
+    f : :obj:`float`
+        Threshold fraction of majority agreement.
+
+        Default is 0.66.
+    axis : :obj:`int`
+        Whether to apply across rows (0, column-wise) or across columns (1, row-wise).
+
+        Default is 0.
+
+    Returns
+    -------
+    :class:`pandas.Series`
+        Pandas Series with values reduced to the signed maximum.
     """
     if axis not in [0, 1]:
         raise ValueError("Axis must be one of 0 (columns) or 1 (rows).")
@@ -327,12 +346,13 @@ def log_pvalues(x, f=0.1):
     x : pandas.Series
         Series with numeric values
     f : float
-        Fraction to augment the maximum value by if ``x``
-        contains infinite values
+        Fraction to augment the maximum value by if ``x`` contains infinite values.
+
+        Defaults to 0.1.
 
     Returns
     -------
-    pandas.Series
+    :class:`pandas.Series`
         Transformed values
     """
     ll = -np.log10(x)
@@ -395,11 +415,11 @@ def recarray2pandas_df(recarray):
 #         for a flat peak, keep only the rising edge ('rising'), only the
 #         falling edge ('falling'), both edges ('both'), or don't detect a
 #         flat peak (None).
-#     kpsh : bool,optional (default = False)
+#     kpsh: :obj:`bool`,optional (default = False)
 #         keep peaks with same height even if they are closer than `mpd`.
-#     valley : bool,optional (default = False)
+#     valley: :obj:`bool`,optional (default = False)
 #         if True (1), detect valleys (local minima) instead of peaks.
-#     show : bool,optional (default = False)
+#     show: :obj:`bool`,optional (default = False)
 #         if True (1), plot data in matplotlib figure.
 #     ax : a matplotlib.axes.Axes instance,optional (default = None).
 
@@ -512,12 +532,12 @@ def collect_md5_sums(df):
 
     Parameters
     ----------
-    df : pandas.DataFrame
+    df : :class:`pandas.DataFrame`
         A dataframe with columns ending in '_md5sum'.
 
     Returns
     -------
-    pandas.DataFrame
+    :class:`pandas.DataFrame`
         DataFrame with md5sum columns replaced with the actual md5sums.
     """
     cols = df.columns[df.columns.str.endswith("_md5sum")]
@@ -697,9 +717,11 @@ def homer_peaks_to_bed(homer_peaks, output_bed):
     Convert HOMER peak calls to BED format.
     The fifth column (score) is the -log10(p-value) of the peak.
 
-    homer_peaks : str
+    Parameters
+    ----------
+    homer_peaks : :obj:`str`
         HOMER output with peak calls.
-    output_bed : str
+    output_bed : :obj:`str`
         Output BED file.
     """
     df = pd.read_csv(homer_peaks, sep="\t", comment="#", header=None)
@@ -714,26 +736,26 @@ def homer_peaks_to_bed(homer_peaks, output_bed):
 
 
 def macs2_call_chipseq_peak(
-    signal_samples, control_samples, output_dir, name, as_job=True
+    signal_samples, control_samples, output_dir, name, distributed=True
 ):
     """
     Call ChIP-seq peaks with MACS2 in a slurm job.
 
     Parameters
     ----------
-    signal_samples : list
+    signal_samples : :obj:`list`
         Signal Sample objects.
 
-    control_samples : list
+    control_samples : :obj:`list`
         Background Sample objects.
 
-    output_dir : list
+    output_dir : :obj:`list`
         Parent directory where MACS2 outputs will be stored.
 
-    name : str
+    name : :obj:`str`
         Name of the MACS2 comparison being performed.
 
-    as_job : bool
+    distributed: :obj:`bool`
         Whether to submit a SLURM job or to return a string with the runnable.
     """
     output_path = os.path.join(output_dir, name)
@@ -741,13 +763,13 @@ def macs2_call_chipseq_peak(
         os.mkdir(output_path)
 
     runnable = """date\nmacs2 callpeak -t {0} -c {1} -n {2} --outdir {3}\ndate""".format(
-        " ".join([s.filtered for s in signal_samples]),
-        " ".join([s.filtered for s in control_samples]),
+        " ".join([s.aligned_filtered_bam for s in signal_samples]),
+        " ".join([s.aligned_filtered_bam for s in control_samples]),
         name,
         output_path,
     )
 
-    if as_job:
+    if distributed:
         job_name = "macs2_{}".format(name)
         job_file = os.path.join(output_path, name + ".macs2.sh")
         submit_job(runnable, job_file, cores=4, jobname=job_name)
@@ -756,23 +778,23 @@ def macs2_call_chipseq_peak(
 
 
 def homer_call_chipseq_peak_job(
-    signal_samples, control_samples, output_dir, name, as_job=True
+    signal_samples, control_samples, output_dir, name, distributed=True
 ):
     """
     Call ChIP-seq peaks with MACS2 in a slurm job.
 
     Parameters
     ----------
-    signal_samples : list
+    signal_samples : :obj:`list`
         Signal Sample objects.
 
-    control_samples : list
+    control_samples : :obj:`list`
         Background Sample objects.
 
-    output_dir : list
+    output_dir : :obj:`list`
         Parent directory where MACS2 outputs will be stored.
 
-    name : str
+    name : :obj:`str`
         Name of the MACS2 comparison being performed.
     """
     output_path = os.path.join(output_dir, name)
@@ -781,12 +803,12 @@ def homer_call_chipseq_peak_job(
 
     # make tag directory for the signal and background samples separately
     signal_tag_directory = os.path.join(output_dir, "homer_tag_dir_" + name + "_signal")
-    fs = " ".join([s.filtered for s in signal_samples])
+    fs = " ".join([s.aligned_filtered_bam for s in signal_samples])
     runnable = """date\nmakeTagDirectory {0} {1}\n""".format(signal_tag_directory, fs)
     background_tag_directory = os.path.join(
         output_dir, "homer_tag_dir_" + name + "_background"
     )
-    fs = " ".join([s.filtered for s in control_samples])
+    fs = " ".join([s.aligned_filtered_bam for s in control_samples])
     runnable += """makeTagDirectory {0} {1}\n""".format(background_tag_directory, fs)
 
     # call peaks
@@ -807,7 +829,7 @@ def homer_call_chipseq_peak_job(
         signal=signal_tag_directory,
     )
 
-    if as_job:
+    if distributed:
         job_name = "homer_findPeaks_{}".format(name)
         job_file = os.path.join(output_path, name + ".homer.sh")
         submit_job(runnable, job_file, cores=4, jobname=job_name)
@@ -822,13 +844,13 @@ def bed_to_fasta(input_bed, output_fasta, genome_file):
 
     Parameters
     ----------
-    input_bed : str
+    input_bed : :obj:`str`
         Path to input BED file.
 
-    output_fasta : str
+    output_fasta : :obj:`str`
         Path to resulting FASTA file.
 
-    genome_file : str
+    genome_file : :obj:`str`
         Path to genome file in either 2bit or FASTA format.
         Will be guessed based on file ending.
 
@@ -856,13 +878,13 @@ def bed_to_fasta_through_2bit(input_bed, output_fasta, genome_2bit):
 
     Parameters
     ----------
-    input_bed : str
+    input_bed : :obj:`str`
         Path to input BED file.
 
-    output_fasta : str
+    output_fasta : :obj:`str`
         Path to resulting FASTA file.
 
-    genome_2bit : str
+    genome_2bit : :obj:`str`
         Path to genome 2bit file.
     """
     import subprocess
@@ -888,13 +910,13 @@ def bed_to_fasta_through_fasta(input_bed, output_fasta, genome_fasta):
 
     Parameters
     ----------
-    input_bed : str
+    input_bed : :obj:`str`
         Path to input BED file.
 
-    output_fasta : str
+    output_fasta : :obj:`str`
         Path to resulting FASTA file.
 
-    genome_fasta : str
+    genome_fasta : :obj:`str`
         Path to genome FASTA file.
     """
     import pybedtools
@@ -914,16 +936,16 @@ def count_reads_in_intervals(bam, intervals):
 
     Parameters
     ----------
-    bam : str
+    bam : :obj:`str`
         Path to BAM file.
 
-    intervals : list
+    intervals : :obj:`list`
         List of strings with genomic coordinates in format
         ``"chrom:start-end"``.
 
     Returns
     -------
-    dict
+    :obj:`dict`
         Dict of read counts for each interval.
     """
     import pysam
@@ -954,12 +976,12 @@ def normalize_quantiles_r(array):
 
     Parameters
     ----------
-    array : numpy.array
+    array : :class:`numpy.array`
         Numeric array to normalize.
 
     Returns
     -------
-    numpy.array
+    :class:`numpy.array`
         Normalized numeric array.
     """
     import rpy2.robjects as robjects
@@ -982,12 +1004,12 @@ def normalize_quantiles_p(df_input):
 
     Parameters
     ----------
-    df_input : pandas.DataFrame
+    df_input : :class:`pandas.DataFrame`
         Dataframe to normalize.
 
     Returns
     -------
-    numpy.array
+    :class:`numpy.array`
         Normalized numeric array.
     """
     df = df_input.copy()

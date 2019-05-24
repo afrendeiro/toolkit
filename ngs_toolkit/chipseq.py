@@ -17,47 +17,45 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
 
     Parameters
     ----------
-    name : str, optional
+    name : :obj:`str`, optional
         Name of the analysis.
-        Defaults to ``analysis``.
 
-    from_pep : str, optional
+        Defaults to "analysis".
+    from_pep : :obj:`str`, optional
         PEP configuration file to initialize analysis from.
         The analysis will adopt as much attributes from the PEP as possible
         but keyword arguments passed at initialization will still have priority.
-        Defaults to None (no PEP used).
 
-    from_pickle : str, optional
+        Defaults to :obj:`None` (no PEP used).
+    from_pickle : :obj:`str`, optional
         Pickle file of an existing serialized analysis object
         from which the analysis should be loaded.
-        Defaults to None (will not load).
 
-    root_dir : str, optional
+        Defaults to :obj:`None` (will not load).
+    root_dir : :obj:`str`, optional
         Base directory for the project.
-        Defaults to current directory or to what is specified in PEP if `from_pep`.
 
-    data_dir : str, optional
+        Defaults to current directory or to what is specified in PEP if `from_pep`.
+    data_dir : :obj:`str`, optional
         Directory containing processed data (e.g. by looper) that will
         be input to the analysis. This is in principle not required.
-        Defaults to ``data``.
 
-    results_dir : str, optional
+        Defaults to "data".
+    results_dir : :obj:`str`, optional
         Directory to contain outputs produced by the analysis.
-        Defaults to ``results``.
 
-    prj : peppy.Project, optional
+        Defaults to "results".
+    prj : :obj:`peppy.Project`, optional
         A ``peppy.Project`` object that this analysis is tied to.
-        Defaults to ``None``.
 
-    samples : list, optional
+        Defaults to :obj:`None`.
+    samples : :obj:`list`, optional
         List of ``peppy.Sample`` objects that this analysis is tied to.
-        Defaults to ``None``.
 
-    kwargs : dict, optional
+        Defaults to :obj:`None`.
+    kwargs : :obj:`dict`, optional
         Additional keyword arguments will be passed to parent class `ngs_toolkit.analysis.Analysis`.
-
     """
-
     def __init__(
         self,
         name=None,
@@ -95,11 +93,11 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
 
     def call_peaks_from_comparisons(
         self,
-        comparison_table,
+        comparison_table=None,
         output_dir="{results_dir}/chipseq_peaks",
         permissive=True,
         overwrite=True,
-        as_jobs=True,
+        distributed=True,
     ):
         """
         Call peaks for ChIP-seq samples using an annotation of which samples
@@ -107,21 +105,32 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
 
         Parameters
         ----------
-        comparison_table : pandas.DataFrame
+        comparison_table : :obj:`pandas.DataFrame`
             Comparison table with the following required columns:
             "comparison_name", "sample_name", "comparison_side", "sample_group".
 
-        output_dir : str
+            Defaults to analysis' own `comparison_table`.
+        output_dir : :obj:`str`
             Parent directory where peaks will be created.
-            Will be created if does not exist.
 
-        permissive : bool
+            Will be created if does not exist.
+        permissive: :obj:`bool`
             If incomplete/incoherent comparisons should be skipped or an error should be thrown.
+
+            Default is :obj:`True`.
+        overwrite: :obj:`bool`
+            If incomplete/incoherent comparisons should be skipped or an error should be thrown.
+
+            Default is :obj:`True`.
+        distributed: :obj:`bool`
+            Whether peak calling should be run in serial or in distributed mode as jobs.
+
+            Default is :obj:`True`.
 
         Raises
         ----------
         ValueError
-            Will be raised if not `permissive` and incomplete/incoherent comparisons are detected.
+            If not `permissive` and incomplete/incoherent comparisons are detected.
         """
         import subprocess
 
@@ -131,6 +140,8 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
         )
         from tqdm import tqdm
 
+        if comparison_table is None:
+            comparison_table = self.comparison_table
         req_columns = [
             "comparison_name",
             "sample_name",
@@ -171,6 +182,7 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
                     _LOGGER.warning(error)
                     continue
                 else:
+                    _LOGGER.error(error)
                     raise ValueError(error)
 
             # Get the sample names of samples in each side
@@ -187,17 +199,17 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
             signal_samples = [s for s in self.samples if s.name in pos_names]
             control_samples = [s for s in self.samples if s.name in neg_names]
 
-            if len(signal_samples) == 0 or len(control_samples) == 0:
+            if (len(signal_samples) == 0) or (len(control_samples) == 0):
                 error = "Comparison side for '{}' comparison does not contain samples.".format(
                     comparison
                 )
                 if permissive:
-                    _LOGGER.warning(error)
+                    print(error)
                     continue
                 else:
                     raise ValueError(error)
 
-            _LOGGER.info(
+            print(
                 "Doing comparison '{}' with positive samples '{}' and background samples '{}'".format(
                     comparison,
                     [s.name for s in signal_samples],
@@ -206,24 +218,12 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
             )
             # Call peaks
             cmds = list()
+            kwargs = {
+                "signal_samples": signal_samples, "control_samples": control_samples,
+                "output_dir": output_dir, "name": comparison, "distributed": distributed}
             if overwrite:
                 cmds += [
-                    macs2_call_chipseq_peak(
-                        signal_samples,
-                        control_samples,
-                        output_dir=output_dir,
-                        name=comparison,
-                        as_job=as_jobs,
-                    )
-                ]
-                cmds += [
-                    homer_call_chipseq_peak_job(
-                        signal_samples,
-                        control_samples,
-                        output_dir=output_dir,
-                        name=comparison,
-                        as_job=as_jobs,
-                    )
+                    macs2_call_chipseq_peak(**kwargs), homer_call_chipseq_peak_job(**kwargs)
                 ]
             else:
                 if not os.path.exists(
@@ -232,13 +232,7 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
                     )
                 ):
                     cmds += [
-                        macs2_call_chipseq_peak(
-                            signal_samples,
-                            control_samples,
-                            output_dir=output_dir,
-                            name=comparison,
-                            as_job=as_jobs,
-                        )
+                        macs2_call_chipseq_peak(**kwargs)
                     ]
                 if not os.path.exists(
                     os.path.join(
@@ -246,13 +240,7 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
                     )
                 ):
                     cmds += [
-                        homer_call_chipseq_peak_job(
-                            signal_samples,
-                            control_samples,
-                            output_dir=output_dir,
-                            name=comparison,
-                            as_job=as_jobs,
-                        )
+                        homer_call_chipseq_peak_job(**kwargs)
                     ]
                 else:
                     _LOGGER.warning(
@@ -261,7 +249,7 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
                         )
                     )
 
-            if not as_jobs:
+            if not distributed:
                 for cmd in cmds:
                     _LOGGER.info(
                         "Calling peaks for comparison '{}' with command: '{}'.\n".format(
@@ -272,50 +260,52 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
 
     def filter_peaks(
         self,
-        comparison_table,
-        filter_bed="blacklist.mm10_liftOver.bed",
+        comparison_table=None,
+        filter_bed=None,
         peaks_dir="{results_dir}/chipseq_peaks",
     ):
         """
-        Filter BED file for entries that overlap another BED file.
+        Filter peak calls for various comparisons for entries that do not overlap another BED file.
 
         Parameters
         ----------
-        input_bed : str
-            BED file to filter.
+        comparison_table : :obj:`pandas.DataFrame`, optional
+            Comparison table with the following required columns:
+            "comparison_name", "sample_name", "comparison_side", "sample_group".
 
-        filter_bed : str
-            BED file with entries to filter from input_bed.
+            Defaults to analysis' own `comparison_table`.
+        filter_bed : :obj:`str`
+            BED file with entries to filter out from the BED files of each comparison.
 
-        output_bed : str
-            Output BED file.
+            Defaults to the set of Blacklisted regions from the analysis' genome.
+            In that case it will be fetched if not present.
+        peaks_dir : :obj:`str`
+            Parent directory where peak calls for each comparison exist.
+            Will be created if does not exist.
+
+            Defaults to "{results_dir}/chipseq_peaks".
+
+        Raises
+        ----------
+        AttributeError
+            If `filter_bed` is not given and failes to be retrieved.
         """
         import pybedtools
         from ngs_toolkit.utils import homer_peaks_to_bed
 
-        if filter_bed == "blacklist.mm10_liftOver.bed":
-            _LOGGER.warning("Using blacklist features of mm10 genome!")
-
-        # Complement default `peaks_dir`
-        if "{results_dir}" in peaks_dir:
-            peaks_dir = os.path.abspath(peaks_dir.format(results_dir=self.results_dir))
-        if not os.path.exists(peaks_dir):
-            os.makedirs(peaks_dir)
-
-        @staticmethod
         def _filter(input_bed, filter_bed, output_bed):
             """
             Filter BED file for entries that overlap another BED file.
 
             Parameters
             ----------
-            input_bed : str
+            input_bed : :obj:`str`
                 BED file to filter.
 
-            filter_bed : str
+            filter_bed : :obj:`str`
                 BED file with entries to filter from input_bed.
 
-            output_bed : str
+            output_bed : :obj:`str`
                 Output BED file.
             """
             (
@@ -323,6 +313,25 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
                 .intersect(pybedtools.BedTool(filter_bed), v=True)
                 .saveas(output_bed)
             )
+
+        if comparison_table is None:
+            comparison_table = self.comparison_table
+
+        if filter_bed is None:
+            _LOGGER.info("Blacklist file not provided. Downloading...")
+            try:
+                filter_bed = self.get_resources(steps=["blacklist"])[
+                    "blacklist_file"
+                ]
+            except AttributeError:
+                msg = "Blacklist file was not provided and cannot be"
+                msg += " get one without analysis having `organism` and `genome` set."
+                _LOGGER.error(msg)
+                raise AttributeError(msg)
+
+        peaks_dir = self._format_string_with_attributes(peaks_dir)
+        if not os.path.exists(peaks_dir):
+            os.makedirs(peaks_dir)
 
         for comparison in comparison_table["comparison_name"].unique():
             # MACS2
@@ -339,7 +348,7 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
 
     def summarize_peaks_from_comparisons(
         self,
-        comparison_table,
+        comparison_table=None,
         output_dir="{results_dir}/chipseq_peaks",
         filtered=True,
         permissive=True,
@@ -350,14 +359,14 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
 
         Parameters
         ----------
-        comparison_table : pandas.DataFrame
+        comparison_table : :obj:`pandas.DataFrame`, optional
             Comparison table with the following required columns:
             "comparison_name", "sample_name", "comparison_side", "sample_group".
 
-        output_dir : str
+            Defaults to analysis' own `comparison_table`.
+        output_dir : :obj:`str`
             Parent directory where peaks will be created. Will be created if does not exist.
-
-        permissive : bool
+        permissive: :obj:`bool`
             If incomplete/incoherent comparisons should be skipped or an error should be thrown.
 
         Raises
@@ -366,6 +375,9 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
             Will be raised if not `permissive` and incomplete/incoherent comparisons are detected.
         """
         from ngs_toolkit.utils import homer_peaks_to_bed
+
+        if comparison_table is None:
+            comparison_table = self.comparison_table
 
         req_columns = [
             "comparison_name",
@@ -472,40 +484,40 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
 
         Parameters
         ----------
-        comparison_table : pandas.DataFrame
+        comparison_table : :obj:`pandas.DataFrame`, optional
             DataFrame with signal/background combinations used to call peaks
 
-        peak_dir : str, optional
+            Defaults to analysis' own `comparison_table`.
+        peak_dir : :obj:`str`, optional
             Path to peaks output directory.
-            Defaults to {analysis.results_dir}/chipseq_peaks
 
-        region_type : str, optional
+            Defaults to `{analysis.results_dir}/chipseq_peaks`.
+        region_type : :obj:`str`, optional
             Type of region to use.
             One of "summits" or "peaks".
-            Default is "summits".
 
-        extension : int, optional
+            Default is "peaks".
+        extension : :obj:`int`, optional
             Width to extend peak summits is `region_type` is "summits".
-            Default is 250.
 
-        blacklist_bed : str, optional
+            Default is 250.
+        blacklist_bed : :obj:`str`, optional
             A BED file with genomic positions to exclude from consensus peak set.
+
             Will try to download if not given.
 
         Attributes
         ----------
-        sites : pybedtools.BedTool
-            Bedtool with consensus sites
+        sites : :class:`pybedtools.BedTool`
+            Bedtool with consensus sites.
         """
         import re
         from ngs_toolkit.general import get_blacklist_annotations
         import pybedtools
         from tqdm import tqdm
 
-        msg = "Function needs a `comparison_table` keyword argument."
         if "comparison_table" not in kwargs:
-            _LOGGER(msg)
-            raise ValueError(msg)
+            comparison_table = self.comparison_table
         else:
             comparison_table = kwargs["comparison_table"]
 
@@ -513,7 +525,7 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
             peak_dir = os.path.join(self.results_dir, "chipseq_peaks")
 
         if "region_type" not in kwargs:
-            region_type = "summits"
+            region_type = "peaks"
         if region_type not in ["summits", "peaks"]:
             msg = "`region_type` attribute must be one of 'summits' or 'peaks'!"
             _LOGGER.error(msg)
@@ -615,19 +627,6 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
             os.path.join(self.results_dir, self.name + ".peak_set.bed")
         )
 
-    def set_consensus_sites(self, bed_file, overwrite=True):
-        """
-        Set consensus (union) sites across samples.
-        Will be stored in a `sites` attribute.
-        """
-        import pybedtools
-
-        self.sites = pybedtools.BedTool(bed_file)
-        if overwrite:
-            self.sites.saveas(
-                os.path.join(self.results_dir, self.name + ".peak_set.bed")
-            )
-
     def calculate_peak_support(self, **kwargs):
         """
         Calculate a measure of support for each region in peak set
@@ -635,25 +634,24 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
 
         Parameters
         ----------
-        comparison_table : pandas.DataFrame
+        comparison_table : :obj:`pandas.DataFrame`, optional
             DataFrame with signal/background combinations used to call peaks
 
-        peak_dir : str, optional
+            Defaults to analysis' own `comparison_table`.
+        peak_dir : :obj:`str`, optional
             Path to peaks output directory.
             Defaults to {analysis.results_dir}/chipseq_peaks
 
         Attributes
         ----------
-        support : pandas.DataFrame
+        support : :obj:`pandas.DataFrame`
             DataFrame with signal/background combinations used to call peaks
         """
         import pybedtools
         from tqdm import tqdm
 
-        msg = "Function needs a `comparison_table` keyword argument."
         if "comparison_table" not in kwargs:
-            _LOGGER(msg)
-            raise ValueError(msg)
+            comparison_table = self.comparison_table
         else:
             comparison_table = kwargs["comparison_table"]
         if "peak_dir" not in kwargs:
@@ -745,7 +743,7 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
 
         Parameters
         ----------
-        comparisons : list
+        comparisons : :obj:`list`
             Iterable of comparison names to restrict to.
             Must match name of comparisons used in comparison_table.
 
@@ -759,3 +757,89 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
             _LOGGER.error(msg)
             raise ValueError(msg)
         return self.support[[c for c in kwargs["comparisons"]]].sum(1) != 0
+
+    def normalize_by_background(
+            self,
+            comparison_table=None,
+            reduction_func=np.mean,
+            comparison_func=np.subtract,
+            by_group=False,
+            matrix="matrix_norm",
+            samples=None):
+        """
+        Normalize values in matrix by background samples in a comparison-specific way as specified in `comparison_table`.
+
+        The background samples will be pooled by the `reduction_func` and their values wil be removed
+        from the signal samples using the `comparison_func`.
+
+        Parameters
+        ----------
+        comparison_table : :class:`pandas.DataFrame`
+            Table with comparisons from which peaks were called.
+
+            Defaults to analysis' `comparison_table`.
+        reduction_func : func
+            Function to reduce the region to gene values to.
+
+            Defaults to :obj:`numpy.mean`.
+        comparison_func : func
+            Function to use for normalization of signal samples against background samples.
+            You can also try for example :obj:`numpy.divide`.
+
+            Defaults to :obj:`numpy.subtract`.
+        by_group : :obj:`bool`
+            Whether output should be by group (:obj:`True`) or for each sample (:obj:`False`).
+
+            Default is :obj:`False`.
+        matrix : {:class:`pandas.DataFrame`, :obj:`str`, optional}
+            Name of attribute or pandas DataFrame to use.
+
+            Defaults to "matrix_norm".
+        samples : :obj:`list`, optional
+            Subset of samples to consider.
+
+            Defaults to all samples in analysis.
+
+        Returns
+        -------
+        :class:`pandas.DataFrame`
+            Dataframe with values normalized by background samples.
+        """
+        if comparison_table is None:
+            comparison_table = self.comparison_table
+        if samples is None:
+            samples = self.samples
+        matrix = self.get_matrix(matrix, samples=samples)
+
+        comparisons = set(comparison_table['comparison_name'])
+        s_names = [s.name for s in samples]
+        if not by_group:
+            res = pd.DataFrame(index=matrix.index)
+            for comparison in comparisons:
+                comp = comparison_table.query("comparison_name == '{}'".format(comparison))
+                signal_samples = [s for s in comp.query("comparison_side == 1")['sample_name'] if s in s_names]
+                background_samples = [s for s in comp.query("comparison_side == 0")['sample_name'] if s in s_names]
+
+                for s in signal_samples:
+                    res.loc[:, s] = comparison_func(
+                        matrix.loc[:, s],
+                        matrix.loc[:, background_samples].apply(reduction_func, axis=1)
+                        if reduction_func != np.mean
+                        else matrix.loc[:, background_samples].mean(axis=1))
+        if by_group:
+            comparisons = set(comparison_table['comparison_name'])
+            s_names = [s.name for s in samples]
+            res = pd.DataFrame(index=matrix.index, columns=comparisons)
+            for comparison in comparisons:
+                comp = comparison_table.query("comparison_name == '{}'".format(comparison))
+                signal_samples = [s for s in comp.query("comparison_side == 1")['sample_name'] if s in s_names]
+                background_samples = [s for s in comp.query("comparison_side == 0")['sample_name'] if s in s_names]
+
+                res.loc[:, comparison] = comparison_func(
+                    matrix.loc[:, signal_samples].apply(reduction_func, axis=1)
+                    if reduction_func != np.mean
+                    else matrix.loc[:, signal_samples].mean(axis=1),
+                    matrix.loc[:, background_samples].apply(reduction_func, axis=1)
+                    if reduction_func != np.mean
+                    else matrix.loc[:, background_samples].mean(axis=1))
+        return res

@@ -744,7 +744,7 @@ class Analysis(object):
         ----------
         output_map : :obj:`dict`
             Dictionary with {attribute_name: (file_path, kwargs)} to load the files.
-            The kwargs in the tuple will be passed to pandas.read_csv.
+            The kwargs in the tuple will be passed to :func:`pandas.read_csv`.
 
             Default is the required to read the keys in ``only_these_keys``.
         only_these_keys : :obj:`list`, optional
@@ -1426,11 +1426,7 @@ class Analysis(object):
         stats : :class:`pandas.DataFrame`
             A DataFrame with statistics for each feature.
         """
-        if samples is None:
-            samples = self.samples
-        matrix = getattr(self, matrix)
-
-        matrix = matrix.loc[:, [s.name for s in samples]]
+        matrix = self.get_matrix(matrix=matrix, samples=samples)
 
         metrics = pd.DataFrame(index=pd.Index(matrix.index, name=self.var_unit_name))
         # calculate mean coverage
@@ -1575,23 +1571,24 @@ class Analysis(object):
         ----------
         matrix : :obj:`str`, optional
             Attribute name of matrix to annotate.
-            Defaults to "matrix_norm".
 
+            Defaults to "matrix_norm".
         attributes : :obj:`list`, optional
             Desired attributes to be annotated.
-            Defaults to all attributes in the original sample annotation sheet of the analysis' Project.
 
+            Defaults to all attributes in the original sample annotation sheet of the analysis' Project.
         numerical_attributes : :obj:`list`, optional
             Attributes which are numeric even though they
             might be so in the samples" attributes. Will attempt
             to convert values to numeric.
-
         save: :obj:`bool`, optional
             Whether to write normalized DataFrame to disk.
-            Default is :obj:`True`.
 
+            Default is :obj:`True`.
         assign: :obj:`bool`, optional
             Whether to assign the normalized DataFrame to "matrix_norm".
+
+            Default is :obj:`True`.
 
         Returns
         -------
@@ -1705,7 +1702,6 @@ class Analysis(object):
 
         Parameters
         ----------
-
         index : pandas.Index, optional
             Pandas Index to use.
 
@@ -1910,10 +1906,10 @@ class Analysis(object):
             Defaults to :obj:`True`.
         pallete : :obj:`str`
             Color pallete to use in levels of `attributes_to_plot`. Will be passed to
-            `analysis.get_level_colors`.
+            :func:`~ngs_toolkit.analysis.Analysis.get_level_colors`.
         cmap : :obj:`str`
             Color map to use in numerical levels of `attributes_to_plot`.
-            Will be passed to `analysis.get_level_colors`.
+            Will be passed to :func:`~ngs_toolkit.analysis.Analysis.get_level_colors`.
         rasterized: :obj:`bool`, optional
             Whether elements with many objects should be rasterized.
 
@@ -1927,7 +1923,7 @@ class Analysis(object):
 
             Defaults to "{results_dir}/unsupervised_analysis_{data_type}".
         **kwargs: optional
-            kwargs are passed to ngs_toolkit.graphics.plot_projection
+            kwargs are passed to :func:`~ngs_toolkit.graphics.plot_projection`.
         """
         from collections import defaultdict
         import itertools
@@ -2417,7 +2413,7 @@ class Analysis(object):
 
             Defaults to :obj:`False`.
         kwargs : :obj:`dict`, optional
-            Additional keyword arguments are passed to `utils.submit_job` and then to the
+            Additional keyword arguments are passed to :func:`~ngs_toolkit.utils.submit_job` and then to the
             chosen `divvy` submission template according to `computing_configuration`.
             Pass for example `cores=4, mem=8000, partition="longq", time="08:00:00"`.
 
@@ -2945,10 +2941,10 @@ class Analysis(object):
             Defaults to all of analysis.group_attributes.
         pallete : :obj:`str`
             Color pallete to use in levels of `group_attributes`.
-            Will be passed to `analysis.get_level_colors`.
+            Will be passed to :func:`~ngs_toolkit.analysis.Analysis.get_level_colors`.
         cmap : :obj:`str`
             Color map to use in numerical levels of `group_attributes`.
-            Will be passed to `analysis.get_level_colors`.
+            Will be passed to :func:`~ngs_toolkit.analysis.Analysis.get_level_colors`.
         """
         # TODO: split plotting into smaller parts
         import matplotlib.pyplot as plt

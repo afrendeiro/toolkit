@@ -1968,7 +1968,7 @@ def project_to_geo(
     distributed: :obj:`bool`, optional
         Whether processing should be distributed as jobs in a computing cluster for each sample.
         Currently available implementation supports a SLURM cluster only.
-        Defaults to False.
+        Defaults to :obj:`False`.
 
     dry_run: :obj:`bool`, optional
         Whether copy/execution/submisison commands should be not be run to test.
@@ -2189,16 +2189,19 @@ def query_biomart(attributes=None, species="hsapiens", ensembl_version="grch37")
     Query Biomart for gene attributes. Returns pandas dataframe with query results.
     If a certain field contains commas, it will attemp to return dataframe but it might fail.
 
+    Parameters
+    ----------
     attributes : :obj:`list`, optional
         List of ensembl atrributes to query.
-        Defaults to ["ensembl_gene_id", "external_gene_name", "hgnc_id", "hgnc_symbol"].
 
+        Defaults to ["ensembl_gene_id", "external_gene_name", "hgnc_id", "hgnc_symbol"].
     species : :obj:`str`, optional
         Ensembl string of species to query. Must be vertebrate.
-        Defaults to "hsapiens".
 
+        Defaults to "hsapiens".
     ensembl_version : :obj:`str`, optional
         Ensembl version to query. Currently "grch37", "grch38" and "grcm38" are tested.
+
         Defaults to "grch37".
 
     Returns

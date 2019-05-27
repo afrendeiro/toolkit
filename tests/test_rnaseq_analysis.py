@@ -99,14 +99,9 @@ def analysis(tmp_path):
 
     # first edit the defaul path to the annotation sheet
     config = os.path.join(tmp_path, project_name, "metadata", "project_config.yaml")
-    prj_path = os.path.join(tmp_path, project_name)
-    os.chdir(prj_path)
-
     # project and associated analysis
     analysis = RNASeqAnalysis(
-        name=project_name,
-        prj=Project(config),
-        results_dir=os.path.join(prj_path, "results"),
+        from_pep=config,
     )
     analysis.load_data()
 

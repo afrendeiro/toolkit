@@ -381,6 +381,13 @@ def log_pvalues(x, f=0.1):
 
 
 def fix_dataframe_header(df, force_dtypes=float):
+    # First try to see whether it is not a MultiIndex after all
+    if df.index.isna().any().sum() == 1:
+        df.columns = df.loc[df.index.isna(), :].squeeze()
+        df.columns.name = None
+        df.index.name = None
+        return df.loc[~df.index.isna()]
+    # If so, get potential categorical columns and prepare MultiIndex with them
     cols = list()
     for i in df.index[:300]:
         try:
@@ -548,7 +555,7 @@ def collect_md5_sums(df):
     Given a dataframe with columns with paths to md5sum files ending in '_md5sum',
     replace the paths to the md5sum files with the actual checksums.
 
-    Useful to use in combination with ``project_to_geo``.
+    Useful to use in combination with :func:`~ngs_toolkit.general.project_to_geo`.
 
     Parameters
     ----------

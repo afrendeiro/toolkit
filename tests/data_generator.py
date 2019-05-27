@@ -132,7 +132,7 @@ class RandomDataGenerator(object):
         g = query_biomart(
             attributes=["external_gene_name"], ensembl_version=m[genome_assembly], species=o[genome_assembly]
         ).squeeze()
-        return pd.Series(np.random.choice(g, size)).sort_values()
+        return pd.Series(np.random.choice(g, size, replace=False)).sort_values()
 
     @staticmethod
     def get_genomic_bins(

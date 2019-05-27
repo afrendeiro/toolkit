@@ -17,11 +17,6 @@ ngs_toolkit.analysis
 .. automodule:: ngs_toolkit.analysis
     :members:
 
-ngs_toolkit.general
------------------------
-.. automodule:: ngs_toolkit.general
-    :members:
-
 ngs_toolkit.atacseq
 -----------------------
 .. automodule:: ngs_toolkit.atacseq
@@ -40,6 +35,11 @@ ngs_toolkit.cnv
 ngs_toolkit.rnaseq
 -----------------------
 .. automodule:: ngs_toolkit.rnaseq
+    :members:
+
+ngs_toolkit.general
+-----------------------
+.. automodule:: ngs_toolkit.general
     :members:
 
 ngs_toolkit.graphics

@@ -56,34 +56,28 @@ class CNVAnalysis(Analysis):
     kwargs : :obj:`dict`, optional
         Additional keyword arguments will be passed to parent class :class:`~ngs_toolkit.analysis.Analysis`.
 
-    :Example:
+    Examples
+    --------
+    >>> from ngs_toolkit.cnv import CNVAnalysis
 
-    .. code-block:: python
-        from ngs_toolkit.cnv import CNVAnalysis
+    This is an example of a CNV analysis:
 
-        pep = "metadata/project_config.yaml"
-        a = CNVAnalysis(from_pep=pep)
-
-        # Get consensus peak set from all samples
-        a.get_cnv_data()
-
-        # Normalize
-        a.normalize(method="median")
-
-        # Segmentation
-        a.segment_genome()
-
-        # General plots
-        a.plot_all_data()
-        a.plot_segmentation_stats()
-
-        # Unsupervised analysis
-        a.unsupervised_analysis()
-
-        # Save object
-        a.to_pickle()
+    >>> pep = "metadata/project_config.yaml"
+    >>> a = CNVAnalysis(from_pep=pep)
+    >>> # Get consensus peak set from all samples
+    >>> a.get_cnv_data()
+    >>> # Normalize
+    >>> a.normalize(method="median")
+    >>> # Segmentation
+    >>> a.segment_genome()
+    >>> # General plots
+    >>> a.plot_all_data()
+    >>> a.plot_segmentation_stats()
+    >>> # Unsupervised analysis
+    >>> a.unsupervised_analysis()
+    >>> # Save object
+    >>> a.to_pickle()
     """
-
     def __init__(
         self,
         name=None,

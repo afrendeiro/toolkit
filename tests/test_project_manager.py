@@ -26,22 +26,39 @@ def test_project_creation(tmp_path):
 
     project_name = "test_project"
     annotation_vars = [
-        "sample_name", "toggle", "pass_qc", "protocol", "library",
-        "cell_line", "cell_type", "condition",
-        "experimental_batch", "experiment_name", "replicate",
-        "organism", "flowcell", "lane", "BSF_name", "data_source"]
+        "sample_name",
+        "toggle",
+        "pass_qc",
+        "protocol",
+        "library",
+        "cell_line",
+        "cell_type",
+        "condition",
+        "experimental_batch",
+        "experiment_name",
+        "replicate",
+        "organism",
+        "flowcell",
+        "lane",
+        "BSF_name",
+        "data_source",
+    ]
 
-    genome_assemblies = {k: v for x in _CONFIG["default_genome_assemblies"]
-                         for k, v in x.items()}
+    genome_assemblies = {
+        k: v
+        for x in _CONFIG["preferences"]["default_genome_assemblies"]
+        for k, v in x.items()
+    }
     create_project(
-        project_name, tmp_path, genome_assemblies=genome_assemblies, overwrite=True)
+        project_name, genome_assemblies=genome_assemblies, overwrite=True, root_projects_dir=tmp_path,
+    )
 
     expected_files = [
         os.path.join(tmp_path, project_name, ".git"),
         os.path.join(tmp_path, project_name, "metadata"),
         os.path.join(tmp_path, project_name, "metadata", "project_config.yaml"),
         os.path.join(tmp_path, project_name, "metadata", "annotation.csv"),
-        os.path.join(tmp_path, project_name, "metadata", "merge_table.csv"),
+        os.path.join(tmp_path, project_name, "metadata", "sample_subannotation.csv"),
         os.path.join(tmp_path, project_name, "metadata", "comparison_table.csv"),
     ]
     for f in expected_files:

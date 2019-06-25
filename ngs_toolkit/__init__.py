@@ -1,23 +1,34 @@
 from ._version import __version__
+import divvy as _divvy
 
 
 def setup_logger(level="INFO", logfile=None):
     """
     Set up a logger for the library.
 
-    :param level: Level of logging to display. Defaults to "INFO". See possible levels here: https://docs.python.org/2/library/logging.html#levels
-    :type level: str, optional
-    :param logfile: File to write log to. Defaults to ``~/ngs_toolkit.log.txt``
-    :type logfile: str, optional
-    :returns: The logger
-    :rtype: logging.Logger
+    Parameters
+    ----------
+
+    level : :obj:`str`, optional
+        Level of logging to display.
+        See possible levels here: https://docs.python.org/2/library/logging.html#levels
+
+        Defaults to "INFO".
+
+    logfile : :obj:`str`, optional
+        File to write log to.
+
+        Defaults to ``~/.ngs_toolkit.log.txt``.
+
+    Returns
+    -------
+    :class:`logging.Logger`
+        A logger called "ngs_toolkit".
     """
     import logging
     import os
 
-    global _LOGGER
-
-    _LOGGER = logging.getLogger('ngs_toolkit')
+    _LOGGER = logging.getLogger("ngs_toolkit")
     _LOGGER.setLevel(logging.DEBUG)
     # create file handler which logs even debug messages
     if logfile is None:
@@ -28,9 +39,10 @@ def setup_logger(level="INFO", logfile=None):
     ch = logging.StreamHandler()
     ch.setLevel(logging.getLevelName(level))
     # create formatter and add it to the handlers
-    fmt = ("ngs_toolkit.v{}:%(module)s:L%(lineno)d (%(funcName)s) [%(levelname)s] %(asctime)s > %(message)s"
-           .format(__version__))
-    formatter = logging.Formatter(fmt, datefmt='%Y-%m-%d %H:%M:%S')
+    fmt = "ngs_toolkit.v{}:%(module)s:L%(lineno)d (%(funcName)s) [%(levelname)s] %(asctime)s > %(message)s".format(
+        __version__
+    )
+    formatter = logging.Formatter(fmt, datefmt="%Y-%m-%d %H:%M:%S")
     fh.setFormatter(formatter)
     fmt = "ngs_toolkit:%(module)s:L%(lineno)d (%(funcName)s) [%(levelname)s] > %(message)s"
     formatter = logging.Formatter(fmt)
@@ -39,8 +51,11 @@ def setup_logger(level="INFO", logfile=None):
     _LOGGER.addHandler(fh)
     _LOGGER.addHandler(ch)
 
-    _LOGGER.debug("This is ngs_toolkit (http://ngs-toolkit.rtfd.io), version: {}"
-                  .format(__version__))
+    _LOGGER.debug(
+        "This is ngs_toolkit (http://ngs-toolkit.rtfd.io), version: {}".format(
+            __version__
+        )
+    )
     return _LOGGER
 
 
@@ -52,29 +67,40 @@ def setup_config(custom_yaml_config=None):
     tries to update it by reading a file in ``~/.ngs_toolkit.config.yaml`` if present,
     and lastly, updates it by reading a possible passed yaml file ``custom_yaml_config``.
     Non-exisiting fields will maintain the previous values, so that the user needs only
-    to specify the section(s) (s)he needs.
+    to specify the section(s) as needed.
 
-    :param custom_yaml_config: Path to YAML file with configuration.
-                               To see the structure of the YAML file, see
-                               https://github.com/afrendeiro/toolkit/blob/master/ngs_toolkit/config/default.yaml
-    :type custom_yaml_config: str, optional
-    :returns: Dictionary with configurations
-    :rtype: dict
+    Parameters
+    ----------
+    custom_yaml_config : :obj:`str`, optional
+        Path to YAML file with configuration.
+        To see the structure of the YAML file, see
+        https://github.com/afrendeiro/toolkit/blob/master/ngs_toolkit/config/default.yaml
+
+        Defaults to :obj:`None`.
+
+    Returns
+    -------
+    dict
+        Dictionary with configurations.
     """
     import pkg_resources
     import os
     import yaml
 
-    global _CONFIG
-
-    default_config_path = 'config/default.yaml'
+    default_config_path = "config/default.yaml"
     default_config_path = pkg_resources.resource_filename(__name__, default_config_path)
-    _LOGGER.debug("Reading default configuration file distributed with package from '{}'.".format(default_config_path))
+    _LOGGER.debug(
+        "Reading default configuration file distributed with package from '{}'.".format(
+            default_config_path
+        )
+    )
     try:
-        _CONFIG = yaml.safe_load(open(default_config_path, 'r'))
+        _CONFIG = yaml.safe_load(open(default_config_path, "r"))
         _LOGGER.debug("Default config: {}".format(_CONFIG))
     except IOError:
-        _LOGGER.error("Couldn't read configuration file from '{}'.".format(default_config_path))
+        _LOGGER.error(
+            "Couldn't read configuration file from '{}'.".format(default_config_path)
+        )
         _CONFIG = dict()
 
     user_config_path = os.path.join(os.path.expanduser("~"), ".ngs_toolkit.config.yaml")
@@ -85,13 +111,25 @@ def setup_config(custom_yaml_config=None):
             custom_config = yaml.safe_load(open(user_config_path, "r"))
             _LOGGER.debug("Custom user config: {}".format(custom_config))
             # Update config
-            _LOGGER.debug("Updating configuration with custom file from '{}'.".format(user_config_path))
+            _LOGGER.debug(
+                "Updating configuration with custom file from '{}'.".format(
+                    user_config_path
+                )
+            )
             _CONFIG.update(custom_config)
             _LOGGER.debug("Current config: {}".format(custom_config))
         except IOError:
-            _LOGGER.error("Configuration file from '{}' exists but is not readable. Ignoring.".format(user_config_path))
+            _LOGGER.error(
+                "Configuration file from '{}' exists but is not readable. Ignoring.".format(
+                    user_config_path
+                )
+            )
     else:
-        _LOGGER.debug("To use custom configurations including paths to static files, create a '{}' file.".format(user_config_path))
+        _LOGGER.debug(
+            "To use custom configurations including paths to static files, create a '{}' file.".format(
+                user_config_path
+            )
+        )
 
     if custom_yaml_config is not None:
         # Read up
@@ -99,24 +137,65 @@ def setup_config(custom_yaml_config=None):
             custom_config = yaml.safe_load(open(custom_yaml_config, "r"))
             _LOGGER.debug("Custom passed config: {}".format(custom_config))
             # Update config
-            _LOGGER.debug("Updating configuration with custom file from '{}'.".format(custom_yaml_config))
+            _LOGGER.debug(
+                "Updating configuration with custom file from '{}'.".format(
+                    custom_yaml_config
+                )
+            )
             _CONFIG.update(custom_config)
             _LOGGER.debug("Current config: {}".format(custom_config))
         except IOError as e:
-            _LOGGER.error("Pased configuration file from '{}' exists but is not readable.".format(custom_yaml_config))
+            _LOGGER.error(
+                "Pased configuration file from '{}' exists but is not readable.".format(
+                    custom_yaml_config
+                )
+            )
             raise e
 
     return _CONFIG
 
 
+def setup_graphic_preferences():
+    """
+    Set up graphic preferences.
+
+    It uses the values under "preferences:graphics:matplotlib:rcParams"
+    and "preferences:graphics:seaborn:parameters" to matplotlib and seaborn respectively.
+    """
+    import matplotlib
+    import seaborn as sns
+
+    # matplotlib
+    rc_params = _CONFIG["preferences"]["graphics"]["matplotlib"]["rcParams"]
+    matplotlib.rcParams.update(rc_params)
+    matplotlib.rcParams["svg.fonttype"] = "none"
+    matplotlib.rc("text", usetex=False)
+
+    # seaborn
+    seaborn_params = _CONFIG["preferences"]["graphics"]["seaborn"]["parameters"]
+    sns.set(**seaborn_params)
+
+
 def clear_log():
     import os
+
     logfile = os.path.join(os.path.expanduser("~"), ".ngs_toolkit.log.txt")
     open(logfile, "w")
 
 
-setup_logger()
-setup_config()
+# setup
+_LOGGER = setup_logger()
+_CONFIG = setup_config()
+setup_graphic_preferences()
 
-_LOGGER
-_CONFIG
+
+# reduce level of logging from divvy
+_divvy.logging.getLogger("divvy").setLevel("ERROR")
+
+
+# easier API
+from ngs_toolkit.analysis import Analysis
+from ngs_toolkit.atacseq import ATACSeqAnalysis
+from ngs_toolkit.chipseq import ChIPSeqAnalysis
+from ngs_toolkit.cnv import CNVAnalysis
+from ngs_toolkit.rnaseq import RNASeqAnalysis

@@ -6,7 +6,6 @@ import os
 import yaml
 from peppy import Project
 from ngs_toolkit.atacseq import ATACSeqAnalysis
-from ngs_toolkit.general import differential_analysis, plot_differential
 
 
 @pytest.fixture
@@ -25,23 +24,35 @@ def analysis(tmp_path):
     n_replicates = 10
     for organism, genome_assembly in [genome_assemblies[0]]:
         project_name = "{}_{}_{}_{}_{}_{}".format(
-            project_prefix_name, data_type, genome_assembly,
-            n_factors, n_variables, n_replicates)
+            project_prefix_name,
+            data_type,
+            genome_assembly,
+            n_factors,
+            n_variables,
+            n_replicates,
+        )
 
         generate_project(
             output_dir=tmp_path,
-            project_name=project_name, genome_assembly=genome_assembly, data_type=data_type,
-            n_factors=n_factors, n_replicates=n_replicates, n_variables=n_variables,
-            group_fold_differences=[20])
+            project_name=project_name,
+            genome_assembly=genome_assembly,
+            data_type=data_type,
+            n_factors=n_factors,
+            n_replicates=n_replicates,
+            n_variables=n_variables,
+            group_fold_differences=[20],
+        )
 
         # first edit the defaul path to the annotation sheet
-        config = os.path.join(
-            tmp_path, project_name, "metadata", "project_config.yaml")
-        c = yaml.safe_load(open(config, 'r'))
-        c['metadata']['sample_annotation'] = os.path.abspath(
-            os.path.join(tmp_path, project_name, "metadata", "annotation.csv"))
-        c['metadata']['comparison_table'] = os.path.abspath(
-            os.path.join(tmp_path, project_name, "metadata", "comparison_table.csv"))
+        config = os.path.join(tmp_path, project_name, "metadata", "project_config.yaml")
+        c = yaml.safe_load(open(config, "r"))
+        c["metadata"]["output_dir"] = os.path.abspath(tmp_path)
+        c["metadata"]["sample_annotation"] = os.path.abspath(
+            os.path.join(tmp_path, project_name, "metadata", "annotation.csv")
+        )
+        c["metadata"]["comparison_table"] = os.path.abspath(
+            os.path.join(tmp_path, project_name, "metadata", "comparison_table.csv")
+        )
         yaml.safe_dump(c, open(config, "w"))
 
         prj_path = os.path.join(tmp_path, project_name)
@@ -51,14 +62,14 @@ def analysis(tmp_path):
         a = ATACSeqAnalysis(
             name=project_name,
             prj=Project(config),
-            results_dir=os.path.join(prj_path, "results"))
+            results_dir=os.path.join(prj_path, "results"),
+        )
         a.set_project_attributes()
         a.load_data()
 
-        a.normalize(method="total")
-        a.normalize(method="quantile")
-        a.annotate_with_sample_metadata(quant_matrix="coverage_qnorm")
-        differential_analysis(a)
+        a.normalize(method="rpm")
+        a.annotate_samples()
+        a.differential_analysis(filter_support=False)
         # # Sometimes the DESeq2 call fails, but it often works if repeated
         # i = 1
         # max_attempts = 10
@@ -78,8 +89,9 @@ def analysis(tmp_path):
 
 @pytest.fixture
 def outputs(analysis):
-    prefix = os.path.join(analysis.results_dir,
-                          "differential_analysis_ATAC-seq", "differential_analysis.")
+    prefix = os.path.join(
+        analysis.results_dir, "differential_analysis_ATAC-seq", "differential_analysis."
+    )
     outputs = [
         prefix + "diff_region.samples.clustermap.corr.svg",
         prefix + "diff_region.samples.clustermap.svg",
@@ -95,13 +107,14 @@ def outputs(analysis):
         prefix + "pvalue.distribution.per_comparison.svg",
         prefix + "pvalue.distribution.svg",
         prefix + "scatter_plots.svg",
-        prefix + "volcano_plots.svg"]
+        prefix + "volcano_plots.svg",
+    ]
     return outputs
 
 
 class Test_plot_differential:
     def test_no_arguments(self, analysis, outputs):
-        plot_differential(analysis)
+        analysis.plot_differential()
         for output in outputs:
             assert os.path.exists(output)
             assert os.stat(output).st_size > 0

@@ -4,7 +4,9 @@ Introduction
 Installation
 =============================
 
-To install ``ngs_toolkit`` simply do:
+``ngs_toolkit`` is available for Python 3 only.
+
+To install, simply do:
 
 .. code-block:: bash
 
@@ -20,4 +22,5 @@ To use a particular class or function from the toolkit, import it like this from
 
 .. code-block:: python
 
-   from ngs_toolkit.atacseq import ATACSeqAnalysis
+   from ngs_toolkit import ATACSeqAnalysis
+   from ngs_toolkit.utils import log_pvalues

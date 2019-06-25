@@ -6,8 +6,7 @@ import pytest
 
 @pytest.fixture
 def log():
-    return os.path.join(
-        os.path.expanduser("~"), ".ngs_toolkit.log.txt")
+    return os.path.join(os.path.expanduser("~"), ".ngs_toolkit.log.txt")
 
 
 def test_config_has_all_required_fields(log):

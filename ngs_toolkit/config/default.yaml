@@ -1,45 +1,88 @@
-username: 
-email: 
-website_root: 
-metadata:
-  root_projects_dir: 
-default_genome_assemblies:
-  - "human": "hg19"
-  - "mouse": "mm10"
+username:
+email:
+website_root:
+supported_data_types:
+  - ATAC-seq
+  - ChIP-seq
+  - RNA-seq
+  - CNV
+preferences:
+  # For the next item, environment variables are formatted if they are of the form ${VAR}
+  root_reference_dir:
+  root_projects_dir:
+  default_genome_assemblies:
+    - human: hg38
+    - mouse: mm10
+  # The next item is the default computing configuration to use from divvy
+  # options are: 'default' (localhost), 'slurm', lsf', 'sge'
+  # see more here: http://code.databio.org/divvy/
+  computing_configuration:
+  graphics:
+    matplotlib:
+      backend: TkAgg # Agg
+      # key:values under rcParams are used to update matplotlib.rcParams
+      rcParams:
+        # this ensures text in plots is exported as text objects
+        svg.fonttype: "none"
+    seaborn:
+      # key:values under parameters are passed to seaborn.set
+      parameters:
+        context: "paper"
+        style: "white"
+        palette: "colorblind"
+        color_codes: True
+    figure_saving:
+      # these arguments are passed to matplotlib.pyplot.savefig
+      # https://matplotlib.org/api/_as_gen/matplotlib.pyplot.savefig.html
+      format: svg
+      dpi: 300
+      bbox_inches: "tight"
+    close_saved_figures: True
+
+sample_input_files:
+  # values in this section can use string formatting
+  # of the form {variable} to be completed with variables from the sample objects
+  # Example:
+  # ATAC-seq:
+  #   aligned_filtered_bam:
+  #     "{data_dir}/{sample_name}/mapped/{sample_name}.bowtie2.filtered.bam"
+  ATAC-seq:
+    aligned_filtered_bam:
+    peaks:
+    summits:
+  ChIP-seq:
+    aligned_filtered_bam:
+  ChIPmentation:
+    aligned_filtered_bam:
+  CNV:
+    aligned_filtered_bam:
+  RNA-seq:
+    aligned_filtered_bam:
+    counts:
+
 resources:
-  genomes:
-    2bit:
-      hg19: 
-      hg38: 
-      mm10: 
-    fasta:
-      hg19: 
-      hg38: 
-      mm10: 
-    chrom_sizes:
-      hg19: 
-      hg38: 
-      mm10: 
   lola:
     region_databases:
+      # under each section, there should be a list of items
       hg19:
-        - 
-        - 
+        -
+        -
       hg38:
-        - 
-        - 
+        -
+        -
       mm10:
-        - 
-        - 
+        -
+        -
   meme:
     motif_databases:
-      human: 
-      mouse: 
-      vertebrate: 
+      human:
+      mouse:
+      vertebrate:
     motif_id_mapping:
-      mouse: 
+      mouse:
   enrichr:
     gene_set_libraries:
+      # this should be a list of items
       - "GO_Biological_Process_2015"
       - "ChEA_2015"
       - "KEGG_2016"
@@ -60,36 +103,10 @@ resources:
       - "Reactome_2016"
       - "BioCarta_2016"
       - "NCI-Nature_2016"
+
 executables:
   twoBitToFa: twoBitToFa
   fasta-dinucleotide-shuffle: fasta-dinucleotide-shuffle
   ame: ame
   findMotifsGenome.pl: findMotifsGenome.pl
   compareMotifs.pl: compareMotifs.pl
-sample_input_files:
-  # values in this section can use string formatting
-  # of the form {variable} to be completed with variables from the sample objects
-  # Example:
-  # ATAC-seq:
-  #   aligned_filtered_bam:
-  #     "{data_dir}/{sample_name}/mapped/{sample_name}.bowtie2.filtered.bam"
-  ATAC-seq:
-    aligned_filtered_bam:
-    peaks:
-    summits:
-  ChIP-seq:
-    aligned_filtered_bam:
-  CNV:
-    aligned_filtered_bam:
-  RNA-seq:
-    aligned_filtered_bam:
-graphics:
-  settings:
-    figure_saving:
-      - dpi: 300
-      - bbox_inches: "tight"
-      - transparent: True
-      - frameon: False
-    matplotlib:
-      backend: TkAgg # Agg
-    close_saved_figures: True

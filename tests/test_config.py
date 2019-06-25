@@ -19,7 +19,9 @@ def test_config_has_all_required_fields():
                 else:
                     return True
 
-    file_config = pkgutil.get_data('ngs_toolkit', "config/default.yaml").decode().strip()
+    file_config = (
+        pkgutil.get_data("ngs_toolkit", "config/default.yaml").decode().strip()
+    )
     file_config = yaml.load(file_config)
 
     assert _dicts_same_keys(file_config, local_config)

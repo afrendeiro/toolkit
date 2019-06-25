@@ -426,7 +426,7 @@ class ATACSeqAnalysis(Analysis):
         bed_file : :obj:`str`
             BED file to use as consensus sites.
 
-        overwrite : book
+        overwrite : :obj:`bool`
             Whether a possibly existing file with a consensus peak set
             for this analysis should be overwritten in disk.
 

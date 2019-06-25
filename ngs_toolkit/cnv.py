@@ -911,7 +911,6 @@ class CNVAnalysis(Analysis):
         segmentation_annot : :obj:`dict`
             Dictionary with CNV matrices for each resolution.
         """
-        import os
         import string
 
         from ngs_toolkit.general import query_biomart

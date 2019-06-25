@@ -22,8 +22,8 @@ def setup_logger(level="INFO", logfile=None):
 
     Returns
     -------
-    logging.Logger
-        The logger.
+    :class:`logging.Logger`
+        A logger called "ngs_toolkit".
     """
     import logging
     import os

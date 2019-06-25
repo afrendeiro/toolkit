@@ -1384,7 +1384,7 @@ class Analysis(object):
         samples : :obj:`list`
             Iterable of peppy.Sample objects to restrict matrix to.
 
-            Default (``None`` is passed) is not to subset matrix.
+            Default (:obj:`None` is passed) is not to subset matrix.
 
         Returns
         -------
@@ -1411,7 +1411,7 @@ class Analysis(object):
             Attribute name of matrix to normalize.
 
             Defaults to "matrix_raw".
-        samples : :obj:`list`(:class:`peppy.Sample`)
+        samples : :obj:`list` [:class:`peppy.Sample`]
             Subset of samples to use.
 
             Defaults to all in analysis.
@@ -1731,7 +1731,7 @@ class Analysis(object):
         as_dataframe: :obj:`bool`, optional
             Whether a dataframe should be return.
 
-            Defaults to False.
+            Defaults to :obj:`False`.
 
         Returns
         -------
@@ -2421,7 +2421,7 @@ class Analysis(object):
         -------
         :class:`pandas.DataFrame`
             Results for all comparisons.
-            Will be ``None`` if `distributed` is `True`.
+            Will be :obj:`None` if `distributed` is `True`.
 
         Attributes
         ----------
@@ -2692,7 +2692,7 @@ class Analysis(object):
         -------
         :class:`pandas.DataFrame`
             Results for all comparisons.
-            Will be ``None`` if ``overwrite`` is :obj:`False` and a results file already exists.
+            Will be :obj:`None` if ``overwrite`` is :obj:`False` and a results file already exists.
 
         Attributes
         ----------
@@ -4596,8 +4596,8 @@ class Analysis(object):
         distributed: :obj:`bool`, optional
             Whether work should be submitted as jobs in a computing cluster.
 
-            Defaults to False.
-        overwrite: :obj:`bool`, ``op``tional
+            Defaults to :obj:`False`.
+        overwrite: :obj:`bool`, optional
             Whether output files should be overwritten when `distributed` is :obj:`True`.
 
             Defaults to :obj:`False`.

@@ -125,7 +125,7 @@ def main():
         raise ValueError("There were no valid comparisons in the comparison table!")
 
     # Call peaks
-    analysis.call_peaks_from_comparisons(as_jobs=args.as_jobs)
+    analysis.call_peaks_from_comparisons(distributed=args.as_jobs)
 
     # # Get summary of peak calls
     # peak_counts = analysis.summarize_peaks_from_comparisons(comparison_table)

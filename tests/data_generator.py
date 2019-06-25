@@ -131,7 +131,7 @@ class RandomDataGenerator(object):
 
         g = query_biomart(
             attributes=["external_gene_name"], ensembl_version=m[genome_assembly], species=o[genome_assembly]
-        ).squeeze()
+        ).squeeze().drop_duplicates()
         return pd.Series(np.random.choice(g, size, replace=False)).sort_values()
 
     @staticmethod

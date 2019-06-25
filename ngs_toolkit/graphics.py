@@ -134,11 +134,14 @@ def radar_plot(
 ):
     """
     
+
+    Parameters
+    ----------
     data : :obj:`pandas.DataFrame`
     subplot_var : :obj:`str`
     group_var : :obj:`str`
     radial_vars : :obj:`list`
-    str : cmap
+    cmap : :obj:`str`
         Matplotlib colormap to use.
     scale_to_max: :obj:`bool`
         Whether values will be scaled
@@ -148,7 +151,6 @@ def radar_plot(
     from matplotlib.projections.polar import PolarAxes
     from matplotlib.path import Path
     from matplotlib.projections import register_projection
-    import matplotlib.pyplot as plt
     from matplotlib.spines import Spine
 
     def radar_factory(num_vars, frame="circle"):

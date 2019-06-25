@@ -189,12 +189,12 @@ def standard_score(x):
 
     Parameters
     ----------
-    x : :class:`numpy.array`
+    x : :class:`numpy.ndarray`
         Numeric array.
 
     Returns
     -------
-    :class:`numpy.array`
+    :class:`numpy.ndarray`
         Transformed array.
     """
     return (x - x.min()) / (x.max() - x.min())
@@ -206,12 +206,12 @@ def z_score(x):
 
     Parameters
     ----------
-    x : :class:`numpy.array`
+    x : :class:`numpy.ndarray`
         Numeric array.
 
     Returns
     -------
-    :class:`numpy.array`
+    :class:`numpy.ndarray`
         Transformed array.
     """
     return (x - x.mean()) / x.std()
@@ -235,6 +235,20 @@ def count_dataframe_values(x):
 
 
 def location_index_to_bed(index):
+    """
+    Get a pandas DataFrame with columns "chrom", "start", "end"
+    from an pandas Index of strings in form "chrom:start-end".
+
+    Parameters
+    ----------
+    index : :class:`pandas.Index`
+        Index strings of the form "chrom:start-end".
+
+    Returns
+    -------
+    :class:`pandas.DataFrame`
+        Pandas dataframe.
+    """
     bed = pd.DataFrame(index=index)
     index = index.to_series(name="region")
     bed["chrom"] = index.str.split(":").str[0]
@@ -252,7 +266,7 @@ def bed_to_index(df):
     Parameters
     ----------
     df : :class:`pandas.DataFrame`
-        DataFrame with columns 'chr', 'start' and 'end'.
+        DataFrame with columns "chrom", "start" and "end".
 
     Returns
     -------
@@ -301,7 +315,7 @@ def signed_max(x, f=0.66, axis=0):
 
     Parameters
     ----------
-    x : {:class:`numpy.array`, :class:`pandas.DataFrame`, :class:`pandas.Series`}
+    x : {:class:`numpy.ndarray`, :class:`pandas.DataFrame`, :class:`pandas.Series`}
         Input values to reduce
     f : :obj:`float`
         Threshold fraction of majority agreement.
@@ -1003,12 +1017,12 @@ def normalize_quantiles_r(array):
 
     Parameters
     ----------
-    array : :class:`numpy.array`
+    array : :class:`numpy.ndarray`
         Numeric array to normalize.
 
     Returns
     -------
-    :class:`numpy.array`
+    :class:`numpy.ndarray`
         Normalized numeric array.
     """
     import rpy2.robjects as robjects
@@ -1036,7 +1050,7 @@ def normalize_quantiles_p(df_input):
 
     Returns
     -------
-    :class:`numpy.array`
+    :class:`numpy.ndarray`
         Normalized numeric array.
     """
     df = df_input.copy()

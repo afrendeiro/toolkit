@@ -476,7 +476,15 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
 
         return peak_counts  # .fillna(0)
 
-    def get_consensus_sites(self, **kwargs):
+    def get_consensus_sites(
+            self,
+            samples=None,
+            region_type="summits",
+            extension=250,
+            blacklist_bed=None,
+            filter_mito_chr=True,
+            permissive=False,
+            **kwargs):
         """
         Get consensus (union) of enriched sites (peaks) across all comparisons.
         If `region_type` is "summits, regions used will be peak summits which will be extended by `extension`
@@ -484,6 +492,29 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
 
         Parameters
         ----------
+        samples : :obj:`list`
+            Iterable of peppy.Sample objects to restrict to.
+            Must have a `peaks` attribute set.
+            Defaults to all samples in the analysis (`samples` attribute).
+
+        region_type : :obj:`str`
+            The type of region to use to create the consensus region set - one of `summits` or `peaks`.
+            If `summits`, peak summits will be extended by `extension` before union.
+            Otherwise sample peaks will be used with no modification.
+
+        extension : :obj:`int`
+            Amount to extend peaks summits by in both directions.
+
+        blacklist_bed : :obj:`str`
+            A (3 column) BED file with genomic positions to exclude from consensus peak set.
+
+        filter_mito_chr: :obj:`bool`
+            Whether to exclude 'chrM' from peak set.
+
+        permissive: :obj:`bool`
+            Whether Samples that which `region_type` attribute file does not exist
+            should be simply skipped or an error thrown.
+
         comparison_table : :obj:`pandas.DataFrame`, optional
             DataFrame with signal/background combinations used to call peaks
 
@@ -492,19 +523,6 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
             Path to peaks output directory.
 
             Defaults to `{analysis.results_dir}/chipseq_peaks`.
-        region_type : :obj:`str`, optional
-            Type of region to use.
-            One of "summits" or "peaks".
-
-            Default is "peaks".
-        extension : :obj:`int`, optional
-            Width to extend peak summits is `region_type` is "summits".
-
-            Default is 250.
-        blacklist_bed : :obj:`str`, optional
-            A BED file with genomic positions to exclude from consensus peak set.
-
-            Will try to download if not given.
 
         Attributes
         ----------
@@ -524,20 +542,12 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
         if "peak_dir" not in kwargs:
             peak_dir = os.path.join(self.results_dir, "chipseq_peaks")
 
-        if "region_type" not in kwargs:
-            region_type = "peaks"
         if region_type not in ["summits", "peaks"]:
             msg = "`region_type` attribute must be one of 'summits' or 'peaks'!"
             _LOGGER.error(msg)
             raise ValueError(msg)
 
-        if "extension" not in kwargs:
-            extension = 250
-
-        if "permissive" not in kwargs:
-            permissive = False
-
-        if "blacklist_bed" not in kwargs:
+        if blacklist_bed is None:
             _LOGGER.info("Blacklist file not provided. Downloading...")
             try:
                 blacklist_bed = get_blacklist_annotations(self.organism, self.genome)
@@ -627,7 +637,9 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
             os.path.join(self.results_dir, self.name + ".peak_set.bed")
         )
 
-    def calculate_peak_support(self, **kwargs):
+    def calculate_peak_support(
+            self, samples=None, region_type="summits", permissive=False,
+            comparison_table=None, peak_dir="{results_dir}/chipseq_peaks"):
         """
         Calculate a measure of support for each region in peak set
         (i.e. ratio of samples containing a peak overlapping region in union set of peaks).
@@ -641,6 +653,12 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
         peak_dir : :obj:`str`, optional
             Path to peaks output directory.
             Defaults to {analysis.results_dir}/chipseq_peaks
+        samples: :obj:`list`
+            Not used. Provided for compatibility with ATACSeqAnalysis class.
+        region_type: :obj:`str`
+            Not used. Provided for compatibility with ATACSeqAnalysis class.
+        permissive: :obj:`bool`
+            Not used. Provided for compatibility with ATACSeqAnalysis class.
 
         Attributes
         ----------
@@ -649,26 +667,15 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
         """
         import pybedtools
         from tqdm import tqdm
+        from ngs_toolkit.utils import bed_to_index
 
-        if "comparison_table" not in kwargs:
+        if comparison_table is None:
             comparison_table = self.comparison_table
-        else:
-            comparison_table = kwargs["comparison_table"]
-        if "peak_dir" not in kwargs:
-            peak_dir = "{results_dir}/chipseq_peaks"
 
-        if "{results_dir}" in peak_dir:
-            peak_dir = os.path.abspath(peak_dir.format(results_dir=self.results_dir))
+        peak_dir = os.path.abspath(self._format_string_with_attributes(peak_dir))
 
         # get index
-        index = self.sites.to_dataframe()
-        index = (
-            index["chrom"]
-            + ":"
-            + index["start"].astype(str)
-            + "-"
-            + index["end"].astype(str)
-        )
+        index = bed_to_index(self.sites.to_dataframe())
 
         # calculate support (number of samples overlaping each merged peak)
         comps = comparison_table["comparison_name"].drop_duplicates()
@@ -736,13 +743,16 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
 
         self.support = support
 
-    def get_supported_peaks(self, **kwargs):
+    def get_supported_peaks(self, samples=None, **kwargs):
         """
         Get mask of sites with 0 support in the given samples.
         Requires support matrix produced by `ngs_toolkit.atacseq.ATACSeqAnalysis.calculate_peak_support`.
 
         Parameters
         ----------
+        samples : :obj:`list`
+            Not used. Provided for compatibility with ATACSeqAnalysis class.
+
         comparisons : :obj:`list`
             Iterable of comparison names to restrict to.
             Must match name of comparisons used in comparison_table.

@@ -1979,8 +1979,6 @@ def project_to_geo(
     pandas.DataFrame
         Annotation of samples and their BAM, BigWig, narrowPeak files and respective md5sums.
     """
-    import os
-
     from ngs_toolkit.utils import submit_job
 
     output_dir = os.path.abspath(output_dir)
@@ -2320,14 +2318,14 @@ def subtract_principal_component(
         fig, axis = plt.subplots(pcs_to_plot, 2, figsize=(4 * 2, 4 * pcs_to_plot))
         for pc in range(pcs_to_plot):
             # before
-            for j, sample in enumerate(x.index):
+            for j, _ in enumerate(x.index):
                 axis[pc, 0].scatter(
                     x_hat[j, pc], x_hat[j, pc + 1], s=50, rasterized=True
                 )
             axis[pc, 0].set_xlabel("PC{}".format(pc + 1))
             axis[pc, 0].set_ylabel("PC{}".format(pc + 2))
             # after
-            for j, sample in enumerate(x2.index):
+            for j, _ in enumerate(x2.index):
                 axis[pc, 1].scatter(
                     x2_hat[j, pc], x2_hat[j, pc + 1], s=35, alpha=0.8, rasterized=True
                 )

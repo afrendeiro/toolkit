@@ -270,7 +270,7 @@ def bed_to_index(df):
 
     Returns
     -------
-    :class:`pandas.Index
+    :class:`pandas.Index`
         Pandas index.
     """
     cols = ["chrom", "start", "end"]

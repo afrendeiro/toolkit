@@ -450,7 +450,8 @@ class ATACSeqAnalysis(Analysis):
 
     @check_has_sites
     def calculate_peak_support(
-        self, samples=None, region_type="summits", permissive=False, **kwargs
+        self, samples=None, region_type="summits", permissive=False,
+        comparison_table=None, peak_dir=None
     ):
         """
         Count number of called peaks per sample in the consensus region set.
@@ -462,19 +463,19 @@ class ATACSeqAnalysis(Analysis):
         samples : :obj:`list`
             Iterable of peppy.Sample objects to restrict to.
             Must have a `peaks` attribute set.
-            If not provided (`None` is passed) if will default to all samples in the analysis (`samples` attribute).
 
+            Defaults to all samples in the analysis (`samples` attribute).
         region_type : :obj:`str`
             The type of region to use to create the consensus region set.
             One of `summits` or `peaks`.
             If `summits`, peak summits will be extended by `extension` before union.
             Otherwise sample peaks will be used with no modification.
-
         permissive: :obj:`bool`
             Whether Samples that which `region_type` attribute file does
             not exist should be simply skipped or an error thrown.
-
-        **kwargs
+        comparison_table: :obj:`pandas.DataFrame`
+            Not used. Provided for compatibility with ChIPSeqAnalysis class.
+        peak_dir: :obj:`str`
             Not used. Provided for compatibility with ChIPSeqAnalysis class.
 
         Raises

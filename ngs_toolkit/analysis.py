@@ -1681,7 +1681,7 @@ class Analysis(object):
     def get_level_colors(
         self,
         index=None,
-        matrix=None,
+        matrix="matrix_norm",
         levels=None,
         pallete="tab20",
         cmap="RdBu_r",
@@ -1692,7 +1692,7 @@ class Analysis(object):
         Get tuples of floats representing a colour for a sample in a given variable in a
         dataframe"s index (particularly useful with MultiIndex dataframes).
 
-        If given, will use the provieded ``index`` argument, otherwise, the the columns
+        If given, will use the provieded ``index`` argument, otherwise, the columns
         and its levels of an attribute of self named ``matrix``.
         ``levels`` can be passed to subset the levels of the index.
 
@@ -1744,11 +1744,7 @@ class Analysis(object):
         import matplotlib.pyplot as plt
 
         if index is None:
-            if matrix is None:
-                msg = "One of `index` or `matrix` must be provided."
-                _LOGGER.error(msg)
-                raise ValueError(msg)
-            index = getattr(self, matrix).columns
+            index = self.get_matrix(matrix).columns
 
         if levels is not None:
             drop = [l.name for l in index.levels if l.name not in levels]

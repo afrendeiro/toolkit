@@ -1,23 +1,17 @@
 Configuration and logging
 ******************************
 
-
-Logging
-=============================
-
-`ngs_toolkit` will log its operations and errors using the Python standard logging library.
-
-This will happen by default to standard output (sys.stdout) but also to a file in ``$HOME/.ngs_toolkit.log.txt``.
-
-The location of the log file and the level of events to be reported can be customized in the ``ngs_toolkit.setup_logger()`` function.
+.. _Configuration:
 
 
 Configuration
 =============================
 
-`ngs_toolkit` allows user configuration to allow usage of static resources across computing environments.
+`ngs_toolkit` uses a YAML configuration file.
 
-To accomplish this, the user can provide its own configuration in two ways:
+While entirely optional, this allows the user to specify preferences, patterns and allows usage across different computing environments.
+
+The user can provide its own configuration in two ways:
 
 * In a YAML file located in ``$HOME/.ngs_toolkit.config.yaml``;
 * A user provided file given during interactive runtime passed to ``ngs_toolkit.setup_config()``.
@@ -32,14 +26,14 @@ To see how to structure the YAML file, see section below.
 
 
 
-Example configuration file
+Example configuration files
 -----------------------------
 
+To see all available configuration fields have a look at the default configuration file: https://github.com/afrendeiro/toolkit/blob/master/ngs_toolkit/config/default.yaml#L1
 
-.. note:: `Not all elements are required`
-    
-    In fact none of it is required, but it is recommended to have a look at the template configuration file and set custom options.
+For a full example of a fully configured file have a look at the example configuration file: https://github.com/afrendeiro/toolkit/blob/master/ngs_toolkit/config/example.yaml#L1
 
+However, the configuration file does not need to include all fields. Below is a minimal example of a configuration file.
 
 .. code-block:: yaml
 
@@ -53,6 +47,7 @@ Example configuration file
       default_genome_assemblies:
         - human: hg38
         - mouse: mm10
+      # Below is the name of the divvy package configuration (http://divvy.databio.org/en/latest/)
       computing_configuration: 'slurm'
     sample_input_files:
       ATAC-seq:
@@ -66,3 +61,20 @@ Example configuration file
       RNA-seq:
         aligned_filtered_bam: "{data_dir}/{sample_name}/mapped/{sample_name}.bowtie2.filtered.bam"
         bitseq_counts: "{data_dir}/{sample_name}/quantification/{sample_name}_bitseq.tsv"
+
+
+.. note:: `Not all elements are required`
+    
+    In fact none of it is required, but it is recommended to have a look at the template configuration file and set custom options.
+
+.. _Logging:
+
+Logging
+=============================
+
+`ngs_toolkit` will log its operations and errors using the Python standard logging library.
+
+This will happen by default to standard output (sys.stdout) but also to a file in ``$HOME/.ngs_toolkit.log.txt``.
+
+The location of the log file and the level of events to be reported can be customized in the ``ngs_toolkit.setup_logger()`` function.
+

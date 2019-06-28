@@ -15,7 +15,6 @@ Contents
     intro
     examples
     concepts
-    comparison_table
     log_config
     manager_programs
     recipes

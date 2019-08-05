@@ -397,6 +397,8 @@ def plot_projection(
         axis = axis.reshape((1, n_attr))
     for pc in range(dims):
         for i, attr in enumerate(attributes_to_plot):
+
+            # TODO: make plotting faster specially for many samples
             for j, sample in enumerate(df.index):
                 sample = pd.Series(sample, index=df.index.names)
                 label = df.index.get_level_values(attr)[j]
@@ -404,23 +406,32 @@ def plot_projection(
                     df.loc[sample["sample_name"], pc],
                     df.loc[sample["sample_name"], pc + 1],
                     s=30,
-                    color=color_dataframe.loc[attr, sample["sample_name"]],
+                    color=color_dataframe.loc[sample["sample_name"], attr],
                     alpha=0.75,
                     label=label,
                     rasterized=rasterized,
                 )
 
             # Plot groups
-            if plot_group_centroids:
-                df2 = df.groupby(attr).mean()
+            values = df.index.get_level_values(attr)
+            numeric = (
+                (not any([isinstance(x, str) for x in values])) and not
+                all((values.dropna() == True) | (values.dropna() == False)))
+            if plot_group_centroids and not numeric:
+                try:
+                    df2 = df.groupby(attr).mean()
+                except IndexError:
+                    _LOGGER.error("Could not plot centroids of projection!")
+                    continue
                 # get the color of each attribute group
-                cd = color_dataframe.loc[attr, :]
+                cd = color_dataframe.loc[:, attr]
                 cd.name = None
                 cd.index = df.index.get_level_values(attr)
                 cd = cd.apply(
                     lambda x: tuple(x) if isinstance(x, list) else x
                 )  # fix for deduplicating lists
-                cd = cd.reset_index().drop_duplicates().set_index(attr)
+                cd = cd.reset_index().drop_duplicates().set_index(attr).drop_duplicates()
+
                 for j, group in enumerate(df2.index):
                     axis[pc, i].scatter(
                         df2.loc[group, pc],
@@ -654,7 +665,7 @@ def plot_comparison_correlations(
                 vmax=vmax,
             )  # color="grey")
 
-        for ax in axis[i, (j + 1) :]:
+        for ax in axis[i, (j + 1):]:
             ax.set_visible(False)
     savefig(fig, os.path.join(output_dir, output_prefix + ".lmfit.svg"))
 

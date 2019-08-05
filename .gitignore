@@ -50,6 +50,9 @@ doc/build/*
 ehthumbs.db
 Thumbs.db
 
+# Sublime files
+*.sublime-*
+
 # Gedit temporary files 
 *~
 
@@ -65,7 +68,8 @@ open_pipelines/
 
 # pytest-related
 .cache/
-.coverage
+.coverage*
+coverage.xml
 
 # Reserved files for comparison
 *RESERVE*
@@ -73,5 +77,4 @@ open_pipelines/
 # Build-related stuff
 build/
 dist/
-looper.egg-info/
-
+*.egg-info

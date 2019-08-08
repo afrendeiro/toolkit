@@ -7,6 +7,12 @@ Changelog
 
 ------------
 
+- **v0.11** (development, pre-1.0):
+
+  - adapt to latest versions of pepkit stack
+  - better colouring of sample group levels in get_level_colors
+  - add support for additional keyword arguments passed to Project initialization when using `from_pep`
+
 - **v0.10** (development, pre-1.0):
 
   - revamp RNASeqAnalysis

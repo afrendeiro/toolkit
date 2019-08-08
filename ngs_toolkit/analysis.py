@@ -133,7 +133,12 @@ class Analysis(object):
 
         # Generate from PEP configuration file
         if from_pep is not False:
-            self.from_pep(pep_config=from_pep)
+            from inspect import signature
+            from peppy import Project
+
+            args = signature(Project).parameters.keys()
+            prj_kwargs = {k: v for k, v in kwargs.items() if k in args}
+            self.from_pep(pep_config=from_pep, **prj_kwargs)
 
         # Store projects attributes in self
         _LOGGER.debug("Trying to set analysis attributes.")
@@ -449,7 +454,7 @@ class Analysis(object):
             raise ValueError(msg)
         return string.format(**self.__dict__)
 
-    def from_pep(self, pep_config):
+    def from_pep(self, pep_config, **kwargs):
         """
         Create a peppy.Project from a PEP configuration file
         and associate is with the analysis.
@@ -467,7 +472,7 @@ class Analysis(object):
         import peppy
 
         # peppy.project.logging.disable()
-        self.prj = peppy.Project(pep_config)
+        self.prj = peppy.Project(cfg=pep_config, **kwargs)
 
     def update(self, pickle_file=None):
         """

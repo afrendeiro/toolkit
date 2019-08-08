@@ -645,15 +645,19 @@ class Analysis(object):
             """
             if string is None:
                 return string
+
+            # fix around sample.__dict__ being overwritten
+            sample_dict = {x: sample[x] for x in sample}
+
             to_format = pd.Series(string).str.extractall(r"{(.*?)}")[0].values
-            attrs = sample.__dict__.keys()
+            attrs = [x for x in sample_dict.keys()]
 
             if not all([x in attrs for x in to_format]):
-                d = sample.__dict__.copy()
+                d = sample_dict.copy()
                 d.update(self.__dict__)
                 return string.format(**d)
             else:
-                return string.format(**sample.__dict__)
+                return string.format(**sample_dict)
 
         if self.samples is None:
             _LOGGER.warning(

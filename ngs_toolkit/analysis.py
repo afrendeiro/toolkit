@@ -666,7 +666,7 @@ class Analysis(object):
         msg = "Setting '{}' in sample {} as '{}'."
         for data_type in _CONFIG["sample_input_files"]:
             for sample in [s for s in self.samples if s.protocol == data_type]:
-                if ("name" in sample) and ("sample_name" in sample):
+                if ("name" in sample) and ("sample_name" not in sample):
                     sample.sample_name = sample.name
                 for attr, value in _CONFIG["sample_input_files"][data_type].items():
                     value = _format_string_with_sample_attributes(sample, value)

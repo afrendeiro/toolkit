@@ -669,7 +669,13 @@ class Analysis(object):
                 if ("name" in sample) and ("sample_name" not in sample):
                     sample.sample_name = sample.name
                 for attr, value in _CONFIG["sample_input_files"][data_type].items():
-                    value = _format_string_with_sample_attributes(sample, value)
+                    try:
+                        value = _format_string_with_sample_attributes(sample, value)
+                    except KeyError:
+                        _LOGGER.error("Failed formatting for sample '{}', value '{}'."
+                                      .format(sample.name, value))
+                        continue
+
                     if overwrite:
                         _LOGGER.debug(msg.format(attr, sample.name, value))
                         setattr(sample, attr, value)

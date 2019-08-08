@@ -28,9 +28,10 @@ pypi: build
 clean_test:
 	rm -rf .pytest_cache/
 	find . -name "__pycache__" -exec rm -r {} \;
+	rm .coverage*
 
 clean_cov: clean_test
-	rm -fr coverage.xml htmlcov 
+	rm -fr coverage.xml htmlcov
 
 clean_docs:
 	rm -fr docs/build/
@@ -41,7 +42,7 @@ clean_dist:
 clean_build:
 	rm -fr build/
 
-clean: clean_cov clean_docs clean_dist clean_build
+clean: clean_test clean_cov clean_docs clean_dist clean_build
 
 all: test coverage docs build pypitest pypi clean_test clean_cov clean_docs clean_dist clean_build clean
 

@@ -133,7 +133,12 @@ class Analysis(object):
 
         # Generate from PEP configuration file
         if from_pep is not False:
-            self.from_pep(pep_config=from_pep)
+            from inspect import signature
+            from peppy import Project
+
+            args = signature(Project).parameters.keys()
+            prj_kwargs = {k: v for k, v in kwargs.items() if k in args}
+            self.from_pep(pep_config=from_pep, **prj_kwargs)
 
         # Store projects attributes in self
         _LOGGER.debug("Trying to set analysis attributes.")
@@ -449,7 +454,7 @@ class Analysis(object):
             raise ValueError(msg)
         return string.format(**self.__dict__)
 
-    def from_pep(self, pep_config):
+    def from_pep(self, pep_config, **kwargs):
         """
         Create a peppy.Project from a PEP configuration file
         and associate is with the analysis.
@@ -467,7 +472,7 @@ class Analysis(object):
         import peppy
 
         # peppy.project.logging.disable()
-        self.prj = peppy.Project(pep_config)
+        self.prj = peppy.Project(cfg=pep_config, **kwargs)
 
     def update(self, pickle_file=None):
         """
@@ -645,15 +650,19 @@ class Analysis(object):
             """
             if string is None:
                 return string
+
+            # fix around sample.__dict__ being overwritten
+            sample_dict = {x: sample[x] for x in sample}
+
             to_format = pd.Series(string).str.extractall(r"{(.*?)}")[0].values
-            attrs = sample.__dict__.keys()
+            attrs = [x for x in sample_dict.keys()]
 
             if not all([x in attrs for x in to_format]):
-                d = sample.__dict__.copy()
+                d = sample_dict.copy()
                 d.update(self.__dict__)
                 return string.format(**d)
             else:
-                return string.format(**sample.__dict__)
+                return string.format(**sample_dict)
 
         if self.samples is None:
             _LOGGER.warning(
@@ -666,8 +675,16 @@ class Analysis(object):
         msg = "Setting '{}' in sample {} as '{}'."
         for data_type in _CONFIG["sample_input_files"]:
             for sample in [s for s in self.samples if s.protocol == data_type]:
+                if ("name" in sample) and ("sample_name" not in sample):
+                    sample.sample_name = sample.name
                 for attr, value in _CONFIG["sample_input_files"][data_type].items():
-                    value = _format_string_with_sample_attributes(sample, value)
+                    try:
+                        value = _format_string_with_sample_attributes(sample, value)
+                    except KeyError:
+                        _LOGGER.error("Failed formatting for sample '{}', value '{}'."
+                                      .format(sample.name, value))
+                        continue
+
                     if overwrite:
                         _LOGGER.debug(msg.format(attr, sample.name, value))
                         setattr(sample, attr, value)
@@ -1684,7 +1701,8 @@ class Analysis(object):
         matrix="matrix_norm",
         levels=None,
         pallete="tab20",
-        cmap="RdBu_r",
+        uniform_cmap="plasma",
+        diverging_cmap="RdYlBu_r",
         nan_color=(0.662745, 0.662745, 0.662745, 1.0),
         as_dataframe=False,
     ):
@@ -1719,8 +1737,9 @@ class Analysis(object):
             See matplotlib.org/examples/color/colormaps_reference.html.
 
             Defaults to "tab20".
-        cmap : :obj:`str`, optional
-            Name of matplotlib color palete to use with numerical levels.
+        {uniform_cmap, diverging_cmap} : :obj:`str`, optional
+            Name of matplotlib color paletes to use with numerical levels.
+            Uniform will be used if values in level are non-negative, while diverging if including negative.
             See matplotlib.org/examples/color/colormaps_reference.html.
 
             Defaults to "RdBu_r".
@@ -1729,7 +1748,7 @@ class Analysis(object):
 
             Defaults to ``(0.662745, 0.662745, 0.662745, 0.5)`` == ``grey``.
         as_dataframe: :obj:`bool`, optional
-            Whether a dataframe should be return.
+            Whether a dataframe should be returned.
 
             Defaults to :obj:`False`.
 
@@ -1739,7 +1758,6 @@ class Analysis(object):
             Matrix of shape (level, sample) with rgb values of each of the variable.
             If as_dataframe, this will be a pandas.DataFrame otherwise, list of lists.
         """
-        from collections import Counter
         import matplotlib
         import matplotlib.pyplot as plt
 
@@ -1754,59 +1772,84 @@ class Analysis(object):
         if not isinstance(index, pd.core.indexes.multi.MultiIndex):
             index = pd.MultiIndex.from_arrays([index.values], names=[index.name])
 
-        _cmap = plt.get_cmap(cmap)
         _pallete = plt.get_cmap(pallete)
+        _uniform_cmap = plt.get_cmap(uniform_cmap)
+        _diverging_cmap = plt.get_cmap(diverging_cmap)
 
         colors = list()
-        for level in index.levels:
+        for l, level in enumerate(index.levels):
             # For empty levels (all values nan), return nan colour
-            if len(level) == 0:
+            if level.empty:
                 colors.append([nan_color] * len(index))
                 _LOGGER.warning("Level {} has only NaN values.".format(level.name))
                 continue
             # determine the type of data in each level
             # TODO: check this works in all cases
-            most_common = Counter([type(x) for x in level]).most_common()[0][0]
-            _LOGGER.debug(
-                "Getting colours for level '{}', which has type '{}'.".format(
-                    level.name, most_common
-                )
-            )
+            values = index.get_level_values(level.name)
+            if sum([isinstance(x, str) for x in values]) >= 1:
+                dtype = "categorical"
+            else:
+                dtype = "numerical or boolean"
 
             # Add either colors based on categories or numerical scale
-            if most_common in [int, float, np.float32, np.float64, np.int32, np.int64]:
-                values = index.get_level_values(level.name)
-                # Create a range of either 0-100 if only positive values are found
-                # or symmetrically from the maximum absolute value found
-                if not any(values.dropna() < 0):
-                    norm = matplotlib.colors.Normalize(
-                        vmin=values.min(), vmax=values.max()
+            if dtype == "categorical":
+                _LOGGER.debug(
+                    "Level '{}' has a categorical type.".format(
+                        level.name, dtype
                     )
-                else:
-                    r = max(abs(values.min()), abs(values.max()))
-                    norm = matplotlib.colors.Normalize(vmin=-r, vmax=r)
-
-                col = _cmap(norm(values))
-                # replace color for nan cases
-                col[
-                    np.where(
-                        index.get_level_values(level.name).to_series().isnull().tolist()
-                    )
-                ] = nan_color
-                colors.append(col.tolist())
-            else:
-                n = len(set(index.get_level_values(level.name)))
+                )
+                n = len(set(values))
                 # get n equidistant colors
                 p = [_pallete(1.0 * i / n) for i in range(n)]
                 color_dict = dict(zip(list(set(index.get_level_values(level.name))), p))
                 # color for nan cases
                 color_dict[np.nan] = nan_color
                 col = [color_dict[x] for x in index.get_level_values(level.name)]
-                colors.append(col)
+            else:
+                # Create a range of either 0-max if only positive values are found
+                # or symmetrically from the maximum absolute value found
+                if all((values.dropna() == True) | (values.dropna() == False)):
+                    # boolean colormap
+                    _LOGGER.debug(
+                        "Level '{}' has a boolean type.".format(
+                            level.name, dtype
+                        )
+                    )
+                    norm = matplotlib.colors.Normalize(vmin=-0.2, vmax=1.2)
+                    col = _diverging_cmap(norm(values.astype(float)))
+                elif not any(values.dropna() < 0):
+                    # uniform colormap with no negative values
+                    # works with True/False and nan (the later are replaced after anyway)
+                    _LOGGER.debug(
+                        "Level '{}' has a numeric type with no negative values.".format(
+                            level.name, dtype
+                        )
+                    )
+                    norm = matplotlib.colors.Normalize(
+                        vmin=values.min(), vmax=values.max())
+                    col = _uniform_cmap(norm(values.astype(float)))
+                else:
+                    # numeric diverging centered on zero
+                    _LOGGER.debug(
+                        "Level '{}' has a numeric type with negative values.".format(
+                            level.name, dtype
+                        )
+                    )
+                    v = np.nanmax(np.absolute(values))
+                    norm = matplotlib.colors.Normalize(vmin=-v, vmax=v)
+                    col = _diverging_cmap(norm(values.astype(float)))
+
+                # replace color for nan cases
+                col[
+                    np.where(
+                        index.get_level_values(level.name).to_series().isnull().tolist()
+                    )
+                ] = nan_color
+            # append vector (list) of sample values to list of levels
+            colors.append([tuple(x) for x in col])
 
         if as_dataframe:
-            colors = pd.DataFrame(colors, index=index.names, columns=index).T
-
+            return pd.DataFrame(colors, index=index.names, columns=index).T
         return colors
 
     def unsupervised_analysis(
@@ -1827,8 +1870,6 @@ class Analysis(object):
         display_corr_values=False,
         plot_max_pcs=8,
         prettier_sample_names=True,
-        pallete="tab20",
-        cmap="RdBu_r",
         rasterized=False,
         dpi=300,
         output_dir="{results_dir}/unsupervised_analysis_{data_type}",
@@ -1900,12 +1941,6 @@ class Analysis(object):
             Whether it should attempt to prettify sample names by removing the data type from plots.
 
             Defaults to :obj:`True`.
-        pallete : :obj:`str`
-            Color pallete to use in levels of `attributes_to_plot`. Will be passed to
-            :func:`~ngs_toolkit.analysis.Analysis.get_level_colors`.
-        cmap : :obj:`str`
-            Color map to use in numerical levels of `attributes_to_plot`.
-            Will be passed to :func:`~ngs_toolkit.analysis.Analysis.get_level_colors`.
         rasterized: :obj:`bool`, optional
             Whether elements with many objects should be rasterized.
 
@@ -1919,7 +1954,8 @@ class Analysis(object):
 
             Defaults to "{results_dir}/unsupervised_analysis_{data_type}".
         **kwargs: optional
-            kwargs are passed to :func:`~ngs_toolkit.graphics.plot_projection`.
+            kwargs are passed to :func:`~ngs_toolkit.Analysis.get_level_colors` and
+            :func:`~ngs_toolkit.graphics.plot_projection`.
         """
         from collections import defaultdict
         import itertools
@@ -1933,6 +1969,9 @@ class Analysis(object):
         from scipy.stats import kruskal, pearsonr
 
         matrix = self.get_matrix(matrix)
+
+        if ("pca_association" in steps) and ("pca" not in steps):
+            steps.append("pca")
 
         if plot_prefix is None:
             plot_prefix = "all_{}s".format(self.var_unit_name)
@@ -1979,10 +2018,17 @@ class Analysis(object):
             except AttributeError:
                 _LOGGER.error(msg)
                 raise
-        # remove attributes with all NaNs
+        # Raise error when requested factor is not known
+        miss = [attr for attr in attributes_to_plot if attr not in matrix.columns.names]
+        if len(miss) > 0:
+            msg = "Requested '{}' value is not present as column level of matrix.".format(", ".join(miss))
+            _LOGGER.error(msg)
+            raise ValueError(msg)
+        # remove attributes not in matrix
         attributes_to_plot = [
             attr for attr in attributes_to_plot if attr in matrix.columns.names
         ]
+        # remove attributes with all NaNs
         attributes_to_plot = [
             attr
             for attr in attributes_to_plot
@@ -1996,20 +2042,6 @@ class Analysis(object):
             _LOGGER.error(msg)
             raise ValueError(msg)
 
-        # This will always be a matrix for all samples
-        color_dataframe = pd.DataFrame(
-            self.get_level_colors(
-                index=matrix.columns,
-                levels=attributes_to_plot,
-                pallete=pallete,
-                cmap=cmap,
-            ),
-            index=attributes_to_plot,
-            columns=matrix.columns,
-        )
-        # will be filtered now by the requested samples if needed
-        color_dataframe = color_dataframe[[s.name for s in samples]]
-
         # All regions, matching samples (provided samples in matrix)
         x = matrix.loc[
             :,
@@ -2017,6 +2049,35 @@ class Analysis(object):
                 [s.name for s in samples]
             ),
         ]
+
+        # Get matrix of samples vs levels with colors as values
+        cd_kwargs = {k: v for k, v in kwargs.items()
+                     if k in ['pallete', 'uniform_cmap', 'diverging_cmap']}
+
+        # # it will always be a matrix for all samples
+        color_dataframe = self.get_level_colors(
+            index=matrix.columns,
+            levels=['sample_name'] + attributes_to_plot
+            if 'sample_name' not in attributes_to_plot
+            else attributes_to_plot,
+            as_dataframe=True,
+            **cd_kwargs
+        )
+        if "sample_name" not in attributes_to_plot:
+            color_dataframe = color_dataframe.drop("sample_name", axis=1)
+        # will be filtered now by the requested samples if needed
+        color_dataframe = color_dataframe.loc[x.columns.get_level_values("sample_name"), :]
+
+        projection_kwargs = {k: v for k, v in kwargs.items()
+                             if k in [
+                                "plot_max_dims",
+                                "rasterized",
+                                "plot_group_centroids",
+                                "axis_ticklabels",
+                                "axis_ticklabels_name",
+                                "axis_lines",
+                                "legends",
+                                "always_legend"]}
 
         if isinstance(x.columns, pd.MultiIndex):
             sample_display_names = x.columns.get_level_values("sample_name")
@@ -2029,16 +2090,22 @@ class Analysis(object):
                 _LOGGER.info(
                     "Plotting pairwise correlation with '{}' metric.".format(method)
                 )
+                xp = x.copy()
+                xp.columns = xp.columns.get_level_values("sample_name")
+                xp = xp.astype(float).corr(method)
+
+                cd = color_dataframe
+                cd.index = cd.index.get_level_values("sample_name")
                 g = sns.clustermap(
-                    x.astype(float).corr(method),
+                    xp,
                     xticklabels=False,
                     yticklabels=sample_display_names,
                     annot=display_corr_values,
                     cmap="Spectral_r",
                     figsize=(0.2 * x.shape[1], 0.2 * x.shape[1]),
                     cbar_kws={"label": "{} correlation".format(method.capitalize())},
-                    row_colors=color_dataframe.T,
-                    col_colors=color_dataframe.T,
+                    row_colors=cd,
+                    col_colors=cd,
                 )
                 g.ax_heatmap.set_yticklabels(
                     g.ax_heatmap.get_yticklabels(), rotation=0, fontsize="xx-small"
@@ -2103,7 +2170,7 @@ class Analysis(object):
                     ),
                     attributes_to_plot=attributes_to_plot,
                     axis_ticklabels_name=algo,
-                    **kwargs
+                    **projection_kwargs
                 )
 
         if "pca" in steps:
@@ -2136,6 +2203,7 @@ class Analysis(object):
                 index=pcs_order,
             ).to_frame()
             variance["log_variance"] = np.log10(pca.explained_variance_)
+            variance.index = variance.index.values
             variance.index.name = "PC"
             variance.to_csv(
                 os.path.join(
@@ -2147,7 +2215,7 @@ class Analysis(object):
             # plot % explained variance per PC
             _LOGGER.info("Plotting variance explained with PCA.")
             fig, axis = plt.subplots(1, 3, figsize=(4 * 3, 4))
-            axis[0].plot(variance.index, variance["percent_variance"], "o-")
+            axis[0].plot(variance.index.values, variance["percent_variance"], "o-")
             axis[0].set_ylim(
                 (
                     0,
@@ -2155,8 +2223,8 @@ class Analysis(object):
                     + variance["percent_variance"].max() * 0.1,
                 )
             )
-            axis[1].plot(variance.index, variance["log_variance"], "o-")
-            axis[2].plot(variance.index, variance["percent_variance"].cumsum(), "o-")
+            axis[1].plot(variance.index.values, variance["log_variance"], "o-")
+            axis[2].plot(variance.index.values, variance["percent_variance"].cumsum(), "o-")
             axis[2].set_ylim((0, 100))
             for ax in axis:
                 ax.axvline(len(attributes_to_plot), linestyle="--")
@@ -2185,45 +2253,47 @@ class Analysis(object):
                 ),
                 attributes_to_plot=attributes_to_plot,
                 axis_ticklabels_name="PCA",
-                **kwargs
+                **projection_kwargs
             )
 
-        if ("pca" in steps) and ("pca_association" in steps):
+        if "pca_association" in steps:
             # Test association of PCs with attributes
             _LOGGER.info(
                 "Computing association of given attributes with principal components."
             )
             associations = list()
-            for pc in pcs_order:
-                for attr in attributes_to_plot:
-                    _LOGGER.debug("PC {}; Attribute {}.".format(pc + 1, attr))
+            for attr in attributes_to_plot:
+                # Get all values of samples for this attr
+                groups = x_new.index.get_level_values(attr).unique().dropna()
 
-                    # Get all values of samples for this attr
-                    groups = x_new.index.get_level_values(attr).unique()
+                if groups.nunique() == 1:
+                    _LOGGER.warning("Attribute '{}' cannot be tested because all values are equal or null.".format(attr))
+                    continue
 
-                    # Determine if attr is categorical or continuous
-                    if (
-                        all([isinstance(i, (str, bool)) for i in groups])
-                        or len(groups) == 2
-                    ):
-                        variable_type = "categorical"
-                    elif all(
-                        [
-                            isinstance(i, (int, float, np.int64, np.float64))
-                            for i in groups
-                        ]
-                    ):
-                        variable_type = "numerical"
-                    else:
-                        _LOGGER.warning("attr %s cannot be tested." % attr)
-                        associations.append(
-                            [pc + 1, attr, variable_type, np.nan, np.nan, np.nan]
-                        )
-                        continue
+                # Determine if attr is categorical or continuous
+                if (
+                    all([isinstance(i, (str, bool)) for i in groups])
+                ):
+                    variable_type = "categorical"
+                elif all(
+                    [
+                        isinstance(i, (int, float, np.int, np.float))
+                        for i in groups
+                    ]
+                ):
+                    variable_type = "numerical"
+                else:
+                    _LOGGER.warning("Attribute '{}' cannot be tested because data type is not undestood.".format(attr))
+                    variable_type = "not-detected"
 
+                _LOGGER.debug("Attribute '{}' is of type {}.".format(attr, variable_type))
+
+                for pc in pcs_order:
+                    _LOGGER.debug("Attribute '{}'; PC {}.".format(attr, pc + 1))
                     if variable_type == "categorical":
                         # It categorical, test pairwise combinations of attributes
                         for group1, group2 in itertools.combinations(groups, 2):
+                            _LOGGER.debug("Testing group '{}' with '{}'.".format(group1, group2))
                             g1_mask = x_new.index.get_level_values(attr) == group1
                             g2_mask = x_new.index.get_level_values(attr) == group2
 
@@ -2247,6 +2317,10 @@ class Analysis(object):
                         associations.append(
                             [pc + 1, attr, variable_type, np.nan, np.nan, p]
                         )
+                    else:
+                        associations.append(
+                            [pc + 1, attr, variable_type, np.nan, np.nan, np.nan]
+                        )
 
             associations = pd.DataFrame(
                 associations,
@@ -2262,7 +2336,7 @@ class Analysis(object):
 
             if associations.empty:
                 msg = "Couldn't test any associations between PCs and factors."
-                hint = " Perhaps PCA produced only 1 PC?"
+                hint = " Perhaps PCA produced only 1 PC or the type of the factors could not be detected?"
                 _LOGGER.warning(msg + hint)
                 return
 
@@ -2283,8 +2357,8 @@ class Analysis(object):
                 index=False,
             )
 
-            if len(attributes_to_plot) < 2:
-                _LOGGER.info("Only one attribute given, can't plot associations.")
+            if associations['attribute'].nunique() < 2:
+                _LOGGER.info("Few attributes tested, can't plot associations.")
                 return
 
             # Plot
@@ -2296,6 +2370,10 @@ class Analysis(object):
                     .pivot(index="pc", columns="attribute", values=var)
                     .dropna(axis=1)
                 )
+
+                # skip if dataframe has no variation
+                if (pivot.nunique() == 1).all().all():
+                    continue
 
                 # heatmap of -log p-values
                 g = sns.clustermap(
@@ -2808,8 +2886,7 @@ class Analysis(object):
         feature_labels=False,
         group_colours=True,
         group_attributes=None,
-        pallete="tab20",
-        cmap="RdBu_r",
+        **kwargs
     ):
         """
         Plot differential features (eg chromatin region, genes) discovered with supervised
@@ -2935,12 +3012,8 @@ class Analysis(object):
             Which variables to colour if `group_colours` if :obj:`True`.
 
             Defaults to all of analysis.group_attributes.
-        pallete : :obj:`str`
-            Color pallete to use in levels of `group_attributes`.
-            Will be passed to :func:`~ngs_toolkit.analysis.Analysis.get_level_colors`.
-        cmap : :obj:`str`
-            Color map to use in numerical levels of `group_attributes`.
-            Will be passed to :func:`~ngs_toolkit.analysis.Analysis.get_level_colors`.
+        **kwargs: :obj:`dict`, optional
+            Additional keyword arguments will be passed to `Analysis.get_level_colors`.
         """
         # TODO: split plotting into smaller parts
         import matplotlib.pyplot as plt
@@ -3025,12 +3098,16 @@ class Analysis(object):
                     raise AssertionError(msg)
 
             # This will always be a matrix for all samples
+
+            # Get matrix of samples vs levels with colors as values
+            cd_kwargs = {k: v for k, v in kwargs.items()
+                         if k in ['pallete', 'uniform_cmap', 'diverging_cmap']}
+
             color_dataframe = pd.DataFrame(
                 self.get_level_colors(
                     index=matrix.columns,
                     levels=group_attributes,
-                    pallete=pallete,
-                    cmap=cmap,
+                    **cd_kwargs
                 ),
                 index=group_attributes,
                 columns=matrix.columns,

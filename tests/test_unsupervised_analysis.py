@@ -143,16 +143,16 @@ class TestUnsupervisedAnalysis:
             prefix + "spearman_correlation.clustermap.svg",
             prefix + "tsne.svg",
             prefix + "pca.variable_principle_components_association.csv",
-            prefix + "pca.variable_principle_components_association.p_value.masked.svg",
-            prefix
-            + "pca.variable_principle_components_association.adj_pvalue.masked.svg",
-            prefix + "pca.variable_principle_components_association.p_value.svg",
-            prefix + "pca.variable_principle_components_association.adj_pvalue.svg",
         ]
         not_outputs = [
             prefix + "isomap.svg",
             prefix + "locallylinearembedding.svg",
             prefix + "spectralembedding.svg",
+            prefix + "pca.variable_principle_components_association.p_value.masked.svg",
+            prefix
+            + "pca.variable_principle_components_association.adj_pvalue.masked.svg",
+            prefix + "pca.variable_principle_components_association.p_value.svg",
+            prefix + "pca.variable_principle_components_association.adj_pvalue.svg",
         ]
         # here I'm picking the first and last samples just to make sure
         # they are from different values of attributes `a` and `b`

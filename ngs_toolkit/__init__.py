@@ -190,7 +190,9 @@ setup_graphic_preferences()
 
 
 # reduce level of logging from divvy
-_divvy.logging.getLogger("divvy").setLevel("ERROR")
+# only for divvy <=0.
+if "logging" in _divvy.__dict__.keys():
+    _divvy.logging.getLogger("divvy").setLevel("ERROR")
 
 
 # easier API

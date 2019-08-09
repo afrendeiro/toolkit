@@ -14,3 +14,4 @@ tqdm>=4.19.5
 peppy>=0.22.2
 divvy>=0.4.0
 attmap>=0.12.9
+requests

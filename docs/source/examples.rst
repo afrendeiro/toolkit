@@ -94,8 +94,8 @@ ATAC-seq analysis example
     ## get coverage values for each peak in each sample of ATAC-seq
     analysis.measure_coverage()
 
-    # Normalize accessibility (quantile normalization + GC correction)
-    analysis.normalize(method="gc_content")
+    # Normalize accessibility (quantile normalization + GC correction, requires cqn R library)
+    analysis.normalize(method="cqn")
 
     # Annotate normalized accessibility with sample and region info
     # # annotate dataframe with peak metadata

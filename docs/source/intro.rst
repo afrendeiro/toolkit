@@ -21,7 +21,7 @@ If you wish to install libraries required for additional work, you can do:
 
 .. code-block:: bash
 
-   pip install ngs-toolkit[r] [--user]
+   pip install ngs-toolkit[rstats] [--user]
 
 
 Non-Python optional requirements

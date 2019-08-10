@@ -31,7 +31,7 @@ with open(os.path.join("ngs_toolkit", "_version.py"), "r") as handle:
 # Requirements
 requirements = parse_requirements("requirements/requirements.txt")
 test_requirements = parse_requirements("requirements/requirements.test.txt")
-requirements_r = parse_requirements("requirements/requirements.r.txt")
+requirements_r = parse_requirements("requirements/requirements.rstats.txt")
 requirements_sc = parse_requirements("requirements/requirements.single_cell.txt")
 
 # Recipes
@@ -83,7 +83,7 @@ setup(
     license="GPL3",
     install_requires=requirements,
     tests_require=test_requirements,
-    extras_require={"r": requirements_r, "single_cell": requirements_sc},
+    extras_require={"rstats": requirements_r, "single_cell": requirements_sc},
     package_data={"ngs_toolkit": ["config/*.yaml"]},
     data_files=[
         "requirements/requirements.txt",

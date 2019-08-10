@@ -93,8 +93,6 @@ class Analysis(object):
         _LOGGER.debug("Adding given arguments to analysis object.")
         self.name = name
         self.root_dir = root_dir
-        self.data_dir = data_dir
-        self.results_dir = results_dir
         self.prj = prj
         self.samples = samples
 
@@ -153,14 +151,14 @@ class Analysis(object):
         _LOGGER.debug("Trying to get analysis genome.")
         self.set_organism_genome()
 
-        # Add sample input file locations
-        _LOGGER.debug("Trying to set sample input file attributes.")
-        self.set_samples_input_files()
-
         # Set root_dir
         if self.root_dir is None:
             self.root_dir = os.curdir
         self.root_dir = os.path.abspath(self.root_dir)
+
+        # Set data and results dir
+        self.data_dir = os.path.join(self.root_dir, data_dir)
+        self.results_dir = os.path.join(self.root_dir, results_dir)
 
         # # if given absolute paths, keep them, otherwise append to root directory
         for dir_, attr in [(data_dir, "data_dir"), (results_dir, "results_dir")]:
@@ -178,6 +176,10 @@ class Analysis(object):
                     _LOGGER.debug(
                         "Could not make directory for Analysis: '{}'".format(directory)
                     )
+
+        # Add sample input file locations
+        _LOGGER.debug("Trying to set sample input file attributes.")
+        self.set_samples_input_files()
 
         # Set pickle file
         if not hasattr(self, "pickle_file"):
@@ -290,10 +292,23 @@ class Analysis(object):
         ----------
         bool
             Whether samples have file.
+
+        Raises
+        -------
+        AttributeError:
+            If attribute does not exist in samples
         """
         if samples is None:
             samples = self.samples
-        return f([os.path.exists(str(getattr(sample, attr))) for sample in samples])
+
+        try:
+            files = [str(getattr(sample, attr)) for sample in samples]
+        except AttributeError:
+            msg = "Sample did not have attribute '{}'".format(attr)
+            _LOGGER.error(msg)
+            raise
+
+        return f([os.path.exists(file) for file in files])
 
     def _get_samples_have_file(self, attr, samples=None):
         """
@@ -312,6 +327,11 @@ class Analysis(object):
         -------
         list
             List of peppy.Sample objects.
+
+        Raises
+        -------
+        AttributeError:
+            If attribute does not exist in samples
         """
         if samples is None:
             samples = self.samples
@@ -337,6 +357,11 @@ class Analysis(object):
         -------
         list
             List of peppy.Sample objects.
+
+        Raises
+        -------
+        AttributeError:
+            If attribute does not exist in samples
         """
         if samples is None:
             samples = self.samples
@@ -385,8 +410,12 @@ class Analysis(object):
 
         msg = "None of the samples have '{}' files.".format(input_file)
         if all([s in missing for s in samples]):
-            _LOGGER.error(msg)
-            raise IOError(msg)
+            if permissive:
+                _LOGGER.warning(msg)
+                return []
+            else:
+                _LOGGER.error(msg)
+                raise IOError(msg)
 
         msg = "Not all samples have '{}' files.".format(input_file)
         hint = " Samples missing files: {}".format(", ".join([s.name for s in missing]))
@@ -415,6 +444,11 @@ class Analysis(object):
         ----------
         str
             Formated string.
+
+        Raises
+        -------
+        ValueError
+            If not all patterns are set environment variables.
         """
         if string is None:
             return string
@@ -441,6 +475,11 @@ class Analysis(object):
         ----------
         str
             Formated string.
+
+        Raises
+        -------
+        ValueError
+            If not all patterns are analysis variables.
         """
         if string is None:
             return string
@@ -1968,6 +2007,10 @@ class Analysis(object):
         from statsmodels.sandbox.stats.multicomp import multipletests
         from scipy.stats import kruskal, pearsonr
 
+        output_dir = self._format_string_with_attributes(output_dir)
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+
         matrix = self.get_matrix(matrix)
 
         if ("pca_association" in steps) and ("pca" not in steps):
@@ -1975,10 +2018,6 @@ class Analysis(object):
 
         if plot_prefix is None:
             plot_prefix = "all_{}s".format(self.var_unit_name)
-
-        output_dir = self._format_string_with_attributes(output_dir)
-        if not os.path.exists(output_dir):
-            os.makedirs(output_dir)
 
         if not isinstance(matrix.columns, pd.core.indexes.multi.MultiIndex):
             msg = "Provided quantification matrix must have columns with MultiIndex."
@@ -2102,7 +2141,7 @@ class Analysis(object):
                     yticklabels=sample_display_names,
                     annot=display_corr_values,
                     cmap="Spectral_r",
-                    figsize=(0.2 * x.shape[1], 0.2 * x.shape[1]),
+                    figsize=(0.4 * x.shape[1], 0.4 * x.shape[1]),
                     cbar_kws={"label": "{} correlation".format(method.capitalize())},
                     row_colors=cd,
                     col_colors=cd,

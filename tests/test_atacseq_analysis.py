@@ -3,129 +3,15 @@
 
 import os
 
-from .data_generator import generate_project
 from ngs_toolkit import _CONFIG
 from ngs_toolkit.atacseq import ATACSeqAnalysis
-from ngs_toolkit.utils import download_gzip_file
 import numpy as np
 import pandas as pd
-from peppy import Project
 import pybedtools
 import pytest
 
 
 travis = "TRAVIS" in os.environ
-
-
-@pytest.fixture
-def various_analysis(tmp_path):
-    tmp_path = str(tmp_path)  # for Python2
-
-    # Let's make several "reallish" test projects
-    to_test = list()
-    project_prefix_name = "test-project"
-    data_type = "ATAC-seq"
-    genome_assemblies = [("human", "hg19"), ("human", "hg38"), ("mouse", "mm10")]
-
-    n_factors = [1, 2, 3][0]
-    n_variables = [100, 1000, 10000][0]
-    n_replicates = [1, 2, 5][0]
-    for organism, genome_assembly in genome_assemblies:
-        project_name = "{}_{}_{}_{}_{}_{}".format(
-            project_prefix_name,
-            data_type,
-            genome_assembly,
-            n_factors,
-            n_variables,
-            n_replicates,
-        )
-
-        generate_project(
-            output_dir=tmp_path,
-            project_name=project_name,
-            organism=organism,
-            genome_assembly=genome_assembly,
-            data_type=data_type,
-            n_factors=n_factors,
-            n_replicates=n_replicates,
-            n_variables=n_variables,
-        )
-
-        # first edit the defaul path to the annotation sheet
-        config = os.path.join(tmp_path, project_name, "metadata", "project_config.yaml")
-        prj_path = os.path.join(tmp_path, project_name)
-        os.chdir(prj_path)
-
-        # project and associated analysis
-        analysis = ATACSeqAnalysis(
-            name=project_name,
-            prj=Project(config),
-            results_dir=os.path.join(prj_path, "results"),
-        )
-        analysis.load_data()
-
-        to_test.append(analysis)
-    return to_test
-
-
-@pytest.fixture
-def analysis(tmp_path):
-    tmp_path = str(tmp_path)  # for Python2
-
-    # Let's make several "reallish" test projects
-    project_prefix_name = "test-project"
-    data_type = "ATAC-seq"
-    organism, genome_assembly = ("human", "hg38")
-
-    n_factors = [1, 2, 3][0]
-    n_variables = [100, 1000, 10000][0]
-    n_replicates = [1, 2, 5][0]
-    project_name = "{}_{}_{}_{}_{}_{}".format(
-        project_prefix_name,
-        data_type,
-        genome_assembly,
-        n_factors,
-        n_variables,
-        n_replicates,
-    )
-
-    generate_project(
-        output_dir=tmp_path,
-        project_name=project_name,
-        organism=organism,
-        genome_assembly=genome_assembly,
-        data_type=data_type,
-        n_factors=n_factors,
-        n_replicates=n_replicates,
-        n_variables=n_variables,
-    )
-
-    # first edit the defaul path to the annotation sheet
-    config = os.path.join(tmp_path, project_name, "metadata", "project_config.yaml")
-    prj_path = os.path.join(tmp_path, project_name)
-    os.chdir(prj_path)
-
-    # project and associated analysis
-    analysis = ATACSeqAnalysis(
-        name=project_name,
-        prj=Project(config),
-        results_dir=os.path.join(prj_path, "results"),
-    )
-    analysis.load_data()
-
-    return analysis
-
-
-@pytest.fixture
-def chrom_file():
-    url = (
-        "https://egg2.wustl.edu/roadmap/data/byFileType/"
-        + "chromhmmSegmentations/ChmmModels/coreMarks/jointModel/"
-        + "final/E002_15_coreMarks_hg38lift_dense.bed.gz"
-    )
-    chrom_state_file = os.path.abspath("E002_15_coreMarks_hg38lift_dense.bed")
-    download_gzip_file(url, chrom_state_file)
-    return chrom_state_file
 
 
 def test_get_consensus_sites(various_analysis):
@@ -212,54 +98,54 @@ def test_quantile_normalization(various_analysis):
 
 
 @pytest.mark.skipif(travis, reason="This is anyway tested after")
-def test_cqn_normalization(analysis):
+def test_cqn_normalization(atac_analysis):
     # At some point, downloading a genome reference in Travis
     # caused memory error.
     # This should now be fixed by implementing download/decompressing
     # functions working in chunks
     try:
-        qnorm = analysis.normalize_cqn()
+        qnorm = atac_analysis.normalize_cqn()
     except OSError:
         if travis:
             pytest.skip()
         else:
             raise
     assert qnorm.dtypes.all() == np.float
-    file = os.path.join(analysis.results_dir, analysis.name + ".matrix_norm.csv")
+    file = os.path.join(atac_analysis.results_dir, atac_analysis.name + ".matrix_norm.csv")
     assert os.path.exists(file)
     assert os.stat(file).st_size > 0
 
 
-def test_normalize(analysis):
-    qnorm = analysis.normalize_rpm(save=False)
+def test_normalize(atac_analysis):
+    qnorm = atac_analysis.normalize_rpm(save=False)
     assert isinstance(qnorm, pd.DataFrame)
-    assert hasattr(analysis, "matrix_norm")
-    del analysis.matrix_norm
+    assert hasattr(atac_analysis, "matrix_norm")
+    del atac_analysis.matrix_norm
 
-    qnorm_d = analysis.normalize(method="rpm", save=False)
+    qnorm_d = atac_analysis.normalize(method="rpm", save=False)
     assert isinstance(qnorm_d, pd.DataFrame)
-    assert hasattr(analysis, "matrix_norm")
+    assert hasattr(atac_analysis, "matrix_norm")
     assert np.array_equal(qnorm_d, qnorm)
-    del analysis.matrix_norm
+    del atac_analysis.matrix_norm
 
-    qnorm = analysis.normalize_quantiles(save=False)
-    assert hasattr(analysis, "matrix_norm")
-    del analysis.matrix_norm
+    qnorm = atac_analysis.normalize_quantiles(save=False)
+    assert hasattr(atac_analysis, "matrix_norm")
+    del atac_analysis.matrix_norm
 
-    qnorm_d = analysis.normalize(method="quantile", save=False)
+    qnorm_d = atac_analysis.normalize(method="quantile", save=False)
     assert isinstance(qnorm_d, pd.DataFrame)
-    assert hasattr(analysis, "matrix_norm")
+    assert hasattr(atac_analysis, "matrix_norm")
     assert np.array_equal(qnorm_d, qnorm)
-    del analysis.matrix_norm
+    del atac_analysis.matrix_norm
 
     # At some point, downloading a genome reference in Travis
     # caused memory error.
     # This should now be fixed by implementing download/decompressing
     # functions working in chunks
     if not travis:
-        norm = analysis.normalize(method="cqn", save=False)
+        norm = atac_analysis.normalize(method="cqn", save=False)
         assert isinstance(norm, pd.DataFrame)
-        assert hasattr(analysis, "matrix_norm")
+        assert hasattr(atac_analysis, "matrix_norm")
 
 
 def test_get_matrix_stats(various_analysis):
@@ -275,34 +161,34 @@ def test_get_matrix_stats(various_analysis):
         assert all([x in annot.columns.tolist() for x in cols])
 
 
-def test_get_peak_gene_annotation(analysis):
+def test_get_peak_gene_annotation(atac_analysis):
     reference_dir = ATACSeqAnalysis._format_string_with_environment_variables(
         _CONFIG["preferences"]["root_reference_dir"]
     )
     if reference_dir is None:
-        reference_dir = os.path.join(analysis.root_dir, "reference")
+        reference_dir = os.path.join(atac_analysis.root_dir, "reference")
 
     mapping = {"hg19": "grch37", "hg38": "grch38", "mm10": "grcm38"}
 
-    annot = analysis.get_peak_gene_annotation(max_dist=1e10)
+    annot = atac_analysis.get_peak_gene_annotation(max_dist=1e10)
     tss = os.path.join(
         reference_dir,
         "{}.{}.gene_annotation.protein_coding.tss.bed".format(
-            analysis.organism, mapping[analysis.genome]
+            atac_analysis.organism, mapping[atac_analysis.genome]
         ),
     )
     assert os.path.exists(tss)
     assert os.stat(tss).st_size > 0
     assert isinstance(annot, pd.DataFrame)
-    assert annot.shape[0] >= len(analysis.sites)
+    assert annot.shape[0] >= len(atac_analysis.sites)
 
 
-def test_get_peak_genomic_location(analysis):
+def test_get_peak_genomic_location(atac_analysis):
     reference_dir = ATACSeqAnalysis._format_string_with_environment_variables(
         _CONFIG["preferences"]["root_reference_dir"]
     )
     if reference_dir is None:
-        reference_dir = os.path.join(analysis.root_dir, "reference")
+        reference_dir = os.path.join(atac_analysis.root_dir, "reference")
     prefix = os.path.join(reference_dir, "{}.{}.genomic_context")
 
     fs = [
@@ -323,7 +209,7 @@ def test_get_peak_genomic_location(analysis):
     # This should now be fixed by implementing download/decompressing
     # functions working in chunks
     try:
-        annot = analysis.get_peak_genomic_location()
+        annot = atac_analysis.get_peak_genomic_location()
     except OSError:
         if travis:
             pytest.skip()
@@ -333,16 +219,16 @@ def test_get_peak_genomic_location(analysis):
     # check annotation files are produced
     mapping = {"hg19": "grch37", "hg38": "grch38", "mm10": "grcm38"}
     for f in fs:
-        f = f.format(analysis.organism, mapping[analysis.genome])
+        f = f.format(atac_analysis.organism, mapping[atac_analysis.genome])
         assert os.path.exists(f)
         assert os.stat(f).st_size > 0
 
     assert isinstance(annot, pd.DataFrame)
-    assert annot.shape[0] >= len(analysis.sites)
+    assert annot.shape[0] >= len(atac_analysis.sites)
 
 
-def test_peak_chromatin_state(analysis, chrom_file):
-    prefix = os.path.join(analysis.results_dir, analysis.name)
+def test_peak_chromatin_state(atac_analysis, chrom_file):
+    prefix = os.path.join(atac_analysis.results_dir, atac_analysis.name)
     fs = [
         prefix + ".chrom_state_annotation.csv",
         prefix + ".chrom_state_annotation_mapping.csv",
@@ -357,36 +243,36 @@ def test_peak_chromatin_state(analysis, chrom_file):
         "chrom_state_annotation_b_mapping",
     ]
 
-    annot = analysis.get_peak_chromatin_state(chrom_state_file=chrom_file)
+    annot = atac_analysis.get_peak_chromatin_state(chrom_state_file=chrom_file)
     assert isinstance(annot, pd.DataFrame)
-    assert annot.shape[0] >= len(analysis.sites)
+    assert annot.shape[0] >= len(atac_analysis.sites)
 
     for f in fs:
         assert os.path.exists(f)
         assert os.stat(f).st_size > 0
     for attr in attrs:
-        assert hasattr(analysis, attr)
+        assert hasattr(atac_analysis, attr)
 
 
-def test_annotate_features(analysis, chrom_file):
-    analysis.get_peak_chromatin_state(chrom_state_file=chrom_file)
-    analysis.get_matrix_stats(matrix="matrix_raw")
-    analysis.get_peak_gene_annotation(max_dist=1e10)
+def test_annotate_features(atac_analysis, chrom_file):
+    atac_analysis.get_peak_chromatin_state(chrom_state_file=chrom_file)
+    atac_analysis.get_matrix_stats(matrix="matrix_raw")
+    atac_analysis.get_peak_gene_annotation(max_dist=1e10)
     # At some point, downloading a genome reference in Travis
     # caused memory error.
     # This should now be fixed by implementing download/decompressing
     # functions working in chunks
     failed = False
     try:
-        analysis.get_peak_genomic_location()
+        atac_analysis.get_peak_genomic_location()
     except OSError:
         if travis:
             failed = True
         else:
             raise
-    analysis.annotate_features(matrix="matrix_raw")
-    f = os.path.join(analysis.results_dir, analysis.name + ".matrix_features.csv")
-    assert hasattr(analysis, "matrix_features")
+    atac_analysis.annotate_features(matrix="matrix_raw")
+    f = os.path.join(atac_analysis.results_dir, atac_analysis.name + ".matrix_features.csv")
+    assert hasattr(atac_analysis, "matrix_features")
     assert os.path.exists(f)
     assert os.stat(f).st_size > 0
 
@@ -407,7 +293,7 @@ def test_annotate_features(analysis, chrom_file):
     if not failed:
         cols += ["genomic_region"]  # from genomic_location
 
-    assert all([c in analysis.matrix_features.columns.tolist() for c in cols])
+    assert all([c in atac_analysis.matrix_features.columns.tolist() for c in cols])
 
 
 def test_plot_raw_coverage(various_analysis):

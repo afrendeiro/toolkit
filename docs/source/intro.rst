@@ -16,6 +16,14 @@ you might need the ``--user`` flag if not root or running in a virtual environme
 
 This will install all the Python dependencies needed too. See `here <https://github.com/afrendeiro/toolkit/blob/master/requirements/requirements.txt>`_ a list of all Python dependencies used.
 
+
+If you wish to install libraries required for additional work, you can do:
+
+.. code-block:: bash
+
+   pip install ngs-toolkit[r] [--user]
+
+
 Non-Python optional requirements
 -----------------------------
 

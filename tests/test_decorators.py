@@ -1,36 +1,11 @@
 #!/usr/bin/env python
 
 
-from ngs_toolkit.atacseq import ATACSeqAnalysis
 import pytest
 import os
 
 
 travis = "TRAVIS" in os.environ
-
-
-@pytest.fixture
-def empty_analysis():
-    return ATACSeqAnalysis()
-
-
-@pytest.fixture
-def null_analysis():
-    analysis = ATACSeqAnalysis()
-    analysis.organism = None
-    analysis.genome = None
-    analysis.sites = None
-    return analysis
-
-
-@pytest.fixture
-def full_analysis():
-    analysis = ATACSeqAnalysis()
-    analysis.organism = "human"
-    analysis.genome = "hg38"
-    analysis.sites = "hg38"
-    analysis.samples = []
-    return analysis
 
 
 class Test_check_organism_genome:

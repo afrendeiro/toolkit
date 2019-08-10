@@ -7,57 +7,9 @@ import shutil
 
 from .data_generator import generate_project
 from ngs_toolkit.analysis import Analysis
-from ngs_toolkit.atacseq import ATACSeqAnalysis
 import numpy as np
 from peppy import Project
 import pytest
-
-
-@pytest.fixture
-def analysis(tmp_path):
-    tmp_path = str(tmp_path)  # for Python2
-
-    # Let's make several "reallish" test projects
-    project_prefix_name = "test-project"
-    data_type = "ATAC-seq"
-    organism, genome_assembly = ("human", "hg38")
-
-    n_factors = [1, 2, 3][0]
-    n_variables = [100, 1000, 10000][0]
-    n_replicates = [1, 2, 5][0]
-    project_name = "{}_{}_{}_{}_{}_{}".format(
-        project_prefix_name,
-        data_type,
-        genome_assembly,
-        n_factors,
-        n_variables,
-        n_replicates,
-    )
-
-    generate_project(
-        output_dir=tmp_path,
-        project_name=project_name,
-        organism=organism,
-        genome_assembly=genome_assembly,
-        data_type=data_type,
-        n_factors=n_factors,
-        n_replicates=n_replicates,
-        n_variables=n_variables,
-    )
-
-    config = os.path.join(tmp_path, project_name, "metadata", "project_config.yaml")
-    prj_path = os.path.join(tmp_path, project_name)
-    os.chdir(prj_path)
-
-    # project and associated analysis
-    analysis = ATACSeqAnalysis(
-        name=project_name,
-        prj=Project(config),
-        results_dir=os.path.join(prj_path, "results"),
-    )
-    analysis.load_data()
-
-    return analysis
 
 
 class TestAnalysis:
@@ -184,11 +136,11 @@ class TestAnalysis:
 
         shutil.rmtree(tmp_path)
 
-    def test__overwride_sample_representation(self, analysis):
+    def test__overwride_sample_representation(self, atac_analysis):
 
-        prev = analysis.samples[0].__repr__
+        prev = atac_analysis.samples[0].__repr__
         Analysis._overwride_sample_representation()
-        new = analysis.samples[0].__repr__
+        new = atac_analysis.samples[0].__repr__
 
         assert prev != new
 
@@ -199,24 +151,75 @@ class TestAnalysis:
         assert Analysis._check_data_type_is_supported("CNV")
         assert not Analysis._check_data_type_is_supported("Microarray")
 
-    def test__format_string_with_attributes(self):
+    def test__get_data_type(self, atac_analysis):
+        assert "ATAC-seq" == atac_analysis._get_data_type()
+        assert "ATAC-seq" == atac_analysis._get_data_type(data_type="ATAC-seq")
+        assert "RNA-seq" == atac_analysis._get_data_type(data_type="RNA-seq")
+
+        with pytest.raises(ValueError):
+            atac_analysis._get_data_type(data_type="Microarray")
+
+        atac_analysis.data_type = None
+        with pytest.raises(ValueError):
+            atac_analysis._get_data_type()
+
+        del atac_analysis.data_type
+        with pytest.raises(AttributeError):
+            atac_analysis._get_data_type()
+
+    def test__check_samples_have_file(self, atac_analysis):
+        with pytest.raises(AttributeError):
+            atac_analysis._check_samples_have_file("NOTEXISTING")
+
+        # assert not atac_analysis._check_samples_have_file("summits")
+
+        assert not atac_analysis._check_samples_have_file("sample_name")
+
+    def test__get_samples_have_file(self, atac_analysis):
+        assert 0 == len(atac_analysis._get_samples_have_file("sample_name"))
+
+    def test__get_samples_missing_file(self, atac_analysis):
+        with pytest.raises(AttributeError):
+            atac_analysis._get_samples_have_file("NOTEXISTING")
+
+        assert 0 == len(atac_analysis._get_samples_have_file("sample_name"))
+
+        assert 0 == len(atac_analysis._get_samples_have_file("aligned_filtered_bam"))
+
+    def test__get_samples_with_input_file(self, atac_analysis):
+        with pytest.raises(AttributeError):
+            atac_analysis._get_samples_with_input_file("NOTEXISTING")
+
+        with pytest.raises(IOError):
+            atac_analysis._get_samples_with_input_file("sample_name")
+
+        with pytest.raises(IOError):
+            atac_analysis._get_samples_with_input_file("aligned_filtered_bam")
+
+        assert 0 == len(atac_analysis._get_samples_with_input_file("aligned_filtered_bam", permissive=True))
+        assert 0 == len(atac_analysis._get_samples_with_input_file("peaks", permissive=True))
+        assert 0 == len(atac_analysis._get_samples_with_input_file("summits", permissive=True))
+
+    @pytest.mark.parametrize(
+        "env_var,string",
+        [
+            ("_${USER}_", "_{}_".format(os.environ.get("USER"))),
+            # ("_$PATH_", "_{}_".format(os.environ.get("PATH"))),
+        ])
+    def test__format_string_with_environment_variables(self, env_var, string):
+        assert string == Analysis._format_string_with_environment_variables(env_var)
+
+    def test__format_string_with_attributes_simple(self):
         t = Analysis()
         t.a = 1
         t.b = ""
         assert "1" == Analysis._format_string_with_attributes(t, "{a}{b}")
 
-    def test__get_data_type(self, analysis):
-        assert "ATAC-seq" == analysis._get_data_type()
-        assert "ATAC-seq" == analysis._get_data_type(data_type="ATAC-seq")
-        assert "RNA-seq" == analysis._get_data_type(data_type="RNA-seq")
-
-        with pytest.raises(ValueError):
-            analysis._get_data_type(data_type="Microarray")
-
-        analysis.data_type = None
-        with pytest.raises(ValueError):
-            analysis._get_data_type()
-
-        del analysis.data_type
-        with pytest.raises(AttributeError):
-            analysis._get_data_type()
+    @pytest.mark.parametrize(
+        "env_var,string",
+        [
+            ("{data_type}", "ATAC-seq".format(os.environ.get("USER"))),
+            ("{name}", "test-project_ATAC-seq_hg38_1_1000_3"),
+        ])
+    def test__format_string_with_attributes(self, atac_analysis, env_var, string):
+        assert string == atac_analysis._format_string_with_attributes(env_var)

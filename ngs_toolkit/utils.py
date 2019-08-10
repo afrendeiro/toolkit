@@ -643,6 +643,15 @@ def compress_file(file, output_file=None):
 def download_file(url, output_file, chunk_size=1024):
     """
     Download a file and write to disk in chunks (not in memory).
+
+    Parameters
+    ----------
+    url : :obj:`str`
+        URL to download from.
+    output_file : :obj:`str`
+        Path to file as output.
+    chunk_size : :obj:`int`
+        Size in bytes of chunk to write to disk at a time.
     """
     """
     # test:
@@ -650,6 +659,8 @@ def download_file(url, output_file, chunk_size=1024):
     url += '/ChmmModels/coreMarks/jointModel/final/E001_15_coreMarks_dense.bed.gz'
     output_file = "file.bed.gz"
     chunk_size = 1024
+
+    download_file(url, output_file, chunk_size)
     """
     import requests
 

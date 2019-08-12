@@ -142,10 +142,13 @@ def test_normalize(atac_analysis):
     # caused memory error.
     # This should now be fixed by implementing download/decompressing
     # functions working in chunks
-    if not travis:
+    try:
         norm = atac_analysis.normalize(method="cqn", save=False)
         assert isinstance(norm, pd.DataFrame)
         assert hasattr(atac_analysis, "matrix_norm")
+    except OSError:
+        if not travis:
+            raise
 
 
 def test_get_matrix_stats(various_analysis):

@@ -5,7 +5,6 @@ import os
 
 from .data_generator import generate_project
 from ngs_toolkit import Analysis, ATACSeqAnalysis
-from ngs_toolkit.utils import download_gzip_file
 from peppy import Project
 import pytest
 
@@ -281,6 +280,9 @@ def various_analysis(tmp_path):
 
 @pytest.fixture
 def chrom_file():
+    from ngs_toolkit.utils import download_gzip_file
+    import pandas as pd
+
     url = (
         "https://egg2.wustl.edu/roadmap/data/byFileType/"
         + "chromhmmSegmentations/ChmmModels/coreMarks/jointModel/"
@@ -288,4 +290,10 @@ def chrom_file():
     )
     chrom_state_file = os.path.abspath("E002_15_coreMarks_hg38lift_dense.bed")
     download_gzip_file(url, chrom_state_file)
+
+    # Test
+    assert os.path.exists(chrom_state_file)
+    assert os.stat(chrom_state_file).st_size > 0
+    b = pd.read_csv(chrom_state_file, skiprows=1, sep="\t")
+    assert b.shape == (281837, 9)
     return chrom_state_file

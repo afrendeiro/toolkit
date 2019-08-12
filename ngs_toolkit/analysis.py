@@ -2297,7 +2297,7 @@ class Analysis(object):
 
             # plot pca
             pcs = min(x_new.shape[1] - 1, plot_max_pcs)
-            _LOGGER.info("Plotting PCA up to {} dimensions.".format(pcs))
+            _LOGGER.info("Plotting PCA up to ({} + 1) dimensions.".format(pcs))
             plot_projection(
                 df=x_new,
                 color_dataframe=color_dataframe,
@@ -2435,7 +2435,6 @@ class Analysis(object):
                     row_cluster=False,
                     annot=True,
                     cbar_kws={"label": "-log10(p_value) of association"},
-                    square=True,
                     rasterized=rasterized,
                     vmin=0,
                 )
@@ -2457,7 +2456,6 @@ class Analysis(object):
                     (pivot < 0.05).astype(int),
                     row_cluster=False,
                     cbar_kws={"label": "significant association"},
-                    square=True,
                     rasterized=rasterized,
                     vmin=0,
                     vmax=1,

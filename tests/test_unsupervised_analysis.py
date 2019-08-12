@@ -165,21 +165,47 @@ class TestUnsupervisedAnalysis:
                 os.path.join(analysis_annotated.results_dir, "unsupervised_analysis_ATAC-seq")
             )
 
-    def test_various_plot_prefixes_attributes(self, atac_analysis_many_factors, unsup_outputs):
-        atac_analysis_many_factors.unsupervised_analysis(plot_prefix="test")
+    def test_various_output_prefixes_attributes(self, atac_analysis_many_factors, unsup_outputs):
+        atac_analysis_many_factors.unsupervised_analysis(output_prefix="test")
         for output in unsup_outputs:
+            old_output = "all_{}s".format(atac_analysis_many_factors.var_unit_name)
             assert os.path.exists(
-                output.replace("all_{}s".format(atac_analysis_many_factors.var_unit_name), "test")
+                output.replace(old_output, "test")
             )
             assert (
                 os.stat(
-                    output.replace("all_{}s".format(atac_analysis_many_factors.var_unit_name), "test")
+                    output.replace(old_output, "test")
                 ).st_size
                 > 0
             )
 
     def test_standardized_matrix(self, atac_analysis_many_factors, unsup_outputs):
-        atac_analysis_many_factors.unsupervised_analysis(standardize_matrix=True)
+        atac_analysis_many_factors.unsupervised_analysis(standardize_matrix=False)
         for output in unsup_outputs:
+            assert os.path.exists(output)
+            assert os.stat(output).st_size > 0
+
+    def test_save_additional(self, atac_analysis_many_factors):
+
+        prefix = os.path.join(
+            atac_analysis_many_factors.results_dir,
+            "unsupervised_analysis_{}".format(atac_analysis_many_factors.data_type),
+            atac_analysis_many_factors.name + ".all_{}s.".format(atac_analysis_many_factors.var_unit_name),
+        )
+
+        additional_outputs = [
+            prefix + "isomap.embedding.csv",
+            prefix + "locallylinearembedding.embedding.csv",
+            prefix + "mds.embedding.csv",
+            prefix + "spectralembedding.embedding.csv",
+            prefix + "tsne.embedding.csv",
+            prefix + "pca.embedding.csv",
+            prefix + "pca.embedding.csv",
+            prefix + "pca.loading.csv",
+        ]
+        atac_analysis_many_factors.unsupervised_analysis(
+            save_additional=True)
+
+        for output in additional_outputs:
             assert os.path.exists(output)
             assert os.stat(output).st_size > 0

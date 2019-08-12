@@ -7,6 +7,11 @@ Changelog
 
 ------------
 
+- **v0.12** (development, pre-1.0):
+
+  - change of unsupervised_analysis API call: homogeneization with remaining functions
+  - optional saving of embeddings and loadings of PCA and manifolds in unsupervised_analysis
+
 - **v0.11** (development, pre-1.0):
 
   - adapt to latest versions of pepkit stack

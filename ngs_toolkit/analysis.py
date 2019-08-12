@@ -864,7 +864,9 @@ class Analysis(object):
 
                 # Fix possible multiindex for matrix_norm
                 if name == "matrix_norm":
-                    setattr(self, name, fix_dataframe_header(getattr(self, name)))
+                    if not isinstance(getattr(self, name).columns, pd.MultiIndex):
+                        _LOGGER.debug("Trying to fix 'matrix_norm' dataframe header.")
+                        setattr(self, name, fix_dataframe_header(getattr(self, name)))
             except IOError as e:
                 if not permissive:
                     raise e
@@ -1897,7 +1899,8 @@ class Analysis(object):
         matrix="matrix_norm",
         samples=None,
         attributes_to_plot=None,
-        plot_prefix=None,
+        output_dir="{results_dir}/unsupervised_analysis_{data_type}",
+        output_prefix="all_{var_unit_name}s",
         standardize_matrix=True,
         manifold_algorithms=[
             "MDS",
@@ -1908,10 +1911,10 @@ class Analysis(object):
         ],
         display_corr_values=False,
         plot_max_pcs=8,
+        save_additional=False,
         prettier_sample_names=True,
         rasterized=False,
         dpi=300,
-        output_dir="{results_dir}/unsupervised_analysis_{data_type}",
         **kwargs
     ):
         """
@@ -1958,7 +1961,11 @@ class Analysis(object):
             List of attributes shared between sample groups should be plotted.
 
             Defaults to attributes in analysis.group_attributes.
-        plot_prefix : :obj:`str`, optional
+        output_dir : :obj:`str`, optional
+            Directory for generated files and plots.
+
+            Defaults to "{results_dir}/unsupervised_analysis_{data_type}".
+        output_prefix : :obj:`str`, optional
             Prefix for output files.
 
             Defaults to "all_regions" if data_type is ATAC-seq and "all_genes" if data_type is RNA-seq.
@@ -1976,6 +1983,10 @@ class Analysis(object):
             Whether values in heatmap of sample correlations should be displayed overlaid on top of colours.
 
             Defaults to :obj:`False`.
+        save_additional: :obj:`bool`, optional
+            Whether additional results such as PCA projection, loadings should be saved.
+
+            Defaults to :obj:`False`.
         prettier_sample_names: :obj:`bool`, optional
             Whether it should attempt to prettify sample names by removing the data type from plots.
 
@@ -1988,10 +1999,6 @@ class Analysis(object):
             Definition of rasterized image in dots per inch (dpi).
 
             Defaults to 300.
-        output_dir : :obj:`str`, optional
-            Directory for generated files and plots.
-
-            Defaults to "{results_dir}/unsupervised_analysis_{data_type}".
         **kwargs: optional
             kwargs are passed to :func:`~ngs_toolkit.Analysis.get_level_colors` and
             :func:`~ngs_toolkit.graphics.plot_projection`.
@@ -2016,8 +2023,7 @@ class Analysis(object):
         if ("pca_association" in steps) and ("pca" not in steps):
             steps.append("pca")
 
-        if plot_prefix is None:
-            plot_prefix = "all_{}s".format(self.var_unit_name)
+        output_prefix = self._format_string_with_attributes(output_prefix)
 
         if not isinstance(matrix.columns, pd.core.indexes.multi.MultiIndex):
             msg = "Provided quantification matrix must have columns with MultiIndex."
@@ -2156,7 +2162,7 @@ class Analysis(object):
                     os.path.join(
                         output_dir,
                         "{}.{}.{}_correlation.clustermap.svg".format(
-                            self.name, plot_prefix, method
+                            self.name, output_prefix, method
                         ),
                     ),
                 )
@@ -2195,6 +2201,15 @@ class Analysis(object):
                 x_new = pd.DataFrame(
                     x_new, index=x.columns, columns=list(range(x_new.shape[1]))
                 )
+                if save_additional:
+                    for d, label in [(x_new, "embedding")]:
+                        _LOGGER.debug("Saving {} {} matrix to disk.".format(algo, label))
+                        d.to_csv(
+                            os.path.join(
+                                output_dir, "{}.{}.{}.{}.csv"
+                                .format(self.name, output_prefix, algo.lower(), label)
+                            )
+                        )
 
                 _LOGGER.info(
                     "Plotting projection of manifold with '{}' algorithm.".format(algo)
@@ -2205,7 +2220,7 @@ class Analysis(object):
                     dims=1,
                     output_file=os.path.join(
                         output_dir,
-                        "{}.{}.{}.svg".format(self.name, plot_prefix, algo.lower()),
+                        "{}.{}.{}.svg".format(self.name, output_prefix, algo.lower()),
                     ),
                     attributes_to_plot=attributes_to_plot,
                     axis_ticklabels_name=algo,
@@ -2223,17 +2238,17 @@ class Analysis(object):
 
             pcs_order = range(pca.n_components_)
             x_new = pd.DataFrame(x_new, index=x.columns, columns=pcs_order)
-            x_new.to_csv(
-                os.path.join(
-                    output_dir, "{}.{}.pca.fit.csv".format(self.name, plot_prefix)
-                )
-            )
             comps = pd.DataFrame(pca.components_.T, index=x.index, columns=pcs_order)
-            comps.to_csv(
-                os.path.join(
-                    output_dir, "{}.{}.pca.loadings.csv".format(self.name, plot_prefix)
-                )
-            )
+
+            if save_additional:
+                for d, label in [(x_new, "embedding"), (comps, "loading")]:
+                    _LOGGER.debug("Saving PCA {} matrix to disk.".format(label))
+                    d.to_csv(
+                        os.path.join(
+                            output_dir, "{}.{}.pca.{}.csv"
+                            .format(self.name, output_prefix, label)
+                        )
+                    )
 
             # Write % variance expained to disk
             variance = pd.Series(
@@ -2247,7 +2262,7 @@ class Analysis(object):
             variance.to_csv(
                 os.path.join(
                     output_dir,
-                    "{}.{}.pca.explained_variance.csv".format(self.name, plot_prefix),
+                    "{}.{}.pca.explained_variance.csv".format(self.name, output_prefix),
                 )
             )
 
@@ -2276,7 +2291,7 @@ class Analysis(object):
                 fig,
                 os.path.join(
                     output_dir,
-                    "{}.{}.pca.explained_variance.svg".format(self.name, plot_prefix),
+                    "{}.{}.pca.explained_variance.svg".format(self.name, output_prefix),
                 ),
             )
 
@@ -2288,7 +2303,7 @@ class Analysis(object):
                 color_dataframe=color_dataframe,
                 dims=pcs,
                 output_file=os.path.join(
-                    output_dir, "{}.{}.pca.svg".format(self.name, plot_prefix)
+                    output_dir, "{}.{}.pca.svg".format(self.name, output_prefix)
                 ),
                 attributes_to_plot=attributes_to_plot,
                 axis_ticklabels_name="PCA",
@@ -2390,7 +2405,7 @@ class Analysis(object):
                 os.path.join(
                     output_dir,
                     "{}.{}.pca.variable_principle_components_association.csv".format(
-                        self.name, plot_prefix
+                        self.name, output_prefix
                     ),
                 ),
                 index=False,
@@ -2432,7 +2447,7 @@ class Analysis(object):
                     os.path.join(
                         output_dir,
                         "{}.{}.pca.variable_principle_components_association.{}.svg".format(
-                            self.name, plot_prefix, var
+                            self.name, output_prefix, var
                         ),
                     ),
                 )
@@ -2456,7 +2471,7 @@ class Analysis(object):
                     os.path.join(
                         output_dir,
                         "{}.{}.pca.variable_principle_components_association.{}.masked.svg".format(
-                            self.name, plot_prefix, var
+                            self.name, output_prefix, var
                         ),
                     ),
                 )

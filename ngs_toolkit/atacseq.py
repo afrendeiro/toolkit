@@ -1242,9 +1242,12 @@ class ATACSeqAnalysis(Analysis):
         ----------
         chrom_state_file : :obj:`str`
             A 4 column BED file (chrom, start, end, feature), where feature is a string with the type of region.
+            Additional columns are ignored.
 
         frac : float
             Minimal fraction of region to overlap with a feature.
+
+            Defaults to 0.2.
 
         Returns
         ----------
@@ -1262,7 +1265,6 @@ class ATACSeqAnalysis(Analysis):
             or for the genome background.
         """
         import pybedtools
-
         from ngs_toolkit.utils import bed_to_index
 
         states = pybedtools.BedTool(chrom_state_file)
@@ -1279,11 +1281,17 @@ class ATACSeqAnalysis(Analysis):
             ("background", "chrom_state_annotation_b", background),
         ]:
             _LOGGER.debug(
-                "Getting chromatinn state annotation for {} regions.".format(label)
+                "Overlapping chromatin state annotation with {} regions.".format(label)
             )
             annot = bed.intersect(
                 states, wa=True, wb=True, f=frac, loj=True
-            ).to_dataframe(usecols=[0, 1, 2, 6])
+            )
+            try:
+                annot = annot.to_dataframe(usecols=[0, 1, 2, 6])
+            except pd.errors.EmptyDataError:
+                _LOGGER.error("Could not annotate region set.")
+                raise
+
             annot.iloc[:, 3] = annot.iloc[:, 3].astype(str)
 
             # remove duplicates (there shouldn't be anyway)

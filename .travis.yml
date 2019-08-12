@@ -30,7 +30,7 @@ before_script:
 
 install:
   - pip install -r requirements/requirements.test.txt
-  - pip install .[r]
+  - pip install .[rstats]
 
 script:
   - pytest --disable-warnings --show-capture=no --cov ./ --cov-report term --cov-report xml tests/test_*.py

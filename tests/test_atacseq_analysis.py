@@ -230,7 +230,7 @@ def test_get_peak_genomic_location(atac_analysis):
     assert annot.shape[0] >= len(atac_analysis.sites)
 
 
-@pytest.skipif(travis)
+@pytest.mark.skipif(travis)
 def test_peak_chromatin_state(atac_analysis, chrom_file):
     prefix = os.path.join(atac_analysis.results_dir, atac_analysis.name)
     fs = [

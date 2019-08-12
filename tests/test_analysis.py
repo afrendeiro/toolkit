@@ -5,15 +5,15 @@ import glob
 import os
 import shutil
 
-from .data_generator import generate_project
 from ngs_toolkit.analysis import Analysis
 import numpy as np
-from peppy import Project
 import pytest
 
 
 class TestAnalysis:
     def test_analysis_creation(self, tmp_path):
+        from .data_generator import generate_project
+        from peppy import Project
 
         tmp_path = str(tmp_path)  # for Python2
 
@@ -223,3 +223,13 @@ class TestAnalysis:
         ])
     def test__format_string_with_attributes(self, atac_analysis, env_var, string):
         assert string == atac_analysis._format_string_with_attributes(env_var)
+
+
+def test_project_with_subprojects(subproject_config):
+    from ngs_toolkit import Analysis
+
+    a = Analysis(from_pep=subproject_config)
+    assert len(a.samples) == 0
+
+    a = Analysis(from_pep=subproject_config, subproject="test_subproject")
+    assert len(a.samples) > 0

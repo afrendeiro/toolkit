@@ -94,6 +94,26 @@ def atac_analysis(tmp_path):
 
 
 @pytest.fixture
+def subproject_config(atac_analysis):
+    import yaml
+
+    annot = os.path.join(atac_analysis.root_dir, "metadata", "annotation.csv")
+    subannot = os.path.join(atac_analysis.root_dir, "metadata", "sample_subannotation.csv")
+
+    yaml_file = os.path.join(atac_analysis.root_dir, "metadata", "project_config.yaml")
+    conf = yaml.safe_load(open(yaml_file, 'r'))
+    conf['subprojects'] = {"test_subproject": {"metadata": {
+        "sample_annotation": annot,
+        "sample_subannotation": subannot}}}
+    del conf['metadata']['sample_annotation']
+    del conf['metadata']['sample_subannotation']
+
+    yaml.safe_dump(conf, open(yaml_file, 'w'))
+
+    return yaml_file
+
+
+@pytest.fixture
 def analysis_normalized(atac_analysis):
     atac_analysis.normalize(method="rpm")
     return atac_analysis

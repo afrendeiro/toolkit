@@ -735,7 +735,11 @@ class ATACSeqAnalysis(Analysis):
                     "date\nbedtools coverage -counts -abam {bam} -b {bed} > {out}\ndate"
                     .format(bam=s.aligned_filtered_bam, bed=sites.fn, out=output_file))
 
-                submit_job(cmd, job_file, job_name=job_name, logfile=log_file, cores=1, mem=8000)
+                submit_job(
+                    cmd, job_file,
+                    jobname=job_name,
+                    logfile=log_file,
+                    cores=1, mem=8000, time="04:00:00")
 
     def collect_coverage(
         self,

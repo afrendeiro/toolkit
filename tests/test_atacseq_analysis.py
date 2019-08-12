@@ -142,13 +142,10 @@ def test_normalize(atac_analysis):
     # caused memory error.
     # This should now be fixed by implementing download/decompressing
     # functions working in chunks
-    try:
+    if not travis:
         norm = atac_analysis.normalize(method="cqn", save=False)
         assert isinstance(norm, pd.DataFrame)
         assert hasattr(atac_analysis, "matrix_norm")
-    except OSError:
-        if not travis:
-            raise
 
 
 def test_get_matrix_stats(various_analysis):
@@ -230,7 +227,7 @@ def test_get_peak_genomic_location(atac_analysis):
     assert annot.shape[0] >= len(atac_analysis.sites)
 
 
-@pytest.mark.skipif(travis)
+@pytest.mark.skipif(travis, reason="Travis only failure, needs investigation")
 def test_peak_chromatin_state(atac_analysis, chrom_file):
     prefix = os.path.join(atac_analysis.results_dir, atac_analysis.name)
     fs = [

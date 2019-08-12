@@ -14,6 +14,7 @@ travis = "TRAVIS" in os.environ
 
 # TODO: test having no config set
 # TODO: test differential analysis with many factors
+# TODO: test subproject initialization
 
 
 @pytest.fixture

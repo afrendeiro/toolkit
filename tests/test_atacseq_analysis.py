@@ -230,6 +230,7 @@ def test_get_peak_genomic_location(atac_analysis):
     assert annot.shape[0] >= len(atac_analysis.sites)
 
 
+@pytest.skipif(travis)
 def test_peak_chromatin_state(atac_analysis, chrom_file):
     prefix = os.path.join(atac_analysis.results_dir, atac_analysis.name)
     fs = [
@@ -258,7 +259,9 @@ def test_peak_chromatin_state(atac_analysis, chrom_file):
 
 
 def test_annotate_features(atac_analysis, chrom_file):
-    atac_analysis.get_peak_chromatin_state(chrom_state_file=chrom_file)
+    if not travis:
+        atac_analysis.get_peak_chromatin_state(chrom_state_file=chrom_file)
+
     atac_analysis.get_matrix_stats(matrix="matrix_raw")
     atac_analysis.get_peak_gene_annotation(max_dist=1e10)
     # At some point, downloading a genome reference in Travis
@@ -283,7 +286,6 @@ def test_annotate_features(atac_analysis, chrom_file):
         "gene_name",
         "strand",
         "distance",  # from gene_annotation
-        "chromatin_state",  # from chromatin_state
         "mean",
         "variance",
         "std_deviation",
@@ -295,6 +297,9 @@ def test_annotate_features(atac_analysis, chrom_file):
 
     if not failed:
         cols += ["genomic_region"]  # from genomic_location
+
+    if not travis:
+        cols += ["chromatin_state"]  # from chromatin_state
 
     assert all([c in atac_analysis.matrix_features.columns.tolist() for c in cols])
 

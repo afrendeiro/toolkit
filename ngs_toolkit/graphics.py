@@ -387,8 +387,9 @@ def plot_projection(
     """
     from collections import OrderedDict
 
-    if not df.index.is_lexsorted():
-        df = df.sort_index()
+    # Make sure dataframes are index-sorted
+    df = df.sort_index()
+    color_dataframe = color_dataframe.sort_index()
 
     n_attr = len(attributes_to_plot)
     fig, axis = plt.subplots(dims, n_attr, figsize=(4 * n_attr, 4 * dims))

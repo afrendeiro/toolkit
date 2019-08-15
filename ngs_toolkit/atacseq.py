@@ -657,7 +657,7 @@ class ATACSeqAnalysis(Analysis):
 
         # Check which samples to run (dependent on permissive)
         samples = self._get_samples_with_input_file(
-            "aligned_filtered_bam", permissive=permissive, samples=samples
+            "aligned_filtered_bam", samples=samples, permissive=permissive
         )
 
         if sites is None:

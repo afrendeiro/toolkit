@@ -94,6 +94,15 @@ def atac_analysis(tmp_path):
 
 
 @pytest.fixture
+def atac_analysis_with_input_files(atac_analysis):
+    from .data_generator import add_sample_input_files
+
+    add_sample_input_files(atac_analysis)
+
+    return atac_analysis
+
+
+@pytest.fixture
 def subproject_config(atac_analysis):
     import yaml
 

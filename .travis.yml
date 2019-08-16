@@ -16,7 +16,8 @@ services:
   - xvfb
 
 before_install:
-  - sudo apt-get install -y bedtools
+  - wget http://ftp.debian.org/debian/pool/main/b/bedtools/bedtools_2.21.0-1_amd64.deb
+  - sudo dpkg -i bedtools_2.21.0-1_amd64.deb
   - sudo sh -c 'echo "deb http://cran.rstudio.com/bin/linux/ubuntu trusty-cran35/" >> /etc/apt/sources.list'
   - gpg --keyserver keyserver.ubuntu.com --recv-key E084DAB9
   - gpg -a --export E084DAB9 | sudo apt-key add -

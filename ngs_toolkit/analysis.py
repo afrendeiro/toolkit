@@ -12,6 +12,7 @@ from ngs_toolkit.decorators import check_organism_genome
 # TODO: Add combat as normalization method
 # TODO: Add PAGE as enrichment method
 # TODO: Analysis.annotate_samples: reimplement to support CNV dict of resolutions
+# TODO: Analysis.annotate_samples: implement connection to analysis' numeric_attributes or another way of preserving dtypes
 # TODO: Add function to complete comparison_table information such as "comparison_genome" and "data_type" and call it when setting automatically
 # TODO: Add function to create comparison_table from samples' group_attributes
 
@@ -404,8 +405,11 @@ class Analysis(object):
         if samples is None:
             samples = self.samples
         check = self._check_samples_have_file(
-            attr=input_file, f=any if permissive else all, samples=samples
+            attr=input_file, f=all, samples=samples
         )
+        if check:
+            return samples
+
         missing = self._get_samples_missing_file(attr=input_file, samples=samples)
 
         msg = "None of the samples have '{}' files.".format(input_file)
@@ -418,16 +422,13 @@ class Analysis(object):
                 raise IOError(msg)
 
         msg = "Not all samples have '{}' files.".format(input_file)
-        hint = " Samples missing files: {}".format(", ".join([s.name for s in missing]))
-        if not check:
-            if permissive:
-                _LOGGER.warning(msg + hint)
-                return [s for s in samples if s not in missing]
-            else:
-                _LOGGER.error(msg)
-                raise IOError(msg)
+        hint = " Samples missing files: '{}'".format(", ".join([s.name for s in missing]))
+        if permissive:
+            _LOGGER.warning(msg + hint)
+            return [s for s in samples if s not in missing]
         else:
-            return samples
+            _LOGGER.error(msg + hint)
+            raise IOError(msg)
 
     @staticmethod
     def _format_string_with_environment_variables(string):
@@ -1783,7 +1784,7 @@ class Analysis(object):
             Uniform will be used if values in level are non-negative, while diverging if including negative.
             See matplotlib.org/examples/color/colormaps_reference.html.
 
-            Defaults to "RdBu_r".
+            Defaults to "plasma" and "RdYlBu_r", respectively.
         nan_color : tuple, optional
             Color for missing (i.e. NA) values.
 

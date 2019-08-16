@@ -78,6 +78,11 @@ setup(
     keywords="bioinformatics, sequencing, ngs, ngs analysis, "
     + "ATAC-Seq, ChIP-seq, RNA-seq, project management",
     url="https://github.com/afrendeiro/toolkit",
+    project_urls={
+        "Bug Tracker": "https://github.com/afrendeiro/toolkit/issues",
+        "Documentation": "https://ngs-toolkit.readthedocs.io",
+        "Source Code": "https://github.com/afrendeiro/toolkit",
+    },
     author=u"Andre Rendeiro",
     author_email="afrendeiro@gmail.com",
     license="GPL3",

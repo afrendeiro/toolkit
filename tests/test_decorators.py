@@ -40,7 +40,8 @@ class Test_check_has_sites:
         with pytest.raises(AttributeError):
             null_analysis.calculate_peak_support()
 
-    def test_full_analysis(self, full_analysis):
+    def test_full_analysis(self, atac_analysis):
         # This passes on the decorator
+        # but raises IOError specific to the function
         with pytest.raises(IOError):
-            full_analysis.calculate_peak_support()
+            atac_analysis.calculate_peak_support()

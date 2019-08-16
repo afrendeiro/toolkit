@@ -253,22 +253,18 @@ class ATACSeqAnalysis(Analysis):
         )
 
     @staticmethod
-    def set_region_index(matrix):
-        if ATACSeqAnalysis.check_region_index(matrix):
+    def set_region_index(matrix, force=False):
+        from ngs_toolkit.utils import bed_to_index
+
+        if (not force) and ATACSeqAnalysis.check_region_index(matrix):
             _LOGGER.warning("Matrix already has well-formatted index.")
             return matrix
         else:
             req = ["chrom", "start", "end"]
             if all([x in matrix.columns for x in req]):
-                matrix.index = (
-                    matrix["chrom"].astype(str)
-                    + ":"
-                    + matrix["start"].astype(str)
-                    + "-"
-                    + matrix["end"].astype(str)
-                )
+                matrix.index = bed_to_index(matrix)
             else:
-                raise ValueError()
+                raise ValueError("Could not format matrix index. Missing '{}' columns.".format(",".join(req)))
 
     def get_consensus_sites(
         self,
@@ -492,14 +488,15 @@ class ATACSeqAnalysis(Analysis):
         # TODO: Implement distributed
         from tqdm import tqdm
         import pybedtools
+        import tempfile
+        from ngs_toolkit.utils import bed_to_index
 
         if samples is None:
             samples = self.samples
 
         # Check which samples to run (dependent on permissive)
         samples = self._get_samples_with_input_file(
-            region_type, permissive=permissive, samples=samples
-        )
+            region_type, permissive=permissive, samples=samples)
 
         # calculate support (number of samples overlaping each merged peak)
         for i, sample in tqdm(enumerate(samples), total=len(samples), desc="Sample"):
@@ -522,23 +519,16 @@ class ATACSeqAnalysis(Analysis):
             OverflowError,
         ):
             _LOGGER.debug(
-                "Could not convert support intersection directly to dataframe, saving temporarly file."
+                "Could not convert support intersection directly to dataframe, saving/reading temporary file."
             )
-            support.saveas("_tmp.peaks.bed")
-            support = pd.read_csv("_tmp.peaks.bed", sep="\t", header=None)
-            os.remove("_tmp.peaks.bed")
+            t = tempfile.NamedTemporaryFile()
+            support.saveas(t.name)
+            support = pd.read_csv(t.name, sep="\t", header=None)
 
         support.columns = ["chrom", "start", "end"] + [
             sample.name for sample in samples
         ]
-        support.index = pd.Index(
-            support["chrom"]
-            + ":"
-            + support["start"].astype(str)
-            + "-"
-            + support["end"].astype(str),
-            name="index",
-        )
+        support.index = bed_to_index(support)
         support.to_csv(
             os.path.join(self.results_dir, self.name + ".binary_overlap_support.csv"),
             index=True,
@@ -657,7 +647,7 @@ class ATACSeqAnalysis(Analysis):
 
         # Check which samples to run (dependent on permissive)
         samples = self._get_samples_with_input_file(
-            "aligned_filtered_bam", permissive=permissive, samples=samples
+            "aligned_filtered_bam", samples=samples, permissive=permissive
         )
 
         if sites is None:
@@ -735,7 +725,11 @@ class ATACSeqAnalysis(Analysis):
                     "date\nbedtools coverage -counts -abam {bam} -b {bed} > {out}\ndate"
                     .format(bam=s.aligned_filtered_bam, bed=sites.fn, out=output_file))
 
-                submit_job(cmd, job_file, job_name=job_name, logfile=log_file, cores=1, mem=8000)
+                submit_job(
+                    cmd, job_file,
+                    jobname=job_name,
+                    logfile=log_file,
+                    cores=1, mem=8000, time="04:00:00")
 
     def collect_coverage(
         self,

@@ -94,6 +94,52 @@ def atac_analysis(tmp_path):
 
 
 @pytest.fixture
+def atac_analysis_with_input_files(atac_analysis):
+    from ngs_toolkit import _CONFIG
+    from .data_generator import generate_sample_input_files
+
+    c = {
+        "sample_input_files": {
+            "ATAC-seq": {
+                "aligned_filtered_bam": "{data_dir}/{sample_name}/mapped/{sample_name}.trimmed.bowtie2.filtered.bam",
+                "peaks": "{data_dir}/{sample_name}/peaks/{sample_name}_peaks.narrowPeak",
+                "summits": "{data_dir}/{sample_name}/peaks/{sample_name}_summits.bed"},
+            "ChIP-seq": {
+                "aligned_filtered_bam": "{data_dir}/{sample_name}/mapped/{sample_name}.trimmed.bowtie2.filtered.bam"},
+            "CNV": {
+                "aligned_filtered_bam": "{data_dir}/{sample_name}/mapped/{sample_name}.trimmed.bowtie2.filtered.bam"},
+            "RNA-seq": {
+                "aligned_filtered_bam": "{data_dir}/{sample_name}/mapped/{sample_name}.trimmed.bowtie2.filtered.bam",
+                "bitseq_counts": "{data_dir}/{sample_name}/bowtie1_{genome}/bitSeq/{sample_name}.counts"}}}
+    _CONFIG.update(c)
+    atac_analysis.set_samples_input_files()
+
+    generate_sample_input_files(atac_analysis)
+
+    return atac_analysis
+
+
+@pytest.fixture
+def subproject_config(atac_analysis):
+    import yaml
+
+    annot = os.path.join(atac_analysis.root_dir, "metadata", "annotation.csv")
+    subannot = os.path.join(atac_analysis.root_dir, "metadata", "sample_subannotation.csv")
+
+    yaml_file = os.path.join(atac_analysis.root_dir, "metadata", "project_config.yaml")
+    conf = yaml.safe_load(open(yaml_file, 'r'))
+    conf['subprojects'] = {"test_subproject": {"metadata": {
+        "sample_annotation": annot,
+        "sample_subannotation": subannot}}}
+    del conf['metadata']['sample_annotation']
+    del conf['metadata']['sample_subannotation']
+
+    yaml.safe_dump(conf, open(yaml_file, 'w'))
+
+    return yaml_file
+
+
+@pytest.fixture
 def analysis_normalized(atac_analysis):
     atac_analysis.normalize(method="rpm")
     return atac_analysis
@@ -235,7 +281,7 @@ def various_analysis(tmp_path):
     genome_assemblies = [("human", "hg19"), ("human", "hg38"), ("mouse", "mm10")]
     factors = [1, 2, 3]
     variables = [100, 1000]  # 10000
-    replicates = [1, 2, 5]
+    replicates = [1, 2]  # 5
 
     for organism, genome_assembly in genome_assemblies:
         for n_factors in factors:

@@ -158,6 +158,7 @@ def generate_project(
     genome_assembly="hg19",
     data_type="ATAC-seq",
     only_metadata=False,
+    sample_input_files=False,
     **kwargs
 ):
     output_dir = os.path.abspath(output_dir)
@@ -234,3 +235,99 @@ def generate_project(
                 output_dir, project_name, "results", project_name + ".matrix_raw.csv"
             )
         )
+
+
+def generate_bam_file(peak_set, output_bam, genome_assembly="hg38", chrom_sizes_file=None, index=True):
+    import tempfile
+    if not isinstance(peak_set, pybedtools.BedTool):
+        peak_set = pybedtools.BedTool(peak_set)
+
+    s = peak_set.to_dataframe()
+
+    # choose a random number of reads per region
+    r = np.random.negative_binomial(1000, 0.99, s.shape[0])
+    i = [i for i in r for _ in range(i)]
+    s = s.reindex(i)
+
+    # shorten/enlarge by a random fraction; name reads
+    d = s['end'] - s['start']
+    s = s.assign(
+        start=(s['start'] + d * np.random.uniform(-0.2, 0.2, s.shape[0])).astype(int),
+        end=(s['end'] + d * np.random.uniform(-0.2, 0.2, s.shape[0])).astype(int),
+        name=["read_{}".format(i) for i in range(s.shape[0])])
+
+    s = pybedtools.BedTool.from_dataframe(s)
+    s = s.truncate_to_chrom(genome=genome_assembly)
+    s = s.sort()
+    # get a file with chromosome sizes (usually not needed but only for bedToBam)
+    if chrom_sizes_file is None:
+        chrom_sizes_file = tempfile.NamedTemporaryFile().name
+        pybedtools.get_chromsizes_from_ucsc(genome=genome_assembly, saveas=chrom_sizes_file)
+    b = s.to_bam(g=chrom_sizes_file)
+
+    b.saveas(output_bam)
+
+    if index:
+        import pysam
+        pysam.index(output_bam)
+
+
+def generate_peak_file(peak_set, output_peak, genome_assembly="hg38", summits=False):
+    if not isinstance(peak_set, pybedtools.BedTool):
+        peak_set = pybedtools.BedTool(peak_set)
+
+    s = peak_set.to_dataframe()
+
+    # choose a random fraction of sites to keep
+    s = pybedtools.BedTool.from_dataframe(
+            s.sample(frac=np.random.uniform()))
+    # shorten/enlarge sites by a random fraction
+    s = s.slop(
+        l=np.random.uniform(-0.2, 0.2),
+        r=np.random.uniform(-0.2, 0.2),
+        pct=True, genome=genome_assembly)
+
+    if summits:
+        # get middle basepair
+        s = s.to_dataframe()
+        mid = ((s['end'] - s['start']) / 2).astype(int)
+        s.loc[:, 'start'] += mid
+        s.loc[:, 'end'] -= (mid - 1)
+        s = pybedtools.BedTool.from_dataframe(s)
+
+    s = s.sort()
+    s.saveas(output_peak)
+
+
+def generate_sample_input_files(analysis):
+    import tempfile
+
+    chrom_sizes_file = tempfile.NamedTemporaryFile().name
+    pybedtools.get_chromsizes_from_ucsc(genome=analysis.genome, saveas=chrom_sizes_file)
+
+    for sample in analysis.samples:
+        if hasattr(sample, "aligned_filtered_bam"):
+            if sample.aligned_filtered_bam is not None:
+                d = os.path.dirname(sample.aligned_filtered_bam)
+                if not os.path.exists(d):
+                    os.makedirs(d)
+                generate_bam_file(
+                    analysis.sites, sample.aligned_filtered_bam,
+                    genome_assembly=analysis.genome,
+                    chrom_sizes_file=chrom_sizes_file)
+        if hasattr(sample, "peaks"):
+            if sample.peaks is not None:
+                d = os.path.dirname(sample.peaks)
+                if not os.path.exists(d):
+                    os.makedirs(d)
+                generate_peak_file(
+                    analysis.sites, sample.peaks, summits=False,
+                    genome_assembly=analysis.genome)
+        if hasattr(sample, "summits"):
+            if sample.summits is not None:
+                d = os.path.dirname(sample.summits)
+                if not os.path.exists(d):
+                    os.makedirs(d)
+                generate_peak_file(
+                    analysis.sites, sample.summits, summits=True,
+                    genome_assembly=analysis.genome)

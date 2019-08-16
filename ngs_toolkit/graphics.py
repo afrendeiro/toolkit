@@ -387,6 +387,10 @@ def plot_projection(
     """
     from collections import OrderedDict
 
+    # Make sure dataframes are index-sorted
+    df = df.sort_index()
+    color_dataframe = color_dataframe.sort_index()
+
     n_attr = len(attributes_to_plot)
     fig, axis = plt.subplots(dims, n_attr, figsize=(4 * n_attr, 4 * dims))
     if n_attr == dims == 1:
@@ -452,9 +456,11 @@ def plot_projection(
                     )
 
             # Graphics
-            axis[pc, i].set_title(attr)
+            if pc == 0:
+                axis[pc, i].set_title(attr)
             axis[pc, i].set_xlabel("{} {}".format(axis_ticklabels_name, pc + 1))
-            axis[pc, i].set_ylabel("{} {}".format(axis_ticklabels_name, pc + 2))
+            if i == 0:
+                axis[pc, i].set_ylabel("{} {}".format(axis_ticklabels_name, pc + 2))
             if not axis_ticklabels:
                 axis[pc, i].set_xticklabels(
                     axis[pc, i].get_xticklabels(), visible=False

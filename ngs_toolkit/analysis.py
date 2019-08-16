@@ -422,7 +422,7 @@ class Analysis(object):
                 raise IOError(msg)
 
         msg = "Not all samples have '{}' files.".format(input_file)
-        hint = " Samples missing files: {}".format(", ".join([s.name for s in missing]))
+        hint = " Samples missing files: '{}'".format(", ".join([s.name for s in missing]))
         if permissive:
             _LOGGER.warning(msg + hint)
             return [s for s in samples if s not in missing]

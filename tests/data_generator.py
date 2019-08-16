@@ -299,7 +299,7 @@ def generate_peak_file(peak_set, output_peak, genome_assembly="hg38", summits=Fa
     s.saveas(output_peak)
 
 
-def add_sample_input_files(analysis):
+def generate_sample_input_files(analysis):
     import tempfile
 
     chrom_sizes_file = tempfile.NamedTemporaryFile().name
@@ -307,24 +307,27 @@ def add_sample_input_files(analysis):
 
     for sample in analysis.samples:
         if hasattr(sample, "aligned_filtered_bam"):
-            d = os.path.dirname(sample.aligned_filtered_bam)
-            if not os.path.exists(d):
-                os.makedirs(d)
-            generate_bam_file(
-                analysis.sites, sample.aligned_filtered_bam,
-                genome_assembly=analysis.genome,
-                chrom_sizes_file=chrom_sizes_file)
+            if sample.aligned_filtered_bam is not None:
+                d = os.path.dirname(sample.aligned_filtered_bam)
+                if not os.path.exists(d):
+                    os.makedirs(d)
+                generate_bam_file(
+                    analysis.sites, sample.aligned_filtered_bam,
+                    genome_assembly=analysis.genome,
+                    chrom_sizes_file=chrom_sizes_file)
         if hasattr(sample, "peaks"):
-            d = os.path.dirname(sample.peaks)
-            if not os.path.exists(d):
-                os.makedirs(d)
-            generate_peak_file(
-                analysis.sites, sample.peaks, summits=False,
-                genome_assembly=analysis.genome)
+            if sample.peaks is not None:
+                d = os.path.dirname(sample.peaks)
+                if not os.path.exists(d):
+                    os.makedirs(d)
+                generate_peak_file(
+                    analysis.sites, sample.peaks, summits=False,
+                    genome_assembly=analysis.genome)
         if hasattr(sample, "summits"):
-            d = os.path.dirname(sample.summits)
-            if not os.path.exists(d):
-                os.makedirs(d)
-            generate_peak_file(
-                analysis.sites, sample.summits, summits=True,
-                genome_assembly=analysis.genome)
+            if sample.summits is not None:
+                d = os.path.dirname(sample.summits)
+                if not os.path.exists(d):
+                    os.makedirs(d)
+                generate_peak_file(
+                    analysis.sites, sample.summits, summits=True,
+                    genome_assembly=analysis.genome)

@@ -4,6 +4,28 @@ from functools import wraps
 from ngs_toolkit import _LOGGER
 
 
+def check_has_samples(f):
+    @wraps(f)
+    def wrapper(*args, **kwds):
+        msg = "Analysis does not have a 'samples' attributes."
+        if not hasattr(args[0], "samples"):
+            _LOGGER.error(msg)
+            raise AttributeError(msg)
+
+        msg = "Analysis 'samples' attribute is not a list."
+        if not isinstance(args[0].samples, list):
+            _LOGGER.error(msg)
+            raise AttributeError(msg)
+
+        msg = "Analysis 'samples' attribute empty."
+        if len(args[0].samples) == 0:
+            _LOGGER.error(msg)
+            raise AttributeError(msg)
+        return f(*args, **kwds)
+
+    return wrapper
+
+
 def check_organism_genome(f):
     @wraps(f)
     def wrapper(*args, **kwds):

@@ -95,9 +95,26 @@ def atac_analysis(tmp_path):
 
 @pytest.fixture
 def atac_analysis_with_input_files(atac_analysis):
-    from .data_generator import add_sample_input_files
+    from ngs_toolkit import _CONFIG
+    from .data_generator import generate_sample_input_files
 
-    add_sample_input_files(atac_analysis)
+    c = {
+        "sample_input_files": {
+            "ATAC-seq": {
+                "aligned_filtered_bam": "{data_dir}/{sample_name}/mapped/{sample_name}.trimmed.bowtie2.filtered.bam",
+                "peaks": "{data_dir}/{sample_name}/peaks/{sample_name}_peaks.narrowPeak",
+                "summits": "{data_dir}/{sample_name}/peaks/{sample_name}_summits.bed"},
+            "ChIP-seq": {
+                "aligned_filtered_bam": "{data_dir}/{sample_name}/mapped/{sample_name}.trimmed.bowtie2.filtered.bam"},
+            "CNV": {
+                "aligned_filtered_bam": "{data_dir}/{sample_name}/mapped/{sample_name}.trimmed.bowtie2.filtered.bam"},
+            "RNA-seq": {
+                "aligned_filtered_bam": "{data_dir}/{sample_name}/mapped/{sample_name}.trimmed.bowtie2.filtered.bam",
+                "bitseq_counts": "{data_dir}/{sample_name}/bowtie1_{genome}/bitSeq/{sample_name}.counts"}}}
+    _CONFIG.update(c)
+    atac_analysis.set_samples_input_files()
+
+    generate_sample_input_files(atac_analysis)
 
     return atac_analysis
 

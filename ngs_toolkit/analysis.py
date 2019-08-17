@@ -1432,6 +1432,73 @@ class Analysis(object):
             _LOGGER.error(msg)
             raise ValueError(msg)
 
+    def remove_factor_from_matrix(
+        self,
+        factor,
+        method="combat",
+        covariates=None,
+        matrix="matrix_norm",
+        samples=None,
+        save=True,
+        assign=True,
+        make_positive=True
+    ):
+        """
+        Get a matrix that is an attribute of self subsetted for the requested samples.
+
+        Parameters
+        ----------
+        matrix : {str, pandas.DataFrame}
+            The name of the attribute with the matrix or a DataFrame already.
+        samples : :obj:`list`
+            Iterable of peppy.Sample objects to restrict matrix to.
+
+            Default (:obj:`None` is passed) is not to subset matrix.
+
+        Returns
+        -------
+        :class:`pandas.DataFrame`
+            Requested matrix (dataframe).
+        """
+        from combat import combat
+        from patsy import dmatrix
+
+        if method != "combat":
+            msg = "Only implemented method is 'combat'."
+            _LOGGER.error(msg)
+            raise NotImplementedError(msg)
+
+        matrix = self.get_matrix(matrix, samples=samples)
+
+        # make vector of factor to remove
+        samples = [s for s in self.samples if s.name in matrix.columns]
+        batch = pd.Series(
+            [getattr(s, factor) for s in samples],
+            index=[s.name for s in samples])
+
+        # make design model of covariates
+        if covariates is not None:
+            _LOGGER.debug("Generating design matrix for covariates.")
+            if not isinstance(matrix.columns, pd.MultiIndex):
+                _LOGGER.debug("Matrix was not MultiIndex, annotating matrix with sample attributes.")
+                matrix = self.annotate_samples(matrix=matrix, save=False, assign=False)
+            d = matrix.columns.to_frame().set_index("sample_name")
+            covariates = dmatrix(" + ".join(covariates), d)
+
+        matrix_norm = combat(matrix, batch=batch, model=covariates)
+
+        if save:
+            matrix_norm.to_csv(
+                os.path.join(self.results_dir, self.name + ".matrix_norm.csv"),
+                index=True,
+            )
+        if assign:
+            self.matrix_norm = matrix_norm
+            self.norm_method = "{} + {}".format(
+                self.norm_method, method).replace("None + ", "")
+
+        return matrix_norm
+
     def get_matrix(self, matrix, samples=None):
         """
         Get a matrix that is an attribute of self subsetted for the requested samples.

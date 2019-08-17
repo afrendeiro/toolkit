@@ -574,10 +574,11 @@ class ATACSeqAnalysis(Analysis):
         sites=None,
         assign=True,
         save=True,
+        peak_set_name="peak_set",
         output_file=None,
         permissive=False,
         distributed=False,
-        peak_set_name="peak_set",
+        **kwargs
     ):
         """
         Measure read coverage (counts) of each sample in each region in consensus sites.
@@ -619,6 +620,11 @@ class ATACSeqAnalysis(Analysis):
         peak_set_name: :obj:`bool`
             Suffix to files containing coverage of `distributed` is True.
             Defaults to "peak_set".
+
+        **kwargs : :obj:`dict`
+            Additional keyword arguments will be passed to `ngs_toolkit.utils.submit_job`
+            and on to a divvy submission template.
+            Pass for example: computing_configuration="slurm", jobname="job", cores=2, mem=8000, partition="longq".
 
         Raises
         ----------
@@ -739,6 +745,7 @@ class ATACSeqAnalysis(Analysis):
         output_file=None,
         permissive=False,
         peak_set_name="peak_set",
+        fast_and_unsafe=False
     ):
         """
         Collect read coverage (counts) of each sample in each region in consensus sites from existing files.
@@ -767,6 +774,13 @@ class ATACSeqAnalysis(Analysis):
         peak_set_name: :obj:`bool`
             Suffix to files containing coverage.
             Defaults to "peak_set".
+
+        fast_and_unsafe: :obj:`bool`
+            Whether to use a faster but unsafer method to concatenate the data.
+            If the order of all rows in all samples is the same then the result should be the same.
+            The default, slower method assures that all rows are matched and is therefore slower.
+
+            Defaults to False.
 
         Raises
         ----------
@@ -836,14 +850,19 @@ class ATACSeqAnalysis(Analysis):
                 _LOGGER.error(msg)
                 raise IOError(msg)
 
-        matrix_raw = (
-            pd.concat(matrix_raw, axis=0, sort=False)
-            .melt(id_vars=["chrom", "start", "end"])
-            .pivot_table(
-                index=["chrom", "start", "end"], columns="variable", values="value"
+        if fast_and_unsafe:
+            _LOGGER.warning("Using a concatenation method that is not 100% safe.")
+            matrix_raw = pd.concat(matrix_raw, axis=1, sort=False)
+            matrix_raw = matrix_raw.loc[:, ~matrix_raw.columns.duplicated()].set_index(["chrom", "start", "end"])
+        else:
+            matrix_raw = (
+                pd.concat(matrix_raw, axis=0, sort=False)
+                .melt(id_vars=["chrom", "start", "end"])
+                .pivot_table(
+                    index=["chrom", "start", "end"], columns="variable", values="value"
+                )
+                .astype(int)
             )
-            .astype(int, downcast=True)
-        )
         matrix_raw.index = bed_to_index(matrix_raw.index.to_frame())
 
         if assign:

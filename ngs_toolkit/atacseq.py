@@ -622,7 +622,7 @@ class ATACSeqAnalysis(Analysis):
             Defaults to "peak_set".
 
         **kwargs : :obj:`dict`
-            Additional keyword arguments will be passed to `ngs_toolkit.utils.submit_job`
+            Additional keyword arguments will be passed to `ngs_toolkit.utils.submit_job` if `distributed` is True.
             and on to a divvy submission template.
             Pass for example: computing_configuration="slurm", jobname="job", cores=2, mem=8000, partition="longq".
 

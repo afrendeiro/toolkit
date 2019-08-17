@@ -233,3 +233,52 @@ def test_project_with_subprojects(subproject_config):
 
     a = Analysis(from_pep=subproject_config, subproject="test_subproject")
     assert len(a.samples) > 0
+
+
+def test_remove_factor(atac_analysis_many_factors):
+    import pandas as pd
+
+    a = atac_analysis_many_factors
+    a.matrix_norm = a.matrix_norm.dropna()
+
+    prefix = os.path.join(
+        a.results_dir,
+        "unsupervised_analysis_{}".format(a.data_type),
+        a.name
+    )
+    # inspect
+    a.unsupervised_analysis(output_prefix="before", steps=['pca_association'])
+
+    f = prefix + ".before.pca.variable_principle_components_association.csv"
+    p = pd.read_csv(f)
+
+    # extract the name of the factor with highest contribution
+    factor = p.iloc[p.query("pc == 1")['p_value'].idxmin()]['attribute']
+    # check if it's significant
+    assert p.query("attribute == '{}' and pc < 15".format(factor))['p_value'].min() < 0.05
+
+    # remove factor without regard for the other factors
+    m = a.remove_factor_from_matrix(
+        factor=factor,
+        assign=False, save=False)
+    a.unsupervised_analysis(
+        matrix=m,
+        output_prefix="after_simple",
+        steps=['pca_association'])
+
+    f = prefix + ".after_simple.pca.variable_principle_components_association.csv"
+    p2 = pd.read_csv(f)
+    assert p2.query("attribute == '{}' and pc < 15".format(factor))['p_value'].min() > 0.05
+
+    # remove factor accounting for the other factors
+    m = a.remove_factor_from_matrix(
+        factor=factor, covariates=[x for x in ['a', 'b', 'c', 'd'] if x != factor],
+        assign=False, save=False)
+    a.unsupervised_analysis(
+        matrix=m,
+        output_prefix="after_covariates",
+        steps=['pca_association'])
+
+    f = prefix + ".after_covariates.pca.variable_principle_components_association.csv"
+    p3 = pd.read_csv(f)
+    assert p3.query("attribute == '{}' and pc < 15".format(factor))['p_value'].min() > 0.05

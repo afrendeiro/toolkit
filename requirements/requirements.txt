@@ -15,4 +15,3 @@ peppy>=0.22.2
 divvy>=0.4.0
 attmap>=0.12.9
 requests
-git+https://github.com/afrendeiro/combat.git

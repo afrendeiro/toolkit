@@ -30,6 +30,7 @@ before_script:
   - export DISPLAY=:99.0
 
 install:
+  - pip install git+https://github.com/afrendeiro/combat.git
   - pip install -r requirements/requirements.test.txt
   - pip install .[rstats]
 

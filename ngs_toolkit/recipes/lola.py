@@ -26,10 +26,9 @@ def parse_arguments():
     )
     parser.add_argument(dest="genome", help="Genome assembly of the region set.")
     parser.add_argument(
-        "--overwrite",
-        action="store_true",
-        default=False,
-        help="Don't overwrite any existing directory or file.",
+        "--no-overwrite",
+        action="store_false",
+        help="Don't overwrite existing output files.",
     )
     parser.add_argument(
         "-c",
@@ -46,7 +45,9 @@ def parse_arguments():
 def main():
     print("LOLA analysis")
     args = parse_arguments()
-    if os.path.exists(args.output_file) and (not args.overwrite):
+
+    output_file = os.path.join(args.output_folder, "allEnrichments.tsv")
+    if os.path.exists(output_file) and (not args.overwrite):
         print("Output exists and `overwrite` is False, so not doing anything.")
         return 0
 

@@ -29,6 +29,10 @@ def parse_arguments():
         "-a", "--max-attempts", type=int, default=5,
         dest="max_attempts", help="Maximum attempts to retry the API before giving up."
     )
+    parser.add_argument(
+        "--no-overwrite", action="store_false",
+        dest="overwrite", help="Whether results should not be overwritten if existing."
+    )
     args = parser.parse_args()
 
     return args

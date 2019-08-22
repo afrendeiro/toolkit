@@ -23,8 +23,8 @@ def parse_arguments():
         dest="bed_file",
         help="BED file with regions.")
     parser.add_argument(
-        dest="pickle",
-        help="The analysis' pickle object.")
+        dest="pep",
+        help="The analysis' PEP config file.")
     parser.add_argument(
         "--output-file",
         dest="output_file",
@@ -50,7 +50,18 @@ def main():
         return 0
 
     print("Reading up the analysis object.")
-    a = ATACSeqAnalysis(pickle_file=args.pickle, from_pickle=True)
+    a = ATACSeqAnalysis(from_pep=args.pep)
+    a.load_data()
+    # (
+    #     "genomic_region",
+    #     "region_annotation_mapping",
+    #     "region_annotation_b_mapping",
+    # ),
+    # (
+    #     "chromatin_state",
+    #     "chrom_state_annotation_mapping",
+    #     "chrom_state_annotation_b_mapping",
+    # ),
     print("Reading up the BED file.")
     df = pd.read_csv(args.bed_file, sep="\t", header=None)
     df.columns = ['chrom', 'start', 'end']

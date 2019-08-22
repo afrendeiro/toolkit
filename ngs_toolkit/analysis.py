@@ -206,6 +206,12 @@ class Analysis(object):
         suffix = "."
         return t + " '{}'".format(self.name) + samples + organism + genome + suffix
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, type, value, traceback):
+        pass
+
     @staticmethod
     def _overwride_sample_representation():
         """

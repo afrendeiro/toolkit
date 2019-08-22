@@ -1778,7 +1778,7 @@ def run_enrichment_jobs(
     background_bed,
     steps=["lola", "meme", "homer", "enrichr"],
     overwrite=True,
-    pickle_file=None,
+    pep_config=None,
 ):
     """
     Submit parallel enrichment jobs for a specific analysis.
@@ -1804,12 +1804,12 @@ def run_enrichment_jobs(
         In this case no jobs will be submitted for jobs with existing output files.
         Defaults to True
 
-    :param pickle_file: :obj:`str`, optional
+    :param pep_config: :obj:`str`, optional
         Pickle file of the analysis.
         Only required for "region" enrichment.
     """
     # TODO: replace hardcoded paths with info from resources
-    # TODO: remove pickle_file requirement to "region_enrichment"
+    # TODO: remove pep_config requirement to "region_enrichment"
     import sys
     from glob import glob
 
@@ -1822,7 +1822,7 @@ def run_enrichment_jobs(
     omap = {"hg38": "human", "hg19": "human", "mm10": "mouse"}
 
     jobs = list()
-    # list of tuples with: job_name, log, exec, requirements (partition, cpu, mem), cmd
+    # list of tuples with: job_name, log, exec, requirements (partition, cpu, mem, time), cmd
 
     # REGION
     if "region" in steps:
@@ -1838,9 +1838,9 @@ def run_enrichment_jobs(
                     name + "_region",
                     os.path.join(dir_, name + ".region.log"),
                     os.path.join(dir_, name + ".region.sh"),
-                    ("shortq", 1, 8000),
+                    ("shortq", 1, 8000, "08:00:00"),
                     "{} -m ngs_toolkit.recipes.region_enrichment --output-file {} {} {}".format(
-                        sys.executable, output_, file, pickle_file
+                        sys.executable, output_, file, pep_config
                     ),
                 ]
             )
@@ -1859,7 +1859,7 @@ def run_enrichment_jobs(
                     name + "_lola",
                     os.path.join(dir_, name + ".lola.log"),
                     os.path.join(dir_, name + ".lola.sh"),
-                    ("shortq", 2, 12000),
+                    ("shortq", 2, 12000, "08:00:00"),
                     "{} -m ngs_toolkit.recipes.lola {} {} {} {} -c 2".format(
                         sys.executable, file, background_bed, dir_, genome
                     ),
@@ -1880,7 +1880,7 @@ def run_enrichment_jobs(
                     name + "_meme",
                     os.path.join(dir_, name + ".meme_ame.log"),
                     os.path.join(dir_, name + ".meme_ame.sh"),
-                    ("shortq", 1, 4000),
+                    ("shortq", 1, 4000, "08:00:00"),
                     "fasta-dinucleotide-shuffle -c 1 -f {f} > {f}.shuffled.fa\n".format(
                         f=file
                     )
@@ -1905,7 +1905,7 @@ def run_enrichment_jobs(
                     name + "_homer",
                     os.path.join(dir_, name + ".homer.log"),
                     os.path.join(dir_, name + ".homer.sh"),
-                    ("shortq", 8, 12000),
+                    ("shortq", 8, 12000, "08:00:00"),
                     "findMotifsGenome.pl {f} {genome}r {d} -size 1000 -h -p 2 -len 8,10,12,14 -noknown".format(
                         f=file, d=dir_, genome=genome
                     ),
@@ -1933,10 +1933,10 @@ def run_enrichment_jobs(
                 ]
             )
 
-    for jobname, log_file, job_file, (partition, cores, mem), task in jobs:
+    for jobname, log_file, job_file, (partition, cores, mem, time), task in jobs:
         submit_job(
             task, job_file, log_file=log_file,
-            jobname=jobname, partition=partition, cores=cores, mem=mem)
+            jobname=jobname, partition=partition, cores=cores, mem=mem, time=time)
 
 
 def project_to_geo(

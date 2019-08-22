@@ -236,6 +236,7 @@ class ATACSeqAnalysis(Analysis):
 
         # Special case
         if "sites" in only_these_keys:
+            _LOGGER.info("Loading 'sites' analysis attribute.")
             file = os.path.join(self.results_dir, self.name + ".peak_set.bed")
             try:
                 setattr(self, "sites", pybedtools.BedTool(file))

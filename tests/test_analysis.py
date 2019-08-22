@@ -11,17 +11,28 @@ import pytest
 
 
 class TestAnalysis:
-    def test_analysis_creation(self, tmp_path):
-        from .data_generator import generate_project
-        from peppy import Project
-
-        tmp_path = str(tmp_path)  # for Python2
-
+    def test_analysis_representation(self):
         name = "test_analysis"
 
         a = Analysis(name=name)
         assert a.__repr__() == "Analysis '{}'.".format(name)
         assert "samples" not in a.__repr__()
+
+    def test_with_object_as(self):
+        name = "test_analysis"
+
+        a = Analysis(name=name)
+        with a as a_:
+            assert a is a_
+            assert a == a_
+            assert a_.__repr__() == "Analysis '{}'.".format(name)
+            assert "samples" not in a_.__repr__()
+
+    def test_analysis_creation(self, tmp_path):
+        from .data_generator import generate_project
+        from peppy import Project
+
+        tmp_path = str(tmp_path)  # for Python2
 
         # Let's make several "reallish" test projects
         project_prefix_name = "test-project"

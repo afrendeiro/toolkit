@@ -46,6 +46,8 @@ def parse_arguments():
         help="Don't overwrite any existing directory or file.")
 
     # To enable the loop to pass args directly on to the pipelines...
+
+    # args = parser.parse_args("--output_prefix differential_analysis --formula '~sample_group' --overwrite /scratch/lab_bock/shared/projects/baf-time_course/results/differential_analysis_ATAC-seq/ARID2_KO".split(" "))
     args = parser.parse_args()
 
     return args

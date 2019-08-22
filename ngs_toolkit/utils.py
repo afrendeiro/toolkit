@@ -217,6 +217,23 @@ def z_score(x):
     return (x - x.mean()) / x.std()
 
 
+def logit(x):
+    """
+    Compute the logit of x, defined as log(x / (1 - x)).
+
+    Parameters
+    ----------
+    x : :class:`numpy.ndarray`
+        Numeric array.
+
+    Returns
+    -------
+    :class:`numpy.ndarray`
+        Transformed array.
+    """
+    return np.log(x / (1 - x))
+
+
 def count_dataframe_values(x):
     """
     Count number of non-null values in a dataframe.

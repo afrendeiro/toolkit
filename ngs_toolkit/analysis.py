@@ -1483,7 +1483,7 @@ class Analysis(object):
                 _LOGGER.debug("Matrix was not MultiIndex, annotating matrix with sample attributes.")
                 matrix = self.annotate_samples(matrix=matrix, save=False, assign=False)
             d = matrix.columns.to_frame().set_index("sample_name")
-            covariates = dmatrix(" + ".join(covariates), d)
+            covariates = dmatrix("~ " + " + ".join(covariates), d)
 
         matrix_norm = combat(matrix, batch=batch, model=covariates)
 
@@ -1977,6 +1977,7 @@ class Analysis(object):
             "SpectralEmbedding",
             "TSNE",
         ],
+        maniford_kwargs={},
         display_corr_values=False,
         plot_max_pcs=8,
         save_additional=False,
@@ -2047,6 +2048,9 @@ class Analysis(object):
             http://scikit-learn.org/stable/modules/classes.html#module-sklearn.manifold
 
             Defaults to ['MDS', 'Isomap', 'LocallyLinearEmbedding', 'SpectralEmbedding', 'TSNE'],
+        maniford_kwargs : :obj:`dict`, optional
+            Dictionary of keyword arguments to pass to the algorithms in ``manifold_algorithms``.
+            Should be of the form {"algorithm_name": {"key": value}}
         display_corr_values: :obj:`bool`, optional
             Whether values in heatmap of sample correlations should be displayed overlaid on top of colours.
 
@@ -2252,6 +2256,7 @@ class Analysis(object):
                     "TSNE": {"init": "pca"},
                 }
             )
+            params.update(maniford_kwargs)
             for algo in manifold_algorithms:
                 msg = "Learning manifold with '{}' algorithm".format(algo)
                 _LOGGER.info(msg + ".")
@@ -3179,6 +3184,13 @@ class Analysis(object):
             samples = self.samples
 
         matrix = self.get_matrix(matrix, samples)
+
+        if not isinstance(matrix.columns, pd.core.indexes.multi.MultiIndex):
+            msg = "Provided quantification matrix must have columns with MultiIndex."
+            hint = " Will try to use `analysis.annotate_samples` to do that."
+            _LOGGER.info(msg + hint)
+            matrix = self.annotate_samples(matrix=matrix, save=False, assign=False)
+
         samples = [s for s in samples if s.name in matrix.columns]
 
         # Get labels
@@ -3788,243 +3800,245 @@ class Analysis(object):
                             + " Proceeding without those."
                         )
                         groups = groups.loc[:, ~groups.columns.isin(m)]
-                    f = groups.index[groups.isnull().sum(1) == groups.shape[1]]
-                    if len(f) > 0:
-                        _LOGGER.warning(
-                            "{} {}s were not found in quantification matrix!".format(
-                                len(m), var_name
-                            )
-                            + " Proceeding without those."
+                f = groups.index[groups.isnull().sum(1) == groups.shape[1]]
+                if len(f) > 0:
+                    _LOGGER.warning(
+                        "{} {}s were not found in quantification matrix!".format(
+                            len(m), var_name
                         )
-                        groups = groups.dropna()
-                    n = groups.isnull().sum().sum()
-                    if n != 0:
-                        _LOGGER.error(
-                            "{} {}s (across all comparisons) still have NaNs. Cannot proceed!".format(
-                                n, var_name
-                            )
+                        + " Proceeding without those."
+                    )
+                    groups = groups.dropna()
+                n = groups.isnull().sum().sum()
+                if n != 0:
+                    _LOGGER.error(
+                        "{} {}s (across all comparisons) still have NaNs. Cannot proceed!".format(
+                            n, var_name
                         )
-                    else:
-                        _LOGGER.info(
-                            "Plotting clustered heatmaps of sample groups in all differential {}s found.".format(
+                    )
+                else:
+                    _LOGGER.info(
+                        "Plotting clustered heatmaps of sample groups in all differential {}s found.".format(
+                            var_name
+                        )
+                    )
+                    figsize = (max(5, 0.12 * groups.shape[1]), 5)
+                    # Heatmaps
+                    # Comparison level
+                    g = sns.clustermap(
+                        groups.corr(),
+                        xticklabels=False,
+                        yticklabels=True,
+                        cbar_kws={
+                            "label": "Pearson correlation\non differential {}s".format(
                                 var_name
                             )
-                        )
-                        figsize = (max(5, 0.12 * groups.shape[1]), 5)
-                        # Heatmaps
-                        # Comparison level
-                        g = sns.clustermap(
-                            groups.corr(),
-                            xticklabels=False,
-                            yticklabels=True,
-                            cbar_kws={
-                                "label": "Pearson correlation\non differential {}s".format(
-                                    var_name
-                                )
-                            },
-                            metric="correlation",
-                            rasterized=True,
-                            figsize=(figsize[0], figsize[0]),
-                        )
-                        g.ax_heatmap.set_yticklabels(
-                            g.ax_heatmap.get_yticklabels(),
-                            rotation=0,
-                            fontsize="xx-small",
-                        )
-                        savefig(
-                            g.fig,
-                            os.path.join(
-                                output_dir,
-                                output_prefix
-                                + ".diff_{}.groups.clustermap.corr.svg".format(
-                                    var_name
-                                ),
+                        },
+                        metric="correlation",
+                        rasterized=True,
+                        figsize=(figsize[0], figsize[0]),
+                    )
+                    g.ax_heatmap.set_yticklabels(
+                        g.ax_heatmap.get_yticklabels(),
+                        rotation=0,
+                        fontsize="xx-small",
+                    )
+                    savefig(
+                        g.fig,
+                        os.path.join(
+                            output_dir,
+                            output_prefix
+                            + ".diff_{}.groups.clustermap.corr.svg".format(
+                                var_name
                             ),
-                        )
+                        ),
+                    )
 
-                        g = sns.clustermap(
-                            groups,
-                            xticklabels=True,
-                            yticklabels=feature_labels,
-                            cbar_kws={
-                                "label": "{} of\ndifferential {}s".format(
-                                    quantity, var_name
-                                )
-                            },
-                            robust=robust,
-                            metric="correlation",
-                            rasterized=True,
-                            figsize=figsize,
-                        )
-                        g.ax_heatmap.set_ylabel(
-                            "Differential {}s (n = {})".format(
-                                var_name, groups.shape[0]
+                    g = sns.clustermap(
+                        groups,
+                        xticklabels=True,
+                        yticklabels=feature_labels,
+                        cbar_kws={
+                            "label": "{} of\ndifferential {}s".format(
+                                quantity, var_name
                             )
+                        },
+                        robust=robust,
+                        metric="correlation",
+                        rasterized=True,
+                        figsize=figsize,
+                    )
+                    g.ax_heatmap.set_ylabel(
+                        "Differential {}s (n = {})".format(
+                            var_name, groups.shape[0]
                         )
-                        g.ax_heatmap.set_xticklabels(
-                            g.ax_heatmap.get_xticklabels(),
-                            rotation=90,
-                            fontsize="xx-small",
-                        )
-                        g.ax_heatmap.set_yticklabels(
-                            g.ax_heatmap.get_yticklabels(),
-                            rotation=0,
-                            fontsize="xx-small",
-                        )
-                        savefig(
-                            g.fig,
-                            os.path.join(
-                                output_dir,
-                                output_prefix
-                                + ".diff_{}.groups.clustermap.svg".format(var_name),
-                            ),
-                        )
+                    )
+                    g.ax_heatmap.set_xticklabels(
+                        g.ax_heatmap.get_xticklabels(),
+                        rotation=90,
+                        fontsize="xx-small",
+                    )
+                    g.ax_heatmap.set_yticklabels(
+                        g.ax_heatmap.get_yticklabels(),
+                        rotation=0,
+                        fontsize="xx-small",
+                    )
+                    savefig(
+                        g.fig,
+                        os.path.join(
+                            output_dir,
+                            output_prefix
+                            + ".diff_{}.groups.clustermap.svg".format(var_name),
+                        ),
+                    )
 
-                        g = sns.clustermap(
-                            groups,
-                            xticklabels=True,
-                            yticklabels=feature_labels,
-                            z_score=0,
-                            cbar_kws={
-                                "label": "Z-score of {}\non differential {}s".format(
-                                    quantity, var_name
-                                )
-                            },
-                            cmap="RdBu_r",
-                            center=0,
-                            robust=robust,
-                            metric="correlation",
-                            rasterized=True,
-                            figsize=figsize,
-                        )
-                        g.ax_heatmap.set_ylabel(
-                            "Differential {}s (n = {})".format(
-                                var_name, groups.shape[0]
+                    g = sns.clustermap(
+                        groups,
+                        xticklabels=True,
+                        yticklabels=feature_labels,
+                        z_score=0,
+                        cbar_kws={
+                            "label": "Z-score of {}\non differential {}s".format(
+                                quantity, var_name
                             )
+                        },
+                        cmap="RdBu_r",
+                        center=0,
+                        robust=robust,
+                        metric="correlation",
+                        rasterized=True,
+                        figsize=figsize,
+                    )
+                    g.ax_heatmap.set_ylabel(
+                        "Differential {}s (n = {})".format(
+                            var_name, groups.shape[0]
                         )
-                        g.ax_heatmap.set_xticklabels(
-                            g.ax_heatmap.get_xticklabels(),
-                            rotation=90,
-                            fontsize="xx-small",
-                        )
-                        g.ax_heatmap.set_yticklabels(
-                            g.ax_heatmap.get_yticklabels(),
-                            rotation=0,
-                            fontsize="xx-small",
-                        )
-                        savefig(
-                            g.fig,
-                            os.path.join(
-                                output_dir,
-                                output_prefix
-                                + ".diff_{}.groups.clustermap.z0.svg".format(var_name),
-                            ),
-                        )
+                    )
+                    g.ax_heatmap.set_xticklabels(
+                        g.ax_heatmap.get_xticklabels(),
+                        rotation=90,
+                        fontsize="xx-small",
+                    )
+                    g.ax_heatmap.set_yticklabels(
+                        g.ax_heatmap.get_yticklabels(),
+                        rotation=0,
+                        fontsize="xx-small",
+                    )
+                    savefig(
+                        g.fig,
+                        os.path.join(
+                            output_dir,
+                            output_prefix
+                            + ".diff_{}.groups.clustermap.z0.svg".format(var_name),
+                        ),
+                    )
 
-                        # same without clustering
-                        g = sns.clustermap(
-                            groups,
-                            col_cluster=False,
-                            xticklabels=True,
-                            yticklabels=feature_labels,
-                            cbar_kws={
-                                "label": "{} of\ndifferential {}s".format(
-                                    quantity, var_name
-                                )
-                            },
-                            robust=robust,
-                            metric="correlation",
-                            rasterized=True,
-                            figsize=figsize,
-                        )
-                        g.ax_heatmap.set_ylabel(
-                            "Differential {}s (n = {})".format(
-                                var_name, groups.shape[0]
+                    # same without clustering
+                    g = sns.clustermap(
+                        groups,
+                        col_cluster=False,
+                        xticklabels=True,
+                        yticklabels=feature_labels,
+                        cbar_kws={
+                            "label": "{} of\ndifferential {}s".format(
+                                quantity, var_name
                             )
+                        },
+                        robust=robust,
+                        metric="correlation",
+                        rasterized=True,
+                        figsize=figsize,
+                    )
+                    g.ax_heatmap.set_ylabel(
+                        "Differential {}s (n = {})".format(
+                            var_name, groups.shape[0]
                         )
-                        g.ax_heatmap.set_xticklabels(
-                            g.ax_heatmap.get_xticklabels(),
-                            rotation=90,
-                            fontsize="xx-small",
-                        )
-                        g.ax_heatmap.set_yticklabels(
-                            g.ax_heatmap.get_yticklabels(),
-                            rotation=0,
-                            fontsize="xx-small",
-                        )
-                        savefig(
-                            g.fig,
-                            os.path.join(
-                                output_dir,
-                                output_prefix
-                                + ".diff_{}.groups.sorted.clustermap.svg".format(
-                                    var_name
-                                ),
+                    )
+                    g.ax_heatmap.set_xticklabels(
+                        g.ax_heatmap.get_xticklabels(),
+                        rotation=90,
+                        fontsize="xx-small",
+                    )
+                    g.ax_heatmap.set_yticklabels(
+                        g.ax_heatmap.get_yticklabels(),
+                        rotation=0,
+                        fontsize="xx-small",
+                    )
+                    savefig(
+                        g.fig,
+                        os.path.join(
+                            output_dir,
+                            output_prefix
+                            + ".diff_{}.groups.sorted.clustermap.svg".format(
+                                var_name
                             ),
-                        )
+                        ),
+                    )
 
-                        g = sns.clustermap(
-                            groups,
-                            col_cluster=False,
-                            xticklabels=True,
-                            yticklabels=feature_labels,
-                            z_score=0,
-                            cbar_kws={
-                                "label": "Z-score of {}\non differential {}s".format(
-                                    quantity, var_name
-                                )
-                            },
-                            cmap="RdBu_r",
-                            center=0,
-                            robust=robust,
-                            metric="correlation",
-                            rasterized=True,
-                            figsize=figsize,
-                        )
-                        g.ax_heatmap.set_ylabel(
-                            "Differential {}s (n = {})".format(
-                                var_name, groups.shape[0]
+                    g = sns.clustermap(
+                        groups,
+                        col_cluster=False,
+                        xticklabels=True,
+                        yticklabels=feature_labels,
+                        z_score=0,
+                        cbar_kws={
+                            "label": "Z-score of {}\non differential {}s".format(
+                                quantity, var_name
                             )
+                        },
+                        cmap="RdBu_r",
+                        center=0,
+                        robust=robust,
+                        metric="correlation",
+                        rasterized=True,
+                        figsize=figsize,
+                    )
+                    g.ax_heatmap.set_ylabel(
+                        "Differential {}s (n = {})".format(
+                            var_name, groups.shape[0]
                         )
-                        g.ax_heatmap.set_xticklabels(
-                            g.ax_heatmap.get_xticklabels(),
-                            rotation=90,
-                            fontsize="xx-small",
-                        )
-                        g.ax_heatmap.set_yticklabels(
-                            g.ax_heatmap.get_yticklabels(),
-                            rotation=0,
-                            fontsize="xx-small",
-                        )
-                        savefig(
-                            g.fig,
-                            os.path.join(
-                                output_dir,
-                                output_prefix
-                                + ".diff_{}.groups.sorted.clustermap.z0.svg".format(
-                                    var_name
-                                ),
+                    )
+                    g.ax_heatmap.set_xticklabels(
+                        g.ax_heatmap.get_xticklabels(),
+                        rotation=90,
+                        fontsize="xx-small",
+                    )
+                    g.ax_heatmap.set_yticklabels(
+                        g.ax_heatmap.get_yticklabels(),
+                        rotation=0,
+                        fontsize="xx-small",
+                    )
+                    savefig(
+                        g.fig,
+                        os.path.join(
+                            output_dir,
+                            output_prefix
+                            + ".diff_{}.groups.sorted.clustermap.z0.svg".format(
+                                var_name
                             ),
-                        )
+                        ),
+                    )
 
         # Fold-changes and P-values
         # pivot table of genes vs comparisons
         if "stats_heatmap" in steps:
             _LOGGER.info("Getting fold-change and p-value values per comparison.")
+            if results.index.name is None:
+                results.index.name = "index"
             fold_changes = pd.pivot_table(
                 results.loc[all_diff, :].reset_index(),
                 index=results.index.name,
                 columns=comparison_column,
                 values=log_fold_change_column,
             ).fillna(0)
-            p_values = -np.log10(
-                pd.pivot_table(
-                    results.loc[all_diff, :].reset_index(),
-                    index=results.index.name,
-                    columns=comparison_column,
-                    values=adjusted_p_value_column,
-                )
-            )
+            p_values = (-np.log10(
+                            pd.pivot_table(
+                                results.loc[all_diff, :].reset_index(),
+                                index=results.index.name,
+                                columns=comparison_column,
+                                values=adjusted_p_value_column,
+                            )
+                        )).fillna(0)
 
             # get a signed p-value
             if fold_changes.shape == p_values.shape:
@@ -4034,6 +4048,15 @@ class Analysis(object):
                 (fold_changes, "log fold change", "log fold change"),
                 (p_values, "p value", "-log10(signed p-value)"),
             ]:
+
+                if matrix_.isnull().sum().sum() > 0:
+                    _LOGGER.warning(
+                        "Some sample groups or regions in {} matrix contain NaNs. Removing those.".format(
+                            label
+                        )
+                    )
+                    matrix_ = matrix_.dropna().T.dropna().T
+
                 if matrix_.shape[1] > 1:
                     _LOGGER.info(
                         "Plotting group-wise correlation of {}s per sample groups in all differential {}s found.".format(
@@ -5035,7 +5058,7 @@ class Analysis(object):
                 background_bed=background,
                 steps=steps,
                 overwrite=overwrite,
-                pickle_file=self.pickle_file,
+                pep_config=self.prj.config_file,
             )
 
     def collect_differential_enrichment(

@@ -55,7 +55,7 @@ sample_input_files:
   ChIPmentation:
     aligned_filtered_bam: "{data_dir}/{sample_name}/mapped/{sample_name}.trimmed.bowtie2.filtered.bam"
   CNV:
-    aligned_filtered_bam: "{data_dir}/{sample_name}/mapped/{sample_name}.trimmed.bowtie2.filtered.bam"
+    log2_read_counts: "{data_dir}/{sample_name}/{sample_name}_{resolution}/CNAprofiles/log2_read_counts.igv"
   RNA-seq:
     aligned_filtered_bam: "{data_dir}/{sample_name}/mapped/{sample_name}.trimmed.bowtie2.filtered.bam"
     counts: "{data_dir}/{sample_name}/bowtie1_{genome}/bitSeq/{sample_name}.counts"

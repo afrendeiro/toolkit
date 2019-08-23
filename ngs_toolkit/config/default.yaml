@@ -55,7 +55,7 @@ sample_input_files:
   ChIPmentation:
     aligned_filtered_bam:
   CNV:
-    aligned_filtered_bam:
+    log2_read_counts:
   RNA-seq:
     aligned_filtered_bam:
     counts:

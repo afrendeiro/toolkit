@@ -330,6 +330,7 @@ class CNVAnalysis(Analysis):
         matrix : :obj:`dict`
             Sets a `matrix` dictionary with CNV matrices for each resolution.
         """
+        # TODO: figure out a way of having the input file specified before hand
         from tqdm import tqdm
 
         if resolutions is None:
@@ -345,12 +346,12 @@ class CNVAnalysis(Analysis):
 
             for sample in tqdm(samples, total=len(samples), desc="Sample"):
                 # Read log2 file
-                if not hasattr(sample, "log2_read_counts"):
-                    sample.copywriter_output_file = os.path.join(
-                        self.data_dir,
-                        sample.name + "_" + resolution,
-                        "CNAprofiles",
-                        "log2_read_counts.igv")
+                # if not hasattr(sample, "log2_read_counts"):
+                sample.log2_read_counts = os.path.join(
+                    self.data_dir,
+                    sample.name + "_" + resolution,
+                    "CNAprofiles",
+                    "log2_read_counts.igv")
                 try:
                     cov = pd.read_csv(
                         sample.log2_read_counts, sep="\t", comment="#"
@@ -497,7 +498,7 @@ class CNVAnalysis(Analysis):
 
     def plot_all_data(
         self,
-        matrix=None,
+        matrix="matrix_norm",
         resolutions=None,
         samples=None,
         output_dir=None,
@@ -563,8 +564,7 @@ class CNVAnalysis(Analysis):
         import matplotlib.pyplot as plt
         import seaborn as sns
 
-        if matrix is None:
-            matrix = self.matrix_norm
+        matrix = self.get_matrix(matrix)
         if resolutions is None:
             resolutions = self.resolutions
         if samples is None:
@@ -1129,10 +1129,10 @@ def all_to_igv(matrix, output_prefix, **kwargs):
     igvs = dict()
     resolutions = matrix.keys()
     for resolution in tqdm(resolutions, total=len(resolutions), desc="Resolution"):
-        print("Making IGV visualization for resolution '{}'.".format(resolution))
+        _LOGGER.info("Making IGV visualization for resolution '{}'.".format(resolution))
         igvs[resolution] = to_igv(
             matrix[resolution],
-            output_file="{}_{}".format(output_prefix, resolution),
+            output_file="{}_{}.igv".format(output_prefix, resolution),
             **kwargs
         )
 
@@ -1170,17 +1170,13 @@ def to_igv(matrix, output_file=None, save=True, view_limits=(-2, 2)):
     ValueError:
         If `save` is True but `output_file` is None.
     """
-    print("Making IGV visualization")
+    _LOGGER.info("Making IGV visualization")
 
     # as IGV file
     igv = pd.DataFrame(index=matrix.index)
-    igv.loc[:, "Chromosome"] = map(lambda x: x[0], matrix.index.str.split(":"))
-    igv.loc[:, "Start"] = map(
-        lambda x: int(x[1].split("-")[0]), matrix.index.str.split(":")
-    )
-    igv.loc[:, "End"] = map(
-        lambda x: int(x[1].split("-")[1]), matrix.index.str.split(":")
-    )
+    igv.loc[:, "Chromosome"] = list(map(lambda x: x[0], matrix.index.str.split(":")))
+    igv.loc[:, "Start"] = list(map(lambda x: int(x[1].split("-")[0]), matrix.index.str.split(":")))
+    igv.loc[:, "End"] = list(map(lambda x: int(x[1].split("-")[1]), matrix.index.str.split(":")))
     igv.loc[:, "Name"] = igv.index
 
     igv = igv.join(matrix).reset_index(drop=True)

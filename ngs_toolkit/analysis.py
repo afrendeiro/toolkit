@@ -896,7 +896,6 @@ class Analysis(object):
         #     )
 
     def record_output_file(self, file_name, name="analysis"):
-        from collections import OrderedDict
         if name in self.output_files:
             self.output_files[name].append(file_name)
         else:
@@ -908,7 +907,7 @@ class Analysis(object):
         from jinja2 import PackageLoader, Environment, FileSystemLoader
 
         def fix_name(x, a):
-            return (" ".join(os.path.basename(x).replace(a.name, "").split(".")[:-1])
+            return (" - ".join(os.path.basename(x).replace(a.name, "").split(".")[:-1])
                     .replace("_", " ").capitalize())
 
         output_html = self._format_string_with_attributes(output_html)

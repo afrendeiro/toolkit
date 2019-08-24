@@ -891,10 +891,13 @@ class Analysis(object):
         #         )
         #     )
 
-    def record_output_file(self, file_name, name=None):
+    def record_output_file(self, file_name, name="analysis"):
         if not hasattr(self, "output_files"):
-            self.output_files = list()
-        self.output_files.append((name, file_name))
+            self.output_files = dict()
+        if name in self.output_files:
+            self.output_files[name].append(file_name)
+        else:
+            self.output_files[name] = [file_name]
 
     def set_matrix(
         self, matrix_name, csv_file, prefix="{results_dir}/{name}", **kwargs

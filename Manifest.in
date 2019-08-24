@@ -1,3 +1,4 @@
 include requirements/requirements*.txt
+include ngs_toolkit/templates/*
 include README.md
 include config/*.yaml

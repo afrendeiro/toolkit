@@ -892,12 +892,44 @@ class Analysis(object):
         #     )
 
     def record_output_file(self, file_name, name="analysis"):
+        from collections import OrderedDict
         if not hasattr(self, "output_files"):
-            self.output_files = dict()
+            self.output_files = OrderedDict()
         if name in self.output_files:
             self.output_files[name].append(file_name)
         else:
             self.output_files[name] = [file_name]
+
+    def generate_report(self, output_html="{root_dir}/{name}.analysis_report.html"):
+        import os
+        import time
+        from jinja2 import PackageLoader, Environment, FileSystemLoader
+
+        def fix_name(x, a):
+            return (" ".join(os.path.basename(x).replace(a.name, "").split(".")[:-1])
+                    .replace("_", " ").capitalize())
+
+        output_html = self._format_string_with_attributes(output_html)
+
+        output_files = {
+            k.capitalize().replace("_", " "):
+                [
+                    (
+                        fix_name(x, self),
+                        x,
+                    )
+                    for x in self.output_files[k]]
+            for k in self.output_files.keys()}
+
+        p = PackageLoader("ngs_toolkit")
+        file_loader = FileSystemLoader('templates')
+        env = Environment(loader=file_loader)
+        template = p.load(env, 'report.html')
+        output = template.render(
+            analysis=self, time=time.asctime(), output_files=output_files)
+
+        with open(output_html, 'w') as handle:
+            handle.write(output)
 
     def set_matrix(
         self, matrix_name, csv_file, prefix="{results_dir}/{name}", **kwargs

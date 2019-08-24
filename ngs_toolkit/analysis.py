@@ -1993,7 +1993,7 @@ class Analysis(object):
         ],
         maniford_kwargs={},
         display_corr_values=False,
-        plot_max_pcs=8,
+        plot_max_pcs=4,
         save_additional=False,
         prettier_sample_names=True,
         rasterized=False,

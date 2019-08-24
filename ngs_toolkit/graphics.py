@@ -314,7 +314,7 @@ def clustermap_rasterize_heatmap(grid):
     q.set_rasterized(True)
 
 
-def savefig(fig, file_name, track=True, **kwargs):
+def savefig(fig, file_name, **kwargs):
     from ngs_toolkit.utils import record_analysis_output
     if isinstance(fig, sns.axisgrid.Grid):
         fig = fig.fig
@@ -324,7 +324,7 @@ def savefig(fig, file_name, track=True, **kwargs):
     if _CONFIG["preferences"]["graphics"]["close_saved_figures"]:
         plt.close(fig)
 
-    if track:
+    if _CONFIG["preferences"]["report"]["record_figures"]:
         record_analysis_output(file_name)
 
 

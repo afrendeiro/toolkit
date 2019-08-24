@@ -29,25 +29,49 @@ def have_unbuffered_output():
     sys.stdout = Unbuffered(sys.stdout)
 
 
-def record_analysis_output(file_name):
+def record_analysis_output(file_name, report=True):
+    """
+    Register a file that is an output of the Analysis.
+    The file will be associated with the function that produced it and
+    saved in the attribute ``output_files``.
+
+    Parameters
+    ----------
+    file_name : :obj:`str`
+        File name of analysis output to record.
+    report : :obj:`bool`
+        Whether to write an html report with all current records.
+
+        Default is :obj:`True`
+
+    Attributes
+    ----------
+    output_files : :obj:`collections.OrderedDict
+        OrderedDict with keys being the function that produced the file
+        and a list of file(s) as values.
+
+    Raises
+    ----------
+    KeyError
+        If function (or parents) that calls this is not part of an Analysis object.
+    """
     import inspect
-    from ngs_toolkit import Analysis, _LOGGER
+    from ngs_toolkit import Analysis, _LOGGER, _CONFIG
 
     # Let's get the object that called the function previous to this one
     # # the use case is often:
     # # Analysis().do_work() <- do work will produce a plot and save it using savefig.
     # # If savefig(track=True), this function will be called and we can trace which Analysis object did so
-    stack = inspect.stack()
 
     # Go up the stack until an Analysis object is found:
     msg = "`record_analysis_output` was called by a function not belonging to a Analysis object"
-    for s in stack:
+    for s in inspect.stack():
         if 'self' not in s.frame.f_locals:
             continue
         # # Get Analysis object
         a = s.frame.f_locals['self']
         if not isinstance(a, Analysis):
-            raise KeyError(msg)
+            continue
         break
     if "a" not in locals():
         _LOGGER.error(msg)
@@ -58,6 +82,8 @@ def record_analysis_output(file_name):
     # # Get parameters
     # loc.frame.f_locals
     a.record_output_file(file_name, name)
+    if _CONFIG["preferences"]["report"]["continuous_generation"]:
+        a.generate_report()
 
 
 def submit_job(

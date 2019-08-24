@@ -90,6 +90,8 @@ class Analysis(object):
         samples=None,
         **kwargs
     ):
+        from collections import OrderedDict
+
         # Add given args and kwargs to object
         _LOGGER.debug("Adding given arguments to analysis object.")
         self.name = name
@@ -129,6 +131,8 @@ class Analysis(object):
                 setattr(self, attr, None)
         if not hasattr(self, "thresholds"):
             self.thresholds = {"alpha": 0.05, "log2_fold_change": 0}
+        if not hasattr(self, "output_files"):
+            self.output_files = OrderedDict()
 
         # Generate from PEP configuration file
         if from_pep is not False:
@@ -893,8 +897,6 @@ class Analysis(object):
 
     def record_output_file(self, file_name, name="analysis"):
         from collections import OrderedDict
-        if not hasattr(self, "output_files"):
-            self.output_files = OrderedDict()
         if name in self.output_files:
             self.output_files[name].append(file_name)
         else:

@@ -17,6 +17,10 @@ preferences:
   # options are: 'default' (localhost), 'slurm', lsf', 'sge'
   # see more here: http://code.databio.org/divvy/
   computing_configuration:
+  report:
+    record_figures: True
+    record_csv: True
+    continuous_generation: True
   graphics:
     matplotlib:
       backend: TkAgg # Agg

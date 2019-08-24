@@ -237,10 +237,11 @@ class TestAnalysis:
 
     def test_record_output_file(self, atac_analysis):
         assert not hasattr(atac_analysis, "output_files")
-        atac_analysis.record_output_file("a")
+        atac_analysis.record_output_file("a", name="analysis")
         assert hasattr(atac_analysis, "output_files")
         assert len(atac_analysis.output_files) == 1
-        assert atac_analysis.output_files[0] == (None, "a")
+        assert "analysis" in atac_analysis.output_files
+        assert atac_analysis.output_files["analysis"] == "a"
 
 
 def test_project_with_subprojects(subproject_config):

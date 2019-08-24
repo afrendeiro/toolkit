@@ -236,7 +236,8 @@ class TestAnalysis:
         assert string == atac_analysis._format_string_with_attributes(env_var)
 
     def test_record_output_file(self, atac_analysis):
-        assert not hasattr(atac_analysis, "output_files")
+        assert hasattr(atac_analysis, "output_files")
+        assert len(atac_analysis.output_files) == 0
         atac_analysis.record_output_file("a", name="analysis")
         assert hasattr(atac_analysis, "output_files")
         assert len(atac_analysis.output_files) == 1

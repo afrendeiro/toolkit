@@ -30,8 +30,19 @@
     <img src="/docs/4.3/assets/brand/bootstrap-solid.svg" width="30" height="30" class="d-inline-block align-top" alt="">
     ngs-toolkit
     </a>
+        <ul class="nav nav-pills">
+            <li class="nav-item">
+                <a class="nav-link" href="#project-description">Project description</a>
+            </li>
+            {% for section, fig_list in output_files.items() %}
+            <li class="nav-item">
+                <a class="nav-link" href="#section-{{ section|replace(' ', '-') }}">{{ section }}</a>
+            </li>
+            {% endfor %}
+        </ul>
     </nav>
 
+    <!-- Jumbotron -->
     <div class="jumbotron jumbotron-fluid">
       <div class="container">
         <h1 class="display-4">{{ analysis.name }}</h1>
@@ -40,40 +51,51 @@
       </div>
     </div>
 
-    <div class="container" id="content">
-        <div class="container ">
-            <h1>Project description</h1>
-            <div class="col">
-                <p> Project contains {{ analysis.samples|length }} samples:</p>
-                <ul id="samples">
-                    {% for sample in analysis.samples %}
-                    <li id="sample">{{ sample.name }}</li>
-                    {% endfor %}
-                </ul>
-            </div>
-            <div class="col">
-                <p> The project main data type is {{ analysis.data_type }}.</p>
-                <p> The project main organism is {{ analysis.organism }}.</p>
-                <p> The project main genome assembly is {{ analysis.genome }}.</p>
+
+    <!-- Content -->
+    <div class="container">
+        <div class="row">
+
+                <div class="container" id="content" data-spy="scroll" data-target="#navbar-example3" data-offset="0">
+                    <div class="container ">
+                        <h1 id="project-description">Project description</h1>
+                        <div class="col">
+                            <p> Project contains {{ analysis.samples|length }} samples:</p>
+                            <ul id="samples">
+                                {% for sample in analysis.samples %}
+                                <li id="sample">{{ sample.name }}</li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                        <div class="col">
+                            <p> The project main data type is {{ analysis.data_type }}.</p>
+                            <p> The project main organism is {{ analysis.organism }}.</p>
+                            <p> The project main genome assembly is {{ analysis.genome }}.</p>
+                        </div>
+                    </div>
+
+                    <div class="container ">
+                        <h1>Analysis report</h1>
+                        {% for section, fig_list in output_files.items() %}
+                        <h3 id="section-{{ section|replace(' ', '-') }}">{{ section }}</h3>
+                        <div class="row">
+                            {% for caption, fig in fig_list %}
+                                <div id="plot-{{ caption }}" class="col-6">
+                                    <figure>
+                                        <a href="{{ fig }}">
+                                            <img class="rounded float-left" src="{{ fig }}" style="width: 100%"/>
+                                        </a>
+                                    <figcaption class="figure-caption text-center">{{ caption }}</figcaption>
+                                    </figure>
+                                </div>
+                            {% endfor %}
+                        </div>
+                        {% endfor %}
+                    </div>
+
             </div>
         </div>
 
-        <div class="container ">
-            <h1>Analysis report</h1>
-            {% for section, fig_list in output_files.items() %}
-            <h3 id="section-{{ section }}">{{ section }}</h3>
-            <div class="row">
-                {% for caption, fig in fig_list %}
-                    <div id="plot-{{ caption }}" class="col-6">
-                        <figure>
-                        <img class="rounded float-left" src="{{ fig }}" style="width: 100%"/>
-                        <figcaption class="figure-caption text-center">{{ caption }}</figcaption>
-                        </figure>
-                    </div>
-                {% endfor %}
-            </div>
-            {% endfor %}
-        </div>
     </div>
 
     <nav class="navbar fixed-bottom navbar-light bg-light">
@@ -87,4 +109,4 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js" integrity="sha384-UO2eT0CpHqdSJQ6hJty5KVphtPhzWj9WO1clHTMGa3JDZwrnQq4sF86dIHNDz0W1" crossorigin="anonymous"></script>
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js" integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM" crossorigin="anonymous"></script>
   </body>
-</html> 
+</html>

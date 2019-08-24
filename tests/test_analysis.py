@@ -235,6 +235,13 @@ class TestAnalysis:
     def test__format_string_with_attributes(self, atac_analysis, env_var, string):
         assert string == atac_analysis._format_string_with_attributes(env_var)
 
+    def test_record_output_file(self, atac_analysis):
+        assert not hasattr(atac_analysis, "output_files")
+        atac_analysis.record_output_file("a")
+        assert hasattr(atac_analysis, "output_files")
+        assert len(atac_analysis.output_files) == 1
+        assert atac_analysis.output_files[0] == (None, "a")
+
 
 def test_project_with_subprojects(subproject_config):
     from ngs_toolkit import Analysis

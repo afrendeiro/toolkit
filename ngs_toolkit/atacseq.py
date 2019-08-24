@@ -2082,6 +2082,7 @@ class ATACSeqAnalysis(Analysis):
         # TODO: get matrix as input, move to graphics
         import matplotlib.pyplot as plt
         import seaborn as sns
+        from ngs_toolkit.graphics import savefig
 
         if samples is None:
             samples = self.samples
@@ -2102,12 +2103,10 @@ class ATACSeqAnalysis(Analysis):
                 ax=axis,
             )
             sns.despine(fig)
-            fig.savefig(
+            savefig(
+                fig,
                 os.path.join(
-                    self.results_dir, self.name + ".raw_counts.violinplot.svg"
-                ),
-                bbox_inches="tight",
-            )
+                    self.results_dir, self.name + ".raw_counts.violinplot.svg"))
         else:
             attrs = set([getattr(s, by_attribute) for s in samples])
             fig, axis = plt.subplots(len(attrs), 1, figsize=(8, len(attrs) * 6))
@@ -2138,13 +2137,11 @@ class ATACSeqAnalysis(Analysis):
                 axis[i].set_title(attr)
                 axis[i].set_xticklabels(axis[i].get_xticklabels(), rotation=90)
             sns.despine(fig)
-            fig.savefig(
+            savefig(
+                fig,
                 os.path.join(
                     self.results_dir,
-                    self.name + ".raw_counts.violinplot.by_{}.svg".format(by_attribute),
-                ),
-                bbox_inches="tight",
-            )
+                    self.name + ".raw_counts.violinplot.by_{}.svg".format(by_attribute)))
 
     def plot_coverage(self):
         import matplotlib.pyplot as plt

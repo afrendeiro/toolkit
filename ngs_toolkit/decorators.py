@@ -56,3 +56,22 @@ def check_has_sites(f):
         return f(*args, **kwds)
 
     return wrapper
+
+
+def add_csv_recording():
+    import pandas as pd
+    from ngs_toolkit.utils import record_analysis_output
+
+    def record_output(f):
+        from functools import wraps
+
+        @wraps(f)
+        def wrapper(*args, **kwds):
+            if len(args) > 1:
+                record_analysis_output(args[1], permissive=True)
+            else:
+                _LOGGER.warning("Could not record output.")
+            return f(*args, **kwds)
+        return wrapper
+
+    pd.DataFrame.to_csv = record_output(pd.DataFrame.to_csv)

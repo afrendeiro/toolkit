@@ -89,7 +89,7 @@ setup(
     install_requires=requirements,
     tests_require=test_requirements,
     extras_require={"rstats": requirements_rstats, "single_cell": requirements_sc},
-    package_data={"ngs_toolkit": ["config/*.yaml"]},
+    package_data={"ngs_toolkit": ["config/*.yaml", "templates/*.html"]},
     data_files=[
         "requirements/requirements.txt",
         "requirements/requirements.test.txt",

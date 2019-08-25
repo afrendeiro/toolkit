@@ -29,7 +29,7 @@ def have_unbuffered_output():
     sys.stdout = Unbuffered(sys.stdout)
 
 
-def record_analysis_output(file_name, report=True):
+def record_analysis_output(file_name, report=True, permissive=False):
     """
     Register a file that is an output of the Analysis.
     The file will be associated with the function that produced it and
@@ -69,13 +69,18 @@ def record_analysis_output(file_name, report=True):
         if 'self' not in s.frame.f_locals:
             continue
         # # Get Analysis object
-        a = s.frame.f_locals['self']
-        if not isinstance(a, Analysis):
+        if not isinstance(s.frame.f_locals['self'], Analysis):
             continue
+        else:
+            a = s.frame.f_locals['self']
         break
     if "a" not in locals():
-        _LOGGER.error(msg)
-        raise KeyError(msg)
+        if permissive:
+            _LOGGER.debug(msg)
+            return
+        else:
+            _LOGGER.error(msg)
+            raise KeyError(msg)
 
     # # Get function name
     name = s.function

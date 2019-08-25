@@ -904,30 +904,56 @@ class Analysis(object):
     def generate_report(self, output_html="{root_dir}/{name}.analysis_report.html"):
         import os
         import time
-        from jinja2 import PackageLoader, Environment, FileSystemLoader
+        from jinja2 import Template
+        import pkg_resources
 
         def fix_name(x, a):
-            return (" - ".join(os.path.basename(x).replace(a.name, "").split(".")[:-1])
+            return (" - ".join(
+                        os.path.basename(x).replace(a.name, "").split(".")[:-1])
                     .replace("_", " ").capitalize())
 
         output_html = self._format_string_with_attributes(output_html)
 
-        output_files = {
+        # Select image outputs (non-CSV files)
+        images = {
+            k: [x for x in v if x.endswith(".svg")]
+            for k, v in self.output_files.items()
+        }
+        # Generate dict = {"section": [(caption, file), ...]}
+        images = {
             k.capitalize().replace("_", " "):
                 [
                     (
                         fix_name(x, self),
                         x,
                     )
-                    for x in self.output_files[k]]
-            for k in self.output_files.keys()}
+                    for x in v]
+            for k, v in images.items()}
+        csvs = {
+            k: [x for x in v if x.endswith(".csv")]
+            for k, v in self.output_files.items()
+        }
+        csvs = {
+            k.capitalize().replace("_", " "):
+                [
+                    (
+                        fix_name(x, self),
+                        x,
+                    )
+                    for x in v]
+            for k, v in csvs.items()}
 
-        p = PackageLoader("ngs_toolkit")
-        file_loader = FileSystemLoader('templates')
-        env = Environment(loader=file_loader)
-        template = p.load(env, 'report.html')
+        resource_package = "ngs_toolkit"
+        resource_path = '/'.join(('templates', 'report.html'))
+        template = Template(
+            pkg_resources.resource_string(resource_package, resource_path).decode())
         output = template.render(
-            analysis=self, time=time.asctime(), output_files=output_files)
+            analysis=self,
+            project_repr={k: v for k, v in self.__dict__.items() if isinstance(v, str)},
+            samples=[s.to_dict() for s in self.samples],
+            time=time.asctime(),
+            images=images,
+            csvs=csvs)
 
         with open(output_html, 'w') as handle:
             handle.write(output)

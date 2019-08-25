@@ -134,7 +134,11 @@ class ATACSeqAnalysis(Analysis):
         only_these_keys : :obj:`list`, optional
             Iterable of analysis attributes to load up.
             Possible attributes:
-                "matrix_raw", "matrix_norm", "matrix_features", "sites", "support", "nuc", "coverage_gc_corrected", "gene_annotation", "region_annotation", "region_annotation_b", "chrom_state_annotation", "chrom_state_annotation_b", "stats", differential_results".
+                "matrix_raw", "matrix_norm", "matrix_features",
+                "sites", "support", "nuc", "coverage_gc_corrected",
+                "gene_annotation", "region_annotation", "region_annotation_b",
+                "chrom_state_annotation", "chrom_state_annotation_b",
+                "stats", differential_results".
 
             Default is all of the above.
         prefix : :obj:`str`, optional

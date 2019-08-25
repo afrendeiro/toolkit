@@ -194,6 +194,10 @@ setup_graphic_preferences()
 if "logging" in _divvy.__dict__.keys():
     _divvy.logging.getLogger("divvy").setLevel("ERROR")
 
+if _CONFIG["preferences"]["report"]["record_csv"]:
+    from ngs_toolkit.decorators import add_csv_recording as _add_csv_recording
+    _add_csv_recording()
+
 
 # easier API
 from ngs_toolkit.analysis import Analysis

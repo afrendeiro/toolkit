@@ -21,6 +21,8 @@ preferences:
     record_figures: True
     record_csv: True
     continuous_generation: True
+    timestamp_figures: True
+    timestamp_tables: True
   graphics:
     matplotlib:
       backend: TkAgg # Agg

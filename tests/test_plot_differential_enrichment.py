@@ -3,6 +3,7 @@
 import os
 
 import pytest
+from .conftest import file_exists_and_not_empty
 
 
 @pytest.fixture
@@ -32,5 +33,4 @@ class Test_plot_differential_enrichment:
     def test_no_arguments(self, analysis_with_differential_enrichment, outputs):
         analysis_with_differential_enrichment.plot_differential_enrichment()
         for output in outputs:
-            assert os.path.exists(output)
-            assert os.stat(output).st_size > 0
+            assert file_exists_and_not_empty(output)

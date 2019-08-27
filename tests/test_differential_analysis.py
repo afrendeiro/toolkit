@@ -4,6 +4,8 @@ import os
 
 import pytest
 
+from .conftest import file_exists, file_exists_and_not_empty
+
 
 @pytest.fixture
 def outputs(atac_analysis):
@@ -42,14 +44,13 @@ class Test_differential_analysis:
         import pandas as pd
 
         atac_analysis.differential_analysis(filter_support=False)
-        assert os.path.exists(
+        assert file_exists(
             os.path.join(atac_analysis.results_dir, "differential_analysis_ATAC-seq")
         )
-        assert os.path.exists(outputs[0])
+        assert file_exists(outputs[0])
         assert os.path.isdir(outputs[0])
         for output in outputs[1:]:
-            assert os.path.exists(output)
-            assert os.stat(output).st_size > 0
+            assert file_exists_and_not_empty(output)
         assert hasattr(atac_analysis, "differential_results")
         assert isinstance(atac_analysis.differential_results, pd.DataFrame)
         assert atac_analysis.differential_results.index.str.startswith("chr").all()
@@ -67,10 +68,10 @@ class Test_differential_analysis:
 
     # def test_no_subdirectories(self, atac_analysis, outputs):
     #     atac_analysis.differential_analysis()
-    #     assert os.path.exists(
+    #     assert file_exists(
     #         os.path.join(atac_analysis.results_dir, "differential_analysis_ATAC-seq"))
-    #     assert os.path.exists(outputs[0])
+    #     assert file_exists(outputs[0])
     #     assert os.path.isdir(outputs[0])
     #     for output in outputs[1:]:
-    #         assert os.path.exists(output)
+    #         assert file_exists(output)
     #         assert os.stat(output).st_size > 0

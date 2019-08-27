@@ -580,7 +580,7 @@ class ATACSeqAnalysis(Analysis):
         assign=True,
         save=True,
         peak_set_name="peak_set",
-        output_file=None,
+        output_file="{results_dir}/{name}.matrix_raw.csv",
         permissive=False,
         distributed=False,
         **kwargs
@@ -656,6 +656,8 @@ class ATACSeqAnalysis(Analysis):
         if samples is None:
             samples = self.samples
 
+        output_file = self._format_string_with_attributes(output_file)
+
         # Check which samples to run (dependent on permissive)
         samples = self._get_samples_with_input_file(
             "aligned_filtered_bam", samples=samples, permissive=permissive
@@ -707,13 +709,7 @@ class ATACSeqAnalysis(Analysis):
             if assign:
                 self.matrix_raw = matrix_raw
             if save:
-                if output_file is not None:
-                    matrix_raw.to_csv(output_file, index=True)
-                else:
-                    self.matrix_raw.to_csv(
-                        os.path.join(self.results_dir, self.name + ".matrix_raw.csv"),
-                        index=True,
-                    )
+                matrix_raw.to_csv(output_file, index=True)
             return matrix_raw
 
         else:
@@ -1074,7 +1070,7 @@ class ATACSeqAnalysis(Analysis):
 
         from ngs_toolkit.utils import bed_to_index
 
-        cols = [6, 8, 9]
+        cols = [6, 8, 9]  # gen_name, strand, distance
 
         if tss_file is None:
             _LOGGER.info(

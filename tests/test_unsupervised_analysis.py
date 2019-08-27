@@ -5,6 +5,8 @@ import shutil
 
 import pytest
 
+from .conftest import file_exists, file_not_empty, file_exists_and_not_empty
+
 
 @pytest.fixture
 def unsup_outputs(atac_analysis_many_factors):
@@ -38,8 +40,7 @@ class TestUnsupervisedAnalysis:
         # no arguments
         atac_analysis_many_factors.unsupervised_analysis()
         for output in unsup_outputs:
-            assert os.path.exists(output)
-            assert os.stat(output).st_size > 0
+            assert file_exists_and_not_empty(output)
 
     def test_matrix_with_no_group_attributes(self, atac_analysis_many_factors):
         atac_analysis_many_factors.group_attributes = []
@@ -49,8 +50,7 @@ class TestUnsupervisedAnalysis:
     def test_matrix_with_no_multiindex(self, atac_analysis_many_factors, unsup_outputs):
         atac_analysis_many_factors.unsupervised_analysis(matrix="matrix_raw")
         for output in unsup_outputs:
-            assert os.path.exists(output)
-            assert os.stat(output).st_size > 0
+            assert file_exists_and_not_empty(output)
 
     def test_matrix_with_no_multiindex_no_sample_attributes(self, atac_analysis):
         atac_analysis.sample_attributes = []
@@ -59,7 +59,7 @@ class TestUnsupervisedAnalysis:
 
     def test_matrix_with_no_multiindex2(self, atac_analysis_many_factors):
         atac_analysis_many_factors.unsupervised_analysis(matrix="matrix_raw")
-        assert os.path.exists(
+        assert file_exists(
             os.path.join(atac_analysis_many_factors.results_dir, "unsupervised_analysis_ATAC-seq")
         )
 
@@ -68,8 +68,8 @@ class TestUnsupervisedAnalysis:
             atac_analysis_many_factors.annotate_samples(matrix=matrix)
             atac_analysis_many_factors.unsupervised_analysis()
             for output in unsup_outputs:
-                assert os.path.exists(output)
-                assert os.stat(output).st_size > 0
+                assert file_exists(output)
+                assert file_not_empty(output)
             shutil.rmtree(
                 os.path.join(atac_analysis_many_factors.results_dir, "unsupervised_analysis_ATAC-seq")
             )
@@ -79,7 +79,7 @@ class TestUnsupervisedAnalysis:
         for i in range(2):
             with pytest.raises(ValueError):
                 atac_analysis_many_factors.unsupervised_analysis(samples=atac_analysis_many_factors.samples[:i])
-            assert os.path.exists(
+            assert file_exists(
                 os.path.join(atac_analysis_many_factors.results_dir, "unsupervised_analysis_ATAC-seq")
             )
             shutil.rmtree(
@@ -117,24 +117,23 @@ class TestUnsupervisedAnalysis:
         atac_analysis_many_factors.unsupervised_analysis(
             samples=[atac_analysis_many_factors.samples[0]] + [atac_analysis_many_factors.samples[-1]])
         for output in outputs2:
-            assert os.path.exists(output)
-            assert os.stat(output).st_size > 0
+            assert file_exists_and_not_empty(output)
         for output in not_outputs:
-            assert not os.path.exists(output)
+            assert not file_exists(output)
 
     # def test_high_samples_varying_all_outputs(self, atac_analysis_many_factors, outputs):
     #     for i in range(4, len(atac_analysis_many_factors.samples), 2):
     #         print(i)
     #         atac_analysis_many_factors.unsupervised_analysis(samples=atac_analysis_many_factors.samples[i:])
     #         for output in outputs:
-    #             assert os.path.exists(output)
-    #             assert os.stat(output).st_size > 0
+    #             assert file_exists(output)
+    #             assert file_not_empty(output)
     #         shutil.rmtree(os.path.join(atac_analysis_many_factors.results_dir, "unsupervised_analysis_ATAC-seq"))
 
     def test_no_plotting_attributes(self, atac_analysis_many_factors):
         with pytest.raises(ValueError):
             atac_analysis_many_factors.unsupervised_analysis(attributes_to_plot=[])
-        assert os.path.exists(
+        assert file_exists(
             os.path.join(atac_analysis_many_factors.results_dir, "unsupervised_analysis_ATAC-seq")
         )
 
@@ -157,10 +156,9 @@ class TestUnsupervisedAnalysis:
             )
             for output in unsup_outputs:
                 if output not in not_outputs:
-                    assert os.path.exists(output)
-                    assert os.stat(output).st_size > 0
+                    assert file_exists_and_not_empty(output)
             for output in not_outputs:
-                assert not os.path.exists(output)
+                assert not file_exists(output)
             shutil.rmtree(
                 os.path.join(analysis_annotated.results_dir, "unsupervised_analysis_ATAC-seq")
             )
@@ -169,21 +167,14 @@ class TestUnsupervisedAnalysis:
         atac_analysis_many_factors.unsupervised_analysis(output_prefix="test")
         for output in unsup_outputs:
             old_output = "all_{}s".format(atac_analysis_many_factors.var_unit_name)
-            assert os.path.exists(
+            assert file_exists_and_not_empty(
                 output.replace(old_output, "test")
-            )
-            assert (
-                os.stat(
-                    output.replace(old_output, "test")
-                ).st_size
-                > 0
             )
 
     def test_standardized_matrix(self, atac_analysis_many_factors, unsup_outputs):
         atac_analysis_many_factors.unsupervised_analysis(standardize_matrix=False)
         for output in unsup_outputs:
-            assert os.path.exists(output)
-            assert os.stat(output).st_size > 0
+            assert file_exists_and_not_empty(output)
 
     def test_save_additional(self, atac_analysis_many_factors):
 
@@ -207,5 +198,4 @@ class TestUnsupervisedAnalysis:
             save_additional=True)
 
         for output in additional_outputs:
-            assert os.path.exists(output)
-            assert os.stat(output).st_size > 0
+            assert file_exists_and_not_empty(output)

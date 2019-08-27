@@ -195,8 +195,14 @@ if "logging" in _divvy.__dict__.keys():
     _divvy.logging.getLogger("divvy").setLevel("ERROR")
 
 if _CONFIG["preferences"]["report"]["record_csv"]:
-    from ngs_toolkit.decorators import add_csv_recording as _add_csv_recording
-    _add_csv_recording()
+    from ngs_toolkit.decorators import (
+        read_csv_timestamped,
+        to_csv_timestamped)
+    import pandas as pd
+
+    pd.read_csv = read_csv_timestamped(pd.read_csv)
+    pd.read_table = read_csv_timestamped(pd.read_table)
+    pd.DataFrame.to_csv = to_csv_timestamped(pd.DataFrame.to_csv)
 
 
 # easier API

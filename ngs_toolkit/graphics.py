@@ -11,6 +11,29 @@ import pandas as pd
 import seaborn as sns
 
 
+def savefig(fig, file_name, **kwargs):
+    from ngs_toolkit.utils import record_analysis_output
+    from ngs_toolkit.utils import get_timestamp
+
+    if isinstance(fig, sns.axisgrid.Grid):
+        fig = fig.fig
+    default_kwargs = _CONFIG["preferences"]["graphics"]["figure_saving"]
+    default_kwargs.update(kwargs)
+
+    if _CONFIG["preferences"]["report"]["timestamp_figures"]:
+        s = file_name.split(".")
+        end = s[-1]
+        f = ".".join(s[:-1])
+        file_name = ".".join([f, get_timestamp(), end])
+
+    fig.savefig(file_name, **default_kwargs)
+    if _CONFIG["preferences"]["graphics"]["close_saved_figures"]:
+        plt.close(fig)
+
+    if _CONFIG["preferences"]["report"]["record_figures"]:
+        record_analysis_output(file_name)
+
+
 def barmap(x, figsize=None, square=False, row_colors=None, z_score=None, ylims=None):
     """
     Plot a heatmap-style grid with barplots.
@@ -312,20 +335,6 @@ def clustermap_rasterize_heatmap(grid):
         if isinstance(x, matplotlib.collections.QuadMesh)
     ][0]
     q.set_rasterized(True)
-
-
-def savefig(fig, file_name, **kwargs):
-    from ngs_toolkit.utils import record_analysis_output
-    if isinstance(fig, sns.axisgrid.Grid):
-        fig = fig.fig
-    default_kwargs = _CONFIG["preferences"]["graphics"]["figure_saving"]
-    default_kwargs.update(kwargs)
-    fig.savefig(file_name, **default_kwargs)
-    if _CONFIG["preferences"]["graphics"]["close_saved_figures"]:
-        plt.close(fig)
-
-    if _CONFIG["preferences"]["report"]["record_figures"]:
-        record_analysis_output(file_name)
 
 
 def plot_projection(

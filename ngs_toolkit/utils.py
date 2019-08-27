@@ -29,6 +29,56 @@ def have_unbuffered_output():
     sys.stdout = Unbuffered(sys.stdout)
 
 
+def get_timestamp(fmt='%Y-%m-%d-%H:%M:%S'):
+    from datetime import datetime
+
+    return datetime.today().strftime(fmt)
+
+
+def remove_timestamp_if_existing(file):
+    import re
+    return re.sub(r"\d{4}-\d{2}-\d{2}-\d{2}:\d{2}:\d{2}\.", "", file)
+
+
+def get_this_file_or_timestamped(file, permissive=True):
+    from glob import glob
+    from ngs_toolkit.utils import sorted_nicely
+    from ngs_toolkit import _LOGGER
+
+    split = file.split(".")
+    body = ".".join(split[:-1])
+    end = split[-1]
+
+    res = sorted_nicely(glob(body + "*" + end))
+    try:
+        # get newest file
+        return res[-1]
+    except IndexError:
+        if permissive:
+            return file
+        else:
+            msg = "Could not remove timestamp from file path."
+            msg += " Probabably it does not exist."
+            _LOGGER.debug(msg)
+            raise IndexError(msg)
+
+
+def is_analysis_descendent():
+    import inspect
+    from ngs_toolkit import Analysis
+
+    for s in inspect.stack():
+        if 'self' not in s.frame.f_locals:
+            continue
+        # # Get Analysis object
+        if not isinstance(s.frame.f_locals['self'], Analysis):
+            continue
+        else:
+            a = s.frame.f_locals['self']
+        break
+    return "a" in locals()
+
+
 def record_analysis_output(file_name, report=True, permissive=False):
     """
     Register a file that is an output of the Analysis.
@@ -55,6 +105,7 @@ def record_analysis_output(file_name, report=True, permissive=False):
     KeyError
         If function (or parents) that calls this is not part of an Analysis object.
     """
+    # TODO: separate stack workflow to get analysis to its own function
     import inspect
     from ngs_toolkit import Analysis, _LOGGER, _CONFIG
 

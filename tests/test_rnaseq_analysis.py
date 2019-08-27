@@ -5,6 +5,7 @@ import os
 
 import numpy as np
 import pandas as pd
+from .conftest import file_exists, file_exists_and_not_empty
 
 
 def test_rpm_normalization(various_analysis):
@@ -15,10 +16,9 @@ def test_rpm_normalization(various_analysis):
         rpm_file = os.path.join(
             analysis.results_dir, analysis.name + ".matrix_norm.csv"
         )
-        assert not os.path.exists(rpm_file)
+        assert not file_exists(rpm_file)
         qnorm = analysis.normalize_rpm(save=True)
-        assert os.path.exists(rpm_file)
-        assert os.stat(rpm_file).st_size > 0
+        assert file_exists_and_not_empty(rpm_file)
         assert hasattr(analysis, "matrix_norm")
 
 
@@ -28,16 +28,14 @@ def test_quantile_normalization(various_analysis):
         qnorm_p = analysis.normalize_quantiles(implementation="Python", save=True)
         assert isinstance(qnorm_p, pd.DataFrame)
         assert hasattr(analysis, "matrix_norm")
-        assert os.path.exists(f)
-        assert os.stat(f).st_size > 0
+        assert file_exists_and_not_empty(f)
         del analysis.matrix_norm
         os.remove(f)
 
         qnorm_r = analysis.normalize_quantiles(implementation="R", save=True)
         assert isinstance(qnorm_r, pd.DataFrame)
         assert hasattr(analysis, "matrix_norm")
-        assert os.path.exists(f)
-        assert os.stat(f).st_size > 0
+        assert file_exists_and_not_empty(f)
 
 
 def test_normalize(rnaseq_analysis):
@@ -70,8 +68,7 @@ def test_annotate_features(rnaseq_analysis):
         rnaseq_analysis.results_dir, rnaseq_analysis.name + ".matrix_features.csv"
     )
     assert hasattr(rnaseq_analysis, "matrix_features")
-    assert os.path.exists(f)
-    assert os.stat(f).st_size > 0
+    assert file_exists_and_not_empty(f)
 
     cols = [
         "mean",
@@ -90,4 +87,4 @@ def test_plot_expression_characteristics(various_analysis):
     for analysis in [a for a in various_analysis if a.data_type == "RNA-seq"]:
         analysis.normalize()
         analysis.plot_expression_characteristics()
-        assert os.path.exists(os.path.join(analysis.results_dir, "quality_control"))
+        assert file_exists(os.path.join(analysis.results_dir, "quality_control"))

@@ -8,6 +8,8 @@ import shutil
 from ngs_toolkit.analysis import Analysis
 import numpy as np
 import pytest
+from .conftest import file_exists, file_not_empty
+from ngs_toolkit.utils import get_this_file_or_timestamped
 
 
 class TestAnalysis:
@@ -107,18 +109,18 @@ class TestAnalysis:
 
         pickle_file = os.path.join(tmp_path, "analysis.pickle")
         a = Analysis(pickle_file=pickle_file)
-        assert not os.path.exists(pickle_file)
+        assert not file_exists(pickle_file)
         a.to_pickle()
-        assert os.path.exists(pickle_file)
-        assert os.stat(pickle_file).st_size > 0
+        assert file_exists(pickle_file)
+        assert file_not_empty(pickle_file)
 
-        previous_size = os.stat(pickle_file).st_size
+        previous_size = os.stat(get_this_file_or_timestamped(pickle_file)).st_size
         a.random = np.random.random((100, 100))
         a.to_pickle()
-        new_size = os.stat(pickle_file).st_size
+        new_size = os.stat(get_this_file_or_timestamped(pickle_file)).st_size
         assert new_size > previous_size
 
-        previous_size = os.stat(pickle_file).st_size
+        previous_size = os.stat(get_this_file_or_timestamped(pickle_file)).st_size
         a.random = np.random.random((100, 100))
         a.to_pickle(timestamp=True)
         assert len(glob.glob(os.path.join(tmp_path, "*.pickle"))) == 2

@@ -9,6 +9,8 @@ import numpy as np
 import pandas as pd
 import pybedtools
 import pytest
+from .conftest import file_exists, file_not_empty, file_exists_and_not_empty
+from ngs_toolkit.utils import get_this_file_or_timestamped
 
 
 travis = "TRAVIS" in os.environ
@@ -67,10 +69,9 @@ def test_rpm_normalization(various_analysis):
         rpm_file = os.path.join(
             analysis.results_dir, analysis.name + ".matrix_norm.csv"
         )
-        assert not os.path.exists(rpm_file)
+        assert not file_exists(rpm_file)
         qnorm = analysis.normalize_rpm(save=True)
-        assert os.path.exists(rpm_file)
-        assert os.stat(rpm_file).st_size > 0
+        assert file_exists_and_not_empty(rpm_file)
         assert hasattr(analysis, "matrix_norm")
 
 
@@ -80,16 +81,14 @@ def test_quantile_normalization(various_analysis):
         qnorm_p = analysis.normalize_quantiles(implementation="Python", save=True)
         assert isinstance(qnorm_p, pd.DataFrame)
         assert hasattr(analysis, "matrix_norm")
-        assert os.path.exists(f)
-        assert os.stat(f).st_size > 0
+        assert file_exists_and_not_empty(f)
         del analysis.matrix_norm
         os.remove(f)
 
         qnorm_r = analysis.normalize_quantiles(implementation="R", save=True)
         assert isinstance(qnorm_r, pd.DataFrame)
         assert hasattr(analysis, "matrix_norm")
-        assert os.path.exists(f)
-        assert os.stat(f).st_size > 0
+        assert file_exists_and_not_empty(f)
 
         # cors = list()
         # for col in qnorm_p.columns:
@@ -112,8 +111,7 @@ def test_cqn_normalization(atac_analysis):
             raise
     assert qnorm.dtypes.all() == np.float
     file = os.path.join(atac_analysis.results_dir, atac_analysis.name + ".matrix_norm.csv")
-    assert os.path.exists(file)
-    assert os.stat(file).st_size > 0
+    assert file_exists_and_not_empty(file)
 
 
 def test_normalize(atac_analysis):
@@ -154,8 +152,7 @@ def test_get_matrix_stats(various_analysis):
         output = os.path.join(
             analysis.results_dir, analysis.name + ".stats_per_feature.csv"
         )
-        assert os.path.exists(output)
-        assert os.stat(output).st_size > 0
+        assert file_exists_and_not_empty(output)
         assert isinstance(annot, pd.DataFrame)
         cols = ["mean", "variance", "std_deviation", "dispersion", "qv2", "amplitude"]
         assert all([x in annot.columns.tolist() for x in cols])
@@ -177,8 +174,7 @@ def test_get_peak_gene_annotation(atac_analysis):
             atac_analysis.organism, mapping[atac_analysis.genome]
         ),
     )
-    assert os.path.exists(tss)
-    assert os.stat(tss).st_size > 0
+    assert file_exists_and_not_empty(tss)
     assert isinstance(annot, pd.DataFrame)
     assert annot.shape[0] >= len(atac_analysis.sites)
 
@@ -220,8 +216,7 @@ def test_get_peak_genomic_location(atac_analysis):
     mapping = {"hg19": "grch37", "hg38": "grch38", "mm10": "grcm38"}
     for f in fs:
         f = f.format(atac_analysis.organism, mapping[atac_analysis.genome])
-        assert os.path.exists(f)
-        assert os.stat(f).st_size > 0
+        assert file_exists_and_not_empty(f)
 
     assert isinstance(annot, pd.DataFrame)
     assert annot.shape[0] >= len(atac_analysis.sites)
@@ -249,8 +244,7 @@ def test_peak_chromatin_state(atac_analysis, chrom_file):
     assert annot.shape[0] >= len(atac_analysis.sites)
 
     for f in fs:
-        assert os.path.exists(f)
-        assert os.stat(f).st_size > 0
+        assert file_exists_and_not_empty(f)
     for attr in attrs:
         assert hasattr(atac_analysis, attr)
 
@@ -276,8 +270,7 @@ def test_annotate_features(atac_analysis, chrom_file):
     atac_analysis.annotate_features(matrix="matrix_raw")
     f = os.path.join(atac_analysis.results_dir, atac_analysis.name + ".matrix_features.csv")
     assert hasattr(atac_analysis, "matrix_features")
-    assert os.path.exists(f)
-    assert os.stat(f).st_size > 0
+    assert file_exists_and_not_empty(f)
 
     cols = [
         "gene_name",
@@ -307,8 +300,7 @@ def test_plot_raw_coverage(various_analysis):
         output = os.path.join(
             analysis.results_dir, analysis.name + ".raw_counts.violinplot.svg"
         )
-        assert os.path.exists(output)
-        assert os.stat(output).st_size > 0
+        assert file_exists_and_not_empty(output)
 
         attr = "a"
         analysis.plot_raw_coverage(by_attribute=attr)
@@ -316,5 +308,4 @@ def test_plot_raw_coverage(various_analysis):
             analysis.results_dir,
             analysis.name + ".raw_counts.violinplot.by_{}.svg".format(attr),
         )
-        assert os.path.exists(output)
-        assert os.stat(output).st_size > 0
+        assert file_exists_and_not_empty(output)

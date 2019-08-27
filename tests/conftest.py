@@ -17,6 +17,46 @@ travis = "TRAVIS" in os.environ
 # TODO: test subproject initialization
 
 
+def is_internet_connected(hostname="www.google.com"):
+    import socket
+    try:
+        # see if we can resolve the host name -- tells us if there is
+        # a DNS listening
+        host = socket.gethostbyname(hostname)
+        # connect to the host -- tells us if the host is actually
+        # reachable
+        s = socket.create_connection((host, 80), 2)
+        s.close()
+        return True
+    except OSError:
+        pass
+    return False
+
+
+def file_exists(file):
+    import os
+    from ngs_toolkit.utils import get_this_file_or_timestamped
+
+    return os.path.exists(get_this_file_or_timestamped(file))
+
+
+def file_not_empty(file):
+    import os
+    from ngs_toolkit.utils import get_this_file_or_timestamped
+
+    return os.stat(get_this_file_or_timestamped(file)).st_size > 0
+
+
+def file_exists_and_not_empty(file):
+    import os
+    from ngs_toolkit.utils import get_this_file_or_timestamped
+
+    f = get_this_file_or_timestamped(file)
+
+    return os.path.exists(f) and (
+        os.stat(f).st_size > 0)
+
+
 @pytest.fixture
 def empty_analysis():
     return ATACSeqAnalysis()

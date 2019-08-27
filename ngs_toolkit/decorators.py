@@ -58,20 +58,43 @@ def check_has_sites(f):
     return wrapper
 
 
-def add_csv_recording():
-    import pandas as pd
-    from ngs_toolkit.utils import record_analysis_output
+def read_csv_timestamped(f):
+    from ngs_toolkit.utils import get_this_file_or_timestamped
+    @wraps(f)
+    def wrapper(*args, **kwds):
+        if len(args) > 1:
+            args = (
+                args[0],
+                get_this_file_or_timestamped(args[1])) + args[2:]
+        return f(*args, **kwds)
+    return wrapper
 
-    def record_output(f):
-        from functools import wraps
 
-        @wraps(f)
-        def wrapper(*args, **kwds):
-            if len(args) > 1:
+def to_csv_timestamped(f):
+    from ngs_toolkit.utils import (
+        record_analysis_output, get_timestamp,
+        is_analysis_descendent)
+    from ngs_toolkit import _CONFIG
+    @wraps(f)
+    def wrapper(*args, **kwds):
+        if len(args) > 1:
+            if is_analysis_descendent():
+                # Add timestamp
+                if _CONFIG["preferences"]["report"]["timestamp_tables"]:
+                    s = args[1].split(".")
+                    end = s[-1]
+                    body = ".".join(s[:-1])
+                    args = (args[0], ".".join([body, get_timestamp(), end])) + args[2:]
                 record_analysis_output(args[1], permissive=True)
-            else:
-                _LOGGER.warning("Could not record output.")
-            return f(*args, **kwds)
-        return wrapper
+        else:
+            _LOGGER.warning("Could not record output.")
+        return f(*args, **kwds)
+    return wrapper
 
-    pd.DataFrame.to_csv = record_output(pd.DataFrame.to_csv)
+
+def timestamped_input(f):
+    from ngs_toolkit.utils import get_this_file_or_timestamped
+    @wraps(f)
+    def wrapper(file):
+        return f(get_this_file_or_timestamped(file))
+    return wrapper

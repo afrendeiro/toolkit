@@ -1,16 +1,18 @@
 #!/usr/bin/env python
 
 
+from .conftest import file_exists
+
+
 def test_cli_parsing():
     import pytest
     from ngs_toolkit.project_manager import parse_arguments
 
     with pytest.raises(SystemExit):
         parse_arguments()
-        parse_arguments("")
-        parse_arguments("--help")
-        parse_arguments("create")
-        parse_arguments("recipe")
+    for s in ["", "--help", "create", "recipe"]:
+        with pytest.raises(SystemExit):
+            parse_arguments(s)
     args = parse_arguments("create asd")
     assert args.command == "create"
 
@@ -62,7 +64,7 @@ def test_project_creation(tmp_path):
         os.path.join(tmp_path, project_name, "metadata", "comparison_table.csv"),
     ]
     for f in expected_files:
-        assert os.path.exists(f)
+        assert file_exists(f)
 
     df = pd.read_csv(os.path.join(tmp_path, project_name, "metadata", "annotation.csv"))
     assert df.shape == (0, len(annotation_vars))

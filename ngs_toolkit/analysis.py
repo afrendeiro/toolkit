@@ -840,7 +840,7 @@ class Analysis(object):
         IOError
             If not permissive and a file is not found.
         """
-        from ngs_toolkit.utils import fix_dataframe_header
+        from ngs_toolkit.utils import fix_dataframe_header, get_this_file_or_timestamped
 
         prefix = self._format_string_with_attributes(prefix)
 
@@ -871,7 +871,8 @@ class Analysis(object):
         for name, (file, kwargs) in output_map.items():
             _LOGGER.info("Loading '{}' analysis attribute.".format(name))
             try:
-                setattr(self, name, pd.read_csv(file, **kwargs))
+                setattr(self, name, pd.read_csv(
+                    get_this_file_or_timestamped(file), **kwargs))
 
                 # Fix possible multiindex for matrix_norm
                 if name == "matrix_norm":

@@ -41,6 +41,7 @@ preferences:
       format: svg
       dpi: 300
       bbox_inches: "tight"
+    timestamp_figures: True
     close_saved_figures: True
 
 sample_input_files:

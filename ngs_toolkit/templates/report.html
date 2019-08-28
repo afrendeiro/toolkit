@@ -14,45 +14,66 @@
     <title>ngs-toolkit report for '{{ analysis.name }}' project</title>
 
     <style type="text/css">
-        body { 
-            padding-bottom: 65px; 
+        body {
+            padding-bottom: 65px;
         }
     </style>
   </head>
   <body>
 
     <!-- Navbar -->
-    <nav class="navbar navbar-dark bg-dark sticky-top">
-    <a class="navbar-brand" href="https://github.com/afrendeiro/toolkit">
-    <img src="/docs/4.3/assets/brand/bootstrap-solid.svg"
-         width="30" height="30" class="d-inline-block align-top" alt="">
-    ngs-toolkit
-    </a>
-        <ul class="nav nav-pills">
+    <nav class="navbar navbar-expand-lg navbar-light bg-light sticky-top" style="background-color: #e3f2fd;">
+        <a class="navbar-brand" href="https://github.com/afrendeiro/toolkit">
+        <img src="/docs/4.3/assets/brand/bootstrap-solid.svg"
+             width="30" height="30" class="d-inline-block align-top" alt="">
+            ngs-toolkit
+        </a>
+        <button class="navbar-toggler"
+                type="button"
+                data-toggle="collapse"
+                data-target="#navbarSupportedContent"
+                aria-controls="navbarSupportedContent"
+                aria-expanded="false"
+                aria-label="Toggle navigation">
+        <span class="navbar-toggler-icon"></span>
+        </button>
+
+        <div class="collapse navbar-collapse" id="navbarSupportedContent">
+        <ul class="navbar-nav mr-auto">
             <li class="nav-item">
                 <a class="nav-link" href="#project-description">Project description</a>
             </li>
+
             <li class="nav-item dropdown">
-              <a class="nav-link dropdown-toggle" href="#analysis-report" id="navbarDropdown" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                <a class="nav-link dropdown-toggle"
+                   href="#"
+                   id="navbarDropdown"
+                   role="button"
+                   data-toggle="dropdown"
+                   aria-haspopup="true"
+                   aria-expanded="false">
                 Analysis report
-              </a>
-              <div class="dropdown-menu" aria-labelledby="navbarDropdown">
-                {% for section, fig_list in images.items() %}
-                <a class="dropdown-item" href="#section-{{ section|replace(' ', '-') }}">{{ section }}</a>
-                {% endfor %}
-              </div>
+                </a>
+                <div class="dropdown-menu" aria-labelledby="navbarDropdown">
+                    {% for section, fig_list in images.items() %}
+                    <a class="dropdown-item" href="#section-{{ section|replace(' ', '-') }}">{{ section }}</a>
+                    {% endfor %}
+                </div>
             </li>
+
             <li class="nav-item">
                 <a class="nav-link" href="#versioning">Versioning</a>
             </li>
-        </ul>
+      </ul>
     </nav>
 
     <!-- Jumbotron -->
     <div class="jumbotron jumbotron-fluid">
       <div class="container">
         <h1 class="display-4">{{ analysis.name }}</h1>
+        {% if analysis.description is not none %}
         <p class="lead">{{ analysis.description }}</p>
+        {% endif %}
         <p class="lead">
             <a href="https://github.com/afrendeiro/toolkit">ngs-toolkit</a> analysis report.
         </p>
@@ -65,16 +86,21 @@
         <div class="row">
 
             <div class="container"
-                 id="content"
-                 data-spy="scroll"
-                 data-target="#navbar-example3"
-                 data-offset="0">
-                <div class="container ">
+                 id="content">
+                <div class="container">
                     <h1 id="project-description">Project description</h1>
+                    {% if analysis.description is not none %}
                     <p>{{ analysis.description }}</p>
+                    {% endif %}
+                    {% if analysis.data_type is not none %}
                     <p> The project main data type is {{ analysis.data_type }}.</p>
+                    {% endif %}
+                    {% if analysis.organism is not none %}
                     <p> The project main organism is {{ analysis.organism }}.</p>
+                    {% endif %}
+                    {% if analysis.genome is not none %}
                     <p> The project main genome assembly is {{ analysis.genome }}.</p>
+                    {% endif %}
 
                     <p>
                       <a class="btn btn-primary"
@@ -99,27 +125,42 @@
                     </div>
                     <hr>
                     <p> Project contains {{ samples|length }} samples:</p>
-                    <div class="row">
-                    {% for sample in samples %}
-                        <p>
-                            <a class="btn btn-primary"
-                               data-toggle="collapse"
-                               href="#sample-{{ sample.name }}"
-                               role="button"
-                               aria-expanded="false"
-                               aria-controls="sample-{{ sample.name }}">
-                            {{ sample.name }}</a>
-                        </p>
-                        <div class="collapse" id="sample-{{ sample.name }}">
-                            <div class="card card-body">
-                                <ul>
-                                    {% for key, value in sample.items() %}
-                                    <li>{{ key }}: {{ value }}</li>
-                                    {% endfor %}
-                                </ul>
-                            </div>
+                    <div class="row-fluid">
+                      <p>
+                        <a class="btn btn-primary"
+                           data-toggle="collapse"
+                           href="#samples"
+                           role="button"
+                           aria-expanded="false"
+                           aria-controls="samples">
+                          Show all samples
+                        </a>
+                      </p>
+                      <div class="collapse" id="samples">
+                        <div class="card card-body">
+                          <ul>
+                              {% for sample in samples %}
+                                <a class="btn btn-primary"
+                                   data-toggle="collapse"
+                                   href="#sample-{{ sample.name }}"
+                                   role="button"
+                                   aria-expanded="false"
+                                   aria-controls="sample-{{ sample.name }}">
+                                {{ sample.name }}</a>
+                                <div class="collapse" id="sample-{{ sample.name }}">
+                                    <div class="card card-body">
+                                        <ul>
+                                            {% for key, value in sample.items() %}
+                                            <li>{{ key }}: {{ value }}</li>
+                                            {% endfor %}
+                                        </ul>
+                                    </div>
+                                </div>
+                              {% endfor %}
+                          </ul>
                         </div>
-                    {% endfor %}
+                      </div>
+
                     </div>
                 </div>
 
@@ -154,28 +195,26 @@
 
                 <div class="container" id="versioning">
                     <h1>Versioning</h1>
-                    <h3 id="section-{{ section|replace(' ', '-') }}">{{ section }}</h3>
                     <ul>
-                      <li>Python version: {{ python_version }}</li>
-                      <li>ngs-toolkit version: {{ library_version }}</li>
+                        <li>Python version: {{ python_version }}</li>
+                        <li>ngs-toolkit version: {{ library_version }}</li>
 
-                      <p>
+                        <p>
                           <a class="btn btn-primary"
                              data-toggle="collapse"
-                             href="#versioning"
+                             href="#versioning-additional"
                              role="button"
                              aria-expanded="false"
-                             aria-controls="versioning">
+                             aria-controls="versioning-additional">
                           Additional Python libraries</a>
-                      </p>
-                      <div class="row collapse" id="versioning">
-                              {% for library in freeze %}
-                                  <div id="versioning-{{library}}" class="col-2">
-                                      <li>{{ library }}</li>
-                                  </div>
-                              {% endfor %}
-                          </div>
-                      </div>
+                        </p>
+                        <div class="row collapse" id="versioning-additional">
+                            {% for library in freeze %}
+                                <div id="versioning-{{library}}" class="col-2">
+                                    <li>{{ library }}</li>
+                                </div>
+                            {% endfor %}
+                        </div>
                     </ul>
                     <hr>
                 </div>

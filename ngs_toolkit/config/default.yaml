@@ -21,6 +21,8 @@ preferences:
     record_figures: True
     record_csv: True
     continuous_generation: True
+    timestamp_figures: True
+    timestamp_tables: True
   graphics:
     matplotlib:
       backend: TkAgg # Agg
@@ -41,7 +43,6 @@ preferences:
       format: svg
       dpi: 300
       bbox_inches: "tight"
-    timestamp_figures: True
     close_saved_figures: True
 
 sample_input_files:

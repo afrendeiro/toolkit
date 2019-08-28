@@ -905,6 +905,7 @@ class Analysis(object):
     def generate_report(
             self,
             output_html="{root_dir}/{name}.analysis_report.html",
+            template=None,
             pip_versions=True):
         import os
         import time
@@ -954,10 +955,13 @@ class Analysis(object):
                     for x in v]
             for k, v in csvs.items()}
 
-        resource_package = "ngs_toolkit"
-        resource_path = '/'.join(('templates', 'report.html'))
-        template = Template(
-            pkg_resources.resource_string(resource_package, resource_path).decode())
+        if template is None:
+            resource_package = "ngs_toolkit"
+            resource_path = '/'.join(('templates', 'report.html'))
+            template = Template(
+                pkg_resources.resource_string(resource_package, resource_path).decode())
+        else:
+            template = Template(open(template, 'r').read())
         output = template.render(
             analysis=self,
             project_repr={k: v for k, v in self.__dict__.items() if isinstance(v, str)},

@@ -7,6 +7,19 @@ Changelog
 
 ------------
 
+- **v0.14** (development, pre-1.0):
+
+  - Add recording of analysis outputs under Analysis.output_files
+  - Add timestamping of table and figure Analysis outputs
+  - Add HTML report with continuous generation
+
+- **v0.13** (development, pre-1.0):
+
+  - Now testing on Ubuntu 18.04 for Python 3.6 and 3.7 only.
+  - add analysis.remove_factor for Combat removal of batch effects
+  - CNV module update
+  - recipe update
+
 - **v0.12** (development, pre-1.0):
 
   - change of unsupervised_analysis API call: homogeneization with remaining functions

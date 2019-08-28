@@ -6,7 +6,7 @@ import os
 import pandas as pd
 import pytest
 
-from .conftest import file_exists_and_not_empty
+from tests.conftest import file_exists_and_not_empty
 from ngs_toolkit.utils import get_this_file_or_timestamped
 
 
@@ -63,6 +63,7 @@ class Test_measure_coverage:
 
         a.measure_coverage(samples=a.samples[:2])
 
+        mn = get_this_file_or_timestamped(mn)
         assert file_exists_and_not_empty(mn)
         assert pd.read_csv(mn, index_col=0).shape[1] == 2
 
@@ -74,6 +75,7 @@ class Test_measure_coverage:
 
         a.measure_coverage(samples=a.samples[:1])
 
+        mn = get_this_file_or_timestamped(mn)
         assert file_exists_and_not_empty(mn)
         assert pd.read_csv(mn, index_col=0).shape[1] == 1
 
@@ -107,5 +109,6 @@ class Test_measure_coverage:
 
         a.measure_coverage(samples=a.samples[:2], permissive=True)
 
+        mn = get_this_file_or_timestamped(mn)
         assert file_exists_and_not_empty(mn)
         assert pd.read_csv(mn, index_col=0).shape[1] == 1

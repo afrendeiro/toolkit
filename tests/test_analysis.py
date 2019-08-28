@@ -272,7 +272,7 @@ def test_remove_factor(atac_analysis_many_factors):
     a.unsupervised_analysis(output_prefix="before", steps=['pca_association'])
 
     f = prefix + ".before.pca.variable_principle_components_association.csv"
-    p = pd.read_csv(f)
+    p = pd.read_csv(get_this_file_or_timestamped(f))
 
     # extract the name of the factor with highest contribution
     factor = p.iloc[p.query("pc == 1")['p_value'].idxmin()]['attribute']
@@ -289,7 +289,7 @@ def test_remove_factor(atac_analysis_many_factors):
         steps=['pca_association'])
 
     f = prefix + ".after_simple.pca.variable_principle_components_association.csv"
-    p2 = pd.read_csv(f)
+    p2 = pd.read_csv(get_this_file_or_timestamped(f))
     assert p2.query("attribute == '{}' and pc < 15".format(factor))['p_value'].min() > 0.05
 
     # remove factor accounting for the other factors
@@ -302,5 +302,5 @@ def test_remove_factor(atac_analysis_many_factors):
         steps=['pca_association'])
 
     f = prefix + ".after_covariates.pca.variable_principle_components_association.csv"
-    p3 = pd.read_csv(f)
+    p3 = pd.read_csv(get_this_file_or_timestamped(f))
     assert p3.query("attribute == '{}' and pc < 15".format(factor))['p_value'].min() > 0.05

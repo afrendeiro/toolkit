@@ -249,9 +249,7 @@ def submit_job(
             # otherwise, submit only after `total_job_lim` is less than number of runnning jobs
             # this is only possible for slurm now though
             if scmd != "slurm":
-                msg = "Submission of jobs depending on job load is only available for 'slurm' jobs."
-                _LOGGER.error(msg)
-                raise ValueError(msg)
+                subprocess.call(cmd)
             else:
                 submit_job_if_possible(cmd, check_cmd="slurm")
 

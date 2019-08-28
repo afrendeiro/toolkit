@@ -1067,10 +1067,9 @@ class ATACSeqAnalysis(Analysis):
             A dataframe with genes annotated for the peak set.
         """
         import pybedtools
+        from ngs_toolkit.utils import bed_to_index, get_this_file_or_timestamped
 
-        from ngs_toolkit.utils import bed_to_index
-
-        cols = [6, 8, 9]  # gen_name, strand, distance
+        cols = [6, 8, -1]  # gene_name, strand, distance
 
         if tss_file is None:
             _LOGGER.info(
@@ -1084,29 +1083,21 @@ class ATACSeqAnalysis(Analysis):
             tss_file = self.get_resources(steps=["tss"])["tss_file"]
 
         # extract only relevant columns
-        tss = pd.read_csv(tss_file, header=None, sep="\t")
-        tss = tss.iloc[:, list(range(6))]
-        tss = pybedtools.BedTool.from_dataframe(tss)
-
+        tss_file = get_this_file_or_timestamped(tss_file)
         if isinstance(self.sites, str):
             self.sites = pybedtools.BedTool(self.sites)
 
         # get closest TSS of each region
-        self.closest_tss_distances = self.sites.closest(tss, D="b").to_dataframe()
+        tss = pybedtools.BedTool(tss_file)
+        columns = [
+            "chrom", "start", "end",
+            "gene_name", "strand", "distance"]
+        self.closest_tss_distances = (
+            self.sites.closest(tss, D="b")
+            .to_dataframe())
 
-        # rename
-        self.closest_tss_distances = self.closest_tss_distances[
-            ["chrom", "start", "end"]
-            + self.closest_tss_distances.columns[cols].tolist()
-        ]
-        self.closest_tss_distances.columns = [
-            "chrom",
-            "start",
-            "end",
-            "gene_name",
-            "strand",
-            "distance",
-        ]
+        self.closest_tss_distances = self.closest_tss_distances.iloc[:, [0, 1, 2] + cols]
+        self.closest_tss_distances.columns = columns
 
         # set NaN to distance without assignment (rather than the default '-1' from bedtools)
         self.closest_tss_distances.loc[

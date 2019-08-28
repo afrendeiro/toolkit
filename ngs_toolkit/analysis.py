@@ -902,11 +902,21 @@ class Analysis(object):
         else:
             self.output_files[name] = [file_name]
 
-    def generate_report(self, output_html="{root_dir}/{name}.analysis_report.html"):
+    def generate_report(
+            self,
+            output_html="{root_dir}/{name}.analysis_report.html",
+            pip_versions=True):
         import os
         import time
         from jinja2 import Template
         import pkg_resources
+        import sys
+        from ngs_toolkit._version import __version__
+
+        try:
+            from pip._internal.operations import freeze
+        except ImportError:  # pip < 10.0
+            from pip.operations import freeze
 
         def fix_name(x, a):
             return (" - ".join(
@@ -954,7 +964,10 @@ class Analysis(object):
             samples=[s.to_dict() for s in self.samples],
             time=time.asctime(),
             images=images,
-            csvs=csvs)
+            csvs=csvs,
+            python_version=sys.version,
+            library_version=__version__,
+            freeze=[] if not pip_versions else freeze.freeze())
 
         with open(output_html, 'w') as handle:
             handle.write(output)
@@ -1059,6 +1072,7 @@ class Analysis(object):
             get_tss_annotations,
             get_genomic_context,
         )
+        from ngs_toolkit.utils import get_this_file_or_timestamped
 
         if organism is None:
             organism = self.organism
@@ -1096,12 +1110,12 @@ class Analysis(object):
             output["blacklist_file"] = get_blacklist_annotations(**args)
         if "tss" in steps:
             get_tss_annotations(**args)
-            output["tss_file"] = os.path.join(
+            output["tss_file"] = get_this_file_or_timestamped(os.path.join(
                 output_dir,
                 "{}.{}.gene_annotation.protein_coding.tss.bed".format(
                     self.organism, mapping[self.genome]
                 ),
-            )
+            ))
         if "genomic_context" in steps:
             get_genomic_context(**args)
             output["genomic_context_file"] = os.path.join(

@@ -3,9 +3,11 @@
 
 import os
 
-from ngs_toolkit import _CONFIG, _LOGGER
 import numpy as np
 import pandas as pd
+
+from ngs_toolkit import _CONFIG, _LOGGER
+from ngs_toolkit.utils import get_this_file_or_timestamped
 
 
 # TODO: revise distributed for project_to_geo
@@ -360,6 +362,7 @@ def get_tss_annotations(
     pandas.DataFrame
         DataFrame with genome annotations
     """
+    from ngs_toolkit.utils import get_this_file_or_timestamped
     organisms = {
         "human": {"species": "hsapiens", "ensembl_version": "grch37"},
         "mouse": {"species": "mmusculus", "ensembl_version": "grcm38"},
@@ -380,11 +383,12 @@ def get_tss_annotations(
     output_file = os.path.join(
         output_dir, "{}.{}.gene_annotation.tss.bed".format(organism, genome_assembly)
     )
-    if os.path.exists(output_file) and (not overwrite):
+    o = get_this_file_or_timestamped(output_file)
+    if os.path.exists(o) and (not overwrite):
         msg = "Annotation file already exists and 'overwrite' is set to False."
-        hint = " Returning existing annotation from file: {}".format(output_file)
+        hint = " Returning existing annotation from file: {}".format(o)
         _LOGGER.warning(msg + hint)
-        annot = pd.read_csv(output_file, header=None, sep="\t")
+        annot = pd.read_csv(o, header=None, sep="\t")
         return annot
 
     if save:
@@ -850,7 +854,7 @@ def deseq_analysis(
                 output_dir, output_prefix + ".deseq_result.{}.csv".format(comp)
             )
 
-        if not overwrite and os.path.exists(out_file):
+        if not overwrite and os.path.exists(get_this_file_or_timestamped(out_file)):
             continue
         _LOGGER.info("Doing comparison '{}'".format(comp))
         a = (
@@ -1919,7 +1923,7 @@ def run_enrichment_jobs(
             dir_ = os.path.dirname(file)
             name = os.path.basename(dir_)
             output_ = file.replace(".gene_symbols.txt", ".enrichr.csv")
-            if os.path.exists(output_) and (not overwrite):
+            if os.path.exists(get_this_file_or_timestamped(output_)) and (not overwrite):
                 continue
             jobs.append(
                 [

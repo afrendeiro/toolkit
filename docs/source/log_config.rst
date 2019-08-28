@@ -1,4 +1,4 @@
-Configuration and logging
+Configuration, logging and versioning
 ******************************
 
 .. _Configuration:
@@ -57,7 +57,7 @@ However, the configuration file does not need to include all fields. Below is a 
       ChIP-seq:
         aligned_filtered_bam: "{data_dir}/{sample_name}/mapped/{sample_name}.bowtie2.filtered.bam"
       CNV:
-        aligned_filtered_bam: "{data_dir}/{sample_name}/mapped/{sample_name}.bowtie2.filtered.bam"
+        log2_read_counts: "{data_dir}/{sample_name}/{sample_name}_{resolution}/CNAprofiles/log2_read_counts.igv"
       RNA-seq:
         aligned_filtered_bam: "{data_dir}/{sample_name}/mapped/{sample_name}.bowtie2.filtered.bam"
         bitseq_counts: "{data_dir}/{sample_name}/quantification/{sample_name}_bitseq.tsv"
@@ -78,3 +78,19 @@ This will happen by default to standard output (sys.stdout) but also to a file i
 
 The location of the log file and the level of events to be reported can be customized in the ``ngs_toolkit.setup_logger()`` function.
 
+
+.. _Versioning:
+
+Versioning
+=============================
+
+`ngs_toolkit` will by default timestamp every output it produces (CSV and figure files).
+
+This behaviour can be controlled independently for tables and figures by setting the respective values of the configuration file:
+
+.. code-block:: yaml
+
+    preferences:
+      report:
+        timestamp_figures: False
+        timestamp_tables: False

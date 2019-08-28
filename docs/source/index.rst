@@ -16,6 +16,7 @@ Contents
     examples
     concepts
     log_config
+    report
     manager_programs
     recipes
     api

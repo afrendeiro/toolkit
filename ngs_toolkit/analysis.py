@@ -897,6 +897,25 @@ class Analysis(object):
         #     )
 
     def record_output_file(self, file_name, name="analysis"):
+        """
+        Record an analysis output.
+
+        Parameters
+        ----------
+        file_name : :obj:`str`
+            Filename of output to report.
+        name : :obj:`str`, optional
+            Name of the output to report.
+
+            Defaults to "analysis".
+
+        Attributes
+        ----------
+        output_files : :obj:`collections.OrderedDict`
+            Updates ``output_files`` for key ``name``
+            by appending to the existing list:
+            {``name``: [``file_name``]}.
+        """
         if name in self.output_files:
             self.output_files[name].append(file_name)
         else:
@@ -907,6 +926,25 @@ class Analysis(object):
             output_html="{root_dir}/{name}.analysis_report.html",
             template=None,
             pip_versions=True):
+        """
+        Record an analysis output.
+
+        Parameters
+        ----------
+        output_html : :obj:`str`
+            Filename of output to report.
+
+            Defaults to "{root_dir}/{name}.analysis_report.html".
+        template : :obj:`None`, optional
+            Name of the output to report.
+
+            Default is the HTML template distributed with ngs-toolkit.
+        pip_versions: :obj:`bool`, optional
+            Whether the versions of Python packages should be included
+            in the report by using pip freeze.
+
+            Default is :obj:`True`.
+        """
         import os
         import time
         from jinja2 import Template

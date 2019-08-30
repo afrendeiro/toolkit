@@ -215,7 +215,7 @@ def main_analysis_pipeline(
         # Get coverage values for each peak in each sample of ATAC-seq and ChIPmentation
         a.measure_coverage()
         # normalize coverage values
-        a.normalize(method="gc_content")
+        a.normalize(method="cqn")
 
         # Annotate peaks with closest gene
         a.get_peak_gene_annotation()

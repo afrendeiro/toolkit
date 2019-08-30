@@ -44,6 +44,7 @@ def setup_logger(level="INFO", logfile=None):
     )
     formatter = logging.Formatter(fmt, datefmt="%Y-%m-%d %H:%M:%S")
     fh.setFormatter(formatter)
+    # fmt = "[%(levelname)s] > %(message)s"
     fmt = "ngs_toolkit:%(module)s:L%(lineno)d (%(funcName)s) [%(levelname)s] > %(message)s"
     formatter = logging.Formatter(fmt)
     ch.setFormatter(formatter)

@@ -133,7 +133,7 @@ ATAC-seq analysis example
     # # using LOLA, MEME-AME, HOMER and Enrichr
     analysis.differential_enrichment(
         directional=True,
-        max_diff=n_top,
+        max_diff=1000,
         sort_var="pvalue")
 
     # # for each type of enrichment results,

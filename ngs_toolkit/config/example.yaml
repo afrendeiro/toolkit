@@ -11,7 +11,7 @@ preferences:
   root_reference_dir: /home/${USER}/reference/
   root_projects_dir: /home/${USER}/projects/
   default_genome_assemblies:
-    - human: hg19
+    - human: hg38
     - mouse: mm10
   # The next item is the default computing configuration to use from divvy
   # options are: 'default', 'slurm', lsf', 'sge'

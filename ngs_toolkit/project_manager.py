@@ -183,7 +183,7 @@ def create_project(
     data_sources:
         local: "{project_dir}/data/{{sample_name}}.bam"
         bsf: /scratch/lab_bsf/samples/{{flowcell}}/{{flowcell}}_{{lane}}_samples/{{flowcell}}_{{lane}}#{{BSF_name}}.bam
-    implied_columns:
+    implied_attributes:
         organism:
             {genome_assemblies}
     pipeline_config:

@@ -2205,6 +2205,11 @@ class Analysis(object):
             kwargs are passed to :func:`~ngs_toolkit.Analysis.get_level_colors` and
             :func:`~ngs_toolkit.graphics.plot_projection`.
         """
+        # TODO: Treat PCA as just one of several possible decomposition methods
+        # by either:
+        #  - creating a new, independent decomposition section
+        #  - lumping all under common decomposition/manifold and handle it internally,
+        #    add association testing under that for any arbitrary
         from collections import defaultdict
         import itertools
         import matplotlib.pyplot as plt

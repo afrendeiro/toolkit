@@ -20,12 +20,19 @@ you might need to add a ``--user`` flag if not root or running in a virtual envi
 This will install all the Python dependencies needed too.
 See `here <https://github.com/afrendeiro/toolkit/blob/master/requirements/requirements.txt>`_ a list of all Python dependencies used.
 
-
 If you wish to install optional libraries that interface with R libraries, you can pass ``[rstats]`` to the following pip call:
 
 .. code-block:: bash
 
    pip install ngs-toolkit[rstats]
+
+
+To install the latest development version:
+
+.. code-block:: bash
+
+   pip install git+https://github.com/afrendeiro/toolkit.git#egg=ngs-toolkit
+
 
 
 **Non-Python optional requirements**

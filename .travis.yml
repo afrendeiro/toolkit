@@ -25,7 +25,7 @@ before_install:
   - sudo apt-get update
   - sudo apt-get -y install r-base r-base-core r-recommended gfortran liblapack-dev libopenblas-dev 
   - R -e "install.packages('BiocManager', repos='https://CRAN.R-project.org')"
-  - R -e "library("BiocManager"); BiocManager::install(c('DESeq2', 'preprocessCore', 'cqn'), version = '3.9')"
+  - R -e "library('BiocManager'); BiocManager::install(c('DESeq2', 'preprocessCore', 'cqn'), version = '3.9')"
 
 before_script:
   - export DISPLAY=:99.0

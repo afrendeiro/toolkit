@@ -21,7 +21,7 @@ Here are the command-line arguments to use it in a stand-alone script:
 
 .. code-block:: none
 
-	usage: python ngs_analysis_recipe [-h] [-n NAME] [-o RESULTS_DIR]
+	usage: python -m ngs_toolkit.recipe.ngs_analysis [-h] [-n NAME] [-o RESULTS_DIR]
 	                           [-t {ATAC-seq,RNA-seq,ChIP-seq}] [-q] [-a ALPHA]
 	                           [-f ABS_FOLD_CHANGE]
 	                           config_file
@@ -61,7 +61,7 @@ Here are the command-line arguments to use it in a stand-alone script:
 
 .. code-block:: none
 
-	usage: call_peaks [-h] [-c COMPARISON_TABLE] [-t] [-j]
+	usage: python -m ngs_toolkit.recipe.call_peaks [-h] [-c COMPARISON_TABLE] [-t] [-j]
 	                           [-o RESULTS_DIR]
 	                           config_file
 
@@ -98,7 +98,7 @@ Here are the command-line arguments to use it in a stand-alone script:
 
 .. code-block:: none
 
-	usage: region_set_frip [-h] [-n NAME] [-r REGION_SET] [-q] [-j]
+	usage: python -m ngs_toolkit.recipe.region_set_frip [-h] [-n NAME] [-r REGION_SET] [-q] [-j]
 	                           [-o RESULTS_DIR]
 	                           config_file
 
@@ -139,7 +139,7 @@ Here are the command-line arguments to use it in a stand-alone script:
 
 .. code-block:: none
 
-	usage: merge_signal [-h] [-a ATTRIBUTES] [-q] [-j] [-n] [--nucleosome]
+	usage: python -m ngs_toolkit.recipe.merge_signal [-h] [-a ATTRIBUTES] [-q] [-j] [-n] [--nucleosome]
 	                    [--overwrite] [-o OUTPUT_DIR]
 	                    config_file
 
@@ -165,3 +165,82 @@ Here are the command-line arguments to use it in a stand-alone script:
 	  -o OUTPUT_DIR, --output-dir OUTPUT_DIR
 	                        Directory for output files. Default is 'merged' under
 	                        the project roort directory.
+
+
+deseq2
+====================
+
+Run differential testing of sample groups using DESeq2
+
+.. code-block:: none
+
+	usage: python -m ngs_toolkit.recipe.deseq2 [-h] [--output_prefix OUTPUT_PREFIX] [--formula FORMULA]
+	                 [--alpha ALPHA] [-d] [--overwrite]
+	                 work_dir
+
+	Perform differential expression using DESeq2 by comparing sample groups using
+	a formula.
+
+	positional arguments:
+	  work_dir              Working directory. Should contain required files for
+	                        DESeq2.
+
+	optional arguments:
+	  -h, --help            show this help message and exit
+	  --output_prefix OUTPUT_PREFIX
+	                        Prefix for output files.
+	  --formula FORMULA     R-style formula for differential expression. Default =
+	                        '~ sample_group'.
+	  --alpha ALPHA         Significance level to call differential expression.
+	                        All results will be output anyway.
+	  -d, --dry-run         Don't actually do anything.
+	  --overwrite           Don't overwrite any existing directory or file.
+
+
+enrichr
+====================
+
+Get enrichment of gene sets using the Enrichr API
+
+.. code-block:: none
+
+	usage: python -m ngs_toolkit.recipe.enrichr [-h] [-a MAX_ATTEMPTS] [--no-overwrite]
+	                  input_file output_file
+
+	A helper script to run enrichment analysis using the Enrichr API on a gene
+	set.
+
+	positional arguments:
+	  input_file            Input file with gene names.
+	  output_file           Output CSV file with results.
+
+	optional arguments:
+	  -h, --help            show this help message and exit
+	  -a MAX_ATTEMPTS, --max-attempts MAX_ATTEMPTS
+	                        Maximum attempts to retry the API before giving up.
+	  --no-overwrite        Whether results should not be overwritten if existing.
+
+
+lola
+=====================
+
+Get enrichment of region sets in public region databases using LOLA
+
+.. code-block:: none
+
+	usage: python -m ngs_toolkit.recipe.lola [-h] [--no-overwrite] [-c CPUS]
+	               bed_file universe_file output_folder genome
+
+	A helper script to run Location Overlap Analysis (LOLA) of a single region set
+	in various sets of region-based annotations.
+
+	positional arguments:
+	  bed_file              BED file with query set regions.
+	  universe_file         BED file with universe where the query set came from.
+	  output_folder         Output directory for produced files.
+	  genome                Genome assembly of the region set.
+
+	optional arguments:
+	  -h, --help            show this help message and exit
+	  --no-overwrite        Don't overwrite existing output files.
+	  -c CPUS, --cpus CPUS  Number of CPUS/threads to use for analysis.

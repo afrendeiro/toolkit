@@ -25,6 +25,13 @@ We have the following `PEP project <https://peppy.readthedocs.io>`_ config YAML 
       sample_annotation: /scratch/lab_bock/shared/projects/example_project/metadata/annotation.csv
       sample_subannotation: /scratch/lab_bock/shared/projects/example_project/metadata/sample_subannotation.csv
       comparison_table: /scratch/lab_bock/shared/projects/example_project/metadata/comparison_table.csv
+    sample_attributes:
+      - sample_name
+      - genotype
+      - replicate
+    group_attributes:
+      - genotype
+      - replicate
     data_sources:
       bsf: /path/to/samples/{flowcell}/{flowcell}_{lane}#{sample_name}.bam
     genomes:

@@ -9,7 +9,6 @@ from ngs_toolkit import _CONFIG, _LOGGER
 from ngs_toolkit.decorators import check_organism_genome
 
 
-# TODO: Add combat as normalization method
 # TODO: Add PAGE as enrichment method
 # TODO: Analysis.annotate_samples: reimplement to support CNV dict of resolutions
 # TODO: Analysis.annotate_samples: implement connection to analysis' numeric_attributes or another way of preserving dtypes
@@ -90,8 +89,6 @@ class Analysis(object):
         samples=None,
         **kwargs
     ):
-        from collections import OrderedDict
-
         # Add given args and kwargs to object
         _LOGGER.debug("Adding given arguments to analysis object.")
         self.name = name
@@ -132,7 +129,7 @@ class Analysis(object):
         if not hasattr(self, "thresholds"):
             self.thresholds = {"alpha": 0.05, "log2_fold_change": 0}
         if not hasattr(self, "output_files"):
-            self.output_files = OrderedDict()
+            self.output_files = list()
 
         # Generate from PEP configuration file
         if from_pep is not False:
@@ -911,15 +908,10 @@ class Analysis(object):
 
         Attributes
         ----------
-        output_files : :obj:`collections.OrderedDict`
-            Updates ``output_files`` for key ``name``
-            by appending to the existing list:
-            {``name``: [``file_name``]}.
+        output_files : :obj:`list`
+            Appends a tuple of (``name``, ``file_name``) to ``output_files``.
         """
-        if name in self.output_files:
-            self.output_files[name].append(file_name)
-        else:
-            self.output_files[name] = [file_name]
+        self.output_files.append((name, file_name))
 
     def generate_report(
             self,
@@ -957,37 +949,45 @@ class Analysis(object):
         except ImportError:  # pip < 10.0
             from pip.operations import freeze
 
-        def fix_name(x, a):
+        def fix_name(x, name):
             return (" - ".join(
-                        os.path.basename(x).replace(a.name, "").split(".")[:-1])
+                        os.path.basename(x).replace(name, "").split(".")[:-1])
                     .replace("_", " ").capitalize())
 
         output_html = self._format_string_with_attributes(output_html)
 
+        # Lets reorganize the output_files
+        # into a dict of {name: list(file_names)}
+
+        keys = set([x[0] for x in self.output_files])
+        outputs = {k: list() for k in keys}
+        for key, file in self.output_files:
+            outputs[key].append(file)
+
         # Select image outputs (non-CSV files)
         images = {
             k: [x for x in v if x.endswith(".svg")]
-            for k, v in self.output_files.items()
+            for k, v in outputs.items()
         }
         # Generate dict = {"section": [(caption, file), ...]}
         images = {
             k.capitalize().replace("_", " "):
                 [
                     (
-                        fix_name(x, self),
+                        fix_name(x, self.a),
                         x,
                     )
                     for x in v]
             for k, v in images.items()}
         csvs = {
             k: [x for x in v if x.endswith(".csv")]
-            for k, v in self.output_files.items()
+            for k, v in outputs.items()
         }
         csvs = {
             k.capitalize().replace("_", " "):
                 [
                     (
-                        fix_name(x, self),
+                        fix_name(x, self.a),
                         x,
                     )
                     for x in v]
@@ -5584,7 +5584,7 @@ class Analysis(object):
             try:
                 g = sns.clustermap(
                     input_df,
-                    figsize=(0.25 * shape[1], 0.12 * shape[0]),
+                    figsize=(0.25 * shape[1], 0.20 * shape[0]),
                     metric=clustermap_metric,
                     xticklabels=True,
                     yticklabels=True,

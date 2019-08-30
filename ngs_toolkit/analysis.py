@@ -974,7 +974,7 @@ class Analysis(object):
             k.capitalize().replace("_", " "):
                 [
                     (
-                        fix_name(x, self.a),
+                        fix_name(x, self.name),
                         x,
                     )
                     for x in v]
@@ -987,7 +987,7 @@ class Analysis(object):
             k.capitalize().replace("_", " "):
                 [
                     (
-                        fix_name(x, self.a),
+                        fix_name(x, self.name),
                         x,
                     )
                     for x in v]
@@ -3055,13 +3055,19 @@ class Analysis(object):
             _LOGGER.warning(msg.format(results_file) + hint)
             return
 
-        comps = (
-            comparison_table.loc[
-                comparison_table["data_type"] == self.data_type, "comparison_name"
-            ]
-            .drop_duplicates()
-            .sort_values()
-        )
+        if "data_type" in comparison_table.columns:
+            comps = (
+                comparison_table.loc[
+                    comparison_table["data_type"] == self.data_type, "comparison_name"
+                ]
+                .drop_duplicates()
+                .sort_values())
+        else:
+            msg = "Comparison table does not have a 'data_type' column."
+            msg += " Collecting all comparisons in table"
+            _LOGGER.warning(msg)
+            comps = comparison_table['comparison_name'].drop_duplicates().sort_values()
+
         results = list()
         for comp in tqdm(comps, total=len(comps), desc="Comparison"):
             res_file = os.path.join(

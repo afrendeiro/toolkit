@@ -10,6 +10,7 @@ import pandas as pd
 import pybedtools
 import pytest
 from .conftest import file_exists, file_exists_and_not_empty
+from ngs_toolkit.utils import get_this_file_or_timestamped
 
 
 travis = "TRAVIS" in os.environ
@@ -82,7 +83,7 @@ def test_quantile_normalization(various_analysis):
         assert hasattr(analysis, "matrix_norm")
         assert file_exists_and_not_empty(f)
         del analysis.matrix_norm
-        os.remove(f)
+        os.remove(get_this_file_or_timestamped(f))
 
         qnorm_r = analysis.normalize_quantiles(implementation="R", save=True)
         assert isinstance(qnorm_r, pd.DataFrame)

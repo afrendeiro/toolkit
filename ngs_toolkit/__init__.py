@@ -184,26 +184,28 @@ def clear_log():
     open(logfile, "w")
 
 
+def setup_timestamping():
+    if _CONFIG["preferences"]["report"]["record_csv"]:
+        from ngs_toolkit.decorators import (
+            read_csv_timestamped,
+            to_csv_timestamped)
+        import pandas as pd
+
+        pd.read_csv = read_csv_timestamped(pd.read_csv)
+        pd.read_table = read_csv_timestamped(pd.read_table)
+        pd.DataFrame.to_csv = to_csv_timestamped(pd.DataFrame.to_csv)
+
+
 # setup
 _LOGGER = setup_logger()
 _CONFIG = setup_config()
 setup_graphic_preferences()
-
+setup_timestamping()
 
 # reduce level of logging from divvy
 # only for divvy <=0.
 if "logging" in _divvy.__dict__.keys():
     _divvy.logging.getLogger("divvy").setLevel("ERROR")
-
-if _CONFIG["preferences"]["report"]["record_csv"]:
-    from ngs_toolkit.decorators import (
-        read_csv_timestamped,
-        to_csv_timestamped)
-    import pandas as pd
-
-    pd.read_csv = read_csv_timestamped(pd.read_csv)
-    pd.read_table = read_csv_timestamped(pd.read_table)
-    pd.DataFrame.to_csv = to_csv_timestamped(pd.DataFrame.to_csv)
 
 
 # easier API

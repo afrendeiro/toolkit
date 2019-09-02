@@ -319,7 +319,7 @@ def various_analysis(tmp_path):
     project_prefix_name = "test-project"
     data_type = "ATAC-seq"
     genome_assemblies = [("human", "hg19"), ("human", "hg38"), ("mouse", "mm10")]
-    factors = [1, 2, 3]
+    factors = [1, 3]
     variables = [100, 1000]  # 10000
     replicates = [1, 2]  # 5
 

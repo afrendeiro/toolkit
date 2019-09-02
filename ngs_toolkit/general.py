@@ -576,9 +576,9 @@ def get_genomic_context(
 
     output_file = os.path.join(
         output_dir,
-        "{}.{}.genomic_context.bed".format(organism, ensembl_genome_assembly),
-    )
-    if os.path.exists(output_file) and (not overwrite):
+        "{}.{}.genomic_context.bed".format(organism, ensembl_genome_assembly))
+    o = get_this_file_or_timestamped(output_file)
+    if os.path.exists(o) and (not overwrite):
         msg = "Annotation file already exists and 'overwrite' is set to False."
         hint = " Returning existing annotation from file: {}".format(output_file)
         _LOGGER.warning(msg + hint)

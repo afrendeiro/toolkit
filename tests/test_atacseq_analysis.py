@@ -96,19 +96,12 @@ def test_quantile_normalization(various_analysis):
         # assert all(np.array(cors) > 0.99)
 
 
-@pytest.mark.skipif(travis, reason="This is anyway tested after")
 def test_cqn_normalization(atac_analysis):
     # At some point, downloading a genome reference in Travis
     # caused memory error.
     # This should now be fixed by implementing download/decompressing
     # functions working in chunks
-    try:
-        qnorm = atac_analysis.normalize_cqn()
-    except OSError:
-        if travis:
-            pytest.skip()
-        else:
-            raise
+    qnorm = atac_analysis.normalize_cqn()
     assert qnorm.dtypes.all() == np.float
     file = os.path.join(atac_analysis.results_dir, atac_analysis.name + ".matrix_norm.csv")
     assert file_exists_and_not_empty(file)
@@ -200,17 +193,7 @@ def test_get_peak_genomic_location(atac_analysis):
             ".utr5.bed",
         ]
     ]
-    # At some point, downloading a genome reference in Travis
-    # caused memory error.
-    # This should now be fixed by implementing download/decompressing
-    # functions working in chunks
-    try:
-        annot = atac_analysis.get_peak_genomic_location()
-    except OSError:
-        if travis:
-            pytest.skip()
-        else:
-            raise
+    annot = atac_analysis.get_peak_genomic_location()
 
     # check annotation files are produced
     mapping = {"hg19": "grch37", "hg38": "grch38", "mm10": "grcm38"}
@@ -222,7 +205,6 @@ def test_get_peak_genomic_location(atac_analysis):
     assert annot.shape[0] >= len(atac_analysis.sites)
 
 
-@pytest.mark.skipif(travis, reason="Travis only failure, needs investigation")
 def test_peak_chromatin_state(atac_analysis, chrom_file):
     prefix = os.path.join(atac_analysis.results_dir, atac_analysis.name)
     fs = [
@@ -250,23 +232,10 @@ def test_peak_chromatin_state(atac_analysis, chrom_file):
 
 
 def test_annotate_features(atac_analysis, chrom_file):
-    if not travis:
-        atac_analysis.get_peak_chromatin_state(chrom_state_file=chrom_file)
-
+    atac_analysis.get_peak_chromatin_state(chrom_state_file=chrom_file)
     atac_analysis.get_matrix_stats(matrix="matrix_raw")
     atac_analysis.get_peak_gene_annotation(max_dist=1e10)
-    # At some point, downloading a genome reference in Travis
-    # caused memory error.
-    # This should now be fixed by implementing download/decompressing
-    # functions working in chunks
-    failed = False
-    try:
-        atac_analysis.get_peak_genomic_location()
-    except OSError:
-        if travis:
-            failed = True
-        else:
-            raise
+    atac_analysis.get_peak_genomic_location()
     atac_analysis.annotate_features(matrix="matrix_raw")
     f = os.path.join(atac_analysis.results_dir, atac_analysis.name + ".matrix_features.csv")
     assert hasattr(atac_analysis, "matrix_features")
@@ -285,11 +254,9 @@ def test_annotate_features(atac_analysis, chrom_file):
         "iqr",
     ]  # from stats
 
-    if not failed:
-        cols += ["genomic_region"]  # from genomic_location
+    cols += ["genomic_region"]  # from genomic_location
 
-    if not travis:
-        cols += ["chromatin_state"]  # from chromatin_state
+    cols += ["chromatin_state"]  # from chromatin_state
 
     assert all([c in atac_analysis.matrix_features.columns.tolist() for c in cols])
 

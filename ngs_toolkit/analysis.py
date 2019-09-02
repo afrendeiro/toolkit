@@ -74,6 +74,10 @@ class Analysis(object):
         List of :class:`peppy.Sample` objects that this analysis is tied to.
 
         Defaults to :obj:`None`.
+    subset_to_data_type : :obj:`bool`, optional
+        Whether to keep only samples that match the data type of the analysis.
+
+        Defaults to :obj:`True`.
     kwargs : :obj:`dict`, optional
         Additional keyword arguments will simply be stored as object attributes.
     """
@@ -87,6 +91,7 @@ class Analysis(object):
         results_dir="results",
         prj=None,
         samples=None,
+        subset_to_data_type=True,
         **kwargs
     ):
         # Add given args and kwargs to object
@@ -142,7 +147,8 @@ class Analysis(object):
 
         # Store projects attributes in self
         _LOGGER.debug("Trying to set analysis attributes.")
-        self.set_project_attributes(overwrite=False)
+        self.set_project_attributes(
+            overwrite=False, subset_to_data_type=subset_to_data_type)
 
         # Get name
         if self.name is None:
@@ -730,8 +736,9 @@ class Analysis(object):
                     try:
                         value = _format_string_with_sample_attributes(sample, value)
                     except KeyError:
-                        _LOGGER.error("Failed formatting for sample '{}', value '{}'."
-                                      .format(sample.name, value))
+                        if (attr != "log2_read_counts"):
+                            _LOGGER.error("Failed formatting for sample '{}', value '{}'."
+                                          .format(sample.name, value))
                         continue
 
                     if overwrite:
@@ -895,9 +902,17 @@ class Analysis(object):
         #         )
         #     )
 
-    def record_output_file(self, file_name, name="analysis"):
+    def record_output_file(
+            self,
+            file_name,
+            name="analysis",
+            dump_yaml=True,
+            output_yaml="{root_dir}/{name}.analysis_record.yaml"):
         """
         Record an analysis output.
+
+        Will also write all records to a YAML file and call `Analysis.generate_report`
+        if specified in general configuration.
 
         Parameters
         ----------
@@ -907,6 +922,15 @@ class Analysis(object):
             Name of the output to report.
 
             Defaults to "analysis".
+        dump_yaml : :obj:`bool`, optional
+            Whether to dump records to yaml file.
+
+            Defaults to :obj:`True`.
+        output_yaml : :obj:`str`, optional
+            YAML file to dump records to.
+            Will be formated with Analysis variables.
+
+            Defaults to "{root_dir}/{name}.analysis_record.yaml".
 
         Attributes
         ----------
@@ -914,6 +938,14 @@ class Analysis(object):
             Appends a tuple of (``name``, ``file_name``) to ``output_files``.
         """
         self.output_files.append((name, file_name))
+        if dump_yaml:
+            import yaml
+            yaml.safe_dump(
+                self.output_files,
+                open(self._format_string_with_attributes(output_yaml), "w"))
+
+        if _CONFIG["preferences"]["report"]["continuous_generation"]:
+            self.generate_report()
 
     def generate_report(
             self,

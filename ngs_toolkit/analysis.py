@@ -3017,11 +3017,14 @@ class Analysis(object):
                     log_file=log_file,
                     jobname=job_name,
                     **kwargs)
-                if getattr(kwargs, "computing_configuration", None) == "localhost":
-                    _LOGGER.info("Collecting differential results.")
-                    return self.collect_differential_analysis(
-                        comparison_table=comparison_table,
-                        overwrite=overwrite)
+                try:
+                    if kwargs["computing_configuration"] == "localhost":
+                        _LOGGER.info("Collecting differential results.")
+                        return self.collect_differential_analysis(
+                            comparison_table=comparison_table,
+                            overwrite=overwrite)
+                except KeyError:
+                    pass
 
     def collect_differential_analysis(
         self,

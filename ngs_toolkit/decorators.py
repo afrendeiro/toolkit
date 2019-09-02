@@ -86,6 +86,7 @@ def to_csv_timestamped(f):
                     body = ".".join(s[:-1])
                     new_args = (args[0], ".".join([body, get_timestamp(), end])) + args[2:]
                 record_analysis_output(new_args[1], permissive=True)
+                return f(*new_args, **kwds)
         else:
             _LOGGER.warning("Could not record output.")
         return f(*args, **kwds)

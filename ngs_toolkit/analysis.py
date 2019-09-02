@@ -658,8 +658,10 @@ class Analysis(object):
                     if isinstance(getattr(self, "comparison_table"), str):
                         _LOGGER.debug("Reading up comparison table.")
                         self.comparison_table = pd.read_csv(self.comparison_table)
-                    if (self.data_type is not None) and (
-                        "data_type" in self.comparison_table.columns
+                    if (
+                        (self.comparison_table is not None) and
+                        (self.data_type is not None) and
+                        ("data_type" in self.comparison_table.columns)
                     ):
                         _LOGGER.info(
                             "Subsetting comparison_table for comparisons of type '{}'.".format(

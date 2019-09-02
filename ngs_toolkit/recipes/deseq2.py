@@ -80,7 +80,7 @@ def main():
         overwrite=args.overwrite, alpha=args.alpha,
         create_subdirectories=False)
 
-    print("Found {} differentially expressed genes with p < {}.\n".format(
+    print("Found {} differentially expressed genes with p < {}.".format(
         res[res['pvalue'] < args.alpha].shape[0], args.alpha))
     print("Found {} differentially expressed genes with FDR < {}.".format(
         res[res['padj'] < args.alpha].shape[0], args.alpha))

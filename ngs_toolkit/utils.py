@@ -29,6 +29,20 @@ def have_unbuffered_output():
     sys.stdout = Unbuffered(sys.stdout)
 
 
+def is_running_inside_ipython():
+    """
+    Check whether code is running inside an IPython session.
+    """
+    try:
+        cfg = get_ipython().config
+        if cfg['IPKernelApp']['parent_appname'] == 'ipython-notebook':
+            return True
+        else:
+            return False
+    except NameError:
+        return False
+
+
 def get_timestamp(fmt='%Y-%m-%d-%H:%M:%S'):
     from datetime import datetime
 

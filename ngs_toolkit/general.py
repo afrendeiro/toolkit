@@ -787,7 +787,6 @@ def deseq_analysis(
     """
     import warnings
 
-    import rpy2
     from rpy2.rinterface import RRuntimeWarning
     from rpy2.robjects import numpy2ri, pandas2ri
     import rpy2.robjects as robjects
@@ -799,7 +798,7 @@ def deseq_analysis(
     pandas2ri.activate()
     warnings.filterwarnings("ignore", category=RRuntimeWarning)
 
-    robjects.r('require("DESeq2")')
+    robjects.r('suppressMessages(library("DESeq2"))')
     _as_formula = robjects.r("as.formula")
     _DESeqDataSetFromMatrix = robjects.r("DESeqDataSetFromMatrix")
     _DESeq = robjects.r("DESeq")
@@ -1359,7 +1358,7 @@ def lola(bed_files, universe_file, output_folder, genome, output_prefixes=None, 
     warnings.filterwarnings("ignore", category=RRuntimeWarning)
 
     _LOGGER.info("Loading LOLA R library thorugh rpy2.")
-    robjects.r('require("LOLA")')
+    robjects.r('suppressMessages(require("LOLA"))')
     _loadRegionDB = robjects.r("LOLA::loadRegionDB")
     _readBed = robjects.r("LOLA::readBed")
     _runLOLA = robjects.r("LOLA::runLOLA")
@@ -2399,7 +2398,7 @@ def fix_batch_effect_limma(matrix, batch_variable="batch", covariates=None):
     numpy2ri.activate()
     pandas2ri.activate()
 
-    robjects.r('require("limma")')
+    robjects.r('suppressMessages(require("limma"))')
     _removeBatchEffect = robjects.r("removeBatchEffect")
 
     if covariates is None:

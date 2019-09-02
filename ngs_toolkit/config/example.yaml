@@ -56,6 +56,7 @@ sample_input_files:
     aligned_filtered_bam: "{data_dir}/{sample_name}/mapped/{sample_name}.trimmed.bowtie2.filtered.bam"
     peaks: "{data_dir}/{sample_name}/peaks/{sample_name}_peaks.narrowPeak"
     summits: "{data_dir}/{sample_name}/peaks/{sample_name}_summits.bed"
+    log2_read_counts: "{data_dir}/{sample_name}/{sample_name}_{resolution}/CNAprofiles/log2_read_counts.igv"
   ChIP-seq:
     aligned_filtered_bam: "{data_dir}/{sample_name}/mapped/{sample_name}.trimmed.bowtie2.filtered.bam"
   ChIPmentation:

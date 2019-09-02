@@ -121,6 +121,7 @@ class CNVAnalysis(Analysis):
         self,
         output_map=None,
         only_these_keys=None,
+        resolutions=None,
         prefix="{results_dir}/{name}",
         permissive=True,
     ):
@@ -193,7 +194,9 @@ class CNVAnalysis(Analysis):
 
         output_map = {k: v for k, v in output_map.items() if k in only_these_keys}
 
-        for resolution in self.resolutions:
+        if resolutions is None:
+            resolutions = self.resolutions
+        for resolution in resolutions:
             for name, (file, kwargs) in output_map.items():
                 file = file.format(resolution)
                 _LOGGER.info("Loading '{}' analysis attribute.".format(name))
@@ -260,13 +263,15 @@ class CNVAnalysis(Analysis):
 
             for sample in tqdm(samples, total=len(samples), desc="Sample"):
                 # Read log2 file
-                f = glob(os.path.join(
-                    self.data_dir,
-                    sample.name + "_" + resolution,
-                    "CNAprofiles", "plots",
-                    "log2.{}.trimmed.bowtie2.filtered.bam.vs.log2.*.bam".format(sample.name.replace("-", ".")),
-                    "all_chrom.pdf"
-                ))
+                if not hasattr(sample, "log2_read_counts"):
+                    sample.log2_read_counts = os.path.join(
+                        self.data_dir,
+                        sample.paths.sample_root, sample.name + "_{resolution}",
+                        "CNAprofiles",
+                        "log2_read_counts.igv")
+                if "{resolution}" in sample.log2_read_counts:
+                    input_file = sample.log2_read_counts.format(resolution=resolution)
+                f = glob(input_file)
                 if len(f) == 1:
                     f = f[0]
                 else:
@@ -346,19 +351,21 @@ class CNVAnalysis(Analysis):
 
             for sample in tqdm(samples, total=len(samples), desc="Sample"):
                 # Read log2 file
-                # if not hasattr(sample, "log2_read_counts"):
-                sample.log2_read_counts = os.path.join(
-                    self.data_dir,
-                    sample.name + "_" + resolution,
-                    "CNAprofiles",
-                    "log2_read_counts.igv")
+                if not hasattr(sample, "log2_read_counts"):
+                    sample.log2_read_counts = os.path.join(
+                        self.data_dir,
+                        sample.paths.sample_root, sample.name + "_{resolution}",
+                        "CNAprofiles",
+                        "log2_read_counts.igv")
+                if "{resolution}" in sample.log2_read_counts:
+                    input_file = sample.log2_read_counts.format(resolution=resolution)
                 try:
                     cov = pd.read_csv(
-                        sample.log2_read_counts, sep="\t", comment="#"
+                        input_file, sep="\t", comment="#"
                     ).set_index("Feature")
                 except IOError as e:
-                    e = "Sample {} does not have a 'log2_read_counts.igv' file: '{}'.".format(
-                        sample.name, sample.log2_read_counts
+                    e = "Sample {} does not have a 'log2_read_counts' file: '{}'.".format(
+                        sample.name, input_file
                     )
                     if permissive:
                         print(e)
@@ -379,6 +386,10 @@ class CNVAnalysis(Analysis):
                         / (0.1 + (2 ** cov.iloc[:, -1]))
                     )
                 )
+            if "cov" not in locals():
+                msg = "None of the samples had a valid 'log2_read_counts' file."
+                _LOGGER.error(msg)
+                raise ValueError(msg)
 
             matrix_raw[resolution].index = (
                 cov["Chromosome"]
@@ -563,6 +574,7 @@ class CNVAnalysis(Analysis):
         from tqdm import tqdm
         import matplotlib.pyplot as plt
         import seaborn as sns
+        from ngs_toolkit.graphics import savefig
 
         matrix = self.get_matrix(matrix)
         if resolutions is None:
@@ -595,15 +607,12 @@ class CNVAnalysis(Analysis):
             )
             axis.set_xlabel("Chromosome position")
             axis.set_ylabel("Sample")
-            fig.savefig(
+            savefig(
+                fig,
                 os.path.join(
                     self.results_dir,
                     self.name
-                    + ".{}.{}.full_data.heatmap.svg".format(resolution, output_prefix),
-                ),
-                bbox_inches="tight",
-                dpi=dpi,
-            )
+                    + ".{}.{}.full_data.heatmap.svg".format(resolution, output_prefix)))
 
             grid = sns.clustermap(
                 matrix[resolution].fillna(0).T,
@@ -622,17 +631,15 @@ class CNVAnalysis(Analysis):
             )
             grid.ax_heatmap.set_xlabel("Chromosome position")
             grid.ax_heatmap.set_ylabel("Sample")
-            grid.savefig(
+            savefig(
+                grid.fig,
                 os.path.join(
                     self.results_dir,
                     self.name
                     + ".{}.{}.full_data.fillna.clustermap.svg".format(
                         resolution, output_prefix
                     ),
-                ),
-                bbox_inches="tight",
-                dpi=dpi,
-            )
+                ))
 
     def plot_stats_per_chromosome(
         self,
@@ -691,6 +698,8 @@ class CNVAnalysis(Analysis):
         """
         import seaborn as sns
         from tqdm import tqdm
+        from ngs_toolkit.graphics import (
+            clustermap_fix_label_orientation, savefig)
 
         matrix = self.get_matrix(matrix)
         if resolutions is None:
@@ -718,30 +727,21 @@ class CNVAnalysis(Analysis):
                     cmap="Greens",
                     xticklabels=sample_labels,
                     yticklabels=True,
-                    rasterized=rasterized,
-                )
-                grid.ax_heatmap.set_yticklabels(
-                    grid.ax_heatmap.get_yticklabels(), rotation=0
-                )
-                grid.ax_heatmap.set_xticklabels(
-                    grid.ax_heatmap.get_xticklabels(), rotation=90
-                )
-                grid.savefig(
+                    rasterized=rasterized)
+                clustermap_fix_label_orientation(grid)
+                savefig(
+                    grid.fig,
                     os.path.join(
                         output_dir,
                         self.name
                         + ".{}.".format(resolution)
                         + output_prefix
-                        + ".{}_per_chrom.svg".format(label),
-                    ),
-                    bbox_inches="tight",
-                    dpi=dpi)
+                        + ".{}_per_chrom.svg".format(label)))
 
                 p = (
                     to_plot.loc[~to_plot["chr"].str.contains("X|Y"), names + ["chr"]]
                     .groupby("chr")
-                    .apply(function)
-                )
+                    .apply(function))
                 kwargs = {
                     "xticklabels": sample_labels,
                     "yticklabels": True,
@@ -750,48 +750,32 @@ class CNVAnalysis(Analysis):
                 grid = sns.clustermap(
                     p + abs(p.min().min()),
                     cbar_kws={"label": label},
-                    cmap="Greens", **kwargs
-                )
-                grid.ax_heatmap.set_yticklabels(
-                    grid.ax_heatmap.get_yticklabels(), rotation=0
-                )
-                grid.ax_heatmap.set_xticklabels(
-                    grid.ax_heatmap.get_xticklabels(), rotation=90
-                )
-                grid.savefig(
+                    cmap="Greens", **kwargs)
+                clustermap_fix_label_orientation(grid)
+                savefig(
+                    grid.fig,
                     os.path.join(
                         output_dir,
                         self.name
                         + ".{}.".format(resolution)
                         + output_prefix
-                        + ".{}_per_chrom.no_sex_chroms.svg".format(label),
-                    ),
-                    bbox_inches="tight",
-                    dpi=dpi)
+                        + ".{}_per_chrom.no_sex_chroms.svg".format(label)))
 
                 grid = sns.clustermap(
                     p,
                     cbar_kws={"label": label + " (Z-score)"},
                     cmap="RdBu_r",
                     center=0,
-                    z_score=1, **kwargs
-                )
-                grid.ax_heatmap.set_yticklabels(
-                    grid.ax_heatmap.get_yticklabels(), rotation=0
-                )
-                grid.ax_heatmap.set_xticklabels(
-                    grid.ax_heatmap.get_xticklabels(), rotation=90
-                )
-                grid.savefig(
+                    z_score=1, **kwargs)
+                clustermap_fix_label_orientation(grid)
+                savefig(
+                    grid.fig,
                     os.path.join(
                         output_dir,
                         self.name
                         + ".{}.".format(resolution)
                         + output_prefix
-                        + ".{}_per_chrom.no_sex_chroms.zscore.svg".format(label),
-                    ),
-                    bbox_inches="tight",
-                    dpi=dpi)
+                        + ".{}_per_chrom.no_sex_chroms.zscore.svg".format(label)))
 
     def segment_genome(
         self,
@@ -1061,6 +1045,7 @@ class CNVAnalysis(Analysis):
         # TODO: plot stats per sample too
         from ngs_toolkit.utils import log_p_value
         import seaborn as sns
+        from ngs_toolkit.graphics import savefig
 
         if segmentation is None:
             segmentation = self.segmentation
@@ -1095,11 +1080,9 @@ class CNVAnalysis(Analysis):
             )
             if "{resolution}" in output_prefix:
                 op = output_prefix.format(resolution=resolution)
-            grid.savefig(
-                os.path.join(output_dir, op + ".all_samples.svg"),
-                dpi=300,
-                bbox_inches="tight",
-            )
+            savefig(
+                grid.fig,
+                os.path.join(output_dir, op + ".all_samples.svg"))
 
         # if per_sample:
 

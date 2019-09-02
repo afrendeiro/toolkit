@@ -58,6 +58,8 @@ class RNASeqAnalysis(Analysis):
     kwargs : :obj:`dict`, optional
         Additional keyword arguments will be passed to parent class :class:`~ngs_toolkit.analysis.Analysis`.
     """
+    _data_type = "RNA-seq"
+
     def __init__(
         self,
         name=None,

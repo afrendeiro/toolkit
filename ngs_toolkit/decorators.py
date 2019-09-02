@@ -62,13 +62,14 @@ def read_csv_timestamped(f):
     from ngs_toolkit.utils import get_this_file_or_timestamped
     @wraps(f)
     def wrapper(*args, **kwds):
-        if len(args) > 1:
-            args = (
-                args[0],
-                get_this_file_or_timestamped(args[1])) + args[2:]
-        else:
+        if isinstance(args[0], str):
             args = (
                 get_this_file_or_timestamped(args[0]),) + args[1:]
+        if len(args) > 1:
+            if isinstance(args[1], str):
+                args = (
+                    args[0],
+                    get_this_file_or_timestamped(args[1])) + args[2:]
         return f(*args, **kwds)
     return wrapper
 

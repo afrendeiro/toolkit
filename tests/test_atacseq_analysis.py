@@ -96,6 +96,7 @@ def test_quantile_normalization(various_analysis):
         # assert all(np.array(cors) > 0.99)
 
 
+@pytest.mark.skipif(travis, reason="CQN normalization not testable in Travis")
 def test_cqn_normalization(atac_analysis):
     # At some point, downloading a genome reference in Travis
     # caused memory error.
@@ -129,10 +130,6 @@ def test_normalize(atac_analysis):
     assert np.array_equal(qnorm_d, qnorm)
     del atac_analysis.matrix_norm
 
-    # At some point, downloading a genome reference in Travis
-    # caused memory error.
-    # This should now be fixed by implementing download/decompressing
-    # functions working in chunks
     if not travis:
         norm = atac_analysis.normalize(method="cqn", save=False)
         assert isinstance(norm, pd.DataFrame)

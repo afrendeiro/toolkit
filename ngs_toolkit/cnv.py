@@ -79,6 +79,8 @@ class CNVAnalysis(Analysis):
     >>> # Save object
     >>> a.to_pickle()
     """
+    _data_type = "CNV"
+
     def __init__(
         self,
         name=None,

@@ -81,6 +81,8 @@ class Analysis(object):
     kwargs : :obj:`dict`, optional
         Additional keyword arguments will simply be stored as object attributes.
     """
+    _data_type = None
+
     def __init__(
         self,
         name=None,

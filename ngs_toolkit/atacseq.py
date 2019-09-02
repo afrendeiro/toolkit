@@ -81,6 +81,8 @@ class ATACSeqAnalysis(Analysis):
     >>> # Save object
     >>> a.to_pickle()
     """
+    _data_type = "ATAC-seq"
+
     def __init__(
         self,
         name=None,
@@ -1164,7 +1166,7 @@ class ATACSeqAnalysis(Analysis):
         """
         import pybedtools
 
-        from ngs_toolkit.utils import bed_to_index
+        from ngs_toolkit.utils import bed_to_index, get_this_file_or_timestamped
 
         if genomic_context_file is None:
             _LOGGER.info(
@@ -1179,7 +1181,7 @@ class ATACSeqAnalysis(Analysis):
                 "genomic_context_file"
             ]
 
-        context = pybedtools.BedTool(genomic_context_file)
+        context = pybedtools.BedTool(get_this_file_or_timestamped(genomic_context_file))
 
         if isinstance(self.sites, str):
             self.sites = pybedtools.BedTool(self.sites)
@@ -1188,7 +1190,7 @@ class ATACSeqAnalysis(Analysis):
         # shuffle regions in genome to create background (keep them in the same chromossome)
         background = self.sites.shuffle(genome=self.genome, chrom=True)
 
-        cols = [0, 1, 2, 6]
+        cols = [0, 1, 2, -1]
         for label, attr, bed in [
             ("background", "region_annotation_b", background),
             ("real", "region_annotation", self.sites),
@@ -1196,7 +1198,8 @@ class ATACSeqAnalysis(Analysis):
             annot = (
                 bed.intersect(context, wa=True, wb=True, f=0.2)
                 .sort()
-                .to_dataframe(usecols=cols)
+                .to_dataframe()
+                .iloc[:, cols]
             )
             annot.index = bed_to_index(annot)
             annot.columns = ["chrom", "start", "end", "genomic_region"]

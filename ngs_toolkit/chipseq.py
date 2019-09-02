@@ -56,6 +56,8 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
     kwargs : :obj:`dict`, optional
         Additional keyword arguments will be passed to parent class :class:`~ngs_toolkit.atacseq.ATACSeqAnalysis`.
     """
+    _data_type = "ChIP-seq"
+
     def __init__(
         self,
         name=None,

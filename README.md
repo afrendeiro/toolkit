@@ -7,6 +7,8 @@
 
 [![PEP compatible](http://pepkit.github.io/img/PEP-compatible-green.svg)](http://pepkit.github.io)
 
+[![Open in Gitpod](https://gitpod.io/button/open-in-gitpod.svg)](https://gitpod.io/#https://github.com/afrendeiro/toolkit)
+
 # ngs-toolkit
 
 This is my NGS analysis toolkit: ``ngs_toolkit``.

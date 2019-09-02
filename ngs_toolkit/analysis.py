@@ -2894,6 +2894,17 @@ class Analysis(object):
             + (covariates if covariates is not None else []),
         ].drop_duplicates()
 
+        # Check whether the is a complex design
+        complx = (comparison_table.groupby('sample_name')['sample_group'].nunique() > 1).any()
+
+        if complx:
+            distributed = True
+            if "computing_configuration" not in kwargs:
+                msg = "Detected complex design with samples in various groups."
+                msg += " Will run analysis in distributed mode, but running in 'localhost'."
+                _LOGGER.info(msg)
+                kwargs['computing_configuration'] = "localhost"
+
         # Make formula for DESeq2
         formula = "~ {}sample_group".format(
             " + ".join(covariates) + " + " if covariates is not None else ""
@@ -3005,8 +3016,12 @@ class Analysis(object):
                     job_file,
                     log_file=log_file,
                     jobname=job_name,
-                    **kwargs
-                )
+                    **kwargs)
+                if getattr(kwargs, "computing_configuration", None) == "localhost":
+                    _LOGGER.info("Collecting differential results.")
+                    return self.collect_differential_analysis(
+                        comparison_table=comparison_table,
+                        overwrite=overwrite)
 
     def collect_differential_analysis(
         self,
@@ -3022,7 +3037,7 @@ class Analysis(object):
     ):
         """
         Collect results from DESeq2 differential analysis.
-        Particularly useful when runing ``differential_analysis`` in distributed mode.
+        Particularly useful when running ``differential_analysis`` in distributed mode.
 
         Parameters
         ----------
@@ -3094,7 +3109,7 @@ class Analysis(object):
             _LOGGER.warning(msg.format(results_file) + hint)
             return
 
-        if "data_type" in comparison_table.columns:
+        if ("data_type" in comparison_table.columns) and (self.data_type is not None):
             comps = (
                 comparison_table.loc[
                     comparison_table["data_type"] == self.data_type, "comparison_name"

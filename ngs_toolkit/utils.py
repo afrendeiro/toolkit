@@ -107,7 +107,7 @@ def record_analysis_output(file_name, report=True, permissive=False):
     """
     # TODO: separate stack workflow to get analysis to its own function
     import inspect
-    from ngs_toolkit import Analysis, _LOGGER, _CONFIG
+    from ngs_toolkit import Analysis, _LOGGER
 
     # Let's get the object that called the function previous to this one
     # # the use case is often:
@@ -124,7 +124,7 @@ def record_analysis_output(file_name, report=True, permissive=False):
             continue
         else:
             a = s.frame.f_locals['self']
-        break
+            break
     if "a" not in locals():
         if permissive:
             _LOGGER.debug(msg)
@@ -138,8 +138,6 @@ def record_analysis_output(file_name, report=True, permissive=False):
     # # Get parameters
     # loc.frame.f_locals
     a.record_output_file(file_name, name)
-    if _CONFIG["preferences"]["report"]["continuous_generation"]:
-        a.generate_report()
 
 
 def submit_job(

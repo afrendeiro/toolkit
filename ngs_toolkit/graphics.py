@@ -450,6 +450,8 @@ def plot_projection(
                 cd = cd.reset_index().drop_duplicates().set_index(attr).drop_duplicates()
 
                 for j, group in enumerate(df2.index):
+                    if group not in df2.index:
+                        continue
                     axis[pc, i].scatter(
                         df2.loc[group, pc],
                         df2.loc[group, pc + 1],

@@ -9,8 +9,7 @@ import numpy as np
 import pandas as pd
 import pybedtools
 import pytest
-from .conftest import file_exists, file_not_empty, file_exists_and_not_empty
-from ngs_toolkit.utils import get_this_file_or_timestamped
+from .conftest import file_exists, file_exists_and_not_empty
 
 
 travis = "TRAVIS" in os.environ

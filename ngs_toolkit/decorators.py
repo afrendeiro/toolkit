@@ -66,6 +66,9 @@ def read_csv_timestamped(f):
             args = (
                 args[0],
                 get_this_file_or_timestamped(args[1])) + args[2:]
+        else:
+            args = (
+                get_this_file_or_timestamped(args[0]),) + args[1:]
         return f(*args, **kwds)
     return wrapper
 
@@ -77,18 +80,23 @@ def to_csv_timestamped(f):
     from ngs_toolkit import _CONFIG
     @wraps(f)
     def wrapper(*args, **kwds):
-        if len(args) > 1:
-            if is_analysis_descendent():
-                # Add timestamp
-                if _CONFIG["preferences"]["report"]["timestamp_tables"]:
-                    s = args[1].split(".")
-                    end = s[-1]
-                    body = ".".join(s[:-1])
-                    new_args = (args[0], ".".join([body, get_timestamp(), end])) + args[2:]
-                record_analysis_output(new_args[1], permissive=True)
-                return f(*new_args, **kwds)
-        else:
-            _LOGGER.warning("Could not record output.")
+        if is_analysis_descendent():
+            # Add timestamp
+            if _CONFIG["preferences"]["report"]["timestamp_tables"]:
+                if len(args) > 1:
+                    if isinstance(args[1], str):
+                        s = args[1].split(".")
+                        end = s[-1]
+                        body = ".".join(s[:-1])
+                        args = (args[0], ".".join([body, get_timestamp(), end])) + args[2:]
+                        record_analysis_output(args[1], permissive=True)
+                else:
+                    if isinstance(args[0], str):
+                        s = args[0].split(".")
+                        end = s[-1]
+                        body = ".".join(s[:-1])
+                        args = (".".join([body, get_timestamp(), end])) + args[1:]
+                        record_analysis_output(args[0], permissive=True)
         return f(*args, **kwds)
     return wrapper
 

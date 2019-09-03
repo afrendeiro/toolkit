@@ -321,7 +321,7 @@ def various_analysis(tmp_path):
     genome_assemblies = [("human", "hg38"), ("mouse", "mm10")]  # ("human", "hg19")
     factors = [1]  # 2, 5
     variables = [100]  # 1000, 10000
-    replicates = [1]  # 3, 5
+    replicates = [3]  # 5
 
     for organism, genome_assembly in genome_assemblies:
         for n_factors in factors:

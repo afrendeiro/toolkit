@@ -56,6 +56,8 @@ def remove_timestamp_if_existing(file):
 
 def get_this_file_or_timestamped(file, permissive=True):
     from glob import glob
+    import re
+
     from ngs_toolkit.utils import sorted_nicely
     from ngs_toolkit import _LOGGER
 
@@ -64,17 +66,25 @@ def get_this_file_or_timestamped(file, permissive=True):
     end = split[-1]
 
     res = sorted_nicely(glob(body + "*" + end))
-    try:
-        # get newest file
-        return res[-1]
-    except IndexError:
-        if permissive:
-            return file
-        else:
-            msg = "Could not remove timestamp from file path."
-            msg += " Probabably it does not exist."
-            _LOGGER.debug(msg)
-            raise IndexError(msg)
+    res = [x for x in res
+           if re.search(body + r"\.\d{4}-\d{2}-\d{2}-\d{2}:\d{2}:\d{2}\.", x)]
+    if len(res) == 0:
+        return file
+    else:
+        try:
+            # get newest file
+            _LOGGER.warning(
+                "Could not get uniquivocous timestamped file for '{}'.".format(file) +
+                " Returning '{}'.".format(res[-1]))
+            return res[-1]
+        except IndexError:
+            if permissive:
+                return file
+            else:
+                msg = "Could not remove timestamp from file path."
+                msg += " Probabably it does not exist."
+                _LOGGER.debug(msg)
+                raise IndexError(msg)
 
 
 def is_analysis_descendent(exclude_functions=[]):

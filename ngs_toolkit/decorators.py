@@ -6,7 +6,7 @@ from ngs_toolkit import _LOGGER
 
 def check_has_samples(f):
     @wraps(f)
-    def wrapper(*args, **kwds):
+    def wrapper(*args, **kwargs):
         msg = "Analysis does not have a 'samples' attributes."
         if not hasattr(args[0], "samples"):
             _LOGGER.error(msg)
@@ -21,14 +21,14 @@ def check_has_samples(f):
         if len(args[0].samples) == 0:
             _LOGGER.error(msg)
             raise AttributeError(msg)
-        return f(*args, **kwds)
+        return f(*args, **kwargs)
 
     return wrapper
 
 
 def check_organism_genome(f):
     @wraps(f)
-    def wrapper(*args, **kwds):
+    def wrapper(*args, **kwargs):
         attrs = ["organism", "genome"]
         msg = "Analysis does not have 'organism' and 'genome' attributes set."
         hint = " You can set them with analysis.set_organism_genome, for example."
@@ -37,14 +37,14 @@ def check_organism_genome(f):
         if not all([r1, r2]):
             _LOGGER.error(msg + hint)
             raise AttributeError(msg)
-        return f(*args, **kwds)
+        return f(*args, **kwargs)
 
     return wrapper
 
 
 def check_has_sites(f):
     @wraps(f)
-    def wrapper(*args, **kwds):
+    def wrapper(*args, **kwargs):
         attrs = ["sites"]
         msg = "Analysis object does not have a `sites` attribute."
         hint = " Produce one with analysis.get_consensus_sites for example."
@@ -53,7 +53,7 @@ def check_has_sites(f):
         if not all([r1, r2]):
             _LOGGER.error(msg + hint)
             raise AttributeError(msg)
-        return f(*args, **kwds)
+        return f(*args, **kwargs)
 
     return wrapper
 
@@ -61,27 +61,24 @@ def check_has_sites(f):
 def read_csv_timestamped(f):
     from ngs_toolkit.utils import get_this_file_or_timestamped
     @wraps(f)
-    def wrapper(*args, **kwds):
-        if isinstance(args[0], str):
-            args = (
-                get_this_file_or_timestamped(args[0]),) + args[1:]
-        if len(args) > 1:
-            if isinstance(args[1], str):
-                args = (
-                    args[0],
-                    get_this_file_or_timestamped(args[1])) + args[2:]
-        return f(*args, **kwds)
+    def wrapper(*args, **kwargs):
+        for i, _ in enumerate(args):
+            if isinstance(args[i], str):
+                args = args[:i] + (
+                    get_this_file_or_timestamped(args[i]),) + args[i + 1:]
+        return f(*args, **kwargs)
     return wrapper
 
 
-def to_csv_timestamped(f):
+def to_csv_timestamped(f, exclude_functions=[]):
     from ngs_toolkit.utils import (
         record_analysis_output, get_timestamp,
         is_analysis_descendent)
     from ngs_toolkit import _CONFIG
+
     @wraps(f)
-    def wrapper(*args, **kwds):
-        if is_analysis_descendent():
+    def wrapper(*args, **kwargs):
+        if is_analysis_descendent(exclude_functions=exclude_functions):
             # Add timestamp
             if _CONFIG["preferences"]["report"]["timestamp_tables"]:
                 if len(args) > 1:
@@ -98,7 +95,7 @@ def to_csv_timestamped(f):
                         body = ".".join(s[:-1])
                         args = (".".join([body, get_timestamp(), end])) + args[1:]
                         record_analysis_output(args[0], permissive=True)
-        return f(*args, **kwds)
+        return f(*args, **kwargs)
     return wrapper
 
 

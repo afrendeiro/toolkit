@@ -1039,7 +1039,7 @@ class Analysis(object):
         output = template.render(
             analysis=self,
             project_repr={k: v for k, v in self.__dict__.items() if isinstance(v, str)},
-            samples=[s.to_dict() for s in self.samples],
+            samples=[s.to_dict() for s in self.samples] if self.samples is not None else [],
             time=time.asctime(),
             images=images,
             csvs=csvs,

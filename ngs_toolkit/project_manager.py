@@ -252,7 +252,9 @@ def create_project(
         handle.write(comparison_table_template)
 
     # Initialize git repository)
-    return subprocess.call("git init {}".format(project_dir).split(" "))
+    p = subprocess.Popen("git init {}".format(project_dir).split(" "), stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    p.communicate()
+    return p.returncode
 
 
 def create_requirements_file(

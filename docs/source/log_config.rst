@@ -1,5 +1,5 @@
 Configuration, logging and versioning
-******************************
+*************************************
 
 .. _Configuration:
 

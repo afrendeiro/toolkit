@@ -39,5 +39,10 @@ RUN wget http://ftp.debian.org/debian/pool/main/b/bedtools/bedtools_2.21.0-1_amd
     && dpkg -i bedtools_2.21.0-1_amd64.deb \
     && rm bedtools_2.21.0-1_amd64.deb
 
-# RUN python3 -m pip install ngs-toolkit[rstats]
-# RUN python3 -m pip install ipython
+RUN R -e "install.packages('BiocManager', repos='https://CRAN.R-project.org')" \
+    && R -e "library('BiocManager'); BiocManager::install(c('DESeq2', 'preprocessCore', 'cqn'), version = '3.9')"
+
+RUN pip3 install git+https://github.com/afrendeiro/combat.git \
+    && pip3 install ipython
+
+# RUN pip3 install git+https://github.com/afrendeiro/toolkit.git#egg=ngs-toolkit[testing] --user

@@ -1,12 +1,8 @@
-image: afrendeiro/ngs-toolkit
+image:
+  file: Dockerfile
 
 tasks:
   - init: >
-      pip3 install git+https://github.com/afrendeiro/combat.git &&
-      R -e "install.packages('BiocManager', repos='https://CRAN.R-project.org')" &&
-      R -e "library('BiocManager'); BiocManager::install(c('DESeq2', 'preprocessCore', 'cqn'), version = '3.9')" &&
-      pip3 install -r .[testing] &&
-      pip3 install ipython
+      pip3 install git+https://github.com/afrendeiro/toolkit.git#egg=ngs-toolkit[testing] --user
     command: ipython
   - command: echo "Bash Terminal"
-

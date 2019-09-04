@@ -39,5 +39,30 @@ RUN wget http://ftp.debian.org/debian/pool/main/b/bedtools/bedtools_2.21.0-1_amd
     && dpkg -i bedtools_2.21.0-1_amd64.deb \
     && rm bedtools_2.21.0-1_amd64.deb
 
-# RUN python3 -m pip install ngs-toolkit[rstats]
-# RUN python3 -m pip install ipython
+RUN apt-get update \
+    && apt-get install -t unstable -y --no-install-recommends \
+        gfortran \
+        liblapack-dev \
+        libopenblas-dev \
+    && rm -rf /tmp/downloaded_packages/ /tmp/*.rds \
+    && rm -rf /var/lib/apt/lists/*
+
+# R packages
+RUN R -e "install.packages('BiocManager', repos='https://CRAN.R-project.org')" \
+    && R -e "library('BiocManager'); BiocManager::install(c('DESeq2', 'preprocessCore', 'cqn'), version = '3.9')"
+
+USER gitpod
+
+# Python dependencies
+RUN pip3 install --user -r https://raw.githubusercontent.com/afrendeiro/toolkit/master/requirements/requirements.txt \
+    && pip3 install --user -r https://raw.githubusercontent.com/afrendeiro/toolkit/master/requirements/requirements.test.txt \
+    && pip3 install --user git+https://github.com/afrendeiro/combat.git
+
+# IPython
+RUN pip3 install --user ipython
+
+# RUN pip3 install git+https://github.com/afrendeiro/toolkit.git#egg=ngs-toolkit[testing] --user
+
+USER root
+
+ENV PATH="/home/gitpod/.local/bin:${PATH}"

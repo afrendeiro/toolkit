@@ -1,0 +1,8 @@
+image:
+  file: Dockerfile
+
+tasks:
+  - init: >
+      pip3 install git+https://github.com/afrendeiro/toolkit.git#egg=ngs-toolkit[testing] --user
+    command: ipython
+  - command: echo "Bash Terminal"

@@ -47,7 +47,7 @@ The following are required only for some data or analysis types:
 
    - `cqn <https://bioconductor.org/packages/release/bioc/html/cqn.html>`_: used for GC-content aware normalization of NGS data.
    - `DESeq2 <https://bioconductor.org/packages/release/bioc/html/DESeq2.html>`_: used for differential testing of genes/regulatory elements.
- - `Kent tools <https://github.com/ENCODE-DCC/kentUtils>`_ (optional): the '2bitToFa' binary from UCSC's Kent bioinformatics toolkit is used to convert between the 2bit and FASTA formats.
+ - `Kent tools <https://github.com/ENCODE-DCC/kentUtils>`_ (optional): the 'twoBitToFa' binary from UCSC's Kent bioinformatics toolkit is used to convert between the 2bit and FASTA formats.
 
 .. note::
 	``bedtools`` version should be below 2.24.0 (2.20.1 is used for testing)

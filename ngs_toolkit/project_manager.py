@@ -152,7 +152,7 @@ def create_project(
     comparison_table = os.path.join(metadata_dir, "comparison_table.csv")
     src_dir = os.path.join(project_dir, "src")
 
-    genome_assemblies = "\n".join(
+    genome_assemblies = "\n            ".join(
         [
             "'{}':\n                genome: '{}'".format(s, g)
             for s, g in genome_assemblies.items()

@@ -191,8 +191,10 @@ def setup_timestamping():
             to_csv_timestamped)
         import pandas as pd
 
-        pd.io.parsers.TextFileReader = read_csv_timestamped(pd.io.parsers.TextFileReader)
-        pd.DataFrame.to_csv = to_csv_timestamped(pd.DataFrame.to_csv, exclude_functions=["from_dataframe"])
+        pd.io.parsers.TextFileReader = read_csv_timestamped(
+            pd.io.parsers.TextFileReader)
+        pd.DataFrame.to_csv = to_csv_timestamped(
+            pd.DataFrame.to_csv)
 
 
 # setup

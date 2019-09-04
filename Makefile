@@ -3,9 +3,6 @@
 test3:
 	python3 -m pytest -n 3 --disable-warnings --show-capture=no --cov=ngs_toolkit --cov-report xml tests/test_*.py --lf
 
-test2:
-	python2 -m pytest -n 3 --disable-warnings --show-capture=no --cov=ngs_toolkit --cov-report xml tests/test_*.py --lf
-
 test: test3
 
 coverage: test

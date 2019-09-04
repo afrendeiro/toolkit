@@ -221,6 +221,11 @@ def submit_job(
     import divvy
     from ngs_toolkit import _CONFIG, _LOGGER
 
+    # reduce level of logging from divvy
+    # only for divvy <=0.
+    if "logging" in divvy.__dict__.keys():
+        divvy.logging.getLogger("divvy").setLevel("ERROR")
+
     def count_jobs_running(check_cmd="squeue", sep="\n"):
         """
         Count running jobs on a cluster by invoquing a command that lists the jobs.

@@ -16,3 +16,5 @@ divvy>=0.4.0
 attmap>=0.12.9
 requests
 jinja2>=2.10.1
+rpy2
+tzlocal  # undocumented requirement for rpy2 < 3.0

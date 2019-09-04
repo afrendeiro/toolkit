@@ -6,7 +6,7 @@ import os
 import pandas as pd
 import pytest
 
-from tests.conftest import file_exists_and_not_empty
+from .conftest import file_exists_and_not_empty
 from ngs_toolkit.utils import get_this_file_or_timestamped
 
 

@@ -1,5 +1,4 @@
 from ._version import __version__
-import divvy as _divvy
 
 
 def setup_logger(level="INFO", logfile=None):
@@ -194,7 +193,8 @@ def setup_timestamping():
         pd.io.parsers.TextFileReader = read_csv_timestamped(
             pd.io.parsers.TextFileReader)
         pd.DataFrame.to_csv = to_csv_timestamped(
-            pd.DataFrame.to_csv)
+            pd.DataFrame.to_csv,
+            exclude_functions=["from_dataframe"])
 
 
 # setup
@@ -202,11 +202,6 @@ _LOGGER = setup_logger()
 _CONFIG = setup_config()
 setup_graphic_preferences()
 setup_timestamping()
-
-# reduce level of logging from divvy
-# only for divvy <=0.
-if "logging" in _divvy.__dict__.keys():
-    _divvy.logging.getLogger("divvy").setLevel("ERROR")
 
 
 # easier API

@@ -3,10 +3,6 @@ Analysis reports
 
 .. _Report:
 
-
-Report
-=============================
-
 Each analysis object in the `ngs_toolkit` will by default record the outputs it produces (e.g. tables, figures).
 
 This allows the collection of all outputs in a standardized way and the generation of an HTML report.

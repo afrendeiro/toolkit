@@ -7,6 +7,15 @@ Changelog
 
 ------------
 
+- **v0.16** (development, pre-1.0):
+
+  - Fixed bug in general.get_genomic_context due to a bug in the timestamping workflow
+  - Distributing tests with library for more portable testing
+
+- **v0.15** (development, pre-1.0):
+
+  - Shortlived, shipped with bug - please ignore
+
 - **v0.14** (development, pre-1.0):
 
   - Add recording of analysis outputs under Analysis.output_files

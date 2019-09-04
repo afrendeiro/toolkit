@@ -7,7 +7,7 @@ Installation
 With pip
 -----------------------------
 
-``ngs_toolkit`` is available for Python 3 only.
+``ngs_toolkit`` is available for Python 3 only. Is is tested in Python 3.6 and 3.7.
 
 To install, simply do:
 
@@ -20,37 +20,11 @@ you might need to add a ``--user`` flag if not root or running in a virtual envi
 This will install all the Python dependencies needed too.
 See `here <https://github.com/afrendeiro/toolkit/blob/master/requirements/requirements.txt>`_ a list of all Python dependencies used.
 
-If you wish to install optional libraries that interface with R libraries, you can pass ``[rstats]`` to the following pip call:
-
-.. code-block:: bash
-
-   pip install ngs-toolkit[rstats]
-
-
 To install the latest development version:
 
 .. code-block:: bash
 
    pip install git+https://github.com/afrendeiro/toolkit.git#egg=ngs-toolkit
-
-
-
-**Non-Python optional requirements**
-
-
-``ngs_toolkit`` makes use of some non-Python dependencies.
-
-The following are required only for some data or analysis types:
-
- - `bedtools <https://bedtools.readthedocs.io/en/latest/>`_: required for some ATAC/ChIP-seq functions. It is underlying the Python interface library to bedtools (pybedtools) which can be installed without bedtools.
- - `R <https://www.r-project.org/>`_ and some bioconductor libraries (optional):
-
-   - `cqn <https://bioconductor.org/packages/release/bioc/html/cqn.html>`_: used for GC-content aware normalization of NGS data.
-   - `DESeq2 <https://bioconductor.org/packages/release/bioc/html/DESeq2.html>`_: used for differential testing of genes/regulatory elements.
- - `Kent tools <https://github.com/ENCODE-DCC/kentUtils>`_ (optional): the 'twoBitToFa' binary from UCSC's Kent bioinformatics toolkit is used to convert between the 2bit and FASTA formats.
-
-.. note::
-	``bedtools`` version should be below 2.24.0 (2.20.1 is used for testing)
 
 
 Using a conda environment
@@ -66,7 +40,7 @@ Setup the bioconda channel:
 	conda config --add channels bioconda
 	conda config --add channels conda-forge
 
-Install the dependencies:
+Install non-Python dependencies:
 
 .. code-block:: bash
 
@@ -80,6 +54,41 @@ And then install the ``ngs-toolkit`` library with pip (available only through Py
 .. code-block:: bash
 
 	pip install ngs-toolkit
+
+
+**Non-Python requirements**
+-----------------------------
+
+
+``ngs_toolkit`` makes use of some non-Python dependencies.
+
+The following are highly recommended only for some data or analysis types:
+
+ - `bedtools <https://bedtools.readthedocs.io/en/latest/>`_: required for some ATAC/ChIP-seq functions. It is underlying the Python interface library to bedtools (pybedtools) which can be installed without bedtools.
+ - `R <https://www.r-project.org/>`_ and some bioconductor libraries (optional):
+
+   - `cqn <https://bioconductor.org/packages/release/bioc/html/cqn.html>`_ (optional): used for GC-content aware normalization of NGS data.
+   - `DESeq2 <https://bioconductor.org/packages/release/bioc/html/DESeq2.html>`_ (optional): used for differential testing of genes/regulatory elements.
+ - `Kent tools <https://github.com/ENCODE-DCC/kentUtils>`_ (optional): the 'twoBitToFa' binary from UCSC's Kent bioinformatics toolkit is used to convert between the 2bit and FASTA formats.
+
+.. note::
+   ``bedtools`` version should be below 2.24.0 (2.20.1 is used for testing)
+
+
+Testing
+=============================
+
+To make sure everything is correctly configured, the user is encouraged to test the library prior to use.
+
+In order to do this, install testing requirements and simply run ``pytest``:
+
+.. code-block:: bash
+
+   pip install ngs-toolkit[testing]
+   pytest --pyargs ngs_toolkit
+
+
+Pytest will output summary results (`see for example <https://travis-ci.org/afrendeiro/toolkit/jobs/580167563>`_) and further outputs can be seen in ``${TMPDIR}/pytest-of-${USER}/`` or ``/tmp/pytest-of-${USER}/`` if $TMPDIR is not defined.
 
 
 API usage

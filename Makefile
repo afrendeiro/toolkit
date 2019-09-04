@@ -1,7 +1,7 @@
 .DEFAULT_GOAL := pypitest
 
 test3:
-	python3 -m pytest -n 3 --disable-warnings --show-capture=no --cov=ngs_toolkit --cov-report xml tests/test_*.py --lf
+	python3 -m pytest -n 3 --disable-warnings --show-capture=no --cov=ngs_toolkit --cov-report xml ngs_toolkit/tests/test_*.py --lf
 
 test: test3
 

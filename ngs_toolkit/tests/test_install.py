@@ -62,14 +62,18 @@ def test_all_requirements_are_importable():
     if travis:
         path = os.path.join(os.environ['TRAVIS_BUILD_DIR'], "requirements", "requirements.txt")
     else:
-        path = os.path.join(os.path.dirname(__file__), "..", "requirements", "requirements.txt")
-    data = open(path).read().split()
+        path = os.path.join("requirements", "requirements.txt")
+    data = open(path).read().split("\n")
 
     replace = {"scikit-learn": "sklearn"}
 
+    # handle github stuff
     requirements = [
-        x.split("=")[0].replace(">", "") for x in data if "extra" not in x
-    ]
+        x.split("=")[0].replace(">", "") for x in data if "extra" not in x]
+    # remove commnets
+    requirements = [x[:x.index("  #")] if "#" in x else x for x in requirements]
+    # remove empty lines
+    requirements = [x for x in requirements if x != ""]
     for req in requirements:
         if req in replace:
             requirements.pop(requirements.index(req))
@@ -79,4 +83,4 @@ def test_all_requirements_are_importable():
         try:
             importlib.import_module(req)
         except ImportError:
-            assert False
+            assert False, "Required '{}' module could not be found!".format(req)

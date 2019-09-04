@@ -1,9 +1,10 @@
 .DEFAULT_GOAL := pypitest
 
-test3:
-	python3 -m pytest -n 3 --disable-warnings --show-capture=no --cov=ngs_toolkit --cov-report xml ngs_toolkit/tests/test_*.py --lf
+install:
+	pip install .[testing] --user
 
-test: test3
+test:
+	python -m pytest -n 3 --disable-warnings --show-capture=no --cov=ngs_toolkit --cov-report xml ngs_toolkit/tests/test_*.py --lf
 
 coverage: test
 	codecov -f coverage.xml

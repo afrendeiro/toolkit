@@ -1286,7 +1286,7 @@ class ATACSeqAnalysis(Analysis):
 
         for label, attr, bed in [
             ("real", "chrom_state_annotation", self.sites),
-            ("background", "chrom_state_annotation_b", background),
+            ("background", "chrom_state_annotation_b", background)
         ]:
             _LOGGER.debug(
                 "Overlapping chromatin state annotation with {} regions.".format(label)

@@ -1610,17 +1610,42 @@ class Analysis(object):
         make_positive=True
     ):
         """
-        Get a matrix that is an attribute of self subsetted for the requested samples.
+        Remove an annotated factor from a matrix.
 
         Parameters
         ----------
+        factor : :obj:`str`
+            The name of the factor to remove from matrix.
+
+        method : :obj:`str`
+            The method to use to remove the factor.
+
+            Default is "combat".
+        covariates : :obj:`list`
+            Covariates to consider when removing factor.
+            These will be kept in the data.
+
         matrix : {str, pandas.DataFrame}
-            The name of the attribute with the matrix or a DataFrame already.
+            The name of the attribute with the matrix or a DataFrame.
+
+            Defaults to "matrix_norm".
         samples : :obj:`list`
             Iterable of peppy.Sample objects to restrict matrix to.
 
             Default (:obj:`None` is passed) is not to subset matrix.
+        save: :obj:`bool`, optional
+            Whether to write normalized DataFrame to disk.
 
+            Defaults to :obj:`True`.
+        assign: :obj:`bool`
+            Whether to assign the result to "matrix_norm".
+
+            Defaults to :obj:`True`.
+        make_positive  : :obj:`bool`
+            Whether to make resulting matrix non-negative.
+            Not implemented yet.
+
+            Defaults to :obj:`True`.
         Returns
         -------
         :class:`pandas.DataFrame`

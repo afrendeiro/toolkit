@@ -1877,10 +1877,10 @@ class Analysis(object):
 
         for matrix_name in feature_tables:
             if hasattr(self, matrix_name):
-                matrix = getattr(self, matrix_name)
+                cur_matrix = getattr(self, matrix_name)
                 matrix_features = pd.merge(
                     next_matrix,
-                    matrix[matrix.columns.difference(next_matrix.columns)],
+                    cur_matrix[cur_matrix.columns.difference(next_matrix.columns)],
                     left_index=True,
                     right_index=True,
                     how="left",
@@ -1898,15 +1898,15 @@ class Analysis(object):
 
         # Pair indexes
         msg = "Annotated matrix does not have same feature length as matrix_raw matrix."
-        if not self.matrix_raw.shape[0] == matrix_features.shape[0]:
+        if not matrix.shape[0] == matrix_features.shape[0]:
             _LOGGER.error(msg)
             raise AssertionError(msg)
-        matrix_features.index = self.matrix_raw.index
+        matrix_features.index = matrix.index
         matrix_features.index.name = "index"
 
         # Save
         if save:
-            self.matrix_features.to_csv(
+            matrix_features.to_csv(
                 os.path.join(self.results_dir, self.name + ".{}.csv".format(output_prefix)),
                 index=True,
             )

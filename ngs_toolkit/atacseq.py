@@ -1143,18 +1143,18 @@ class ATACSeqAnalysis(Analysis):
         if save:
             if output_prefix != "":
                 output_prefix += "."
-            self.closest_tss_distances.to_csv(
+            closest_tss_distances.to_csv(
                 os.path.join(self.results_dir, self.name + ".closest_tss_distances.{}csv".format(output_prefix)),
                 index=True,
             )
-            self.gene_annotation.to_csv(
+            gene_annotation.to_csv(
                 os.path.join(self.results_dir, self.name + ".gene_annotation.{}csv".format(output_prefix)),
                 index=True,
             )
         if assign:
             self.closest_tss_distances = closest_tss_distances
             self.gene_annotation = gene_annotation
-        return self.gene_annotation
+        return gene_annotation
 
     @check_organism_genome
     @check_has_sites

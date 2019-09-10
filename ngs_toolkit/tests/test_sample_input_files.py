@@ -55,6 +55,21 @@ class Test_measure_coverage:
 
         assert file_exists_and_not_empty(mn)
 
+    def test_distributed(self, a):
+        mn = get_this_file_or_timestamped(
+            os.path.join(a.results_dir, a.name + ".matrix_raw.csv"))
+
+        os.remove(mn)
+
+        a.measure_coverage(distributed=True, computing_configuration="default")
+
+        fs = list()
+        for s in a.samples:
+            f = os.path.join(s.paths['sample_root'], "coverage", s.name + ".peak_set_coverage.")
+            for end in ['sh', 'log', 'bed']:
+                fs.append(f + end)
+        assert all([file_exists_and_not_empty(f) for f in fs])
+
     def test_few_samples(self, a):
         mn = get_this_file_or_timestamped(
             os.path.join(a.results_dir, a.name + ".matrix_raw.csv"))

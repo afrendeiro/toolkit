@@ -1032,7 +1032,13 @@ class ATACSeqAnalysis(Analysis):
         return matrix_norm
 
     @check_has_sites
-    def get_peak_gene_annotation(self, tss_file=None, max_dist=100000):
+    def get_peak_gene_annotation(
+            self,
+            tss_file=None,
+            max_dist=100000,
+            save=True,
+            output_prefix="",
+            assign=True):
         """
         Annotates peaks with closest gene.
         The annotation reference can either be given in the `tss_file` parameter
@@ -1052,6 +1058,18 @@ class ATACSeqAnalysis(Analysis):
             Regions with no genes within the range will have NaN values.
 
             Default is 100000.
+        save: :obj:`bool`, optional
+            Whether to write the annotated DataFrame to disk.
+
+            Default is :obj:`True`.
+        output_prefix: :obj:`str`, optional
+            Prefix to add to output file when save is True.
+
+            Default is "" (empty string).
+        assign: :obj:`bool`, optional
+            Whether to assign the DataFrames to `Attributes`.
+
+            Default is :obj:`True`.
 
         Attributes
         ----------
@@ -1094,47 +1112,58 @@ class ATACSeqAnalysis(Analysis):
         columns = [
             "chrom", "start", "end",
             "gene_name", "strand", "distance"]
-        self.closest_tss_distances = (
+        closest_tss_distances = (
             self.sites.closest(tss, D="b")
             .to_dataframe())
 
-        self.closest_tss_distances = self.closest_tss_distances.iloc[:, [0, 1, 2] + cols]
-        self.closest_tss_distances.columns = columns
+        closest_tss_distances = closest_tss_distances.iloc[:, [0, 1, 2] + cols]
+        closest_tss_distances.columns = columns
 
         # set NaN to distance without assignment (rather than the default '-1' from bedtools)
-        self.closest_tss_distances.loc[
-            self.closest_tss_distances["gene_name"] == ".", "distance"
+        closest_tss_distances.loc[
+            closest_tss_distances["gene_name"] == ".", "distance"
         ] = np.nan
 
         # set NaN to assignments out of range
-        self.closest_tss_distances.loc[
-            self.closest_tss_distances["distance"].abs() > max_dist,
+        closest_tss_distances.loc[
+            closest_tss_distances["distance"].abs() > max_dist,
             ["gene_name", "strand", "distance"],
         ] = np.nan
 
         # aggregate annotation per peak, concatenate various genes (comma-separated)
-        self.gene_annotation = (
-            self.closest_tss_distances.groupby(["chrom", "start", "end"])
+        gene_annotation = (
+            closest_tss_distances.groupby(["chrom", "start", "end"])
             .aggregate(lambda x: ",".join(set([str(i) for i in x if i != "."])))
             .reset_index()
         )
-        self.closest_tss_distances.index = bed_to_index(self.closest_tss_distances)
-        self.gene_annotation.index = bed_to_index(self.gene_annotation)
+        closest_tss_distances.index = bed_to_index(closest_tss_distances)
+        gene_annotation.index = bed_to_index(gene_annotation)
 
         # save to disk
-        self.closest_tss_distances.to_csv(
-            os.path.join(self.results_dir, self.name + ".closest_tss_distances.csv"),
-            index=True,
-        )
-        self.gene_annotation.to_csv(
-            os.path.join(self.results_dir, self.name + ".gene_annotation.csv"),
-            index=True,
-        )
+        if save:
+            if output_prefix != "":
+                output_prefix += "."
+            self.closest_tss_distances.to_csv(
+                os.path.join(self.results_dir, self.name + ".closest_tss_distances.{}csv".format(output_prefix)),
+                index=True,
+            )
+            self.gene_annotation.to_csv(
+                os.path.join(self.results_dir, self.name + ".gene_annotation.{}csv".format(output_prefix)),
+                index=True,
+            )
+        if assign:
+            self.closest_tss_distances = closest_tss_distances
+            self.gene_annotation = gene_annotation
         return self.gene_annotation
 
     @check_organism_genome
     @check_has_sites
-    def get_peak_genomic_location(self, genomic_context_file=None):
+    def get_peak_genomic_location(
+            self,
+            genomic_context_file=None,
+            save=True,
+            output_prefix="",
+            assign=True):
         """
         Annotates a consensus peak set (``sites`` attribute of analysis) with their genomic context.
         The genomic context is mostly gene-centric, which includes overlap with
@@ -1150,6 +1179,18 @@ class ATACSeqAnalysis(Analysis):
         genomic_context_file : :obj:`str`
             A 4 column BED file (chrom, start, end, feature), where feature is a string with the type of region.
             If not provided will be get with the get_genomic_context function.
+        save: :obj:`bool`, optional
+            Whether to write the annotated DataFrame to disk.
+
+            Default is :obj:`True`.
+        output_prefix: :obj:`str`, optional
+            Prefix to add to output file when save is True.
+
+            Default is "" (empty string).
+        assign: :obj:`bool`, optional
+            Whether to assign the DataFrames to `Attributes`.
+
+            Default is :obj:`True`.
 
         Attributes
         ----------
@@ -1215,28 +1256,38 @@ class ATACSeqAnalysis(Analysis):
             annot_comp.index = bed_to_index(annot_comp)
             annot_comp.columns = ["chrom", "start", "end", "genomic_region"]
             # save to disk
-            a = "" if (label == "real") else ("_" + label)
-            annot.to_csv(
-                os.path.join(
-                    self.results_dir,
-                    self.name + ".region_annotation{}_mapping.csv".format(a),
-                ),
-                index=True,
-            )
-            annot_comp.to_csv(
-                os.path.join(
-                    self.results_dir, self.name + ".region_annotation{}.csv".format(a)
-                ),
-                index=True,
-            )
+            if save:
+                a = "" if (label == "real") else ("_" + label)
+                if output_prefix != "":
+                    output_prefix += "."
+                annot.to_csv(
+                    os.path.join(
+                        self.results_dir,
+                        self.name + ".region_annotation{}_mapping.{}csv".format(a, output_prefix),
+                    ),
+                    index=True,
+                )
+                annot_comp.to_csv(
+                    os.path.join(
+                        self.results_dir, self.name + ".region_annotation{}.{}csv".format(a, output_prefix)
+                    ),
+                    index=True,
+                )
 
-            setattr(self, attr, annot_comp)
-            setattr(self, attr + "_mapping", annot)
+            if assign:
+                setattr(self, attr, annot_comp)
+                setattr(self, attr + "_mapping", annot)
         return self.region_annotation
 
     @check_organism_genome
     @check_has_sites
-    def get_peak_chromatin_state(self, chrom_state_file, frac=0.2):
+    def get_peak_chromatin_state(
+            self,
+            chrom_state_file,
+            frac=0.2,
+            save=True,
+            output_prefix="",
+            assign=True):
         """
         Annotates a consensus peak set (``sites`` attribute of analysis) with their chromatin
         state context. This would be given, for example by a chromatin state segmentation
@@ -1256,6 +1307,18 @@ class ATACSeqAnalysis(Analysis):
             Minimal fraction of region to overlap with a feature.
 
             Defaults to 0.2.
+        save: :obj:`bool`, optional
+            Whether to write the annotated DataFrame to disk.
+
+            Default is :obj:`True`.
+        output_prefix: :obj:`str`, optional
+            Prefix to add to output file when save is True.
+
+            Default is "" (empty string).
+        assign: :obj:`bool`, optional
+            Whether to assign the DataFrames to `Attributes`.
+
+            Default is :obj:`True`.
 
         Returns
         ----------
@@ -1315,24 +1378,28 @@ class ATACSeqAnalysis(Analysis):
             annot_comp.index = bed_to_index(annot_comp)
             annot_comp.columns = ["chrom", "start", "end", "chromatin_state"]
             # save to disk
-            a = "" if (label == "real") else ("_" + label)
-            annot.to_csv(
-                os.path.join(
-                    self.results_dir,
-                    self.name + ".chrom_state_annotation{}_mapping.csv".format(a),
-                ),
-                index=True,
-            )
-            annot_comp.to_csv(
-                os.path.join(
-                    self.results_dir,
-                    self.name + ".chrom_state_annotation{}.csv".format(a),
-                ),
-                index=True,
-            )
+            if save:
+                a = "" if (label == "real") else ("_" + label)
+                if output_prefix != "":
+                    output_prefix += "."
+                annot.to_csv(
+                    os.path.join(
+                        self.results_dir,
+                        self.name + ".chrom_state_annotation{}_mapping.{}csv".format(a, output_prefix),
+                    ),
+                    index=True,
+                )
+                annot_comp.to_csv(
+                    os.path.join(
+                        self.results_dir,
+                        self.name + ".chrom_state_annotation{}.{}csv".format(a, output_prefix),
+                    ),
+                    index=True,
+                )
 
-            setattr(self, attr, annot_comp)
-            setattr(self, attr + "_mapping", annot)
+            if assign:
+                setattr(self, attr, annot_comp)
+                setattr(self, attr + "_mapping", annot)
         return self.chrom_state_annotation
 
     def get_sex_chrom_ratio(

@@ -1717,7 +1717,13 @@ class Analysis(object):
             # subset to requested samples
             return matrix.loc[:, [s.name for s in samples]]
 
-    def get_matrix_stats(self, matrix="matrix_raw", samples=None):
+    def get_matrix_stats(
+            self,
+            matrix="matrix_raw",
+            samples=None,
+            save=True,
+            output_prefix="stats_per_feature",
+            assign=True):
         """
         Gets a matrix of feature-wise (ie for every gene or region) statistics such
         across samples such as mean, variance, deviation, dispersion and amplitude.
@@ -1732,6 +1738,18 @@ class Analysis(object):
             Subset of samples to use.
 
             Defaults to all in analysis.
+        save: :obj:`bool`, optional
+            Whether to write the annotated DataFrame to disk.
+
+            Default is :obj:`True`.
+        output_prefix: :obj:`str`, optional
+            Prefix to add to output file when save is True.
+
+            Default is "matrix_features".
+        assign: :obj:`bool`, optional
+            Whether to assign the annoatated DataFrame to "matrix_features".
+
+            Default is :obj:`True`.
 
         Returns
         -------
@@ -1765,16 +1783,25 @@ class Analysis(object):
             0.25, axis=1
         )
         metrics.index.name = "index"
-        metrics.to_csv(
-            os.path.join(self.results_dir, self.name + ".stats_per_feature.csv"),
-            index=True,
-        )
+        if save:
+            metrics.to_csv(
+                os.path.join(self.results_dir, self.name + ".{}.csv".format(output_prefix)),
+                index=True,
+            )
 
-        self.stats = metrics
-        return self.stats
+        if assign:
+            self.stats = metrics
+        return metrics
 
     def annotate_features(
-        self, samples=None, matrix="matrix_norm", feature_tables=None, permissive=True
+        self,
+        samples=None,
+        matrix="matrix_norm",
+        feature_tables=None,
+        permissive=True,
+        save=True,
+        output_prefix="matrix_features",
+        assign=True,
     ):
         """
         Annotates analysis features (regions/genes) by aggregating annotations
@@ -1806,6 +1833,18 @@ class Analysis(object):
             Whether DataFrames that do not exist should be simply skipped or an error will be thrown.
 
             Defaults to :obj:`True`.
+        save: :obj:`bool`, optional
+            Whether to write the annotated DataFrame to disk.
+
+            Default is :obj:`True`.
+        output_prefix: :obj:`str`, optional
+            Prefix to add to output file when save is True.
+
+            Default is "matrix_features".
+        assign: :obj:`bool`, optional
+            Whether to assign the annoatated DataFrame to "matrix_features".
+
+            Default is :obj:`True`.
 
         Raises
         ----------
@@ -1839,14 +1878,14 @@ class Analysis(object):
         for matrix_name in feature_tables:
             if hasattr(self, matrix_name):
                 matrix = getattr(self, matrix_name)
-                self.matrix_features = pd.merge(
+                matrix_features = pd.merge(
                     next_matrix,
                     matrix[matrix.columns.difference(next_matrix.columns)],
                     left_index=True,
                     right_index=True,
                     how="left",
                 )
-                next_matrix = self.matrix_features
+                next_matrix = matrix_features
             else:
                 if not permissive:
                     _LOGGER.error(msg.format(matrix_name))
@@ -1854,22 +1893,27 @@ class Analysis(object):
                 else:
                     _LOGGER.warning(msg.format(matrix_name) + " Proceeding anyway.")
 
-        if not hasattr(self, "matrix_features"):
-            self.matrix_features = next_matrix
+        if "matrix_features" not in locals():
+            matrix_features = next_matrix
 
         # Pair indexes
         msg = "Annotated matrix does not have same feature length as matrix_raw matrix."
-        if not self.matrix_raw.shape[0] == self.matrix_features.shape[0]:
+        if not self.matrix_raw.shape[0] == matrix_features.shape[0]:
             _LOGGER.error(msg)
             raise AssertionError(msg)
-        self.matrix_features.index = self.matrix_raw.index
-        self.matrix_features.index.name = "index"
+        matrix_features.index = self.matrix_raw.index
+        matrix_features.index.name = "index"
 
         # Save
-        self.matrix_features.to_csv(
-            os.path.join(self.results_dir, self.name + ".matrix_features.csv"),
-            index=True,
-        )
+        if save:
+            self.matrix_features.to_csv(
+                os.path.join(self.results_dir, self.name + ".{}.csv".format(output_prefix)),
+                index=True,
+            )
+        if assign:
+            self.matrix_features = matrix_features
+
+        return matrix_features
 
     def annotate_samples(
         self,

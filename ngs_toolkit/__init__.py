@@ -197,9 +197,26 @@ def setup_timestamping():
             exclude_functions=["from_dataframe"])
 
 
+def check_bedtools_version():
+    import pybedtools
+
+    # not existing
+    v = ".".join([str(x) for x in pybedtools.helpers.settings.bedtools_version])
+    msg = "Bedtools does not seem to be installed or is not in $PATH."
+    if v == '':
+        raise Exception(msg)
+
+    # too low version
+    msg = "Bedtools version '{}' is smaller than 2.27.".format(v)
+    msg = " Please upgrade to newer version."
+    if not pybedtools.helpers.settings._v_2_27_plus:
+        raise Exception(msg)
+
+
 # setup
 _LOGGER = setup_logger()
 _CONFIG = setup_config()
+check_bedtools_version()
 setup_graphic_preferences()
 setup_timestamping()
 

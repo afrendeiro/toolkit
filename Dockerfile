@@ -35,9 +35,11 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 # Install specific bedtools version
-RUN wget http://ftp.debian.org/debian/pool/main/b/bedtools/bedtools_2.21.0-1_amd64.deb \
-    && dpkg -i bedtools_2.21.0-1_amd64.deb \
-    && rm bedtools_2.21.0-1_amd64.deb
+RUN apt-get update \
+    && apt-get install -t unstable -y --no-install-recommends \
+        bedtools=2.27.1+dfsg-4 \
+    && rm -rf /tmp/downloaded_packages/ /tmp/*.rds \
+    && rm -rf /var/lib/apt/lists/*
 
 RUN apt-get update \
     && apt-get install -t unstable -y --no-install-recommends \

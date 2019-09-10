@@ -44,7 +44,7 @@ Install non-Python dependencies:
 
 .. code-block:: bash
 
-   conda install -y bedtools==2.20.1
+   conda install -y bedtools==2.27.1
    conda install -y ucsc-twobittofa
    conda install -y bioconductor-deseq2
    conda install -y bioconductor-cqn
@@ -62,17 +62,14 @@ And then install the ``ngs-toolkit`` library with pip (available only through Py
 
 ``ngs_toolkit`` makes use of some non-Python dependencies.
 
+ - `bedtools <https://bedtools.readthedocs.io/en/latest/>`_: version should be at least 2.27.1
+
 The following are highly recommended only for some data or analysis types:
 
- - `bedtools <https://bedtools.readthedocs.io/en/latest/>`_: required for some ATAC/ChIP-seq functions. It is underlying the Python interface library to bedtools (pybedtools) which can be installed without bedtools.
  - `R <https://www.r-project.org/>`_ and some bioconductor libraries (optional):
-
    - `cqn <https://bioconductor.org/packages/release/bioc/html/cqn.html>`_ (optional): used for GC-content aware normalization of NGS data.
    - `DESeq2 <https://bioconductor.org/packages/release/bioc/html/DESeq2.html>`_ (optional): used for differential testing of genes/regulatory elements.
  - `Kent tools <https://github.com/ENCODE-DCC/kentUtils>`_ (optional): the 'twoBitToFa' binary from UCSC's Kent bioinformatics toolkit is used to convert between the 2bit and FASTA formats.
-
-.. note::
-   ``bedtools`` version should be below 2.24.0 (2.20.1 is used for testing)
 
 
 Testing

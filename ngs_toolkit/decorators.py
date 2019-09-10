@@ -70,7 +70,7 @@ def read_csv_timestamped(f):
     return wrapper
 
 
-def to_csv_timestamped(f, exclude_functions=[]):
+def to_csv_timestamped(f, exclude_functions=None):
     from ngs_toolkit.utils import (
         record_analysis_output, get_timestamp,
         is_analysis_descendent)

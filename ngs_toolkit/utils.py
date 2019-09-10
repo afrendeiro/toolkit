@@ -85,12 +85,12 @@ def get_this_file_or_timestamped(file, permissive=True):
             raise IndexError(msg)
 
 
-def is_analysis_descendent(exclude_functions=[]):
+def is_analysis_descendent(exclude_functions=None):
     import inspect
     from ngs_toolkit import Analysis
 
     for s in inspect.stack():
-        if s.function in exclude_functions:
+        if s.function in exclude_functions or []:
             return False
         if 'self' not in s.frame.f_locals:
             continue

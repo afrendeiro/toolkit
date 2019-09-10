@@ -2183,7 +2183,7 @@ def rename_sample_files(
                 raise OSError("Command '{}' failed.".format(cmd))
 
 
-def query_biomart(attributes=None, species="hsapiens", ensembl_version="grch37"):
+def query_biomart(attributes=None, species="hsapiens", ensembl_version="grch37", max_api_retries=5):
     """
     Query Biomart (https://www.ensembl.org/biomart/martview/).
 
@@ -2204,6 +2204,10 @@ def query_biomart(attributes=None, species="hsapiens", ensembl_version="grch37")
         Ensembl version to query. Currently "grch37", "grch38" and "grcm38" are tested.
 
         Defaults to "grch37".
+    max_api_retries : :obj:`int`, optional
+        How many times to try .
+
+        Defaults to "grch37".
 
     Returns
     -------
@@ -2211,6 +2215,7 @@ def query_biomart(attributes=None, species="hsapiens", ensembl_version="grch37")
         Dataframe with required attributes for each entry.
     """
     import requests
+    import time
 
     supported = ["grch37", "grch38", "grcm38"]
     if ensembl_version not in supported:
@@ -2235,12 +2240,33 @@ def query_biomart(attributes=None, species="hsapiens", ensembl_version="grch37")
         + ["""<Attribute name="{}" />""".format(attr) for attr in attributes]
         + ["""</Dataset>""", """</Query>"""]
     )
-    req = requests.get(url_query, stream=True)
-    if not req.ok:
-        msg = "Request to Biomart API was not successful."
-        _LOGGER.error(msg)
-        raise ValueError(msg)
-    content = list(req.iter_lines())
+
+    n_fails = 0
+    success = False
+    while not success:
+        req = requests.get(url_query, stream=True)
+        if not req.ok:
+            n_fails += 1
+            msg = "Request to Biomart API was not successful."
+            if n_fails == max_api_retries:
+                _LOGGER.error(msg)
+                raise ValueError(msg)
+            else:
+                _LOGGER.warning(msg + " Retrying.")
+                time.sleep(1)
+        else:
+            try:
+                content = list(req.iter_lines())
+                success = True
+            except (requests.exceptions.ChunkedEncodingError, requests.urllib3.exceptions.ProtocolError):
+                msg = "Retrieving Biomart request failed."
+                n_fails += 1
+                if n_fails == max_api_retries:
+                    _LOGGER.error(msg)
+                    raise ValueError(msg)
+                else:
+                    _LOGGER.warning(msg + " Retrying.")
+                    time.sleep(1)
 
     if (len(content) == 1) and (content[0].startswith("Query ERROR")):
         msg = "Request to Biomart API was not successful. Check your input.\n{}".format(

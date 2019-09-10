@@ -7,6 +7,11 @@ Changelog
 
 ------------
 
+- **v0.17** (development, pre-1.0):
+
+  - Required bedtools version is now 2.17.1
+
+
 - **v0.16** (development, pre-1.0):
 
   - Fixed bug in general.get_genomic_context due to a bug in the timestamping workflow

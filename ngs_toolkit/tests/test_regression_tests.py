@@ -51,3 +51,30 @@ def test_get_right_timestamped_file(tmpdir):
             handle.write(f)
 
     assert get_this_file_or_timestamped(target) == outs[0]
+
+
+def test_bedtools_intersect_to_dataframe():
+    import pandas as pd
+    import pybedtools
+
+    a = pd.DataFrame([
+        ['chr1', 9844, 10460],
+        ['chr1', 180534, 181797]])
+
+    b = pd.DataFrame([
+        ['chr1', 10000, 10800, '9_Het'],
+        ['chr1', 10800, 16000, '15_Quies'],
+        ['chr1', 16000, 16200, '1_TssA'],
+        ['chr1', 16200, 19000, '5_TxWk'],
+        ['chr1', 19000, 96080, '15_Quies'],
+        ['chr1', 96276, 96476, '15_Quies'],
+        ['chr1', 97276, 177200, '15_Quies']])
+
+    a_ = pybedtools.BedTool.from_dataframe(a)
+    b_ = pybedtools.BedTool.from_dataframe(b)
+
+    res = a_.intersect(b_, wa=True, wb=True, loj=True)
+    df = res.to_dataframe()
+    assert isinstance(df, pd.DataFrame)
+    assert df.shape == (2, 7)
+    assert df.iloc[1, -1] == '.'

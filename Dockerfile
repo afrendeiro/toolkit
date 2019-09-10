@@ -35,12 +35,10 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 # Install specific bedtools version
-RUN apt-get update \
-    && apt-get install -t unstable -y --no-install-recommends \
-        bedtools=2.27.1+dfsg-4 \
-    && rm -rf /tmp/downloaded_packages/ /tmp/*.rds \
-    && rm -rf /var/lib/apt/lists/*
+RUN wget http://ftp.br.debian.org/debian/pool/main/b/bedtools/bedtools_2.27.1+dfsg-4_amd64.deb \
+    && sudo dpkg -i bedtools_2.27.1+dfsg-4_amd64.deb
 
+# Install R dependencies
 RUN apt-get update \
     && apt-get install -t unstable -y --no-install-recommends \
         gfortran \

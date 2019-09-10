@@ -855,7 +855,7 @@ class ATACSeqAnalysis(Analysis):
 
         if fast_and_unsafe:
             _LOGGER.warning("Using a concatenation method that is not 100% safe.")
-            matrix_raw = pd.concat(matrix_raw, axis=1, sort=False)
+            matrix_raw = pd.concat(matrix_raw, axis=1, sort=False).sort_index()
             matrix_raw = matrix_raw.loc[:, ~matrix_raw.columns.duplicated()].set_index(["chrom", "start", "end"])
         else:
             matrix_raw = (

@@ -805,6 +805,47 @@ class Analysis(object):
             pickle_file = self.pickle_file
         return pickle.load(open(pickle_file, "rb"))
 
+    def get_sample_annotation(self, attributes=None, samples=None):
+        """
+        Get dataframe annotation of sample attributes.
+
+        Attributes
+        -------
+        attributes : :obj:`None`, optional
+            Attributes to include.
+
+            Defaults to the union of sample_attributes and group_attributes in Analysis.
+        samples : :obj:`None`, optional
+            Samples to subset.
+
+            Defaults to all samples in Analysis.
+
+        Returns
+        -------
+        pandas.DataFrame
+            Dataframe with requested attributes (columns) for each sample (rows).
+        """
+        if attributes is None:
+            attributes = list(
+                set(self.sample_attributes)
+                .union(set(self.group_attributes)))
+
+        if samples is None:
+            samples = self.samples
+
+        try:
+            v = [getattr(s, p) for s in samples for p in attributes]
+        except AttributeError:
+            msg = "All samples must have all attributes specified!"
+            _LOGGER.error(msg)
+            raise AttributeError(msg)
+        df = pd.DataFrame(
+            np.array(v)
+            .reshape(len(samples), len(attributes)),
+            index=[s.name for s in samples],
+            columns=attributes)
+        return df
+
     def load_data(
         self,
         output_map=None,

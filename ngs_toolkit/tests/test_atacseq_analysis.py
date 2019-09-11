@@ -98,10 +98,6 @@ def test_quantile_normalization(various_analysis):
 
 @pytest.mark.skipif(travis, reason="CQN normalization not testable in Travis")
 def test_cqn_normalization(atac_analysis):
-    # At some point, downloading a genome reference in Travis
-    # caused memory error.
-    # This should now be fixed by implementing download/decompressing
-    # functions working in chunks
     qnorm = atac_analysis.normalize_cqn()
     assert qnorm.dtypes.all() == np.float
     file = os.path.join(atac_analysis.results_dir, atac_analysis.name + ".matrix_norm.csv")
@@ -273,3 +269,158 @@ def test_plot_raw_coverage(various_analysis):
             analysis.name + ".raw_counts.violinplot.by_{}.svg".format(attr),
         )
         assert file_exists_and_not_empty(output)
+
+
+@pytest.fixture
+def peak_outputs(atac_analysis_with_input_files):
+    outputs = [
+        ".peak_location.per_sample.svg",
+        ".lengths.svg",
+        ".peak_lengths.per_sample.svg",
+        ".total_open_chromatin_space.per_sample.svg",
+        ".open_chromatin_space.csv"]
+    with atac_analysis_with_input_files as a:
+        outputs = [os.path.join(a.results_dir, "peak_characteristics", a.name + f) for f in outputs]
+
+    return outputs
+
+
+class Test_plot_peak_characteristics:
+    def test_no_arguments(
+            self, atac_analysis_with_input_files, peak_outputs):
+        with atac_analysis_with_input_files as a:
+            a.plot_peak_characteristics()
+
+            for f in peak_outputs:
+                assert file_exists_and_not_empty(f)
+
+    def test_plot_peak_characteristics_by_group(
+            self, atac_analysis_with_input_files, peak_outputs):
+        with atac_analysis_with_input_files as a:
+            g = a.group_attributes[-1]
+            outputs = [
+                ".peak_lengths.per_{}.svg".format(g),
+                ".total_open_chromatin_space.per_{}.svg".format(g)]
+            outputs = [os.path.join(a.results_dir, "peak_characteristics", a.name + f) for f in outputs]
+
+            a.plot_peak_characteristics(by_attribute=g)
+
+            for f in peak_outputs + outputs:
+                assert file_exists_and_not_empty(f)
+
+    def test_plot_peak_characteristics_with_closest_tss(
+            self, atac_analysis_with_input_files, peak_outputs):
+        with atac_analysis_with_input_files as a:
+            outputs = [
+                ".tss_distance.svg"]
+            outputs = [os.path.join(a.results_dir, "peak_characteristics", a.name + f) for f in outputs]
+
+            a.get_peak_gene_annotation()
+            a.plot_peak_characteristics()
+
+            for f in peak_outputs + outputs:
+                assert file_exists_and_not_empty(f)
+
+    def test_plot_peak_characteristics_with_genomic_location(
+            self, atac_analysis_with_input_files, peak_outputs):
+        with atac_analysis_with_input_files as a:
+            outputs = [
+                ".genomic_regions.svg"]
+            outputs = [os.path.join(a.results_dir, "peak_characteristics", a.name + f) for f in outputs]
+
+            a.get_peak_genomic_location()
+            a.plot_peak_characteristics()
+
+            for f in peak_outputs + outputs:
+                assert file_exists_and_not_empty(f)
+
+    def test_plot_peak_characteristics_with_chromatin_state(
+            self, atac_analysis_with_input_files, chrom_file, peak_outputs):
+        with atac_analysis_with_input_files as a:
+            outputs = [
+                ".chromatin_states.svg"]
+            outputs = [os.path.join(a.results_dir, "peak_characteristics", a.name + f) for f in outputs]
+
+            a.get_peak_chromatin_state(chrom_file)
+            a.plot_peak_characteristics()
+
+            for f in peak_outputs + outputs:
+                assert file_exists_and_not_empty(f)
+
+    def test_plot_peak_characteristics_with_both(
+            self, atac_analysis_with_input_files, chrom_file, peak_outputs):
+        with atac_analysis_with_input_files as a:
+            outputs = [
+                ".genomic_regions.svg",
+                ".chromatin_states.svg",
+                ".genomic_region_and_chromatin_states.svg"]
+            outputs = [os.path.join(a.results_dir, "peak_characteristics", a.name + f) for f in outputs]
+
+            a.get_peak_genomic_location()
+            a.get_peak_chromatin_state(chrom_file)
+            a.plot_peak_characteristics()
+
+            for f in peak_outputs + outputs:
+                assert file_exists_and_not_empty(f)
+
+    def test_plot_peak_characteristics_with_both_and_stats(
+            self, atac_analysis_with_input_files, chrom_file, peak_outputs):
+        with atac_analysis_with_input_files as a:
+            outputs = [
+                ".genomic_regions.svg",
+                ".chromatin_states.svg",
+                ".genomic_region_and_chromatin_states.svg",
+                ".mean_vs_iqr.svg",
+                ".mean_vs_amplitude.svg",
+                ".mean_vs_qv2.svg",
+                ".mean_vs_dispersion.svg",
+                ".mean_vs_variance.svg",
+                ".mean_vs_std_deviation.svg",
+                ".qv2.distplot.svg",
+                ".iqr.distplot.svg",
+                ".amplitude.distplot.svg",
+                ".variance.distplot.svg",
+                ".std_deviation.distplot.svg",
+                ".mean.distplot.svg",
+                ".dispersion.distplot.svg"]
+            outputs = [os.path.join(a.results_dir, "peak_characteristics", a.name + f) for f in outputs]
+
+            a.get_peak_genomic_location()
+            a.get_peak_chromatin_state(chrom_file)
+            a.get_matrix_stats()
+            a.plot_peak_characteristics()
+
+            for f in peak_outputs + outputs:
+                assert file_exists_and_not_empty(f)
+
+    def test_plot_peak_characteristics_with_both_and_stats_and_support(
+            self, atac_analysis_with_input_files, chrom_file, peak_outputs):
+        with atac_analysis_with_input_files as a:
+            outputs = [
+                ".genomic_regions.svg",
+                ".chromatin_states.svg",
+                ".genomic_region_and_chromatin_states.svg",
+                ".mean_vs_iqr.svg",
+                ".mean_vs_amplitude.svg",
+                ".mean_vs_qv2.svg",
+                ".mean_vs_dispersion.svg",
+                ".mean_vs_variance.svg",
+                ".mean_vs_std_deviation.svg",
+                ".qv2.distplot.svg",
+                ".iqr.distplot.svg",
+                ".amplitude.distplot.svg",
+                ".variance.distplot.svg",
+                ".std_deviation.distplot.svg",
+                ".mean.distplot.svg",
+                ".dispersion.distplot.svg",
+                ".mean_vs_support.svg"]
+            outputs = [os.path.join(a.results_dir, "peak_characteristics", a.name + f) for f in outputs]
+
+            a.calculate_peak_support()
+            a.get_peak_genomic_location()
+            a.get_peak_chromatin_state(chrom_file)
+            a.get_matrix_stats()
+            a.plot_peak_characteristics()
+
+            for f in peak_outputs + outputs:
+                assert file_exists_and_not_empty(f)

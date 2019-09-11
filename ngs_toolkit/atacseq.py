@@ -1628,7 +1628,12 @@ class ATACSeqAnalysis(Analysis):
         return dr3.loc[:, ~dr3.isnull().all()]
 
     def plot_peak_characteristics(
-        self, samples=None, by_attribute=None, genome_space=3e9
+        self,
+        samples=None,
+        by_attribute=None,
+        genome_space=3e9,
+        output_dir="{results_dir}/peak_characteristics",
+        output_prefix="{name}"
     ):
         """
         Several diagnostic plots on the analysis' consensus peak set
@@ -1647,7 +1652,19 @@ class ATACSeqAnalysis(Analysis):
 
         genome_space : :obj:`int`
             Length of genome.
+
+            Defaults to 3e9 basepairs (human genome).
+
+        output_dir : :obj:`str`
+            Directory to output files. Will be formated with variables from Analysis.
+
+            Defaults to "peak_characteristics" under the Analysis "results_dir".
+        output_prefix : :obj:`str`
+            Prefix to add to output files.
+
+            Defaults to the Analysis' name.
         """
+        # TODO: abstract genome space kwarg
         import multiprocessing
         import parmap
         import matplotlib.pyplot as plt
@@ -1665,6 +1682,11 @@ class ATACSeqAnalysis(Analysis):
         if samples is None:
             samples = self.samples
 
+        output_dir = self._format_string_with_attributes(output_dir)
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+        output_prefix = self._format_string_with_attributes(output_prefix)
+
         reads = parmap.map(
             count_bam_file_length, [s.aligned_filtered_bam for s in samples]
         )
@@ -1681,74 +1703,59 @@ class ATACSeqAnalysis(Analysis):
         stats["open_chromatin_norm"] = stats["open_chromatin"] / stats["reads_used"]
         stats.to_csv(
             os.path.join(
-                self.results_dir, "{}.open_chromatin_space.csv".format(self.name)
+                output_dir, "{}.open_chromatin_space.csv".format(output_prefix)
             ),
             index=True,
         )
         # stats = pd.read_csv(os.path.join(
-        #         self.results_dir,
+        #         output_dir,
         #         "{}.open_chromatin_space.csv"
-        #         .format(self.name)),
+        #         .format(output_prefix)),
         #     index_col=0)
 
         # median lengths per sample (split-apply-combine)
         if by_attribute is not None:
+            stats = stats.join(self.get_sample_annotation())
             stats = pd.merge(
                 stats,
                 stats.groupby(by_attribute)["open_chromatin"]
                 .median()
                 .to_frame(name="group_open_chromatin")
                 .reset_index(),
-            )
+            ).set_index(stats.index)
             stats = pd.merge(
                 stats,
                 stats.groupby(by_attribute)["open_chromatin_norm"]
                 .median()
                 .to_frame(name="group_open_chromatin_norm")
                 .reset_index(),
-            )
+            ).set_index(stats.index)
 
         # plot
         stats = stats.sort_values("open_chromatin_norm")
         fig, axis = plt.subplots(2, 1, figsize=(1 * 3, 2 * 3))
-        sns.barplot(
-            y="index",
-            x="open_chromatin",
-            orient="horiz",
-            data=stats.reset_index(),
-            palette="summer",
-            ax=axis[0],
-        )
-        sns.barplot(
-            y="index",
-            x="open_chromatin_norm",
-            orient="horiz",
-            data=stats.reset_index(),
-            palette="summer",
-            ax=axis[1],
-        )
+        for ax, var in zip(axis, ['open_chromatin', 'open_chromatin_norm']):
+            sns.barplot(
+                y="index",
+                x=var,
+                orient="horiz",
+                data=stats.reset_index(),
+                palette="summer",
+                ax=ax,
+            )
+            ax.set_ylabel("Sample name")
         axis[0].set_xlabel("Total open chromatin space (bp)")
         axis[1].set_xlabel("Total open chromatin space (normalized)")
         sns.despine(fig)
         savefig(
             fig,
             os.path.join(
-                self.results_dir,
-                "{}.total_open_chromatin_space.per_sample.svg".format(self.name),
+                output_dir,
+                "{}.total_open_chromatin_space.per_sample.svg".format(output_prefix),
             ),
         )
 
         if by_attribute is not None:
-            # median lengths per group (split-apply-combine)
-            stats = pd.merge(
-                stats,
-                stats.groupby(by_attribute)["open_chromatin"]
-                .median()
-                .to_frame(name="group_open_chromatin")
-                .reset_index()
-                .sort_values("group_open_chromatin"),
-            )
-
             fig, axis = plt.subplots(2, 1, figsize=(4 * 2, 6 * 1))
             stats = stats.sort_values("group_open_chromatin")
             sns.barplot(
@@ -1784,23 +1791,13 @@ class ATACSeqAnalysis(Analysis):
                 palette="summer",
                 ax=axis[1],
             )
-            axis[0].axhline(
-                stats.groupby(by_attribute)["open_chromatin"].median()["WT"],
-                color="black",
-                linestyle="--",
-            )
-            axis[1].axhline(
-                stats.groupby(by_attribute)["open_chromatin_norm"].median()["WT"],
-                color="black",
-                linestyle="--",
-            )
             axis[0].set_xlabel("Total open chromatin space (bp)")
             axis[1].set_xlabel("Total open chromatin space (normalized)")
             sns.despine(fig)
             savefig(
                 fig,
                 os.path.join(
-                    self.results_dir,
+                    output_dir,
                     "{}.total_open_chromatin_space.per_{}.svg".format(
                         self.name, by_attribute
                     ),
@@ -1825,39 +1822,30 @@ class ATACSeqAnalysis(Analysis):
             .sort_values("mean_peak_length"),
         )
 
-        fig, axis = plt.subplots(2, 1, figsize=(3 * 1, 3 * 2))
-        sns.boxplot(
-            y="sample_name",
-            x="peak_length",
-            orient="horiz",
-            data=lengths,
-            palette="summer",
-            ax=axis[0],
-            showfliers=False,
-        )
-        axis[0].set_ylabel("Peak length (bp)")
-        axis[0].set_xticklabels(axis[0].get_xticklabels(), visible=False)
-        sns.boxplot(
-            y="sample_name",
-            x="peak_length",
-            orient="horiz",
-            data=lengths,
-            palette="summer",
-            ax=axis[1],
-            showfliers=False,
-        )
+        fig, axis = plt.subplots(2, 1, figsize=(3 * 1, 3 * 2), sharex=False)
+        for ax in axis:
+            sns.boxplot(
+                y="sample_name",
+                x="peak_length",
+                orient="horiz",
+                data=lengths,
+                palette="summer",
+                ax=ax,
+                showfliers=False,
+            )
+            ax.set_ylabel("Sample name")
+            ax.set_xlabel("Peak length (bp)")
         axis[1].set_xscale("log")
-        axis[1].set_xlabel("Peak length (bp)")
         sns.despine(fig)
         savefig(
             fig,
             os.path.join(
-                self.results_dir, "{}.peak_lengths.per_sample.svg".format(self.name)
+                output_dir, "{}.peak_lengths.per_sample.svg".format(output_prefix)
             ),
         )
 
         if by_attribute is not None:
-            # median lengths per group (split-apply-combine)
+            lengths = lengths.merge(self.get_sample_annotation())
             lengths = pd.merge(
                 lengths,
                 lengths.groupby(by_attribute)["peak_length"]
@@ -1865,37 +1853,27 @@ class ATACSeqAnalysis(Analysis):
                 .to_frame(name="group_mean_peak_length")
                 .reset_index()
                 .sort_values("group_mean_peak_length"),
-            )
+            ).set_index(lengths.index)
 
-            fig, axis = plt.subplots(2, 1, figsize=(3 * 1, 3 * 2))
-            sns.boxplot(
-                y=by_attribute,
-                x="peak_length",
-                orient="horiz",
-                data=lengths,
-                palette="summer",
-                ax=axis[0],
-                showfliers=False,
-            )
-            axis[0].set_xlabel("Peak length (bp)")
-            sns.boxplot(
-                y=by_attribute,
-                x="peak_length",
-                orient="horiz",
-                data=lengths,
-                palette="summer",
-                ax=axis[1],
-                showfliers=False,
-            )
+            fig, axis = plt.subplots(2, 1, figsize=(3 * 1, 3 * 2), sharex=False)
+            for ax in axis:
+                sns.boxplot(
+                    y=by_attribute,
+                    x="peak_length",
+                    orient="horiz",
+                    data=lengths,
+                    palette="summer",
+                    ax=ax,
+                    showfliers=False,
+                )
+                ax.set_xlabel("Peak length (bp)")
             axis[1].set_xscale("log")
-            axis[1].set_xlabel("Peak length (bp)")
-            axis[1].set_yticklabels(axis[1].get_yticklabels(), visible=False)
             sns.despine(fig)
             savefig(
                 fig,
                 os.path.join(
-                    self.results_dir,
-                    "{}.peak_lengths.per_{}.svg".format(self.name, by_attribute),
+                    output_dir,
+                    "{}.peak_lengths.per_{}.svg".format(output_prefix, by_attribute),
                 ),
             )
 
@@ -1927,14 +1905,17 @@ class ATACSeqAnalysis(Analysis):
                 cmap="summer",
                 xticklabels=True,
                 yticklabels=True,
+                cbar_kws={"label": "Normalized accessibility"},
                 ax=axis,
             )
+            axis.set_xlabel("Sample name")
+            axis.set_ylabel("Chromosome")
             axis.set_xticklabels(axis.get_xticklabels(), rotation=90, ha="right")
             axis.set_yticklabels(axis.get_yticklabels(), rotation=0, ha="right")
             savefig(
                 fig,
                 os.path.join(
-                    self.results_dir, "{}.peak_location.per_sample.svg".format(self.name)
+                    output_dir, "{}.peak_location.per_sample.svg".format(output_prefix)
                 ),
             )
 
@@ -1950,7 +1931,7 @@ class ATACSeqAnalysis(Analysis):
         axis.set_xlabel("Peak width (bp)")
         axis.set_ylabel("Density")
         sns.despine(fig)
-        savefig(fig, os.path.join(self.results_dir, "{}.lengths.svg".format(self.name)))
+        savefig(fig, os.path.join(output_dir, "{}.lengths.svg".format(output_prefix)))
 
         # plot support
         if hasattr(self, "support"):
@@ -1959,51 +1940,29 @@ class ATACSeqAnalysis(Analysis):
             axis.set_ylabel("frequency")
             sns.despine(fig)
             savefig(
-                fig, os.path.join(self.results_dir, "{}.support.svg".format(self.name))
+                fig, os.path.join(output_dir, "{}.support.svg".format(output_prefix))
             )
 
         # Plot distance to nearest TSS
         if hasattr(self, "closest_tss_distances"):
             fig, axis = plt.subplots(
-                2, 2, figsize=(4 * 2, 4 * 2), sharex=False, sharey=False
+                2, 1, figsize=(3 * 1, 3 * 2), sharex=False, sharey=False
             )
-            sns.distplot(
-                self.closest_tss_distances["distance"],
-                bins=1000,
-                kde=True,
-                hist=False,
-                ax=axis[0][0],
-            )
-            sns.distplot(
-                self.closest_tss_distances["distance"],
-                bins=1000,
-                kde=True,
-                hist=False,
-                ax=axis[0][1],
-            )
-            sns.distplot(
-                self.closest_tss_distances["distance"],
-                bins=1000,
-                kde=True,
-                hist=False,
-                ax=axis[1][0],
-            )
-            sns.distplot(
-                self.closest_tss_distances["distance"],
-                bins=1000,
-                kde=True,
-                hist=False,
-                ax=axis[1][1],
-            )
-            for ax in axis.flat:
+            for i, ax in enumerate(axis):
+                sns.distplot(
+                    self.closest_tss_distances["distance"],
+                    bins=1000,
+                    kde=True,
+                    hist=False if (i % 2 == 0) else True,
+                    ax=ax,
+                )
                 ax.set_xlabel("Distance to nearest TSS (bp)")
                 ax.set_ylabel("Density")
-            axis[0][1].set_yscale("log")
-            axis[1][1].set_yscale("log")
+            axis[1].set_yscale("log")
             sns.despine(fig)
             savefig(
                 fig,
-                os.path.join(self.results_dir, "{}.tss_distance.svg".format(self.name)),
+                os.path.join(output_dir, "{}.tss_distance.svg".format(output_prefix)),
             )
 
         # Plot genomic regions
@@ -2055,7 +2014,7 @@ class ATACSeqAnalysis(Analysis):
                 savefig(
                     g,
                     os.path.join(
-                        self.results_dir, "{}.{}s.svg".format(self.name, name)
+                        output_dir, "{}.{}s.svg".format(output_prefix, name)
                     ),
                 )
 
@@ -2063,12 +2022,12 @@ class ATACSeqAnalysis(Analysis):
         if len(datas) > 1:
             data = pd.concat(datas)
             g = sns.FacetGrid(
-                data=pd.melt(data.reset_index(), id_vars="region"),
+                data=pd.melt(data.reset_index(), id_vars="region").sort_values("value"),
                 col="variable",
                 col_wrap=2,
                 sharex=False,
                 sharey=True,
-                size=2,
+                size=3,
                 aspect=1.2,
             )
             g.map(sns.barplot, "value", "region", orient="horiz")
@@ -2076,8 +2035,8 @@ class ATACSeqAnalysis(Analysis):
             savefig(
                 g,
                 os.path.join(
-                    self.results_dir,
-                    "{}.genomic_region_and_chromatin_states.svg".format(self.name),
+                    output_dir,
+                    "{}.genomic_region_and_chromatin_states.svg".format(output_prefix),
                 ),
             )
 
@@ -2090,7 +2049,7 @@ class ATACSeqAnalysis(Analysis):
                 savefig(
                     fig,
                     os.path.join(
-                        self.results_dir, "{}.{}.distplot.svg".format(self.name, attr)
+                        output_dir, "{}.{}.distplot.svg".format(output_prefix, attr)
                     ),
                 )
         if hasattr(self, "support"):
@@ -2101,20 +2060,21 @@ class ATACSeqAnalysis(Analysis):
             savefig(
                 fig,
                 os.path.join(
-                    self.results_dir, "{}.{}.distplot.svg".format(self.name, attr)
+                    output_dir, "{}.{}.distplot.svg".format(output_prefix, attr)
                 ),
             )
 
         # Pairwise against mean
         if hasattr(self, "stats"):
+            stats = self.stats.copy()
             if hasattr(self, "support"):
-                self.stats.loc[:, "support"] = self.support.loc[:, "support"]
-            for attr in self.stats.columns:
+                stats = stats.join(self.support.loc[:, "support"])
+            for attr in stats.columns:
                 if attr == "mean":
                     continue
-                p = self.stats[
-                    (self.stats["mean"] > 0)
-                    & (self.stats[attr] < np.percentile(self.stats[attr], 99) * 3)
+                p = stats[
+                    (stats["mean"] > 0)
+                    & (stats[attr] < np.percentile(stats[attr], 99) * 3)
                 ]
                 g = sns.jointplot(
                     p["mean"], p[attr], s=1, alpha=0.1, rasterized=True, height=3
@@ -2122,7 +2082,7 @@ class ATACSeqAnalysis(Analysis):
                 savefig(
                     g.fig,
                     os.path.join(
-                        self.results_dir, "{}.mean_vs_{}.svg".format(self.name, attr)
+                        output_dir, "{}.mean_vs_{}.svg".format(output_prefix, attr)
                     ),
                 )
 

@@ -1910,7 +1910,7 @@ class ATACSeqAnalysis(Analysis):
         )
         chroms_norm = (chroms / chroms.sum(axis=0)) * 100
 
-        if hasattr(self, "organim"):
+        if hasattr(self, "organism"):
             if self.organism == "human":
                 chroms_norm = chroms_norm.loc[
                     ["chr{}".format(i) for i in list(range(1, 23)) + ["X", "Y", "M"]], :
@@ -1920,23 +1920,23 @@ class ATACSeqAnalysis(Analysis):
                     ["chr{}".format(i) for i in list(range(1, 19)) + ["X", "Y", "M"]], :
                 ]
 
-        fig, axis = plt.subplots(1, 1, figsize=(8 * 1, 8 * 1))
-        sns.heatmap(
-            chroms_norm,
-            square=True,
-            cmap="summer",
-            xticklabels=True,
-            yticklabels=True,
-            ax=axis,
-        )
-        axis.set_xticklabels(axis.get_xticklabels(), rotation=90, ha="right")
-        axis.set_yticklabels(axis.get_yticklabels(), rotation=0, ha="right")
-        savefig(
-            fig,
-            os.path.join(
-                self.results_dir, "{}.peak_location.per_sample.svg".format(self.name)
-            ),
-        )
+            fig, axis = plt.subplots(1, 1, figsize=(8 * 1, 8 * 1))
+            sns.heatmap(
+                chroms_norm,
+                square=True,
+                cmap="summer",
+                xticklabels=True,
+                yticklabels=True,
+                ax=axis,
+            )
+            axis.set_xticklabels(axis.get_xticklabels(), rotation=90, ha="right")
+            axis.set_yticklabels(axis.get_yticklabels(), rotation=0, ha="right")
+            savefig(
+                fig,
+                os.path.join(
+                    self.results_dir, "{}.peak_location.per_sample.svg".format(self.name)
+                ),
+            )
 
         # Peak set across samples:
         # interval lengths

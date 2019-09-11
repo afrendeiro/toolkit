@@ -18,3 +18,4 @@ requests
 jinja2>=2.10.1
 rpy2
 tzlocal  # undocumented requirement for rpy2 < 3.0
+natsort

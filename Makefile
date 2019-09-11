@@ -39,6 +39,7 @@ clean_dist:
 
 clean_build:
 	rm -fr build/
+	rm -fr ngs_toolkit.egg-info
 
 clean: clean_test clean_cov clean_docs clean_dist clean_build
 

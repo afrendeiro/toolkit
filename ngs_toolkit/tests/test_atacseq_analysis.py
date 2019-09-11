@@ -271,6 +271,19 @@ def test_plot_raw_coverage(various_analysis):
         assert file_exists_and_not_empty(output)
 
 
+def test_get_sex_chrom_ratio(analysis_normalized):
+    fs = [
+        ".sex_chrom_ratio.csv",
+        ".sex_chrom_ratio.clustermap.svg",
+        ".sex_chrom_ratio.rank_vs_ratio.svg"]
+    with analysis_normalized as a:
+        fs = [os.path.join(a.results_dir, a.name + f) for f in fs]
+        a.get_sex_chrom_ratio()
+
+        for f in fs:
+            assert file_exists_and_not_empty(f)
+
+
 @pytest.fixture
 def peak_outputs(atac_analysis_with_input_files):
     outputs = [

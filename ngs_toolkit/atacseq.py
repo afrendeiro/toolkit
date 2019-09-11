@@ -1460,7 +1460,7 @@ class ATACSeqAnalysis(Analysis):
         # calculate ratio
         ratio = m.loc[sex_chroms[1]] - m.loc[sex_chroms[0]]
         ratio.name = "{}_to_{}_ratio".format(sex_chroms[1], sex_chroms[0])
-        ratio.to_csv(os.path.join(output_dir, output_prefix + ".csv"), header=True)
+        ratio.to_csv(os.path.join(output_dir, self.name + "." + output_prefix + ".csv"), header=True)
 
         if plot:
             ratio.sort_values(inplace=True)
@@ -1484,7 +1484,7 @@ class ATACSeqAnalysis(Analysis):
             )
             grid.ax_heatmap.set_xlabel("Chromosomes")
             grid.ax_heatmap.set_ylabel("Samples")
-            savefig(grid, os.path.join(output_dir, output_prefix + ".clustermap.svg"))
+            savefig(grid, os.path.join(output_dir, self.name + "." + output_prefix + ".clustermap.svg"))
 
             # Value vs Rank
             fig, axis = plt.subplots(1, figsize=(3, ratio.shape[0] * 0.3))
@@ -1501,7 +1501,7 @@ class ATACSeqAnalysis(Analysis):
             v += v * 0.1
             axis.set_xlim((-v, v))
             sns.despine(fig)
-            savefig(fig, os.path.join(output_dir, output_prefix + ".rank_vs_ratio.svg"))
+            savefig(fig, os.path.join(output_dir, self.name + "." + output_prefix + ".rank_vs_ratio.svg"))
 
         return ratio.sort_index()
 

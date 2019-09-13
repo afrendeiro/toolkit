@@ -194,7 +194,7 @@ class RNASeqAnalysis(Analysis):
             samples = self.samples
 
         first = True
-        for i, sample in enumerate(samples):
+        for sample in samples:
             msg = "Sample {} is missing.".format(sample.name)
             try:
                 # read the "tr" file of one sample to get indexes
@@ -911,7 +911,7 @@ def assess_cell_cycle(
     knockout_plot(
         knockout_genes=cc_prots,
         output_prefix=output_prefix + ".gene_expression.zscore0",
-        expression_matrix=exp_z,
+        matrix=exp_z,
     )
 
     adata = anndata.AnnData(exp_z.T)

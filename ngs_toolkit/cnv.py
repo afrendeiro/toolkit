@@ -8,7 +8,7 @@ import pandas as pd
 
 from ngs_toolkit import _LOGGER
 from ngs_toolkit.analysis import Analysis
-from ngs_toolkit.decorators import check_organism_genome
+from ngs_toolkit.decorators import check_has_attributes
 
 
 class CNVAnalysis(Analysis):
@@ -909,7 +909,7 @@ class CNVAnalysis(Analysis):
 
         return segmentation
 
-    @check_organism_genome
+    @check_has_attributes(['organism', 'genome'])
     def annotate_with_chrom_bands(
         self, segmentation=None, resolutions=None, save=True, assign=True
     ):

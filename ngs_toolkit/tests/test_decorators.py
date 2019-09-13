@@ -8,7 +8,7 @@ import os
 travis = "TRAVIS" in os.environ
 
 
-class Test_check_organism_genome:
+class Test_check_has_attributes:
     # here we use 'get_resources' as en example
     # decorated function that won't fail for some other
     # reason on a fairly empty analysis object
@@ -25,8 +25,6 @@ class Test_check_organism_genome:
     def test_full_analysis(self, full_analysis):
         full_analysis.get_resources(steps=[])
 
-
-class Test_check_has_sites:
     # here we use 'calculate_peak_support' as en example
     # decorated function. It will however fail for another
     # reason due to the fairly empty analysis object (last test)
@@ -45,3 +43,34 @@ class Test_check_has_sites:
         # but raises IOError specific to the function
         with pytest.raises(IOError):
             atac_analysis.calculate_peak_support()
+
+    def test_iterable_attributes(self, atac_analysis):
+        from ngs_toolkit import Analysis
+        from ngs_toolkit.decorators import check_has_attributes
+
+        class TestAnalysis(Analysis):
+            @check_has_attributes(['samples'], [list])
+            def test_function(self):
+                print(self.samples)
+                return True
+
+        a = TestAnalysis()
+
+        # has not samples set
+        del a.samples
+        with pytest.raises(AttributeError):
+            a.test_function()
+
+        # samples is None
+        a.samples = None
+        with pytest.raises(AttributeError):
+            a.test_function()
+
+        # samples is empty list
+        a.samples = list()
+        with pytest.raises(AttributeError):
+            a.test_function()
+
+        # has samples
+        a.samples = [1, 2, 3]
+        assert a.test_function()

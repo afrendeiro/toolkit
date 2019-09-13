@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 
 from ngs_toolkit import _CONFIG, _LOGGER
-from ngs_toolkit.decorators import check_organism_genome
+from ngs_toolkit.decorators import check_has_attributes
 
 
 # TODO: Add PAGE as enrichment method
@@ -1135,7 +1135,7 @@ class Analysis(object):
         _LOGGER.info("Saving '{}' attribute to {}.".format(matrix_name, output_file))
         df.to_csv(output_file, index=True)
 
-    @check_organism_genome
+    @check_has_attributes(['organism', 'genome'])
     def get_resources(
         self,
         steps=["blacklist", "tss", "genomic_context"],
@@ -5056,7 +5056,7 @@ class Analysis(object):
                     ),
                 )
 
-    @check_organism_genome
+    @check_has_attributes(['organism', 'genome'])
     def differential_enrichment(
         self,
         differential=None,

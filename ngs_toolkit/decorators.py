@@ -4,58 +4,68 @@ from functools import wraps
 from ngs_toolkit import _LOGGER
 
 
-def check_has_samples(f):
-    @wraps(f)
-    def wrapper(*args, **kwargs):
-        msg = "Analysis does not have a 'samples' attributes."
-        if not hasattr(args[0], "samples"):
-            _LOGGER.error(msg)
-            raise AttributeError(msg)
+def check_has_attributes(attributes=None, object_types=None):
+    attributes = [] or attributes
+    object_types = [None] * len(attributes) or object_types
+    if len(attributes) != len(object_types):
+        msg = "`attributes` and `object_types` arguments must be the same length."
+        _LOGGER.error(msg)
+        raise ValueError(msg)
+    def decorator(f):
+        @wraps(f)
+        def wrapper(*args, **kwargs):
+            import pandas as pd
 
-        msg = "Analysis 'samples' attribute is not a list."
-        if not isinstance(args[0].samples, list):
-            _LOGGER.error(msg)
-            raise AttributeError(msg)
+            # check attributes are set
+            msg = "Analysis '{}' attribute(s) are not set."
+            has = pd.Series(
+                [hasattr(args[0], attr) for attr in attributes],
+                index=attributes)
+            if not has.all():
+                msg = msg.format(",".join(has[~has].index))
+                _LOGGER.error(msg)
+                raise AttributeError(msg)
 
-        msg = "Analysis 'samples' attribute empty."
-        if len(args[0].samples) == 0:
-            _LOGGER.error(msg)
-            raise AttributeError(msg)
-        return f(*args, **kwargs)
+            # check attributes are not None
+            msg = "Analysis '{}' attribute(s) are None."
+            not_none = pd.Series(
+                [getattr(args[0], attr) is not None for attr in attributes],
+                index=attributes)
+            if not not_none.all():
+                msg = msg.format(",".join(not_none[~not_none].index))
+                _LOGGER.error(msg)
+                raise AttributeError(msg)
 
-    return wrapper
+            # check the type of attribute values matches requested
+            msg = "Analysis '{}' attribute(s) are not of requested types '{}'."
+            t_attributes = [a for a, t in zip(attributes, object_types) if t is not None]
+            t_object_types = [t for a, t in zip(attributes, object_types) if t is not None]
+            not_type = pd.Series(
+                [isintance(getattr(args[0], attr), t) is not None for attr, t in zip(t_attributes, t_object_types)],
+                index=t_attributes)
+            if not not_type.all():
+                msg = msg.format(
+                    ",".join(not_type[~not_type].index),
+                    ",".join([str(t) for t in t_object_types]))
+                _LOGGER.error(msg)
+                raise AttributeError(msg)
 
-
-def check_organism_genome(f):
-    @wraps(f)
-    def wrapper(*args, **kwargs):
-        attrs = ["organism", "genome"]
-        msg = "Analysis does not have 'organism' and 'genome' attributes set."
-        hint = " You can set them with analysis.set_organism_genome, for example."
-        r1 = all([hasattr(args[0], attr) for attr in attrs])
-        r2 = all([getattr(args[0], attr) is not None for attr in attrs])
-        if not all([r1, r2]):
-            _LOGGER.error(msg + hint)
-            raise AttributeError(msg)
-        return f(*args, **kwargs)
-
-    return wrapper
-
-
-def check_has_sites(f):
-    @wraps(f)
-    def wrapper(*args, **kwargs):
-        attrs = ["sites"]
-        msg = "Analysis object does not have a `sites` attribute."
-        hint = " Produce one with analysis.get_consensus_sites for example."
-        r1 = all([hasattr(args[0], attr) for attr in attrs])
-        r2 = all([getattr(args[0], attr) is not None for attr in attrs])
-        if not all([r1, r2]):
-            _LOGGER.error(msg + hint)
-            raise AttributeError(msg)
-        return f(*args, **kwargs)
-
-    return wrapper
+            # for iterable types, check length > 0
+            msg = "Analysis '{}' attribute(s) have 0 elements."
+            i_attributes = [a for a, t in zip(attributes, object_types) if hasattr(a, "__iter__")]
+            i_object_types = [t for a, t in zip(attributes, object_types) if hasattr(a, "__iter__")]
+            not_empty = pd.Series(
+                [len(getattr(args[0], attr)) > 0 for attr in i_attributes],
+                index=i_attributes)
+            if not not_empty.all():
+                msg = msg.format(
+                    ",".join(not_empty[~not_empty].index),
+                    ",".join([str(t) for t in i_object_types]))
+                _LOGGER.error(msg)
+                raise AttributeError(msg)
+            return f(*args, **kwargs)
+        return wrapper
+    return decorator
 
 
 def read_csv_timestamped(f):

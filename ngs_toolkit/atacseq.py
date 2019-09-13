@@ -8,7 +8,7 @@ import pandas as pd
 
 from ngs_toolkit import _LOGGER
 from ngs_toolkit.analysis import Analysis
-from ngs_toolkit.decorators import check_organism_genome, check_has_sites
+from ngs_toolkit.decorators import check_has_attributes
 
 
 class ATACSeqAnalysis(Analysis):
@@ -451,7 +451,7 @@ class ATACSeqAnalysis(Analysis):
                 self.sites.saveas(default_sites)
         # TODO: warn if not overwrite and file exists already
 
-    @check_has_sites
+    @check_has_attributes(['sites'])
     def calculate_peak_support(
         self, samples=None, region_type="summits", permissive=False,
         comparison_table=None, peak_dir=None
@@ -880,7 +880,7 @@ class ATACSeqAnalysis(Analysis):
                 )
         return matrix_raw
 
-    @check_organism_genome
+    @check_has_attributes(['organism', 'genome'])
     def get_peak_gccontent_length(self, bed_file=None, fasta_file=None):
         """
         Get length and GC content of features in region set.
@@ -1031,7 +1031,7 @@ class ATACSeqAnalysis(Analysis):
 
         return matrix_norm
 
-    @check_has_sites
+    @check_has_attributes(['sites'])
     def get_peak_gene_annotation(
             self,
             tss_file=None,
@@ -1156,8 +1156,7 @@ class ATACSeqAnalysis(Analysis):
             self.gene_annotation = gene_annotation
         return gene_annotation
 
-    @check_organism_genome
-    @check_has_sites
+    @check_has_attributes(['organism', 'genome', 'sites'])
     def get_peak_genomic_location(
             self,
             genomic_context_file=None,
@@ -1279,8 +1278,7 @@ class ATACSeqAnalysis(Analysis):
                 setattr(self, attr + "_mapping", annot)
         return self.region_annotation
 
-    @check_organism_genome
-    @check_has_sites
+    @check_has_attributes(['organism', 'genome', 'sites'])
     def get_peak_chromatin_state(
             self,
             chrom_state_file,

@@ -1963,8 +1963,8 @@ class Analysis(object):
         matrix="matrix_norm",
         attributes=None,
         numerical_attributes=None,
-        save=True,
-        assign=True,
+        save=False,
+        assign=False,
     ):
         """
         Annotate matrix ``(n_features, n_samples)`` with sample metadata

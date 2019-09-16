@@ -561,7 +561,7 @@ class Analysis(object):
             )
         else:
             hint = "Will not set an organism for analysis."
-            organisms = list(set([s.organism for s in self.samples]))
+            organisms = [x for x in {getattr(s, "organism", None) for s in self.samples} if x is not None]
             if len(organisms) == 1:
                 _LOGGER.info("Setting analysis organism as '{}'.".format(organisms[0]))
                 self.organism = organisms[0]
@@ -573,7 +573,7 @@ class Analysis(object):
                 _LOGGER.warning(msg + hint)
 
             hint = "Will not set a genome for analysis."
-            genomes = list(set([s.genome for s in self.samples]))
+            genomes = [x for x in {getattr(s, "genome", None) for s in self.samples} if x is not None]
             if len(genomes) == 1:
                 _LOGGER.info("Setting analysis genome as '{}'.".format(genomes[0]))
                 self.genome = genomes[0]

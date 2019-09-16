@@ -366,7 +366,7 @@ def various_analysis(tmp_path):
 
 
 @pytest.fixture
-def chrom_file():
+def chrom_file(tmp_path):
     from ngs_toolkit.utils import download_gzip_file
     import pandas as pd
 
@@ -375,7 +375,7 @@ def chrom_file():
         + "chromhmmSegmentations/ChmmModels/coreMarks/jointModel/"
         + "final/E002_15_coreMarks_hg38lift_dense.bed.gz"
     )
-    chrom_state_file = os.path.abspath("E002_15_coreMarks_hg38lift_dense.bed")
+    chrom_state_file = os.path.join(tmp_path, "E002_15_coreMarks_hg38lift_dense.bed")
     download_gzip_file(url, chrom_state_file)
 
     # Test

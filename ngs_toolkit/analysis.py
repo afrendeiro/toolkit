@@ -3027,7 +3027,7 @@ class Analysis(object):
         # Run DESeq2 analysis
         if not distributed:
             # filter features without support for given comparison
-            if (self.data_type != "RNA-seq") and filter_support:
+            if (self.data_type in ["ATAC-seq", "ChIP-seq"]) and filter_support:
                 if not hasattr(self, "support"):
                     msg = "`filter_support` enabled but analysis has no `support` attribute!"
                     _LOGGER.error(msg)
@@ -3226,16 +3226,23 @@ class Analysis(object):
             _LOGGER.warning(msg.format(results_file) + hint)
             return
 
+        # Subset comparisons by data type
         if ("data_type" in comparison_table.columns) and (self.data_type is not None):
+            _LOGGER.debug("Subsetting comparisons for data type '{}'".format(self.data_type))
             comps = (
                 comparison_table.loc[
                     comparison_table["data_type"] == self.data_type, "comparison_name"
                 ]
                 .drop_duplicates()
                 .sort_values())
+            if comps.empty:
+                msg = "After subsetting comparison data_types for '{}', table was empty."
+                msg += " Continuing with all comparisons in table."
+                _LOGGER.warning(msg)
+                comps = comparison_table['comparison_name'].drop_duplicates().sort_values()
         else:
             msg = "Comparison table does not have a 'data_type' column."
-            msg += " Collecting all comparisons in table"
+            msg += " Collecting all comparisons in table."
             _LOGGER.warning(msg)
             comps = comparison_table['comparison_name'].drop_duplicates().sort_values()
 
@@ -3257,9 +3264,9 @@ class Analysis(object):
                     continue
                 else:
                     raise e
-            results.append(res2)
+            results.append(res2.reset_index())
 
-        if len(results) == 0:
+        if not results:
             msg = "No comparison had a valid results file!"
             if permissive:
                 _LOGGER.warning(msg)

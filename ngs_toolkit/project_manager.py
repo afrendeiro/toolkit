@@ -325,7 +325,7 @@ def create_makefile(project_name, project_dir, overwrite=False):
         mkdir -p log
 
     analysis: summarize
-        ngs_analysis.py {project_config}
+        ngs_analysis {project_config}
 
     analysis_job: summarize mklog
         sbatch -p longq --time 8-00:00:00 -c 12 --mem 80000 \\

@@ -565,7 +565,7 @@ class Analysis(object):
             if len(organisms) == 1:
                 _LOGGER.info("Setting analysis organism as '{}'.".format(organisms[0]))
                 self.organism = organisms[0]
-            elif len(organisms) == 0:
+            elif organisms:
                 msg = "Did not found any organism in the analysis samples. "
                 _LOGGER.warning(msg + hint)
             else:
@@ -577,7 +577,7 @@ class Analysis(object):
             if len(genomes) == 1:
                 _LOGGER.info("Setting analysis genome as '{}'.".format(genomes[0]))
                 self.genome = genomes[0]
-            elif len(genomes) == 0:
+            elif genomes:
                 msg = "Did not found any genome assembly in the analysis samples. "
                 _LOGGER.warning(msg + hint)
             else:
@@ -618,12 +618,12 @@ class Analysis(object):
         if self.prj is not None:
             self.prj.root_dir = self.prj.output_dir
             for attr, parent in [
-                ("name", self.prj),
-                ("root_dir", self.prj),
-                ("samples", self.prj),
-                ("sample_attributes", self.prj),
-                ("group_attributes", self.prj),
-                ("comparison_table", self.prj.metadata),
+                    ("name", self.prj),
+                    ("root_dir", self.prj),
+                    ("samples", self.prj),
+                    ("sample_attributes", self.prj),
+                    ("group_attributes", self.prj),
+                    ("comparison_table", self.prj.metadata),
             ]:
                 if not hasattr(parent, attr):
                     _LOGGER.warning(
@@ -931,8 +931,7 @@ class Analysis(object):
             except IOError as e:
                 if not permissive:
                     raise e
-                else:
-                    _LOGGER.warning(e)
+                _LOGGER.warning(e)
 
         # if "differential_enrichment" in output_map:
         #     self.enrichment_results = dict()
@@ -1014,7 +1013,6 @@ class Analysis(object):
 
             Default is :obj:`True`.
         """
-        import os
         import time
         from jinja2 import Template
         import pkg_resources
@@ -1028,15 +1026,15 @@ class Analysis(object):
 
         def fix_name(x, name):
             return (" - ".join(
-                        os.path.basename(x).replace(name, "").split(".")[:-1])
-                    .replace("_", " ").capitalize())
+                os.path.basename(x).replace(name, "").split(".")[:-1])
+                .replace("_", " ").capitalize())
 
         output_html = self._format_string_with_attributes(output_html)
 
         # Lets reorganize the output_files
         # into a dict of {name: list(file_names)}
 
-        keys = set([x[0] for x in self.output_files])
+        keys = {x[0] for x in self.output_files}
         outputs = {k: list() for k in keys}
         for key, file in self.output_files:
             outputs[key].append(file)
@@ -1070,6 +1068,7 @@ class Analysis(object):
                     for x in v]
             for k, v in csvs.items()}
 
+        # Get template
         if template is None:
             resource_package = "ngs_toolkit"
             resource_path = '/'.join(('templates', 'report.html'))
@@ -1077,6 +1076,8 @@ class Analysis(object):
                 pkg_resources.resource_string(resource_package, resource_path).decode())
         else:
             template = Template(open(template, 'r').read())
+
+        # Format
         output = template.render(
             analysis=self,
             project_repr={k: v for k, v in self.__dict__.items() if isinstance(v, str)},
@@ -1088,11 +1089,12 @@ class Analysis(object):
             library_version=__version__,
             freeze=[] if not pip_versions else freeze.freeze())
 
+        # Write
         with open(output_html, 'w') as handle:
             handle.write(output)
 
     def set_matrix(
-        self, matrix_name, csv_file, prefix="{results_dir}/{name}", **kwargs
+            self, matrix_name, csv_file, prefix="{results_dir}/{name}", **kwargs
     ):
         """
         Set an existing CSV file as the value of the analysis' matrix.
@@ -1137,12 +1139,12 @@ class Analysis(object):
 
     @check_has_attributes(['organism', 'genome'])
     def get_resources(
-        self,
-        steps=["blacklist", "tss", "genomic_context"],
-        organism=None,
-        genome_assembly=None,
-        output_dir=None,
-        overwrite=False,
+            self,
+            steps=["blacklist", "tss", "genomic_context"],
+            organism=None,
+            genome_assembly=None,
+            output_dir=None,
+            overwrite=False,
     ):
         """
         Get genome-centric resources used by several `ngs_toolkit` analysis functions.
@@ -1245,14 +1247,14 @@ class Analysis(object):
         return output
 
     def normalize_rpm(
-        self,
-        matrix="matrix_raw",
-        samples=None,
-        mult_factor=1e6,
-        log_transform=True,
-        pseudocount=1,
-        save=True,
-        assign=True,
+            self,
+            matrix="matrix_raw",
+            samples=None,
+            mult_factor=1e6,
+            log_transform=True,
+            pseudocount=1,
+            save=True,
+            assign=True,
     ):
         """
         Normalization of matrix of (n_features, n_samples) by total in each sample.
@@ -1322,14 +1324,14 @@ class Analysis(object):
         return matrix_norm
 
     def normalize_quantiles(
-        self,
-        matrix="matrix_raw",
-        samples=None,
-        implementation="Python",
-        log_transform=True,
-        pseudocount=1,
-        save=True,
-        assign=True,
+            self,
+            matrix="matrix_raw",
+            samples=None,
+            implementation="Python",
+            log_transform=True,
+            pseudocount=1,
+            save=True,
+            assign=True,
     ):
         """
         Quantile normalization of matrix of (n_features, n_samples).
@@ -1416,13 +1418,13 @@ class Analysis(object):
         return matrix_norm
 
     def normalize_median(
-        self,
-        matrix="matrix_raw",
-        samples=None,
-        function=np.nanmedian,
-        fillna=True,
-        save=True,
-        assign=True,
+            self,
+            matrix="matrix_raw",
+            samples=None,
+            function=np.nanmedian,
+            fillna=True,
+            save=True,
+            assign=True,
     ):
         """
         Normalization of matrices of (n_features, n_samples)
@@ -1486,7 +1488,7 @@ class Analysis(object):
         return matrix_norm
 
     def normalize_pca(
-        self, pc, matrix="matrix_raw", samples=None, save=True, assign=True
+            self, pc, matrix="matrix_raw", samples=None, save=True, assign=True
     ):
         """
         Normalization of a matrix by subtracting the
@@ -1550,13 +1552,13 @@ class Analysis(object):
         return matrix_norm
 
     def normalize(
-        self,
-        method="quantile",
-        matrix="matrix_raw",
-        samples=None,
-        save=True,
-        assign=True,
-        **kwargs
+            self,
+            method="quantile",
+            matrix="matrix_raw",
+            samples=None,
+            save=True,
+            assign=True,
+            **kwargs
     ):
         """
         Normalization of matrix of (n_features, n_samples).
@@ -1640,15 +1642,15 @@ class Analysis(object):
             raise ValueError(msg)
 
     def remove_factor_from_matrix(
-        self,
-        factor,
-        method="combat",
-        covariates=None,
-        matrix="matrix_norm",
-        samples=None,
-        save=True,
-        assign=True,
-        make_positive=True
+            self,
+            factor,
+            method="combat",
+            covariates=None,
+            matrix="matrix_norm",
+            samples=None,
+            save=True,
+            assign=True,
+            make_positive=True
     ):
         """
         Remove an annotated factor from a matrix.
@@ -3280,43 +3282,43 @@ class Analysis(object):
         return results
 
     def plot_differential(
-        self,
-        steps=[
-            "distributions",
-            "counts",
-            "scatter",
-            "volcano",
-            "ma",
-            "stats_heatmap",
-            "correlation",
-            "heatmap",
-        ],
-        results=None,
-        comparison_table=None,
-        samples=None,
-        matrix="matrix_norm",
-        only_comparison_samples=False,
-        alpha=0.05,
-        corrected_p_value=True,
-        fold_change=None,
-        diff_based_on_rank=False,
-        max_rank=1000,
-        ranking_variable="pvalue",
-        respect_stat_thresholds=True,
-        output_dir="{results_dir}/differential_analysis_{data_type}",
-        output_prefix="differential_analysis",
-        plot_each_comparison=True,
-        mean_column="baseMean",
-        log_fold_change_column="log2FoldChange",
-        p_value_column="pvalue",
-        adjusted_p_value_column="padj",
-        comparison_column="comparison_name",
-        rasterized=True,
-        robust=False,
-        feature_labels=False,
-        group_colours=True,
-        group_attributes=None,
-        **kwargs
+            self,
+            steps=[
+                "distributions",
+                "counts",
+                "scatter",
+                "volcano",
+                "ma",
+                "stats_heatmap",
+                "correlation",
+                "heatmap",
+            ],
+            results=None,
+            comparison_table=None,
+            samples=None,
+            matrix="matrix_norm",
+            only_comparison_samples=False,
+            alpha=0.05,
+            corrected_p_value=True,
+            fold_change=None,
+            diff_based_on_rank=False,
+            max_rank=1000,
+            ranking_variable="pvalue",
+            respect_stat_thresholds=True,
+            output_dir="{results_dir}/differential_analysis_{data_type}",
+            output_prefix="differential_analysis",
+            plot_each_comparison=True,
+            mean_column="baseMean",
+            log_fold_change_column="log2FoldChange",
+            p_value_column="pvalue",
+            adjusted_p_value_column="padj",
+            comparison_column="comparison_name",
+            rasterized=True,
+            robust=False,
+            feature_labels=False,
+            group_colours=True,
+            group_attributes=None,
+            **kwargs
     ):
         """
         Plot differential features (eg chromatin region, genes) discovered with supervised

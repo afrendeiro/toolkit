@@ -3796,7 +3796,7 @@ class Analysis(object):
                         [
                             s.name
                             for s in samples
-                            if s.name in a.tolist() and s.library == self.data_type
+                            if s.name in a.tolist()
                         ],
                     ].mean(axis=1)
                     b = matrix.loc[
@@ -3804,24 +3804,28 @@ class Analysis(object):
                         [
                             s.name
                             for s in samples
-                            if s.name in b.tolist() and s.library == self.data_type
+                            if s.name in b.tolist()
                         ],
                     ].mean(axis=1)
 
                     # Hexbin plot
                     ax = next(axes)
-                    ax.hexbin(
-                        b,
-                        a,
-                        alpha=0.85,
-                        cmap="Greys",
-                        color="black",
-                        edgecolors="white",
-                        linewidths=0,
-                        bins="log",
-                        mincnt=1,
-                        rasterized=True,
-                    )
+                    try:
+                        ax.hexbin(
+                            b,
+                            a,
+                            alpha=0.85,
+                            cmap="Greys",
+                            color="black",
+                            edgecolors="white",
+                            linewidths=0,
+                            bins="log",
+                            mincnt=1,
+                            rasterized=True,
+                        )
+                    except ValueError:
+                        _LOGGER.warning("Couldn't plot scatter for comparison '{}'.".format(comparison))
+                        continue
 
                     # Scatter for significant features
                     diff_vars = results.loc[

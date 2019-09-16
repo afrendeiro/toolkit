@@ -651,6 +651,11 @@ class Analysis(object):
                                     )
                                 )
 
+            if hasattr(self, "comparison_table"):
+                if isinstance(getattr(self, "comparison_table"), str):
+                    _LOGGER.debug("Reading up comparison table.")
+                    self.comparison_table = pd.read_csv(self.comparison_table)
+
             if subset_to_data_type:
                 if hasattr(self, "samples"):
                     if self.data_type is not None:
@@ -663,13 +668,10 @@ class Analysis(object):
                             s for s in self.samples if s.protocol == self.data_type
                         ]
                 if hasattr(self, "comparison_table"):
-                    if isinstance(getattr(self, "comparison_table"), str):
-                        _LOGGER.debug("Reading up comparison table.")
-                        self.comparison_table = pd.read_csv(self.comparison_table)
                     if (
-                        (self.comparison_table is not None) and
-                        (self.data_type is not None) and
-                        ("data_type" in self.comparison_table.columns)
+                            (self.comparison_table is not None) and
+                            (self.data_type is not None) and
+                            ("data_type" in self.comparison_table.columns)
                     ):
                         _LOGGER.info(
                             "Subsetting comparison_table for comparisons of type '{}'.".format(
@@ -1705,7 +1707,8 @@ class Analysis(object):
         matrix = self.get_matrix(matrix, samples=samples)
 
         # make vector of factor to remove
-        samples = [s for s in self.samples if s.name in matrix.columns]
+        if samples is None:
+            samples = [s for s in self.samples if s.name in matrix.columns]
         batch = pd.Series(
             [getattr(s, factor) for s in samples],
             index=[s.name for s in samples])

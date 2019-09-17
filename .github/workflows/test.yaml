@@ -51,7 +51,9 @@ jobs:
         sudo R -e "install.packages('BiocManager', repos='https://CRAN.R-project.org')"
         sudo R -e "library('BiocManager'); BiocManager::install(c('DESeq2', 'preprocessCore', 'cqn'), version = '3.9')"
     - name: Install Combat
-      run: python3 -m pip install git+https://github.com/afrendeiro/combat.git
+      run: |
+        sudo apt-get install python3-setuptools
+        python3 -m pip install git+https://github.com/afrendeiro/combat.git
     - name: Install ngs-toolkit
       run: python3 -m pip install .[testing]
     - name: Lint with flake8

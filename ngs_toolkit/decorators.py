@@ -11,6 +11,7 @@ def check_has_attributes(attributes=None, object_types=None):
         msg = "`attributes` and `object_types` arguments must be the same length."
         _LOGGER.error(msg)
         raise ValueError(msg)
+
     def decorator(f):
         @wraps(f)
         def wrapper(*args, **kwargs):
@@ -41,7 +42,8 @@ def check_has_attributes(attributes=None, object_types=None):
             t_attributes = [a for a, t in zip(attributes, object_types) if t is not None]
             t_object_types = [t for a, t in zip(attributes, object_types) if t is not None]
             not_type = pd.Series(
-                [isintance(getattr(args[0], attr), t) is not None for attr, t in zip(t_attributes, t_object_types)],
+                [isinstance(getattr(args[0], attr), t) is not None
+                 for attr, t in zip(t_attributes, t_object_types)],
                 index=t_attributes)
             if not not_type.all():
                 msg = msg.format(
@@ -81,6 +83,8 @@ def read_csv_timestamped(f):
 
 
 def to_csv_timestamped(f, exclude_functions=None):
+
+    # TODO: fix to files without "." (dot)
     from ngs_toolkit.utils import (
         record_analysis_output, get_timestamp,
         is_analysis_descendent)
@@ -111,6 +115,7 @@ def to_csv_timestamped(f, exclude_functions=None):
 
 def timestamped_input(f):
     from ngs_toolkit.utils import get_this_file_or_timestamped
+
     @wraps(f)
     def wrapper(file):
         return f(get_this_file_or_timestamped(file))

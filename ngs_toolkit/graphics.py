@@ -5,10 +5,11 @@ import os
 
 import matplotlib
 import matplotlib.pyplot as plt
-from ngs_toolkit import _CONFIG, _LOGGER
 import numpy as np
 import pandas as pd
 import seaborn as sns
+
+from ngs_toolkit import _CONFIG, _LOGGER
 
 
 def savefig(fig, file_name, **kwargs):
@@ -148,12 +149,12 @@ def barmap(x, figsize=None, square=False, row_colors=None, z_score=None, ylims=N
 
 
 def radar_plot(
-    data,
-    subplot_var="patient_id",
-    group_var="timepoint",
-    radial_vars=["NaiveBcell", "SwitchedBcell", "UnswitchedBcell"],
-    cmap="inferno",
-    scale_to_max=True,
+        data,
+        subplot_var="patient_id",
+        group_var="timepoint",
+        radial_vars=["NaiveBcell", "SwitchedBcell", "UnswitchedBcell"],
+        cmap="inferno",
+        scale_to_max=True,
 ):
     """
     
@@ -338,19 +339,19 @@ def clustermap_rasterize_heatmap(grid):
 
 
 def plot_projection(
-    df,
-    color_dataframe,
-    dims,
-    output_file,
-    attributes_to_plot,
-    plot_max_dims=8,
-    rasterized=False,
-    plot_group_centroids=True,
-    axis_ticklabels=True,
-    axis_ticklabels_name="PC",
-    axis_lines=True,
-    legends=False,
-    always_legend=False,
+        df,
+        color_dataframe,
+        dims,
+        output_file,
+        attributes_to_plot,
+        plot_max_dims=8,
+        rasterized=False,
+        plot_group_centroids=True,
+        axis_ticklabels=True,
+        axis_ticklabels_name="PC",
+        axis_lines=True,
+        legends=False,
+        always_legend=False,
 ):
     """
     Plot a low dimentionality projection of samples.

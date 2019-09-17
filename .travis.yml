@@ -10,8 +10,9 @@ env:
   R_LIBS=$HOME/R_libs/
 
 cache:
-  - pip
-  - packages
+  directories:
+    - $HOME/R_libs
+    - $HOME/.cache/pip
 
 services:
   - xvfb

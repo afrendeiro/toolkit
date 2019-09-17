@@ -1,0 +1,79 @@
+on:
+  push:
+    branches:
+    - master
+    - dev
+  schedule:
+    # Run every sunday at 2am
+    - cron: 0 2 * * 0
+
+jobs:
+  test:
+    name: $GITHUB_REPOSITORY - ${{ matrix.python }}
+    strategy:
+      matrix:
+        python_version: ['3.x']
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v1
+    - name: Set up Python 3.7
+      uses: actions/setup-python@v1
+      with:
+          python-version: ${{ matrix.python }}
+          architecture: x64
+    - name: Update pip
+      run: python -m pip install --upgrade pip
+    - name: Install bedtools 2.27.1
+      run: |
+        wget http://ftp.br.debian.org/debian/pool/main/b/bedtools/bedtools_2.27.1+dfsg-4_amd64.deb
+        sudo dpkg -i bedtools_2.27.1+dfsg-4_amd64.deb
+    - name: Install R 3.6
+      env:
+        R_LIBS: $HOME/R_libs/
+      run: |
+        sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys E298A3A825C0D65DFD57CBB651716619E084DAB9
+        sudo add-apt-repository 'deb https://cloud.r-project.org/bin/linux/ubuntu bionic-cran35/'
+        sudo apt-get update
+        sudo apt-get -y install \
+          r-base \
+          r-base-core \
+          r-recommended \
+          gfortran \
+          liblapack-dev \
+          libopenblas-dev
+    - name: Install bioconductor libraries
+      env:
+        R_LIBS: $HOME/R_libs/
+      run: |
+        R -e "install.packages('BiocManager', repos='https://CRAN.R-project.org')"
+        R -e "library('BiocManager'); BiocManager::install(c('DESeq2', 'preprocessCore', 'cqn'), version = '3.9')"
+    - name: Install Combat
+      run: pip install git+https://github.com/afrendeiro/combat.git
+    - name: Install ngs-toolkit
+      run: |
+        pip install .[testing]
+    - name: Lint with flake8
+      run: |
+        pip install flake8
+        # stop the build if there are Python syntax errors or undefined names
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
+        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+    - name: Test with pytest
+      env:
+        R_LIBS: $HOME/R_libs/
+      run: |
+        pip install pytest
+        pytest \
+        --disable-warnings \
+        --show-capture=no \
+        --cov ./ \
+        --cov-report term \
+        --cov-report xml \
+        --pyargs ngs_toolkit
+    - name: Report coverage
+      run: |
+        coverage xml
+        codecov -f coverage.xml
+        python-codacy-coverage -r coverage.xml

@@ -42,14 +42,14 @@ jobs:
           gfortran \
           liblapack-dev \
           libopenblas-dev \
-          r-cran-rcpp \
-          r-cran-xml2
+          libcurl4-openssl-dev \
+          libxml2-dev
     - name: Install bioconductor libraries
       # env:
       #   R_LIBS_USER: $HOME/R_libs/
       run: |
-        sudo R -e "install.packages('pak')"
-        sudo R -e "pak::pkg_install(c('DESeq2', 'cqn'))"
+        sudo R -e "install.packages('BiocManager', repos='https://CRAN.R-project.org')"
+        sudo R -e "library('BiocManager'); BiocManager::install(c('DESeq2', 'preprocessCore', 'cqn'), version = '3.9')"
     - name: Install Combat
       run: python -m pip install git+https://github.com/afrendeiro/combat.git
     - name: Install ngs-toolkit

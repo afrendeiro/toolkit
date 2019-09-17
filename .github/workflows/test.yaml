@@ -41,7 +41,9 @@ jobs:
           r-recommended \
           gfortran \
           liblapack-dev \
-          libopenblas-dev
+          libopenblas-dev \
+          libcurl4-openssl-dev \
+          libxml2-dev
     - name: Install bioconductor libraries
       # env:
       #   R_LIBS_USER: $HOME/R_libs/

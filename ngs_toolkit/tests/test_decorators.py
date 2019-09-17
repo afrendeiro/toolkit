@@ -2,10 +2,6 @@
 
 
 import pytest
-import os
-
-
-travis = "TRAVIS" in os.environ
 
 
 class Test_check_has_attributes:
@@ -28,17 +24,17 @@ class Test_check_has_attributes:
     # here we use 'calculate_peak_support' as en example
     # decorated function. It will however fail for another
     # reason due to the fairly empty analysis object (last test)
-    def test_empty_analysis(self, empty_analysis):
+    def test_empty_analysis_2(self, empty_analysis):
         # Make sure it raises AttributeError
         with pytest.raises(AttributeError):
             empty_analysis.calculate_peak_support()
 
-    def test_null_analysis(self, null_analysis):
+    def test_null_analysis_2(self, null_analysis):
         # Make sure it raises AttributeError
         with pytest.raises(AttributeError):
             null_analysis.calculate_peak_support()
 
-    def test_full_analysis(self, atac_analysis):
+    def test_full_analysis_2(self, atac_analysis):
         # This passes on the decorator
         # but raises IOError specific to the function
         with pytest.raises(IOError):

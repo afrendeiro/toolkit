@@ -3,17 +3,15 @@
 
 import os
 
-from ngs_toolkit import _CONFIG
-from ngs_toolkit.atacseq import ATACSeqAnalysis
 import numpy as np
 import pandas as pd
 import pybedtools
 import pytest
-from .conftest import file_exists, file_exists_and_not_empty
+
+from ngs_toolkit import _CONFIG
+from ngs_toolkit.atacseq import ATACSeqAnalysis
 from ngs_toolkit.utils import get_this_file_or_timestamped
-
-
-travis = "TRAVIS" in os.environ
+from .conftest import file_exists, file_exists_and_not_empty, CI
 
 
 def test_get_consensus_sites(various_analysis):
@@ -96,7 +94,7 @@ def test_quantile_normalization(various_analysis):
         # assert all(np.array(cors) > 0.99)
 
 
-@pytest.mark.skipif(travis, reason="CQN normalization not testable in Travis")
+@pytest.mark.skipif(CI, reason="CQN normalization not testable in Travis")
 def test_cqn_normalization(atac_analysis):
     qnorm = atac_analysis.normalize_cqn()
     assert qnorm.dtypes.all() == np.float
@@ -126,7 +124,7 @@ def test_normalize(atac_analysis):
     assert np.array_equal(qnorm_d, qnorm)
     del atac_analysis.matrix_norm
 
-    if not travis:
+    if not CI:
         norm = atac_analysis.normalize(method="cqn", save=False)
         assert isinstance(norm, pd.DataFrame)
         assert hasattr(atac_analysis, "matrix_norm")

@@ -4,14 +4,7 @@ import os
 
 import pytest
 
-
-travis = "TRAVIS" in os.environ
-if travis:
-    dev = os.environ['TRAVIS_BRANCH'] == 'dev'
-else:
-    import subprocess
-    o = subprocess.check_output("git status".split(" "))
-    dev = "dev" in o.decode().split("\n")[0]
+from .conftest import CI, DEV
 
 
 def test_version_matches():
@@ -28,7 +21,7 @@ def test_version_matches():
     assert installed_version == file_version
 
 
-@pytest.mark.skipif(dev, reason="Development mode, not testing Pypi requirements")
+@pytest.mark.skipif(DEV, reason="Development mode, not testing Pypi requirements")
 def test_pypi_requirements_are_importable():
     import requests
     import importlib
@@ -59,7 +52,7 @@ def test_all_requirements_are_importable():
     import importlib
 
     # test only basic requirements (not extras)
-    if travis:
+    if CI:
         path = os.path.join(os.environ['TRAVIS_BUILD_DIR'], "requirements", "requirements.txt")
     else:
         path = os.path.join("requirements", "requirements.txt")

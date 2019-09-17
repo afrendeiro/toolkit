@@ -10,9 +10,6 @@ from .conftest import file_exists_and_not_empty
 from ngs_toolkit.utils import get_this_file_or_timestamped
 
 
-travis = "TRAVIS" in os.environ
-
-
 @pytest.fixture
 def a(atac_analysis_with_input_files):
     return atac_analysis_with_input_files

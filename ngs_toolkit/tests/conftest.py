@@ -3,14 +3,25 @@
 
 import os
 
-from .data_generator import generate_project
-from ngs_toolkit import Analysis, ATACSeqAnalysis
 from peppy import Project
 import pytest
 
+from ngs_toolkit import Analysis, ATACSeqAnalysis
+from .data_generator import generate_project
 
-travis = "TRAVIS" in os.environ
 
+CI = ("TRAVIS" in os.environ) or ("GITHUB_WORKFLOW" in os.environ)
+
+try:
+    DEV = os.environ['TRAVIS_BRANCH'] == 'dev'
+except KeyError:
+    pass
+try:
+    DEV = os.environ['GITHUB_REF'] == 'dev'
+except KeyError:
+    import subprocess
+    o = subprocess.check_output("git status".split(" "))
+    DEV = "dev" in o.decode().split("\n")[0]
 
 # TODO: test having no config set
 # TODO: test differential analysis with many factors
@@ -384,3 +395,15 @@ def chrom_file(tmp_path):
     b = pd.read_csv(chrom_state_file, skiprows=1, sep="\t")
     assert b.shape == (281837, 9)
     return chrom_state_file
+
+
+@pytest.fixture
+def get_crispr_matrix(tmp_path):
+    import pandas as pd
+
+    url = "http://liulab.dfci.harvard.edu/Mageck/melanoma.csv.zip"
+    output_file = os.path.join(tmp_path, "Mageck.melanoma.example_data.zip")
+    b = pd.read_csv(url, index_col=[0, 1])
+    assert b.shape == (64076, 9)
+    b.to_csv(output_file)
+    return output_file

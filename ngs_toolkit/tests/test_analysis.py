@@ -5,11 +5,12 @@ import glob
 import os
 import shutil
 
-from ngs_toolkit.analysis import Analysis
 import numpy as np
 import pytest
-from .conftest import file_exists, file_not_empty
+
+from ngs_toolkit.analysis import Analysis
 from ngs_toolkit.utils import get_this_file_or_timestamped
+from .conftest import file_exists, file_not_empty
 
 
 class TestAnalysis:

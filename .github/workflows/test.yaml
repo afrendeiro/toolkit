@@ -23,7 +23,7 @@ jobs:
           python-version: ${{ matrix.python }}
           architecture: x64
     - name: Update pip
-      run: python -m pip install --upgrade pip
+      run: python3 -m pip install --upgrade pip
     - name: Install bedtools 2.27.1
       run: |
         wget http://ftp.br.debian.org/debian/pool/main/b/bedtools/bedtools_2.27.1+dfsg-4_amd64.deb
@@ -51,12 +51,12 @@ jobs:
         sudo R -e "install.packages('BiocManager', repos='https://CRAN.R-project.org')"
         sudo R -e "library('BiocManager'); BiocManager::install(c('DESeq2', 'preprocessCore', 'cqn'), version = '3.9')"
     - name: Install Combat
-      run: python -m pip install git+https://github.com/afrendeiro/combat.git
+      run: python3 -m pip install git+https://github.com/afrendeiro/combat.git
     - name: Install ngs-toolkit
-      run: python -m pip install .[testing]
+      run: python3 -m pip install .[testing]
     - name: Lint with flake8
       run: |
-        python -m pip install flake8
+        python3 -m pip install flake8
         # stop the build if there are Python syntax errors or undefined names
         flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
         # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
@@ -65,7 +65,7 @@ jobs:
       # env:
       #   R_LIBS_USER: $HOME/R_libs/
       run: |
-        python -m pip install pytest
+        python3 -m pip install pytest
         pytest \
         --disable-warnings \
         --show-capture=no \

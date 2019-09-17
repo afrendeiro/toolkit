@@ -29,8 +29,8 @@ jobs:
         wget http://ftp.br.debian.org/debian/pool/main/b/bedtools/bedtools_2.27.1+dfsg-4_amd64.deb
         sudo dpkg -i bedtools_2.27.1+dfsg-4_amd64.deb
     - name: Install R 3.6
-      env:
-        R_LIBS_USER: $HOME/R_libs/
+      # env:
+      #   R_LIBS_USER: $HOME/R_libs/
       run: |
         sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys E298A3A825C0D65DFD57CBB651716619E084DAB9
         sudo add-apt-repository 'deb https://cloud.r-project.org/bin/linux/ubuntu bionic-cran35/'
@@ -43,11 +43,11 @@ jobs:
           liblapack-dev \
           libopenblas-dev
     - name: Install bioconductor libraries
-      env:
-        R_LIBS_USER: $HOME/R_libs/
+      # env:
+      #   R_LIBS_USER: $HOME/R_libs/
       run: |
-        R -e "install.packages('BiocManager', repos='https://CRAN.R-project.org')"
-        R -e "library('BiocManager'); BiocManager::install(c('DESeq2', 'preprocessCore', 'cqn'), version = '3.9')"
+        sudo R -e "install.packages('BiocManager', repos='https://CRAN.R-project.org')"
+        sudo R -e "library('BiocManager'); BiocManager::install(c('DESeq2', 'preprocessCore', 'cqn'), version = '3.9')"
     - name: Install Combat
       run: pip install git+https://github.com/afrendeiro/combat.git
     - name: Install ngs-toolkit
@@ -61,8 +61,8 @@ jobs:
         # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
         flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
     - name: Test with pytest
-      env:
-        R_LIBS_USER: $HOME/R_libs/
+      # env:
+      #   R_LIBS_USER: $HOME/R_libs/
       run: |
         pip install pytest
         pytest \

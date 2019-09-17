@@ -53,12 +53,12 @@ jobs:
     - name: Install Combat
       run: |
         sudo apt-get install python3-setuptools
-        python3 -m pip install git+https://github.com/afrendeiro/combat.git
+        python3 -m pip install --user git+https://github.com/afrendeiro/combat.git
     - name: Install ngs-toolkit
-      run: python3 -m pip install .[testing]
+      run: python3 -m pip install --user .[testing]
     - name: Lint with flake8
       run: |
-        python3 -m pip install flake8
+        python3 -m pip install --user flake8
         # stop the build if there are Python syntax errors or undefined names
         flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
         # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
@@ -67,7 +67,7 @@ jobs:
       # env:
       #   R_LIBS_USER: $HOME/R_libs/
       run: |
-        python3 -m pip install pytest
+        python3 -m pip install --user pytest
         pytest \
         --disable-warnings \
         --show-capture=no \

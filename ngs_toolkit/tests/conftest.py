@@ -12,6 +12,17 @@ from .data_generator import generate_project
 
 CI = ("TRAVIS" in os.environ) or ("GITHUB_WORKFLOW" in os.environ)
 
+CI_NAME = None
+BUILD_DIR = os.path.abspath(os.path.curdir)
+if CI:
+    if ("TRAVIS" in os.environ):
+        CI_NAME = "TRAVIS"
+        BUILD_DIR = os.environ['TRAVIS_BUILD_DIR']
+    elif ("GITHUB_WORKFLOW" in os.environ):
+        CI_NAME = "GITHUB"
+        BUILD_DIR = os.path.join(
+            "home", "runner", "work", "toolkit", "toolkit")
+
 try:
     DEV = os.environ['TRAVIS_BRANCH'] == 'dev'
 except KeyError:

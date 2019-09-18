@@ -12,7 +12,7 @@ jobs:
     name: ngs_toolkit - ${{ matrix.python }}
     strategy:
       matrix:
-        python_version: ['3.x']
+        python_version: ['3.6', '3.7']
     runs-on: ubuntu-latest
 
     steps:

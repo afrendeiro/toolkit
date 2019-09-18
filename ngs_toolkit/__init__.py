@@ -10,7 +10,8 @@ def setup_logger(level="INFO", logfile=None):
 
     level : :obj:`str`, optional
         Level of logging to display.
-        See possible levels here: https://docs.python.org/2/library/logging.html#levels
+        See possible levels here:
+        https://docs.python.org/2/library/logging.html#levels
 
         Defaults to "INFO".
 
@@ -38,13 +39,13 @@ def setup_logger(level="INFO", logfile=None):
     ch = logging.StreamHandler()
     ch.setLevel(logging.getLevelName(level))
     # create formatter and add it to the handlers
-    fmt = "ngs_toolkit.v{}:%(module)s:L%(lineno)d (%(funcName)s) [%(levelname)s] %(asctime)s > %(message)s".format(
-        __version__
-    )
+    fmt = "ngs_toolkit.v{}:%(module)s:L%(lineno)d (%(funcName)s)"
+    fmt += " [%(levelname)s] %(asctime)s > %(message)s".format(__version__)
     formatter = logging.Formatter(fmt, datefmt="%Y-%m-%d %H:%M:%S")
     fh.setFormatter(formatter)
     # fmt = "[%(levelname)s] > %(message)s"
-    fmt = "ngs_toolkit:%(module)s:L%(lineno)d (%(funcName)s) [%(levelname)s] > %(message)s"
+    fmt = "ngs_toolkit:%(module)s:L%(lineno)d (%(funcName)s) [%(levelname)s]"
+    fmt += " > %(message)s"
     formatter = logging.Formatter(fmt)
     ch.setFormatter(formatter)
     # add the handlers to the logger
@@ -52,9 +53,8 @@ def setup_logger(level="INFO", logfile=None):
     _LOGGER.addHandler(ch)
 
     _LOGGER.debug(
-        "This is ngs_toolkit (http://ngs-toolkit.rtfd.io), version: {}".format(
-            __version__
-        )
+        "This is ngs_toolkit (http://ngs-toolkit.rtfd.io), version: {}"
+        .format(__version__)
     )
     return _LOGGER
 
@@ -64,10 +64,11 @@ def setup_config(custom_yaml_config=None):
     Set up global library configuration.
 
     It reads ngs_toolkit's package data to load a default configuration,
-    tries to update it by reading a file in ``~/.ngs_toolkit.config.yaml`` if present,
-    and lastly, updates it by reading a possible passed yaml file ``custom_yaml_config``.
-    Non-exisiting fields will maintain the previous values, so that the user needs only
-    to specify the section(s) as needed.
+    tries to update it by reading a file in ``~/.ngs_toolkit.config.yaml``
+    if present, and lastly, updates it by reading a possible passed yaml file
+    ``custom_yaml_config``.
+    Non-exisiting fields will maintain the previous values, so that the user
+    needs only to specify the section(s) as needed.
 
     Parameters
     ----------
@@ -88,9 +89,11 @@ def setup_config(custom_yaml_config=None):
     import yaml
 
     default_config_path = "config/default.yaml"
-    default_config_path = pkg_resources.resource_filename(__name__, default_config_path)
+    default_config_path = pkg_resources.resource_filename(
+        __name__, default_config_path)
     _LOGGER.debug(
-        "Reading default configuration file distributed with package from '{}'.".format(
+        "Reading default configuration file distributed"
+        " with package from '{}'.".format(
             default_config_path
         )
     )
@@ -99,11 +102,13 @@ def setup_config(custom_yaml_config=None):
         _LOGGER.debug("Default config: {}".format(_CONFIG))
     except IOError:
         _LOGGER.error(
-            "Couldn't read configuration file from '{}'.".format(default_config_path)
+            "Couldn't read configuration file from '{}'."
+            .format(default_config_path)
         )
         _CONFIG = dict()
 
-    user_config_path = os.path.join(os.path.expanduser("~"), ".ngs_toolkit.config.yaml")
+    user_config_path = os.path.join(
+        os.path.expanduser("~"), ".ngs_toolkit.config.yaml")
     if os.path.exists(user_config_path):
         # Read up
         _LOGGER.debug("Found custom user config: {}".format(user_config_path))
@@ -112,23 +117,21 @@ def setup_config(custom_yaml_config=None):
             _LOGGER.debug("Custom user config: {}".format(custom_config))
             # Update config
             _LOGGER.debug(
-                "Updating configuration with custom file from '{}'.".format(
-                    user_config_path
-                )
+                "Updating configuration with custom file from '{}'."
+                .format(user_config_path)
             )
             _CONFIG.update(custom_config)
             _LOGGER.debug("Current config: {}".format(custom_config))
         except IOError:
             _LOGGER.error(
-                "Configuration file from '{}' exists but is not readable. Ignoring.".format(
-                    user_config_path
-                )
+                "Configuration file from '{}' exists but is not readable."
+                " Ignoring."
+                .format(user_config_path)
             )
     else:
         _LOGGER.debug(
-            "To use custom configurations including paths to static files, create a '{}' file.".format(
-                user_config_path
-            )
+            "To use custom configurations including paths to static files,"
+            " create a '{}' file.".format(user_config_path)
         )
 
     if custom_yaml_config is not None:
@@ -146,9 +149,8 @@ def setup_config(custom_yaml_config=None):
             _LOGGER.debug("Current config: {}".format(custom_config))
         except IOError as e:
             _LOGGER.error(
-                "Pased configuration file from '{}' exists but is not readable.".format(
-                    custom_yaml_config
-                )
+                "Passed configuration from '{}' exists but is not readable."
+                .format(custom_yaml_config)
             )
             raise e
 
@@ -160,19 +162,21 @@ def setup_graphic_preferences():
     Set up graphic preferences.
 
     It uses the values under "preferences:graphics:matplotlib:rcParams"
-    and "preferences:graphics:seaborn:parameters" to matplotlib and seaborn respectively.
+    and "preferences:graphics:seaborn:parameters" to matplotlib
+    and seaborn respectively.
     """
     import matplotlib
     import seaborn as sns
 
+    graphics = _CONFIG["preferences"]["graphics"]
     # matplotlib
-    rc_params = _CONFIG["preferences"]["graphics"]["matplotlib"]["rcParams"]
+    rc_params = graphics["matplotlib"]["rcParams"]
     matplotlib.rcParams.update(rc_params)
     matplotlib.rcParams["svg.fonttype"] = "none"
     matplotlib.rc("text", usetex=False)
 
     # seaborn
-    seaborn_params = _CONFIG["preferences"]["graphics"]["seaborn"]["parameters"]
+    seaborn_params = graphics["seaborn"]["parameters"]
     sns.set(**seaborn_params)
 
 
@@ -201,7 +205,8 @@ def check_bedtools_version():
     import pybedtools
 
     # not existing
-    v = ".".join([str(x) for x in pybedtools.helpers.settings.bedtools_version])
+    v = ".".join(
+        [str(x) for x in pybedtools.helpers.settings.bedtools_version])
     msg = "Bedtools does not seem to be installed or is not in $PATH."
     if v == '':
         raise Exception(msg)

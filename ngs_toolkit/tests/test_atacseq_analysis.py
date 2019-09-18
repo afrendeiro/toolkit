@@ -52,7 +52,8 @@ def test_coverage_matrix_loading(various_analysis):
 
 def test_set_consensus_set(various_analysis):
     for analysis in various_analysis:
-        peaks = os.path.join(analysis.results_dir, analysis.name + ".peak_set.bed")
+        peaks = os.path.join(
+            analysis.results_dir, analysis.name + ".peak_set.bed")
         analysis.set_consensus_sites(peaks)
         assert hasattr(analysis, "sites")
         sites = pd.read_csv(peaks, header=None)
@@ -75,8 +76,9 @@ def test_rpm_normalization(various_analysis):
 
 def test_quantile_normalization(various_analysis):
     for analysis in various_analysis:
-        f = os.path.join(analysis.results_dir, analysis.name + ".matrix_norm.csv")
-        qnorm_p = analysis.normalize_quantiles(implementation="Python", save=True)
+        f = os.path.join(
+            analysis.results_dir, analysis.name + ".matrix_norm.csv")
+        qnorm_p = analysis.normalize_quantiles(implementation="Python", save=1)
         assert isinstance(qnorm_p, pd.DataFrame)
         assert hasattr(analysis, "matrix_norm")
         assert file_exists_and_not_empty(f)
@@ -94,11 +96,12 @@ def test_quantile_normalization(various_analysis):
         # assert all(np.array(cors) > 0.99)
 
 
-@pytest.mark.skipif(CI, reason="CQN normalization not testable in Travis")
+@pytest.mark.skipif(CI, reason="CQN normalization not testable in CI")
 def test_cqn_normalization(atac_analysis):
     qnorm = atac_analysis.normalize_cqn()
     assert qnorm.dtypes.all() == np.float
-    file = os.path.join(atac_analysis.results_dir, atac_analysis.name + ".matrix_norm.csv")
+    file = os.path.join(
+        atac_analysis.results_dir, atac_analysis.name + ".matrix_norm.csv")
     assert file_exists_and_not_empty(file)
 
 

@@ -56,10 +56,17 @@ def test_all_requirements_are_importable():
     import importlib
 
     # test only basic requirements (not extras)
+    path = None
     if CI:
-        path = os.path.join(BUILD_DIR, "requirements", "requirements.txt")
-    else:
+        reqs = os.path.join(BUILD_DIR, "requirements", "requirements.txt")
+        if os.path.exists(reqs):
+            path = reqs
+    if path is None:
         path = os.path.join("requirements", "requirements.txt")
+
+    if not os.path.exists(path):
+        pytest.skip("Could not locate requirements.txt")
+
     data = open(path).read().split("\n")
 
     replace = {"scikit-learn": "sklearn"}

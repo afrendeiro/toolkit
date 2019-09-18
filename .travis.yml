@@ -19,6 +19,7 @@ before_install:
     && sudo dpkg -i bedtools_2.27.1+dfsg-4_amd64.deb
   - sudo apt-get -y install r-base r-base-dev r-base-core r-recommended gfortran liblapack-dev libopenblas-dev
   - sudo apt-get -y install r-bioc-deseq2 r-bioc-preprocesscore
+  - pip install pip --upgrade
   - pip install git+https://github.com/afrendeiro/combat.git
   # - R -e "install.packages('BiocManager', repos='https://CRAN.R-project.org')"
   # - R -e "library('BiocManager'); BiocManager::install('cqn', version = '3.9')"

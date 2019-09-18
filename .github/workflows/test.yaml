@@ -30,6 +30,7 @@ jobs:
         sudo dpkg -i bedtools_2.27.1+dfsg-4_amd64.deb
     - name: Install R 3.6
       run: |
+        sudo apt-get update
         sudo apt-get -y install \
           r-base \
           r-base-core \

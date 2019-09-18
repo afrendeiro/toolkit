@@ -44,6 +44,11 @@ def parse_arguments():
         action="store_true",
         default=False,
         help="Don't overwrite any existing directory or file.")
+    parser.add_argument(
+        "--no-save-inputs",
+        action="store_false",
+        default=True,
+        help="Don't write inputs to disk.")
 
     # To enable the loop to pass args directly on to the pipelines...
 
@@ -78,7 +83,8 @@ def main():
         output_dir=args.work_dir,
         output_prefix=args.output_prefix,
         overwrite=args.overwrite, alpha=args.alpha,
-        create_subdirectories=False)
+        create_subdirectories=False,
+        save_inputs=not args.no_save_inputs)
 
     print("Found {} differentially expressed genes with p < {}.".format(
         res[res['pvalue'] < args.alpha].shape[0], args.alpha))

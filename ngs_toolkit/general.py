@@ -312,13 +312,13 @@ def get_blacklist_annotations(
 
 
 def get_tss_annotations(
-    organism,
-    genome_assembly=None,
-    save=True,
-    output_dir=None,
-    chr_prefix=True,
-    gene_types=["protein_coding", "processed_transcript", "lincRNA", "antisense"],
-    overwrite=True,
+        organism,
+        genome_assembly=None,
+        save=True,
+        output_dir=None,
+        chr_prefix=True,
+        gene_types=["protein_coding", "processed_transcript", "lincRNA", "antisense"],
+        overwrite=True,
 ):
     """
     Get annotations of TSS for a given organism/genome assembly.
@@ -482,23 +482,23 @@ def get_tss_annotations(
 
 
 def get_genomic_context(
-    organism,
-    genome_assembly=None,
-    save=True,
-    output_dir=None,
-    chr_prefix=True,
-    region_subset=[
-        "promoter",
-        "exon",
-        "5utr",
-        "3utr",
-        "intron",
-        "genebody",
-        "intergenic",
-    ],
-    gene_types=["protein_coding", "processed_transcript", "lincRNA", "antisense"],
-    promoter_width=3000,
-    overwrite=True,
+        organism,
+        genome_assembly=None,
+        save=True,
+        output_dir=None,
+        chr_prefix=True,
+        region_subset=[
+            "promoter",
+            "exon",
+            "5utr",
+            "3utr",
+            "intron",
+            "genebody",
+            "intergenic",
+        ],
+        gene_types=["protein_coding", "processed_transcript", "lincRNA", "antisense"],
+        promoter_width=3000,
+        overwrite=True,
 ):
     """
     Get annotations of TSS for a given organism/genome assembly.
@@ -729,16 +729,17 @@ def get_genomic_context(
 
 
 def deseq_analysis(
-    count_matrix,
-    experiment_matrix,
-    comparison_table,
-    formula,
-    output_dir,
-    output_prefix,
-    overwrite=True,
-    alpha=0.05,
-    independent_filtering=False,
-    create_subdirectories=True,
+        count_matrix,
+        experiment_matrix,
+        comparison_table,
+        formula,
+        output_dir,
+        output_prefix,
+        overwrite=True,
+        alpha=0.05,
+        independent_filtering=False,
+        create_subdirectories=True,
+        save_inputs=True
 ):
     """
     Perform differential comparison analysis with DESeq2.
@@ -811,15 +812,16 @@ def deseq_analysis(
     ]
 
     # save the matrices just in case
-    count_matrix.to_csv(
-        os.path.join(output_dir, output_prefix + ".count_matrix.tsv"), sep="\t"
-    )
-    experiment_matrix.to_csv(
-        os.path.join(output_dir, output_prefix + ".experiment_matrix.tsv"), sep="\t"
-    )
-    comparison_table.to_csv(
-        os.path.join(output_dir, output_prefix + ".comparison_table.tsv"), sep="\t"
-    )
+    if save_inputs:
+        count_matrix.to_csv(
+            os.path.join(output_dir, output_prefix + ".count_matrix.tsv"), sep="\t"
+        )
+        experiment_matrix.to_csv(
+            os.path.join(output_dir, output_prefix + ".experiment_matrix.tsv"), sep="\t"
+        )
+        comparison_table.to_csv(
+            os.path.join(output_dir, output_prefix + ".comparison_table.tsv"), sep="\t"
+        )
 
     # Rename samples to avoid R errors with sample names containing symbols
     count_matrix.columns = ["S{}".format(i) for i in range(len(count_matrix.columns))]

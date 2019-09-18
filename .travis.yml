@@ -15,8 +15,7 @@ services:
 
 before_install:
   # - sudo apt-get install bedtools=2.27.1+dfsg-4
-  - wget http://ftp.br.debian.org/debian/pool/main/b/bedtools/bedtools_2.27.1+dfsg-4_amd64.deb \
-    && sudo dpkg -i bedtools_2.27.1+dfsg-4_amd64.deb
+  - wget http://ftp.br.debian.org/debian/pool/main/b/bedtools/bedtools_2.27.1+dfsg-4_amd64.deb && sudo dpkg -i bedtools_2.27.1+dfsg-4_amd64.deb
   - sudo apt-get -y install r-base r-base-dev r-base-core r-recommended gfortran liblapack-dev libopenblas-dev
   - sudo apt-get -y install r-bioc-deseq2 r-bioc-preprocesscore
   - pip install pip --upgrade

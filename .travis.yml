@@ -14,32 +14,29 @@ services:
   - xvfb
 
 before_install:
-  # - sudo apt-get install bedtools=2.27.1+dfsg-4
-  - wget http://ftp.br.debian.org/debian/pool/main/b/bedtools/bedtools_2.27.1+dfsg-4_amd64.deb && sudo dpkg -i bedtools_2.27.1+dfsg-4_amd64.deb
-  - sudo apt-get -y install r-base r-base-dev r-base-core r-recommended gfortran liblapack-dev libopenblas-dev
+  # Install bedtools
+  - sudo apt-get -y install bedtools
+  # Install R
+  - sudo apt-get -y install r-base
+  # Add bioconductor libraries
   - sudo apt-get -y install r-bioc-deseq2 r-bioc-preprocesscore
-  - pip install pip --upgrade
+  # Install Combat
   - pip install git+https://github.com/afrendeiro/combat.git
-  # - R -e "install.packages('BiocManager', repos='https://CRAN.R-project.org')"
-  # - R -e "library('BiocManager'); BiocManager::install('cqn', version = '3.9')"
-
-before_script:
-  - export DISPLAY=:99.0
-  # lint code
-  - pip install flake8
-    # stop the build if there are Python syntax errors or undefined names
-  - flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-    # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
-  - flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
 
 install:
   - pip install .[testing]
 
+before_script:
+  - export DISPLAY=:99.0
+  - R -e "suppressMessages(library("DESeq2")); suppressMessages(library("preprocessCore")); sessionInfo()"
+
 script:
+  # - pytest ngs_toolkit/tests/test_plot_differential.py
   - pytest --disable-warnings --show-capture=no --cov ./ --cov-report term --cov-report xml --pyargs ngs_toolkit
-  # - pytest ngs_toolkit/tests/test_install.py
+  
 
 after_success:
+  # - ls
   - coverage xml
   - codecov -f coverage.xml
   - python-codacy-coverage -r coverage.xml

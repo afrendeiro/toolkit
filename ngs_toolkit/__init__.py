@@ -39,8 +39,8 @@ def setup_logger(level="INFO", logfile=None):
     ch = logging.StreamHandler()
     ch.setLevel(logging.getLevelName(level))
     # create formatter and add it to the handlers
-    fmt = "ngs_toolkit.v{}:%(module)s:L%(lineno)d (%(funcName)s)"
-    fmt += " [%(levelname)s] %(asctime)s > %(message)s".format(__version__)
+    fmt = "ngs_toolkit.v{}:%(module)s:L%(lineno)d ".format(__version__)
+    fmt += "(%(funcName)s) [%(levelname)s] %(asctime)s > %(message)s"
     formatter = logging.Formatter(fmt, datefmt="%Y-%m-%d %H:%M:%S")
     fh.setFormatter(formatter)
     # fmt = "[%(levelname)s] > %(message)s"
@@ -204,17 +204,18 @@ def setup_timestamping():
 def check_bedtools_version():
     import pybedtools
 
+    version = pybedtools.helpers.settings.bedtools_version
     # not existing
     v = ".".join(
-        [str(x) for x in pybedtools.helpers.settings.bedtools_version])
+        [str(x) for x in version])
     msg = "Bedtools does not seem to be installed or is not in $PATH."
     if v == '':
         raise Exception(msg)
 
     # too low version
-    msg = "Bedtools version '{}' is smaller than 2.27.".format(v)
-    msg = " Please upgrade to newer version."
-    if not pybedtools.helpers.settings._v_2_27_plus:
+    msg = "Bedtools version '{}' is smaller than 2.26.".format(v)
+    msg += " Please upgrade to newer version."
+    if (version[0] < 2) or (version[1] < 26):
         raise Exception(msg)
 
 

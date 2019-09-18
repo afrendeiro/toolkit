@@ -62,7 +62,6 @@ jobs:
         python3 -m flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
     - name: Test with pytest
       run: |
-        python3 -m pip install --user pytest
         python3 -m pytest --disable-warnings --show-capture=no --cov ./ --cov-report term --cov-report xml --pyargs ngs_toolkit
     - name: Report coverage
       env:

@@ -3119,8 +3119,12 @@ class Analysis(object):
                 log_file = os.path.join(out, job_name + ".log")
                 job_file = os.path.join(out, job_name + ".sh")
                 cmd = (
-                    "date\n{executable} -m ngs_toolkit.recipes.deseq2 --output_prefix "
-                    "{output_prefix} --formula '{formula}' {overwrite} {out}\ndate".format(
+                    (
+                        "date\n{executable} -m ngs_toolkit.recipes.deseq2 "
+                        "--no-save-inputs --output_prefix {output_prefix} "
+                        "--formula '{formula}' "
+                        "{overwrite} {out}\ndate")
+                    .format(
                         executable=sys.executable,
                         output_prefix=output_prefix,
                         formula=formula,

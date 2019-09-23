@@ -36,7 +36,14 @@ script:
   
 
 after_success:
-  # - ls
-  - coverage xml
-  - codecov -f coverage.xml
-  - python-codacy-coverage -r coverage.xml
+- coverage xml
+- codecov -f coverage.xml
+- python-codacy-coverage -r coverage.xml
+
+deploy:
+  provider: pypi
+  user: afrendeiro
+  password:
+    secure: D1KWSJZHlw/v2JLR0ClOiaw4xAuj550NmSVF1jHpIb8An9WrcfJ2YSg4VWoNL8HCMHPTC+EPeaphQa68+RhZTy5fmvifs8qaKnvzADA3Tz514uAA+vjSa3ohI0fZnX3CsI2q8f0Zr45T1O9dgDLecrYnyNqq5iOwcxTNzpxTwTxgSFoj81k3qhJBer4DLG0yVmfG9SsV+V7ApTv3iUp+PZhiGW+duXsTRzFwZAObDfJuMwuT7O9gwSZ7ACm4pXVRk22CzJtjLX/MKT74QY9+eJehtaWfkGRsl9cVqhQZSb2PELLpbXa8sOAdtEcsvg0IlMuFDjPoV5vxgA5PiZL836Ec1Koi+GD5KJY1RFUoXB1Fq3wP4s9mTlSLggVr+C0YZK6XU1hiJp5+YUZycwxtQBIZmLzT+eUDuQnYCdrowqcnqyoWV3Mjd2Aan0Kn5ZlSb73UD+KX+5C9c8CPhrNBo9odDtK8f6Wuz8s6Szz9kbPKQNIaCWD5MTZGN8te5rq/qWjHEayUJprirgRY7eoJgFjOKO15U2+5QyBF9Z4r98WC03FYUr3EExcTQWhGbsqzVY1GsFgSnlNNgbgl3DwIyPprXMn9G8LJjl4thNZqDAs8q2YH6GJkc6DUkXAM4Ma9bS+PsUNJs0vclBXH3utasARF66t5X36KeYo5W8shsj0=
+  on:
+    tags: true

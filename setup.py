@@ -25,18 +25,24 @@ except ImportError:
 
     if sys.version_info < (2, 7):
         extra["dependencies"] = ["argparse"]
-with open(os.path.join("ngs_toolkit", "_version.py"), "r") as handle:
-    version = handle.readline().split()[-1].strip("\"'\n")
+# with open(os.path.join("ngs_toolkit", "_version.py"), "r") as handle:
+#     version = handle.readline().split()[-1].strip("\"'\n")
 
 # Requirements
-requirements = parse_requirements("requirements/requirements.txt")
-test_requirements = parse_requirements("requirements/requirements.test.txt")
-requirements_sc = parse_requirements("requirements/requirements.single_cell.txt")
+requirements = parse_requirements(
+    "requirements/requirements.txt")
+test_requirements = parse_requirements(
+    "requirements/requirements.test.txt")
+requirements_sc = parse_requirements(
+    "requirements/requirements.single_cell.txt")
 
 # Recipes
-recipes = glob.glob(os.path.join(os.path.curdir, "ngs_toolkit", "recipes", "*.py"))
+recipes = glob.glob(
+    os.path.join(os.path.curdir, "ngs_toolkit", "recipes", "*.py"))
 recipes = list(
-    map(lambda x: x.replace(".py", "").replace("./", "").replace("/", "."), recipes)
+    map(
+        lambda x: x.replace(".py", "").replace("./", "").replace("/", "."),
+        recipes)
 )
 recipes = [
     " = ".join([i, j + ":main"])
@@ -57,8 +63,11 @@ except (IOError, ImportError):
 # setup
 setup(
     name="ngs_toolkit",
-    packages=find_packages(),  # should eval to ["ngs_toolkit", "ngs_toolkit.recipes"],
-    version=version,
+    packages=find_packages(),
+    use_scm_version={
+        'write_to': 'ngs_toolkit/_version.py',
+        'write_to_template': '__version__ = "{version}"\n'
+    },
     entry_points={
         "console_scripts": [
             "projectmanager = ngs_toolkit.project_manager:main",
@@ -70,7 +79,8 @@ setup(
     long_description=long_description,
     classifiers=[
         "Development Status :: 3 - Alpha",
-        "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
+        "License :: OSI Approved :: "
+        "GNU General Public License v3 or later (GPLv3+)",
         "Programming Language :: Python :: 2.7",
         "Topic :: Scientific/Engineering :: Bio-Informatics",
     ],
@@ -85,6 +95,7 @@ setup(
     author=u"Andre Rendeiro",
     author_email="andre.rendeiro@pm.me",
     license="GPL3",
+    setup_requires=['setuptools_scm'],
     install_requires=requirements,
     tests_require=test_requirements,
     extras_require={

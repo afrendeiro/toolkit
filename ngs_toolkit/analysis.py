@@ -983,15 +983,16 @@ class Analysis(object):
         output_files : :obj:`list`
             Appends a tuple of (``name``, ``file_name``) to ``output_files``.
         """
+        import yaml
+
         self.output_files.append((name, file_name))
         if dump_yaml:
-            import yaml
             yaml.safe_dump(
                 self.output_files,
                 open(self._format_string_with_attributes(output_yaml), "w"))
 
         if _CONFIG["preferences"]["report"]["continuous_generation"]:
-            self.generate_report()
+            self.generate_report(pip_versions=False)
 
     def generate_report(
             self,
@@ -1077,21 +1078,34 @@ class Analysis(object):
             resource_package = "ngs_toolkit"
             resource_path = '/'.join(('templates', 'report.html'))
             template = Template(
-                pkg_resources.resource_string(resource_package, resource_path).decode())
+                pkg_resources.resource_string(resource_package, resource_path)
+                .decode())
         else:
             template = Template(open(template, 'r').read())
 
         # Format
         output = template.render(
             analysis=self,
-            project_repr={k: v for k, v in self.__dict__.items() if isinstance(v, str)},
-            samples=[s.to_dict() for s in self.samples] if self.samples is not None else [],
+            project_repr={
+                k: v
+                for k, v in self.__dict__.items()
+                if isinstance(v, str)},
+            samples=[
+                s.to_dict()
+                for s in self.samples
+            ] if self.samples is not None
+            else [],
             time=time.asctime(),
             images=images,
             csvs=csvs,
             python_version=sys.version,
             library_version=__version__,
-            freeze=[] if not pip_versions else freeze.freeze())
+            freeze=[
+                ("ngs_toolkit", __version__)
+            ]
+            if not pip_versions
+            else freeze.freeze()
+        )
 
         # Write
         with open(output_html, 'w') as handle:

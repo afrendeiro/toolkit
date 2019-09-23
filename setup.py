@@ -50,14 +50,7 @@ recipes = [
 ]
 recipes = [r for r in recipes if not r.startswith("__init__")]
 
-
-# Handle the pypi README formatting
-try:
-    import pypandoc
-
-    long_description = pypandoc.convert_file("README.md", "rst")
-except (IOError, ImportError):
-    long_description = open("README.md").read()
+long_description = open("README.md").read()
 
 
 # setup
@@ -77,6 +70,7 @@ setup(
     },
     description="A toolkit for NGS analysis with Python.",
     long_description=long_description,
+    long_description_content_type="text/markdown",
     classifiers=[
         "Development Status :: 3 - Alpha",
         "License :: OSI Approved :: "

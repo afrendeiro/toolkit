@@ -1680,7 +1680,7 @@ def enrichr(dataframe, gene_set_libraries=None, kind="genes", max_attempts=5):
 
     if gene_set_libraries is None:
         # Get region databases from config
-        _LOGGER.info("Getting Enrichr gene set libraries from configuration.")
+        _LOGGER.debug("Getting Enrichr gene set libraries from configuration.")
 
         msg = "Enrichr gene set libraries value in configuration could not be found or understood. "
         msg += "Please add a list of value(s) to this section 'resources:mem:motif_databases'. "
@@ -1726,7 +1726,7 @@ def enrichr(dataframe, gene_set_libraries=None, kind="genes", max_attempts=5):
     for gene_set_library in tqdm(
         gene_set_libraries, total=len(gene_set_libraries), desc="Gene set library"
     ):
-        _LOGGER.info("Using Enricher on {} gene set library.".format(gene_set_library))
+        _LOGGER.debug("Using Enricher on {} gene set library.".format(gene_set_library))
 
         # Request enriched sets in gene set
         i = 0
@@ -1742,7 +1742,7 @@ def enrichr(dataframe, gene_set_libraries=None, kind="genes", max_attempts=5):
             )
             okay = response.ok
             if not okay:
-                _LOGGER.debug("API request failed. Retrying.")
+                _LOGGER.warning("API request failed. Retrying.")
 
         # Get enriched sets in gene set
         res = json.loads(response.text)

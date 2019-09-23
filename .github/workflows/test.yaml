@@ -31,17 +31,7 @@ jobs:
     - name: Install R 3.6
       run: |
         sudo apt-get update
-        sudo apt-get -y install \
-          r-base \
-          r-base-core \
-          r-recommended \
-          r-base-dev \
-          gfortran \
-          liblapack-dev \
-          libopenblas-dev \
-          libcurl4-openssl-dev \
-          libxml2-dev \
-          libreadline6-dev
+        sudo apt-get -y install r-base
     - name: Install bioconductor libraries
       run: |
         sudo apt-get -y install \
@@ -62,12 +52,12 @@ jobs:
         python3 -m flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
     - name: Test with pytest
       run: |
-        python3 -m pytest --disable-warnings --show-capture=no --cov ./ --cov-report term --cov-report xml --pyargs ngs_toolkit
+        python3 -m pytest -n 2 --disable-warnings --show-capture=no --cov ./ --cov-report term --cov-report xml --pyargs ngs_toolkit
     - name: Report coverage
       env:
         CODACY_PROJECT_TOKEN: ${{ secrets.CODACY_PROJECT_TOKEN }}
         CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
       run: |
-        coverage xml
-        codecov -f coverage.xml
-        python-codacy-coverage -r coverage.xml
+        python3 -m coverage xml
+        python3 -m codecov -f coverage.xml
+        python3 -m python-codacy-coverage -r coverage.xml

@@ -15,6 +15,8 @@ from ngs_toolkit.decorators import check_has_attributes
 # TODO: Add function to complete comparison_table information such as "comparison_genome" and "data_type" and call it when setting automatically
 # TODO: Add function to create comparison_table from samples' group_attributes
 
+# TODO: add DEseq variance stabilization as normalization method
+
 # TODO: idea: make Analysis.annotate() call both annotate_features(), annotate_samples() and their ancestors with `steps`
 # TODO: Idea: merging analysis. If same type, merge matrices, otherwise use dicts?
 # TODO: Idea: if genome of analysis is set, get required static files for that genome assembly automatically

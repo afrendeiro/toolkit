@@ -31,9 +31,7 @@ before_script:
   - R -e "suppressMessages(library("DESeq2")); suppressMessages(library("preprocessCore")); sessionInfo()"
 
 script:
-  # - pytest ngs_toolkit/tests/test_plot_differential.py
-  - pytest --disable-warnings --show-capture=no --cov ./ --cov-report term --cov-report xml --pyargs ngs_toolkit
-  
+  - pytest -n 2 --disable-warnings --show-capture=no --cov ./ --cov-report term --cov-report xml --pyargs ngs_toolkit
 
 after_success:
   - coverage xml

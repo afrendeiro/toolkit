@@ -1527,6 +1527,14 @@ class ATACSeqAnalysis(Analysis):
             Function to apply to reduce values.
 
             Default is mean.
+        assign: :obj:`bool`
+            Whether to assign the matrix to an attribute of self named `matrix_gene`.
+
+            Default is :obj:`True`.
+        save: :obj:`bool`
+            Whether to save to disk the coverage matrix with filename `output_file`.
+
+            Default is :obj:`True`.
         output_file : :obj:`str`
             Path to save a CSV file with coverage output if `save` is `True`.
 
@@ -1571,11 +1579,15 @@ class ATACSeqAnalysis(Analysis):
             matrix3.to_csv(self._format_string_with_attributes(output_file))
         return matrix3
 
-    def get_gene_level_changes(self, differential_results=None, reduce_func=np.mean):
+    def get_gene_level_changes(
+            self,
+            differential_results=None, reduce_func=np.mean):
         """
-        Redcuce changes in regulatory elements to gene-level by aggregating across regulatory elements.
-        Requires a 'gene_annotation' attribute to be set containing a mapping between
-        the index of `matrix` and genes (produced from `get_peak_gene_annotation`).
+        Redcuce changes in regulatory elements to gene-level by
+        aggregating across regulatory elements.
+        Requires a 'gene_annotation' attribute to be set containing
+        a mapping between the index of `matrix` and genes (produced
+        from `get_peak_gene_annotation`).
 
         Parameters
         ----------
@@ -1589,7 +1601,8 @@ class ATACSeqAnalysis(Analysis):
         Returns
         ---------
         pandas.DataFrame
-            Changes in chromatin accessibility (log2FoldChanges) reduced per gene.
+            Changes in chromatin accessibility (log2FoldChanges)
+            reduced per gene.
         """
         msg = "Analysis object lacks a 'gene_annotation' or 'closest_tss_distances' dataframe."
         hint = " Call 'analysis.get_peak_gene_annotation' to have region-gene associations."

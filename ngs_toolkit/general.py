@@ -739,7 +739,8 @@ def deseq_analysis(
         alpha=0.05,
         independent_filtering=False,
         create_subdirectories=True,
-        save_inputs=True
+        save_inputs=True,
+        **kwargs
 ):
     """
     Perform differential comparison analysis with DESeq2.
@@ -780,6 +781,9 @@ def deseq_analysis(
 
     create_subdirectories: :obj:`bool`
         Whether to create subdirectories for the result of each comparison.
+
+    **kwargs: :obj:`dict`
+        Additional keyword arguments to be passed to the DESeq function of DESeq2.
 
     Returns
     -------
@@ -838,7 +842,7 @@ def deseq_analysis(
         colData=experiment_matrix,
         design=_as_formula(formula),
     )
-    dds = _DESeq(dds, parallel=True)
+    dds = _DESeq(dds, parallel=True, **kwargs)
     # _save(dds, file=os.path.join(output_dir, output_prefix + ".deseq_dds_object.Rdata"))
 
     results = list()

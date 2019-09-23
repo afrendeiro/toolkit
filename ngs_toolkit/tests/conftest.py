@@ -218,7 +218,8 @@ def analysis_with_differential(analysis_normalized):
     analysis_normalized.get_peak_gene_annotation()
     analysis_normalized.annotate_features()
     analysis_normalized.annotate_samples()
-    analysis_normalized.differential_analysis(filter_support=False)
+    analysis_normalized.differential_analysis(
+        filter_support=False, deseq_kwargs={"fitType": "mean"})
     return analysis_normalized
 
 
@@ -370,7 +371,8 @@ def various_analysis(tmp_path):
 
                     # first edit the defaul path to the annotation sheet
                     config = os.path.join(
-                        tmp_path, project_name, "metadata", "project_config.yaml")
+                        tmp_path, project_name,
+                        "metadata", "project_config.yaml")
                     prj_path = os.path.join(
                         tmp_path, project_name)
 
@@ -397,7 +399,8 @@ def chrom_file(tmp_path):
         + "chromhmmSegmentations/ChmmModels/coreMarks/jointModel/"
         + "final/E002_15_coreMarks_hg38lift_dense.bed.gz"
     )
-    chrom_state_file = os.path.join(tmp_path, "E002_15_coreMarks_hg38lift_dense.bed")
+    chrom_state_file = os.path.join(
+        tmp_path, "E002_15_coreMarks_hg38lift_dense.bed")
     download_gzip_file(url, chrom_state_file)
 
     # Test

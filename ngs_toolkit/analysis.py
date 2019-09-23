@@ -2843,25 +2843,30 @@ class Analysis(object):
         output_prefix="differential_analysis",
         overwrite=True,
         distributed=False,
+        deseq_kwargs=None,
         **kwargs
     ):
         """
-        Perform differential regions/genes across samples that are associated with a certain trait.
+        Perform differential regions/genes across samples that are
+        associated with a certain trait.
         Currently the only implementation is with DESeq2.
-        This implies the rpy2 library and the respective R library are installed.
+        This implies the rpy2 library and the respective R library
+        are installed.
 
         Requires the R package "DESeq2" to be installed:
             >>> if (!requireNamespace("BiocManager", quietly = TRUE))
             >>>     install.packages("BiocManager")
             >>> BiocManager::install("DESeq2")
 
-        For other implementations of differential analysis see `ngs_toolkit.general.least_squares_fit`
+        For other implementations of differential analysis see
+        `ngs_toolkit.general.least_squares_fit`
         and `ngs_toolkit.general.differential_from_bivariate_fit`.
 
         Parameters
         ----------
         comparison_table : :obj:`pandas.DataFrame`
-            A dataframe with "comparison_name", "comparison_side" and "sample_name", "sample_group" columns.
+            A dataframe with "comparison_name", "comparison_side" and
+            "sample_name", "sample_group" columns.
 
             Defaults to the analysis' own "comparison_table" attribute.
         samples : :obj:`list`, optional
@@ -2873,14 +2878,16 @@ class Analysis(object):
 
             Defaults to None.
         filter_support: :obj:`bool`, optional
-            Whether features not supported in a given comparison should be removed
-            (i.e. regions with no peaks in any sample in a comparison are not tested)
+            Whether features not supported in a given comparison should
+            be removed (i.e. regions with no peaks in any sample in a
+            comparison are not tested).
             Applies only to ATAC-/ChIP-seq data.
 
             Default is :obj:`True`.
         output_dir : :obj:`str`, optional
             Output directory for analysis.
-            Variables in curly braces will be formated with attributes from analysis.
+            Variables in curly braces will be formated
+            with attributes from analysis.
 
             Defaults to "{results_dir}/differential_analysis_{data_type}".
         output_prefix : :obj:`str`, optional
@@ -2892,15 +2899,22 @@ class Analysis(object):
 
             Defaults to :obj:`True`.
         distributed: :obj:`bool`, optional
-            Whether analysis should be distributed in a computing cluster for each comparison.
-            Currently, only a SLURM implementation is available.
-            If `True`, will not return results.
+            Whether analysis should be distributed in a computing cluster
+            for each comparison.
+            Additional configuration can be passed in ``kwargs``.
 
             Defaults to :obj:`False`.
+        deseq_kwargs : :obj:`dict`, optional
+            Additional keyword arguments to be passed to the
+            `DESeq` function of DESeq2.
+
         kwargs : :obj:`dict`, optional
-            Additional keyword arguments are passed to :func:`~ngs_toolkit.utils.submit_job` and then to the
-            chosen `divvy` submission template according to `computing_configuration`.
-            Pass for example `cores=4, mem=8000, partition="longq", time="08:00:00"`.
+            Additional keyword arguments are passed to
+            :func:`~ngs_toolkit.utils.submit_job` and then to the
+            chosen `divvy` submission template according to
+            `computing_configuration`.
+            Pass for example `cores=4, mem=8000, partition="longq",
+            time="08:00:00"`.
 
         Returns
         -------
@@ -2913,7 +2927,6 @@ class Analysis(object):
         differential_results : :obj:`pandas.DataFrame`
             Pandas dataframe with results.
         """
-        # TODO: for complex designs (one sample is in multiple groups/comparisons) implement running one comparison after the other
         import sys
 
         from ngs_toolkit.general import deseq_analysis
@@ -2929,6 +2942,9 @@ class Analysis(object):
                 _LOGGER.info(hint)
                 raise e
 
+        if deseq_kwargs is None:
+            deseq_kwargs = {}
+
         # Check comparisons
         # check comparison table has required columns
         req_attrs = [
@@ -2939,32 +2955,34 @@ class Analysis(object):
         ]
         if not all([x in comparison_table.columns for x in req_attrs]):
             raise AssertionError(
-                "Given comparison table does not have all of '{}' columns.".format(
-                    "', '".join(req_attrs)
-                )
+                "Given comparison table does not have all of '{}' columns."
+                .format("', '".join(req_attrs))
             )
         # check all comparisons have samples in two sides
         if not all(
-            comparison_table.groupby("comparison_name")["comparison_side"].nunique()
+            comparison_table.groupby("comparison_name")["comparison_side"]
+            .nunique()
             == 2
         ):
             msg = "All comparisons must have samples in each side of the comparison."
             raise AssertionError(msg)
-        # check if any comparison and sample group has samples disagreeing in their side
+        # check if any comparison and sample group has samples disagreeing in side
         if not all(
             comparison_table.groupby(["comparison_name", "sample_group"])[
                 "comparison_side"
             ].nunique()
             == 1
         ):
-            msg = "Samples in same comparison and group must agree on their side of the comparison."
+            msg = "Samples in same comparison and group must agree"
+            msg += " on their side of the comparison."
             raise AssertionError(msg)
 
         # Handle samples under self
         if samples is None:
             samples = self.samples
         samples = [
-            s for s in samples if s.name in comparison_table["sample_name"].tolist()
+            s for s in samples
+            if s.name in comparison_table["sample_name"].tolist()
         ]
 
         # Make output dir
@@ -3053,6 +3071,7 @@ class Analysis(object):
                 output_dir,
                 output_prefix,
                 overwrite=overwrite,
+                **deseq_kwargs
             )
             try:
                 results = results.set_index("index")
@@ -5155,6 +5174,7 @@ class Analysis(object):
         # TODO: add overwrite function when distributed==False
         from ngs_toolkit.parsers import parse_ame, parse_homer
         from ngs_toolkit.general import enrichr, run_enrichment_jobs
+        from ngs_toolkit.utils import get_this_file_or_timestamped
         from tqdm import tqdm
 
         serial = not distributed
@@ -5220,12 +5240,15 @@ class Analysis(object):
                 pathway_enr,
                 pd.read_csv,
                 {"encoding": "utf-8"},
-                output_prefix + "_regions.enrichr.csv",
+                output_prefix + ".enrichr.csv",
                 ".enrichr.csv",
             ),
         ]
 
-        if self.data_type == "RNA-seq":
+        gene_level_data_types = ['RNA-seq', 'CRISPR']
+        region_level_data_types = ["ATAC-seq", "ChIP-seq", "CNV"]
+
+        if self.data_type in gene_level_data_types:
             possible_steps = [x for x in possible_steps if x[0] == "enrichr"]
 
         # Examine each region cluster
@@ -5288,7 +5311,7 @@ class Analysis(object):
                     os.makedirs(comparison_dir)
 
                 # Prepare files and run (if not distributed)
-                if self.data_type == "RNA-seq":
+                if self.data_type in gene_level_data_types:
                     _LOGGER.debug(
                         "Doing genes of comparison '{}', direction '{}'.".format(
                             comp, direction
@@ -5319,12 +5342,11 @@ class Analysis(object):
                                 enr = enrichr(comparison_df.reset_index())
                                 enr.to_csv(
                                     os.path.join(
-                                        comparison_dir, output_prefix + ".enrichr.csv"
-                                    ),
+                                        comparison_dir, output_prefix + ".enrichr.csv"),
                                     index=False,
                                     encoding="utf-8",
                                 )
-                else:
+                elif self.data_type in region_level_data_types:
                     _LOGGER.debug(
                         "Doing regions of comparison '{}', direction '{}'.".format(
                             comp, direction
@@ -5346,7 +5368,8 @@ class Analysis(object):
                     for name, df, function, kwargs, suffix, _ in possible_steps:
                         if name in steps:
                             enr = function(
-                                os.path.join(comparison_dir, suffix), **kwargs
+                                get_this_file_or_timestamped(os.path.join(comparison_dir, suffix)),
+                                **kwargs
                             )
                             enr.loc[:, "comparison_name"] = comp
                             enr.loc[:, "direction"] = direction
@@ -5368,7 +5391,7 @@ class Analysis(object):
                     )
         else:
             background = ""
-            if self.data_type != "RNA-seq":
+            if self.data_type in region_level_data_types:
                 try:
                     _LOGGER.info("Using background region set from analysis.sites")
                     background = getattr(self, "sites").fn

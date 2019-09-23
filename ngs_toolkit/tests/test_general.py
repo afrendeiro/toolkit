@@ -28,5 +28,8 @@ def test_get_matrix(atac_analysis):
     assert (matrix == (atac_analysis.matrix_raw + 1)).all().all()
 
     # sample subssetting
-    matrix = atac_analysis.get_matrix(matrix="matrix_raw", samples=atac_analysis.samples[:2])
-    assert (pd.Series([s.name for s in atac_analysis.samples[:2]]) == matrix.columns).all()
+    matrix = atac_analysis.get_matrix(
+        matrix="matrix_raw", samples=atac_analysis.samples[:2])
+    assert (pd.Series([
+        s.name
+        for s in atac_analysis.samples[:2]]) == matrix.columns).all()

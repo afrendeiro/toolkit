@@ -52,7 +52,10 @@ def test_project_creation(tmp_path):
         for k, v in x.items()
     }
     create_project(
-        project_name, genome_assemblies=genome_assemblies, overwrite=True, root_projects_dir=tmp_path,
+        project_name,
+        genome_assemblies=genome_assemblies,
+        overwrite=True,
+        root_projects_dir=tmp_path,
     )
 
     expected_files = [

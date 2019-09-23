@@ -836,7 +836,7 @@ class Analysis(object):
             samples = self.samples
 
         try:
-            v = [getattr(s, p) for s in samples for p in attributes]
+            v = [getattr(s, p, np.nan) for s in samples for p in attributes]
         except AttributeError:
             msg = "All samples must have all attributes specified!"
             _LOGGER.error(msg)

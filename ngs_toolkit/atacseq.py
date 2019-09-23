@@ -2707,7 +2707,7 @@ class ATACSeqAnalysis(Analysis):
             _LOGGER.info("Running Enrichr for '{}'".format(prefix))
             results = enrichr(clean_gene.to_frame(name="gene_name"))
             results.to_csv(
-                os.path.join(output_dir, "{}_regions.enrichr.csv".format(prefix)),
+                os.path.join(output_dir, "{}.enrichr.csv".format(prefix)),
                 index=False,
                 encoding="utf-8",
             )

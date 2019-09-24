@@ -22,7 +22,7 @@ def test_version_matches():
 
 
 @pytest.mark.skipif(
-    DEV,
+    CI,
     reason="Development mode, not testing Pypi requirements")
 def test_pypi_requirements_are_importable():
     import requests

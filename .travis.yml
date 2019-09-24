@@ -39,12 +39,22 @@ after_success:
   - python-codacy-coverage -r coverage.xml
 
 deploy:
-  provider: pypi
-  user: afrendeiro
-  password:
-    secure: D1KWSJZHlw/v2JLR0ClOiaw4xAuj550NmSVF1jHpIb8An9WrcfJ2YSg4VWoNL8HCMHPTC+EPeaphQa68+RhZTy5fmvifs8qaKnvzADA3Tz514uAA+vjSa3ohI0fZnX3CsI2q8f0Zr45T1O9dgDLecrYnyNqq5iOwcxTNzpxTwTxgSFoj81k3qhJBer4DLG0yVmfG9SsV+V7ApTv3iUp+PZhiGW+duXsTRzFwZAObDfJuMwuT7O9gwSZ7ACm4pXVRk22CzJtjLX/MKT74QY9+eJehtaWfkGRsl9cVqhQZSb2PELLpbXa8sOAdtEcsvg0IlMuFDjPoV5vxgA5PiZL836Ec1Koi+GD5KJY1RFUoXB1Fq3wP4s9mTlSLggVr+C0YZK6XU1hiJp5+YUZycwxtQBIZmLzT+eUDuQnYCdrowqcnqyoWV3Mjd2Aan0Kn5ZlSb73UD+KX+5C9c8CPhrNBo9odDtK8f6Wuz8s6Szz9kbPKQNIaCWD5MTZGN8te5rq/qWjHEayUJprirgRY7eoJgFjOKO15U2+5QyBF9Z4r98WC03FYUr3EExcTQWhGbsqzVY1GsFgSnlNNgbgl3DwIyPprXMn9G8LJjl4thNZqDAs8q2YH6GJkc6DUkXAM4Ma9bS+PsUNJs0vclBXH3utasARF66t5X36KeYo5W8shsj0=
-  distributions: "sdist bdist_wheel"
-  on:
-    branch: master
-    tags: true
-    python: 3.7
+  - provider: pypi
+    user: afrendeiro
+    password:
+      secure: D1KWSJZHlw/v2JLR0ClOiaw4xAuj550NmSVF1jHpIb8An9WrcfJ2YSg4VWoNL8HCMHPTC+EPeaphQa68+RhZTy5fmvifs8qaKnvzADA3Tz514uAA+vjSa3ohI0fZnX3CsI2q8f0Zr45T1O9dgDLecrYnyNqq5iOwcxTNzpxTwTxgSFoj81k3qhJBer4DLG0yVmfG9SsV+V7ApTv3iUp+PZhiGW+duXsTRzFwZAObDfJuMwuT7O9gwSZ7ACm4pXVRk22CzJtjLX/MKT74QY9+eJehtaWfkGRsl9cVqhQZSb2PELLpbXa8sOAdtEcsvg0IlMuFDjPoV5vxgA5PiZL836Ec1Koi+GD5KJY1RFUoXB1Fq3wP4s9mTlSLggVr+C0YZK6XU1hiJp5+YUZycwxtQBIZmLzT+eUDuQnYCdrowqcnqyoWV3Mjd2Aan0Kn5ZlSb73UD+KX+5C9c8CPhrNBo9odDtK8f6Wuz8s6Szz9kbPKQNIaCWD5MTZGN8te5rq/qWjHEayUJprirgRY7eoJgFjOKO15U2+5QyBF9Z4r98WC03FYUr3EExcTQWhGbsqzVY1GsFgSnlNNgbgl3DwIyPprXMn9G8LJjl4thNZqDAs8q2YH6GJkc6DUkXAM4Ma9bS+PsUNJs0vclBXH3utasARF66t5X36KeYo5W8shsj0=
+    distributions: "sdist bdist_wheel"
+    on:
+      branch: master
+      tags: true
+      python: 3.7
+  - provider: releases
+    user: afrendeiro
+    password:
+      secure: kkJ2DMzDoVV10L6jwGotvF0h1XNdWkrKRleTJW4nZ51809RXeCyf7fxL2xDenzi9YTyH7ItMeuiCr7nPwmtTO6oKNQdY94pGnZ8+E70QughYjYyWB2g3MBpd2ssbCMKRclVQU9OrNLvh6ApghABpxetSw2eSu/aeDDG7BwbwJUKRf1uI6pm5tnKvtbr5Bab0qF0L/ceuqMqS+UvkPFUvOPgrVh502TbEYW/R3v4rBTk+BAJ9aFEPHoPh6lNPIgDe3axScsWfIFRBAhjiRZEumkPdcGmL6PGuNIMdgnwtIZkD8sCz7xJxKHOKBjZ033dnGi0t8LXMvePi0BOkAXWfgBf5VX49VYcRwW7aE5H+P8a0omA+ro8aPtzwCYSRAEek8oWdNZEVtN9w1OIB8sRXmkFGo5Uxh/7rsrO5Co63ffmOX4FhkZZq2EDEvWYC0jZMnj4YFga8NEBH1bTDx4BGqmcUVpu6FkrMBJp/Z79t96A5DXZvrxRHDrlyjBCBkAqcujicrZmdpRAK59R3x6ZFVpWk7ejrbdf3rKNT3YLshpqiQ7s63EtzZxMXJXTBEWzl0aXvvP4iSsVVRCm/iywbPvYi90IVfvbdRRNzgWFRWk3VCrjwgmVQId0AHO77RfRZ/FiMJYYnyVTAEK5mnX4vsXbpb+BFRX/R8DBxsbkC+Gs=
+    file: dist/ngs_toolkit-*
+    skip_cleanup: true
+    on:
+      branch: master
+      tags: true
+      python: 3.7

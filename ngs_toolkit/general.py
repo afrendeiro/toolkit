@@ -10,9 +10,6 @@ from ngs_toolkit import _CONFIG, _LOGGER
 from ngs_toolkit.utils import get_this_file_or_timestamped
 
 
-# TODO: revise distributed for project_to_geo
-
-
 def get_genome_reference(
     organism,
     genome_assembly=None,
@@ -1949,7 +1946,12 @@ def run_enrichment_jobs(
 
 
 def project_to_geo(
-    project, output_dir="geo_submission", samples=None, distributed=False, dry_run=False
+    project,
+    output_dir="geo_submission",
+    samples=None,
+    distributed=False,
+    dry_run=False,
+    **kwargs
 ):
     """
     Prepare raw sequencing files for submission to GEO.
@@ -1983,6 +1985,11 @@ def project_to_geo(
         Whether copy/execution/submisison commands should be not be run to test.
         Default is :obj:`False`.
 
+    **kwargs : :obj:`dict`
+        Additional keyword arguments will be passed to `ngs_toolkit.utils.submit_job` if `distributed` is True.
+        and on to a divvy submission template.
+        Pass for example: computing_configuration="slurm", jobname="job", cores=2, mem=8000, partition="longq".
+
     Returns
     -------
     pandas.DataFrame
@@ -2004,38 +2011,38 @@ def project_to_geo(
             suffix = ".file{}".format(i) if various else ""
             # Copy raw file
             bam_file = os.path.join(output_dir, sample.name + "{}.bam".format(suffix))
-            cmd += "cp {} {}; ".format(file, bam_file)
-            cmd += "chmod 644 {}; ".format(bam_file)
+            cmd += "cp {} {};\n".format(file, bam_file)
+            cmd += "chmod 644 {};\n".format(bam_file)
             annot.loc[sample.name, "bam_file{}".format(i)] = bam_file
 
             # Copy or generate md5sum
             md5_file = bam_file + ".md5"
             if os.path.exists(file + ".md5"):
-                cmd += "cp {} {}; ".format(file + ".md5", md5_file)
+                cmd += "cp {} {};\n".format(file + ".md5", md5_file)
             else:
                 b = os.path.basename(file)
-                cmd += "md5sum {} > {}; ".format(os.path.join(output_dir, b), md5_file)
-            cmd += "chmod 644 {}; ".format(md5_file)
+                cmd += "md5sum {} > {};\n".format(os.path.join(output_dir, b), md5_file)
+            cmd += "chmod 644 {};\n".format(md5_file)
             annot.loc[sample.name, "bam_file{}_md5sum".format(i)] = md5_file
 
         # Copy bigWig files
         if sample.library in ["ATAC-seq", "ChIP-seq"]:
             if hasattr(sample, "bigwig"):
                 bigwig_file = os.path.join(output_dir, sample.name + ".bigWig")
-                cmd += "cp {} {}; ".format(sample.bigwig, bigwig_file)
-                cmd += "chmod 644 {}; ".format(bigwig_file)
+                cmd += "cp {} {};\n".format(sample.bigwig, bigwig_file)
+                cmd += "chmod 644 {};\n".format(bigwig_file)
                 annot.loc[sample.name, "bigwig_file"] = bigwig_file
 
                 # Copy or generate md5sum
                 md5_file = bigwig_file + ".md5"
                 if os.path.exists(sample.bigwig + ".md5"):
-                    cmd += "cp {} {}; ".format(sample.bigwig + ".md5", md5_file)
+                    cmd += "cp {} {};\n".format(sample.bigwig + ".md5", md5_file)
                 else:
                     b = os.path.basename(sample.bigwig)
-                    cmd += "md5sum {} > {}; ".format(
+                    cmd += "md5sum {} > {};\n".format(
                         os.path.join(output_dir, b), md5_file
                     )
-                cmd += "chmod 644 {}; ".format(md5_file)
+                cmd += "chmod 644 {};\n".format(md5_file)
                 annot.loc[sample.name, "bigwig_file_md5sum"] = md5_file
             else:
                 _LOGGER.warning(
@@ -2048,18 +2055,18 @@ def project_to_geo(
         if sample.library == "ATAC-seq":
             if hasattr(sample, "peaks"):
                 peaks_file = os.path.join(output_dir, sample.name + ".peaks.narrowPeak")
-                cmd += "cp {} {}; ".format(sample.peaks, peaks_file)
-                cmd += "chmod 644 {}; ".format(peaks_file)
+                cmd += "cp {} {};\n".format(sample.peaks, peaks_file)
+                cmd += "chmod 644 {};\n".format(peaks_file)
                 annot.loc[sample.name, "peaks_file"] = peaks_file
 
                 # Copy or generate md5sum
                 md5_file = peaks_file + ".md5"
                 if os.path.exists(sample.peaks + ".md5"):
-                    cmd += "cp {} {}; ".format(sample.peaks + ".md5", md5_file)
+                    cmd += "cp {} {};\n".format(sample.peaks + ".md5", md5_file)
                 else:
                     b = os.path.basename(sample.peaks)
-                    cmd += "md5sum {} > {}; ".format(peaks_file, md5_file)
-                cmd += "chmod 644 {}; ".format(md5_file)
+                    cmd += "md5sum {} > {};\n".format(peaks_file, md5_file)
+                cmd += "chmod 644 {};\n".format(md5_file)
                 annot.loc[sample.name, "peaks_file_md5sum"] = md5_file
             else:
                 _LOGGER.warning(
@@ -2068,6 +2075,7 @@ def project_to_geo(
                     )
                     + " Skipping peaks file."
                 )
+        cmd += "\ndate\n"
 
         # Assemble job
         job_name = "project_to_geo.{}".format(sample.name)
@@ -2076,7 +2084,7 @@ def project_to_geo(
         submit_job(
             cmd, job_file, log_file=log_file,
             jobname=job_name, cores=1, mem=8000,
-            dry_run=dry_run)
+            dry_run=dry_run, **kwargs)
 
     return annot
 

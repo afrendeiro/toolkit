@@ -7,6 +7,17 @@ import pytest
 from .conftest import file_exists, file_exists_and_not_empty
 
 
+# Note:
+# The DESeq2 1.24.0 version in Debian archives
+# differs from the DESeq2 1.24.0 version in bioconductor version 3.9
+# If estimateDispersions with default fitType="parametric" fails,
+# (as often happens with the quickly generated synthetic data from tests),
+# it tries to use local fit using the locfit package, but in Debian
+# version this is not a valid choice of fit, causing failure.
+# Due to this, and since I'm using Debian packages for faster testing
+# I'm manually setting fitType="mean" for testing only.
+
+
 @pytest.fixture
 def outputs(atac_analysis):
     output_dir = os.path.join(atac_analysis.results_dir, "differential_analysis_ATAC-seq")
@@ -37,6 +48,43 @@ def outputs(atac_analysis):
 #         prefix + "deseq_result.all_comparisons.csv",
 #         prefix + "experiment_matrix.tsv"]
 #     return outputs
+
+
+def test_deseq_functionality():
+    import warnings
+
+    import pandas as pd
+
+    from rpy2.rinterface import RRuntimeWarning
+    from rpy2.robjects import numpy2ri, pandas2ri
+    import rpy2.robjects as robjects
+
+    from ngs_toolkit.utils import recarray2pandas_df
+
+    numpy2ri.activate()
+    pandas2ri.activate()
+    warnings.filterwarnings("ignore", category=RRuntimeWarning)
+
+    robjects.r('suppressMessages(library("DESeq2"))')
+    _makeExampleDESeqDataSet = robjects.r("DESeq2::makeExampleDESeqDataSet")
+    _estimateSizeFactors = robjects.r("DESeq2::estimateSizeFactors")
+    _estimateDispersions = robjects.r("DESeq2::estimateDispersions")
+    _nbinomWaldTest = robjects.r("DESeq2::nbinomWaldTest")
+    _DESeq = robjects.r("DESeq2::DESeq")
+    _results = robjects.r("DESeq2::results")
+    _as_data_frame = robjects.r("as.data.frame")
+
+    dds = _makeExampleDESeqDataSet()
+    dds = _estimateSizeFactors(dds)
+    dds = _estimateDispersions(dds)
+    dds = _nbinomWaldTest(dds)
+    res = recarray2pandas_df(_as_data_frame(_results(dds)))
+    assert isinstance(res, pd.DataFrame)
+
+    dds = _makeExampleDESeqDataSet()
+    dds = _DESeq(dds)
+    res = recarray2pandas_df(_as_data_frame(_results(dds)))
+    assert isinstance(res, pd.DataFrame)
 
 
 class Test_differential_analysis:

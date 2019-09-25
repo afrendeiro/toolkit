@@ -359,7 +359,6 @@ def get_tss_annotations(
     pandas.DataFrame
         DataFrame with genome annotations
     """
-    from ngs_toolkit.utils import get_this_file_or_timestamped
     organisms = {
         "human": {"species": "hsapiens", "ensembl_version": "grch37"},
         "mouse": {"species": "mmusculus", "ensembl_version": "grcm38"},
@@ -938,7 +937,7 @@ def deseq_analysis(
     results.index.name = "index"
     results.to_csv(
         os.path.join(output_dir, output_prefix + ".deseq_result.all_comparisons.csv"),
-        index=False,
+        index=True,
     )
 
     # return

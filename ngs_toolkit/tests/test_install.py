@@ -27,7 +27,10 @@ def test_pypi_requirements_are_importable():
     url = "https://pypi.python.org/pypi/" + str(package_name) + "/json"
     data = requests.get(url).json()
 
-    replace = {"scikit-learn": "sklearn"}
+    # handle packages where the package name is different than the Pypi name
+    replace = {
+        "setuptools-scm": "setuptools_scm",
+        "scikit-learn": "sklearn"}
 
     # not extra requirements
     requirements = [

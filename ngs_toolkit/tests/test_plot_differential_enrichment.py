@@ -28,7 +28,6 @@ def outputs(analysis_with_differential_enrichment):
     return outputs
 
 
-# @pytest.mark.skip(reason="no way of currently testing this")
 class Test_plot_differential_enrichment:
     def test_no_arguments(self, analysis_with_differential_enrichment, outputs):
         analysis_with_differential_enrichment.plot_differential_enrichment()

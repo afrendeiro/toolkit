@@ -169,6 +169,7 @@ def generate_project(
         genome_assemblies={organism: genome_assembly},
         overwrite=True,
         root_projects_dir=output_dir,
+        git=False
     )
 
     # Generate random data

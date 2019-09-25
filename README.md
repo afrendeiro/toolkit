@@ -17,7 +17,7 @@ Head to the [documentation](http://ngs-toolkit.readthedocs.io/) to see how to in
 
 Install with:
 
-```
+```bash
 pip install ngs-toolkit
 ```
 

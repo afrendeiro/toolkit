@@ -95,7 +95,8 @@ def parse_arguments(cli_string=None):
     elif args.command == "create":
         args.root_dir = os.path.abspath(args.root_dir)
     elif args.command == "recipe":
-        if not args.list_only and ((args.recipe_name is None) or (args.project_config is None)):
+        if not args.list_only and (
+                (args.recipe_name is None) or (args.project_config is None)):
             parser.print_help(sys.stderr)
             sys.exit(1)
 
@@ -110,6 +111,7 @@ def create_project(
     username=None,
     email=None,
     url=None,
+    git=True,
 ):
     """
     Main function: Create project.
@@ -252,9 +254,14 @@ def create_project(
         handle.write(comparison_table_template)
 
     # Initialize git repository)
-    p = subprocess.Popen("git init {}".format(project_dir).split(" "), stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-    p.communicate()
-    return p.returncode
+    if git:
+        p = subprocess.Popen(
+            "git init {}".format(project_dir).split(" "),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT)
+        p.communicate()
+        return p.returncode
+    return 0
 
 
 def create_requirements_file(

@@ -1,5 +1,5 @@
-# FROM gitpod/workspace-full-vnc
-FROM gitpod/workspace-full:latest
+# FROM gitpod/workspace-full
+FROM gitpod/workspace-full-vnc
 
 USER root
 
@@ -21,6 +21,8 @@ RUN apt-get update \
 
 USER gitpod
 
+ENV PYTHONPATH=/home/gitpod/.local/lib/python3.7/site-packages/
+
 # Install IPython
 RUN pip3 install --user ipython
 
@@ -34,8 +36,6 @@ RUN pip3 install --user -r \
 # # Install library
 # RUN pip3 install --user \
 #     git+https://github.com/afrendeiro/toolkit.git#egg=ngs-toolkit[testing]
-
-ENV PYTHONPATH=/home/gitpod/.local/lib/python3.7/site-packages/
 
 USER root
 

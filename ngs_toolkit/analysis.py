@@ -1022,7 +1022,7 @@ class Analysis(object):
         from jinja2 import Template
         import pkg_resources
         import sys
-        from ngs_toolkit._version import __version__
+        from ngs_toolkit import __version__
 
         try:
             from pip._internal.operations import freeze

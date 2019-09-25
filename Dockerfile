@@ -35,6 +35,8 @@ RUN pip3 install --user -r \
 # RUN pip3 install --user \
 #     git+https://github.com/afrendeiro/toolkit.git#egg=ngs-toolkit[testing]
 
+ENV PYTHONPATH=/home/gitpod/.local/lib/python3.7/site-packages/
+
 USER root
 
 ENV PATH="/home/gitpod/.local/bin:${PATH}"

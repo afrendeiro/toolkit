@@ -48,13 +48,3 @@ deploy:
       branch: master
       tags: true
       python: 3.7
-  - provider: releases
-    user: afrendeiro
-    password:
-      secure: kkJ2DMzDoVV10L6jwGotvF0h1XNdWkrKRleTJW4nZ51809RXeCyf7fxL2xDenzi9YTyH7ItMeuiCr7nPwmtTO6oKNQdY94pGnZ8+E70QughYjYyWB2g3MBpd2ssbCMKRclVQU9OrNLvh6ApghABpxetSw2eSu/aeDDG7BwbwJUKRf1uI6pm5tnKvtbr5Bab0qF0L/ceuqMqS+UvkPFUvOPgrVh502TbEYW/R3v4rBTk+BAJ9aFEPHoPh6lNPIgDe3axScsWfIFRBAhjiRZEumkPdcGmL6PGuNIMdgnwtIZkD8sCz7xJxKHOKBjZ033dnGi0t8LXMvePi0BOkAXWfgBf5VX49VYcRwW7aE5H+P8a0omA+ro8aPtzwCYSRAEek8oWdNZEVtN9w1OIB8sRXmkFGo5Uxh/7rsrO5Co63ffmOX4FhkZZq2EDEvWYC0jZMnj4YFga8NEBH1bTDx4BGqmcUVpu6FkrMBJp/Z79t96A5DXZvrxRHDrlyjBCBkAqcujicrZmdpRAK59R3x6ZFVpWk7ejrbdf3rKNT3YLshpqiQ7s63EtzZxMXJXTBEWzl0aXvvP4iSsVVRCm/iywbPvYi90IVfvbdRRNzgWFRWk3VCrjwgmVQId0AHO77RfRZ/FiMJYYnyVTAEK5mnX4vsXbpb+BFRX/R8DBxsbkC+Gs=
-    file: dist/ngs_toolkit-*
-    skip_cleanup: true
-    on:
-      branch: master
-      tags: true
-      python: 3.7

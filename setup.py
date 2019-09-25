@@ -25,8 +25,6 @@ except ImportError:
 
     if sys.version_info < (2, 7):
         extra["dependencies"] = ["argparse"]
-# with open(os.path.join("ngs_toolkit", "_version.py"), "r") as handle:
-#     version = handle.readline().split()[-1].strip("\"'\n")
 
 # Requirements
 requirements = parse_requirements(
@@ -65,8 +63,7 @@ setup(
         "console_scripts": [
             "projectmanager = ngs_toolkit.project_manager:main",
             "trackmanager = ngs_toolkit.track_manager:main",
-        ]
-        + recipes
+        ] + recipes
     },
     description="A toolkit for NGS analysis with Python.",
     long_description=long_description,
@@ -79,7 +76,7 @@ setup(
         "Topic :: Scientific/Engineering :: Bio-Informatics",
     ],
     keywords="bioinformatics, sequencing, ngs, ngs analysis, "
-    + "ATAC-Seq, ChIP-seq, RNA-seq, project management",
+             "ATAC-Seq, ChIP-seq, RNA-seq, project management",
     url="https://github.com/afrendeiro/toolkit",
     project_urls={
         "Bug Tracker": "https://github.com/afrendeiro/toolkit/issues",

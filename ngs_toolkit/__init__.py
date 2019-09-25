@@ -1,4 +1,6 @@
-from ._version import __version__
+from setuptools_scm import get_version as _get_version
+
+__version__ = _get_version(root='..', relative_to=__file__)
 
 
 def setup_logger(level="INFO", logfile=None):

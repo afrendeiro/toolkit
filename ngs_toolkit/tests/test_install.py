@@ -9,20 +9,15 @@ from .conftest import CI, DEV, BUILD_DIR
 
 def test_version_matches():
     from ngs_toolkit import __version__ as installed_version
-    import pkgutil
+    from pkg_resources import get_distribution
 
-    file_version = (
-        pkgutil.get_data("ngs_toolkit", "_version.py")
-        .decode()
-        .strip()
-        .split(" = ")[1]
-        .replace('"', "")
-    )
+    file_version = get_distribution('ngs_toolkit').version
+
     assert installed_version == file_version
 
 
 @pytest.mark.skipif(
-    CI,
+    DEV,
     reason="Development mode, not testing Pypi requirements")
 def test_pypi_requirements_are_importable():
     import requests

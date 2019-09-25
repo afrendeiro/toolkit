@@ -15,6 +15,8 @@
 import sys
 import os
 import sphinx_rtd_theme
+from pkg_resources import get_distribution
+
 # import sphinx_bootstrap_theme
 
 # If extensions (or modules to document with autodoc) are in another directory,
@@ -61,15 +63,15 @@ master_doc = "index"
 
 # General information about the project.
 project = u"ngs_toolkit"
-copyright = u"2017, Andre Rendeiro"
+copyright = u"2019, Andre Rendeiro"
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
 # built documents.
 #
-# The short X.Y version.
-with open(os.path.join("..", "..", "ngs_toolkit", "_version.py"), "r") as handle:
-    version = handle.readline().split()[-1].strip("\"'\n")
+release = get_distribution('ngs_toolkit').version
+# for example take major/minor
+version = '.'.join(release.split('.')[:3])
 
 # The full version, including alpha/beta/rc tags.
 release = version

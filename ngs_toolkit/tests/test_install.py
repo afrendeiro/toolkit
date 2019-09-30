@@ -7,6 +7,9 @@ import pytest
 from .conftest import CI, DEV, BUILD_DIR
 
 
+@pytest.mark.skipif(
+    not CI,
+    reason="Development mode, not testing Pypi requirements")
 def test_version_matches():
     from ngs_toolkit import __version__ as installed_version
     from pkg_resources import get_distribution

@@ -29,8 +29,10 @@ except ImportError:
 # Requirements
 requirements = parse_requirements(
     "requirements/requirements.txt")
-test_requirements = parse_requirements(
+requirements_test = parse_requirements(
     "requirements/requirements.test.txt")
+requirements_docs = parse_requirements(
+    "requirements/requirements.docs.txt")
 requirements_sc = parse_requirements(
     "requirements/requirements.single_cell.txt")
 
@@ -88,9 +90,10 @@ setup(
     license="GPL3",
     setup_requires=['setuptools_scm'],
     install_requires=requirements,
-    tests_require=test_requirements,
+    tests_require=requirements_test,
     extras_require={
-        "testing": test_requirements,
+        "testing": requirements_test,
+        "docs": requirements_docs,
         "single_cell": requirements_sc},
     package_data={"ngs_toolkit": ["config/*.yaml", "templates/*.html"]},
     data_files=[

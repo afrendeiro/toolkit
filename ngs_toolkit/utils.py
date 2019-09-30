@@ -7,32 +7,30 @@ import numpy as np
 import pandas as pd
 
 
-class Unbuffered:
-    def __init__(self, stream):
-        self.stream = stream
-
-    def write(self, data):
-        self.stream.write(data)
-        self.stream.flush()
-
-    def writelines(self, datas):
-        self.stream.writelines(datas)
-        self.stream.flush()
-
-    def __getattr__(self, attr):
-        return getattr(self.stream, attr)
-
-
 def have_unbuffered_output():
+    """Set unbuffered output for current session."""
     import sys
+
+    class Unbuffered:
+        def __init__(self, stream):
+            self.stream = stream
+
+        def write(self, data):
+            self.stream.write(data)
+            self.stream.flush()
+
+        def writelines(self, datas):
+            self.stream.writelines(datas)
+            self.stream.flush()
+
+        def __getattr__(self, attr):
+            return getattr(self.stream, attr)
 
     sys.stdout = Unbuffered(sys.stdout)
 
 
 def is_running_inside_ipython():
-    """
-    Check whether code is running inside an IPython session.
-    """
+    """Check whether code is running inside an IPython session."""
     try:
         cfg = get_ipython().config
         if cfg['IPKernelApp']['parent_appname'] == 'ipython-notebook':
@@ -44,17 +42,35 @@ def is_running_inside_ipython():
 
 
 def get_timestamp(fmt='%Y-%m-%d-%H:%M:%S'):
+    """Get current timestamp in ``fmt`` format."""
     from datetime import datetime
 
     return datetime.today().strftime(fmt)
 
 
 def remove_timestamp_if_existing(file):
+    """Remove timestamp from path if matching timestamp pattern exists."""
     import re
     return re.sub(r"\d{4}-\d{2}-\d{2}-\d{2}:\d{2}:\d{2}\.", "", file)
 
 
 def get_this_file_or_timestamped(file, permissive=True):
+    """
+    Get a path to an existing timestamped file based on an non-timestamped path.
+
+    Parameters
+    ----------
+    file_name : :obj:`str`
+        File name of analysis output to record.
+    permissive : :obj:`bool`
+        Whether failure to find timestamped file should return the original file
+        or raise a IndexError.
+
+    Raises
+    ----------
+    IndexError
+        If not `permissive` and can't find timestamped file.
+    """
     from glob import glob
     import re
 
@@ -70,8 +86,8 @@ def get_this_file_or_timestamped(file, permissive=True):
            if re.search(body + r"\.\d{4}-\d{2}-\d{2}-\d{2}:\d{2}:\d{2}\.", x)]
     if len(res) > 1:
         _LOGGER.warning(
-            "Could not get unequivocal timestamped file for '{}'.".format(file) +
-            " Returning latest: '{}'.".format(res[-1]))
+            "Could not get unequivocal timestamped file for '{}'.".format(file)
+            + " Returning latest: '{}'.".format(res[-1]))
     try:
         # get newest file
         return res[-1]
@@ -86,52 +102,26 @@ def get_this_file_or_timestamped(file, permissive=True):
 
 
 def is_analysis_descendent(exclude_functions=None):
-    import inspect
-    from ngs_toolkit import Analysis
-
-    for s in inspect.stack():
-        if s.function in exclude_functions or []:
-            return False
-        if 'self' not in s.frame.f_locals:
-            continue
-        # # Get Analysis object
-        if not isinstance(s.frame.f_locals['self'], Analysis):
-            continue
-        else:
-            a = s.frame.f_locals['self']
-        break
-    return "a" in locals()
-
-
-def record_analysis_output(file_name, report=True, permissive=False):
     """
-    Register a file that is an output of the Analysis.
-    The file will be associated with the function that produced it and
-    saved in the attribute ``output_files``.
+    Check whether any call in the traceback comes from a function part of a
+    ``ngs_toolkit.Analysis`` object.
 
     Parameters
     ----------
-    file_name : :obj:`str`
-        File name of analysis output to record.
-    report : :obj:`bool`
-        Whether to write an html report with all current records.
+    exclude_functions : :obj:`list`
+        List of function names to exclude from.
 
-        Default is :obj:`True`
-
-    Attributes
+    Returns
     ----------
-    output_files : :obj:`collections.OrderedDict
-        OrderedDict with keys being the function that produced the file
-        and a list of file(s) as values.
-
-    Raises
-    ----------
-    KeyError
-        If function (or parents) that calls this is not part of an Analysis object.
+    tuple
+        If is descentent, returns tuple of (Analysis instance, function name),
+        othewise returns :obj:`False`.
     """
-    # TODO: separate stack workflow to get analysis to its own function
     import inspect
-    from ngs_toolkit import Analysis, _LOGGER
+    from ngs_toolkit import Analysis
+
+    if exclude_functions is None:
+        exclude_functions = list()
 
     # Let's get the object that called the function previous to this one
     # # the use case is often:
@@ -139,29 +129,35 @@ def record_analysis_output(file_name, report=True, permissive=False):
     # # If savefig(track=True), this function will be called and we can trace which Analysis object did so
 
     # Go up the stack until an Analysis object is found:
-    msg = "`record_analysis_output` was called by a function not belonging to a Analysis object"
     for s in inspect.stack():
+        if s.function in exclude_functions:
+            return False
+        # # Function does not have "self" in locals and therefore
+        # # unlikely part of Analysis
         if 'self' not in s.frame.f_locals:
             continue
         # # Get Analysis object
-        if not isinstance(s.frame.f_locals['self'], Analysis):
-            continue
-        else:
-            a = s.frame.f_locals['self']
-            break
-    if "a" not in locals():
-        if permissive:
-            _LOGGER.debug(msg)
-            return
-        else:
-            _LOGGER.error(msg)
-            raise KeyError(msg)
+        if isinstance(s.frame.f_locals['self'], Analysis):
+            return (s.frame.f_locals['self'], s.function)
+    return False
 
-    # # Get function name
-    name = s.function
-    # # Get parameters
-    # loc.frame.f_locals
-    a.record_output_file(file_name, name)
+
+def record_analysis_output(file_name, **kwargs):
+    """
+    Register a file that is an output of an Analysis.
+    The file will be associated with the function that produced it and
+    saved in the attribute ``output_files``.
+
+    Parameters
+    ----------
+    file_name : :obj:`str`
+        File name of analysis output to record.
+    **kwargs : :obj:`bool`
+        Keyword arguments passed to ``is_analysis_descendent``.
+    """
+    out = is_analysis_descendent(**kwargs)
+    if out:
+        out[0].record_output_file(file_name, out[1])
 
 
 def submit_job(
@@ -1237,7 +1233,7 @@ def count_bam_file_length(bam_file):
 
 
 def count_lines(file):
-    with open(file) as f:
+    with open(file, 'r') as f:
         for i, _ in enumerate(f):
             pass
     return i + 1

@@ -101,14 +101,14 @@ def to_csv_timestamped(f, exclude_functions=None):
                         end = s[-1]
                         body = ".".join(s[:-1])
                         args = (args[0], ".".join([body, get_timestamp(), end])) + args[2:]
-                        record_analysis_output(args[1], permissive=True)
+                        record_analysis_output(args[1])
                 else:
                     if isinstance(args[0], str):
                         s = args[0].split(".")
                         end = s[-1]
                         body = ".".join(s[:-1])
                         args = (".".join([body, get_timestamp(), end])) + args[1:]
-                        record_analysis_output(args[0], permissive=True)
+                        record_analysis_output(args[0])
         return f(*args, **kwargs)
     return wrapper
 

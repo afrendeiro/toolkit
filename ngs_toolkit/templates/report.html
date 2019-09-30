@@ -208,6 +208,7 @@
                              aria-controls="versioning-additional">
                           Additional Python libraries</a>
                         </p>
+                        {% if library|length > 0 %}
                         <div class="row collapse" id="versioning-additional">
                             {% for library in freeze %}
                                 <div id="versioning-{{library}}" class="col-2">
@@ -215,6 +216,7 @@
                                 </div>
                             {% endfor %}
                         </div>
+                        {% endif %}
                     </ul>
                     <hr>
                 </div>

@@ -1041,8 +1041,11 @@ class Analysis(object):
 
         keys = {x[0] for x in self.output_files}
         outputs = {k: list() for k in keys}
+
+        # get relative paths:
+        # this enables viewing linked files in html independent of the machine
         for key, file in self.output_files:
-            outputs[key].append(file)
+            outputs[key].append(os.path.relpath(file, self.root_dir))
 
         # Select image outputs (non-CSV files)
         images = {
@@ -1100,11 +1103,7 @@ class Analysis(object):
             csvs=csvs,
             python_version=sys.version,
             library_version=__version__,
-            freeze=[
-                ("ngs_toolkit", __version__)
-            ]
-            if not pip_versions
-            else freeze.freeze()
+            freeze=[] if not pip_versions else freeze.freeze()
         )
 
         # Write

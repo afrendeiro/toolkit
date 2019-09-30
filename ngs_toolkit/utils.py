@@ -808,17 +808,18 @@ def download_file(url, output_file, chunk_size=1024):
     chunk_size : :obj:`int`
         Size in bytes of chunk to write to disk at a time.
     """
-    # # test:
-    # url = 'https://egg2.wustl.edu/roadmap/data/byFileType/chromhmmSegmentations'
-    # url += '/ChmmModels/coreMarks/jointModel/final/E001_15_coreMarks_dense.bed.gz'
-    # output_file = "file.bed.gz"
-    # chunk_size = 1024
-    # download_file(url, output_file, chunk_size)
-    import requests
-
-    response = requests.get(url, stream=True)
-    with open(output_file, "wb") as outfile:
-        outfile.writelines(response.iter_content(chunk_size=chunk_size))
+    if url.startswith("ftp://"):
+        import shutil
+        import urllib.request as request
+        from contextlib import closing
+        with closing(request.urlopen(url)) as r:
+            with open(output_file, 'wb') as f:
+                shutil.copyfileobj(r, f)
+    else:
+        import requests
+        response = requests.get(url, stream=True)
+        with open(output_file, "wb") as outfile:
+            outfile.writelines(response.iter_content(chunk_size=chunk_size))
 
 
 def download_gzip_file(url, output_file):

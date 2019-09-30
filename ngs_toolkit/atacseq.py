@@ -734,11 +734,15 @@ class ATACSeqAnalysis(Analysis):
                     "date\nbedtools coverage -counts -a {bed} -b {bam} > {out}\ndate"
                     .format(bam=s.aligned_filtered_bam, bed=sites.fn, out=output_file))
 
+                for k, v in [("cores", 1), ("mem", 8000), ("time", "04:00:00")]:
+                    if k not in kwargs:
+                        kwargs[k] = v
+
                 submit_job(
                     cmd, job_file,
                     jobname=job_name,
                     logfile=log_file,
-                    cores=1, mem=8000, time="04:00:00", **kwargs)
+                    **kwargs)
 
     def collect_coverage(
         self,

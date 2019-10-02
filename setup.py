@@ -36,20 +36,6 @@ requirements_docs = parse_requirements(
 requirements_sc = parse_requirements(
     "requirements/requirements.single_cell.txt")
 
-# Recipes
-recipes = glob.glob(
-    os.path.join(os.path.curdir, "ngs_toolkit", "recipes", "*.py"))
-recipes = list(
-    map(
-        lambda x: x.replace(".py", "").replace("./", "").replace("/", "."),
-        recipes)
-)
-recipes = [
-    " = ".join([i, j + ":main"])
-    for i, j in zip(map(lambda x: x.split(".")[-1], recipes), recipes)
-]
-recipes = [r for r in recipes if not r.startswith("__init__")]
-
 long_description = open("README.md").read()
 
 
@@ -64,8 +50,7 @@ setup(
     entry_points={
         "console_scripts": [
             "projectmanager = ngs_toolkit.project_manager:main",
-            "trackmanager = ngs_toolkit.track_manager:main",
-        ] + recipes
+            "trackmanager = ngs_toolkit.track_manager:main"]
     },
     description="A toolkit for NGS analysis with Python.",
     long_description=long_description,

@@ -448,6 +448,7 @@ def bed_to_index(df):
 
 
 def bedtool_to_index(bedtool):
+    """Convert bedtool or path to a bed file to list of region identifiers"""
     import pybedtools
     if isinstance(bedtool, str):
         bedtool = pybedtools.BedTool(bedtool)
@@ -462,6 +463,7 @@ def bedtool_to_index(bedtool):
 
 
 def to_bed_index(sites):
+    """Convert bedtool, BED file or dataframe to list of region identifiers"""
     import pybedtools
     msg = "Input not pybedtools.BedTool, pandas.DataFrame or path to BED file."
     if isinstance(sites, pybedtools.BedTool):

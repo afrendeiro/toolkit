@@ -689,7 +689,7 @@ class ATACSeqAnalysis(Analysis):
             # Count reads with pysam
             # make strings with intervals
             from ngs_toolkit.utils import to_bed_index
-            sites_str = to_bed_index(sites).tolist()
+            sites_str = to_bed_index(sites)
             # count, create dataframe
             matrix_raw = pd.DataFrame(
                 map(

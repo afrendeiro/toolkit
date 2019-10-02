@@ -58,14 +58,24 @@ class Test_measure_coverage:
 
         os.remove(mn)
 
-        a.measure_coverage(distributed=True, computing_configuration="default")
+        a.measure_coverage(distributed=True, computing_configuration="localhost")
 
+        # Check job files for each sample exist
         fs = list()
         for s in a.samples:
             f = os.path.join(s.paths['sample_root'], "coverage", s.name + ".peak_set_coverage.")
-            for end in ['sh', 'log', 'bed']:
+            for end in ['sh', 'bed']:
                 fs.append(f + end)
         assert all([file_exists_and_not_empty(f) for f in fs])
+
+        # # has to be done separately for log files because they'll empty
+        # # just check for existence
+        fs = list()
+        for s in a.samples:
+            f = os.path.join(s.paths['sample_root'], "coverage", s.name + ".peak_set_coverage.")
+            for end in ['log']:
+                fs.append(f + end)
+        assert all([os.path.exists(f) for f in fs])
 
     def test_few_samples(self, a):
         mn = get_this_file_or_timestamped(

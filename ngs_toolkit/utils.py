@@ -401,11 +401,14 @@ def location_index_to_bed(index):
         Pandas dataframe.
     """
     bed = pd.DataFrame(index=index)
-    index = index.to_series(name="region")
-    bed["chrom"] = index.str.split(":").str[0]
-    index2 = index.str.split(":").str[1]
-    bed["start"] = index2.str.split("-").str[0]
-    bed["end"] = index2.str.split("-").str[1]
+    if isinstance(index, list):
+        index = pd.Series(index=index, name="region")
+    elif isinstance(index, pd.DataFrame):
+        index = index.to_series(name="region")
+    bed.loc[:, "chrom"] = index.index.str.split(":").str[0]
+    index2 = index.index.str.split(":").str[1]
+    bed.loc[:, "start"] = index2.str.split("-").str[0]
+    bed.loc[:, "end"] = index2.str.split("-").str[1]
     return bed
 
 
@@ -437,6 +440,33 @@ def bed_to_index(df):
         + df["end"].astype(int).astype(str)
     )
     return pd.Index(index, name="region")
+
+
+def bedtool_to_index(bedtool):
+    import pybedtools
+    if isinstance(bedtool, str):
+        bedtool = pybedtools.BedTool(bedtool)
+    elif isinstance(bedtool, pybedtools.BedTool):
+        pass
+    else:
+        msg = "Input not pybedtools.BedTool or string to BED file."
+        raise ValueError(msg)
+    return [
+        str(i.chrom) + ":" + str(i.start) + "-" + str(i.stop)
+        for i in bedtool]
+
+
+def to_bed_index(sites):
+    import pybedtools
+    msg = "Input not pybedtools.BedTool, pandas.DataFrame or path to BED file."
+    if isinstance(sites, pybedtools.BedTool):
+        return bedtool_to_index(sites)
+    elif isinstance(sites, pd.core.frame.DataFrame):
+        return bed_to_index(sites)
+    elif isinstance(sites, str):
+        return bedtool_to_index(sites)
+    else:
+        raise ValueError(msg)
 
 
 def timedelta_to_years(x):

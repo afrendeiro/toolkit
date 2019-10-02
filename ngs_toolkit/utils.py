@@ -392,7 +392,7 @@ def location_index_to_bed(index):
 
     Parameters
     ----------
-    index : :class:`pandas.Index`
+    index : {:obj:`list`, :class:`pandas.Index`, :class:`pandas.Series)`, :class:`pandas.DataFrame)`}
         Index strings of the form "chrom:start-end".
 
     Returns
@@ -402,11 +402,16 @@ def location_index_to_bed(index):
     """
     bed = pd.DataFrame(index=index)
     if isinstance(index, list):
-        index = pd.Series(index=index, name="region")
+        index = pd.Series(index=index, name="region").index
     elif isinstance(index, pd.DataFrame):
-        index = index.to_series(name="region")
-    bed.loc[:, "chrom"] = index.index.str.split(":").str[0]
-    index2 = index.index.str.split(":").str[1]
+        index = index.to_series(name="region").index
+    elif isinstance(index, pd.Index):
+        pass
+    else:
+        msg = "index is not list, Series or Index"
+        TypeError(msg)
+    bed.loc[:, "chrom"] = index.str.split(":").str[0]
+    index2 = index.str.split(":").str[1]
     bed.loc[:, "start"] = index2.str.split("-").str[0]
     bed.loc[:, "end"] = index2.str.split("-").str[1]
     return bed

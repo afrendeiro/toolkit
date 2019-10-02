@@ -24,8 +24,6 @@ jobs:
           architecture: x64
     - name: Update pip
       run: python3 -m pip install --upgrade pip
-    - name: Add $HOME/.local/bin to PATH
-      run: export PATH="${PATH}:$HOME/.local/bin"
     - name: Install bedtools 2.27.1
       run: |
         wget http://ftp.br.debian.org/debian/pool/main/b/bedtools/bedtools_2.27.1+dfsg-4_amd64.deb
@@ -62,4 +60,4 @@ jobs:
       run: |
         python3 -m coverage xml
         python3 -m codecov -f coverage.xml
-        python3 -m python-codacy-coverage -r coverage.xml
+        python3 -m codacy-coverage -r coverage.xml

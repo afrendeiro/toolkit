@@ -33,10 +33,10 @@ RUN pip3 install --user -r \
         https://raw.githubusercontent.com/afrendeiro/toolkit/master/requirements/requirements.test.txt \
     && pip3 install --user git+https://github.com/afrendeiro/combat.git
 
-# # Install library
-# RUN pip3 install --user \
-#     git+https://github.com/afrendeiro/toolkit.git#egg=ngs-toolkit[testing]
-
-USER root
+# Install library
+RUN pip3 install --user \
+    git+https://github.com/afrendeiro/toolkit.git#egg=ngs-toolkit[testing]
 
 ENV PATH="/home/gitpod/.local/bin:${PATH}"
+
+USER root

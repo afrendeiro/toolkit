@@ -2,7 +2,6 @@ image:
   file: Dockerfile
 
 tasks:
-  - init: >
-      pip3 install --user git+https://github.com/afrendeiro/toolkit.git#egg=ngs-toolkit
-    command: ipython3
-  - command: echo "Bash Terminal"
+  - init: ln -s ngs_toolkit/config/example.yaml ~/.ngs_toolkit.config.yaml
+  - command: ipython3
+  - command: sh

@@ -585,64 +585,81 @@ class ATACSeqAnalysis(Analysis):
         output_file="{results_dir}/{name}.matrix_raw.csv",
         permissive=False,
         distributed=False,
+        overwrite=True,
         **kwargs
     ):
         """
-        Measure read coverage (counts) of each sample in each region in consensus sites.
+        Measure read coverage (counts) of each sample in each region
+        in consensus sites.
         Uses parallel computing using the `parmap` library.
-        However, for many samples (hundreds), parallelization in a computing cluster is possible
-        with the `distributed` option. Only supports SLURM clusters fow now though.
+        However, for many samples (hundreds), parallelization in a
+        computing cluster is possible with the `distributed` option.
 
         Parameters
         ----------
         samples : :obj:`list`
-            Iterable of peppy.Sample objects to restrict to. Must have a `filtered` attribute set.
-            If not provided (`None` is passed) if will default to all samples in the analysis (`samples` attribute).
+            Iterable of peppy.Sample objects to restrict to.
+            Must have a `aligned_filtered_bam` attribute set.
 
+            Defaults to all samples in the analysis (`samples` attribute).
         sites : {:class:`pybedtools.BedTool`, :class:`pandas.DataFrame`, :obj:`str`}
-            Sites in the genome to quantify, usually a pybedtools.BedTool from analysis.get_consensus_sites()
-            If a DataFrame, will try to convert to BED format assuming first three columns are chr,start,end.
+            Sites in the genome to quantify, usually a pybedtools.BedTool
+            from analysis.get_consensus_sites()
+            If a DataFrame, will try to convert to BED format assuming first
+            three columns are chr,start,end.
             If a string assumes a path to a BED file.
-            If `None` the object's `sites` attribute will be used.
 
+            Defaults to `sites` attribute of analysis object.
         assign: :obj:`bool`
-            Whether to assign the matrix to an attribute of self named `coverage`.
+            Whether to assign the matrix to an attribute named `coverage`.
 
+            Default is :obj:`True`.
         save: :obj:`bool`
             Whether to save to disk the coverage matrix with filename `output_file`.
 
+            Default is :obj:`True`.
+        peak_set_name: :obj:`bool`
+            Suffix to files containing coverage of `distributed` is True.
+
+            Defaults to "peak_set".
         output_file : :obj:`str`
             A path to a CSV file with coverage output.
-            Default is `self.results_dir/self.name + ".raw_coverage.csv"`.
 
+            Default is `self.results_dir/self.name + ".raw_coverage.csv"`.
         permissive: :obj:`bool`
             Whether Samples that which `region_type` attribute file does not exist
             should be simply skipped or an error thrown.
 
+            Default is :obj:`False`.
         distributed: :obj:`bool`
-            Whether it should be run as jobs for each sample separately in parallel.
+            Whether it should be run as jobs for each sample
+            separately in parallel.
             Currently only implemented for a SLURM cluster.
-            Default False.
 
-        peak_set_name: :obj:`bool`
-            Suffix to files containing coverage of `distributed` is True.
-            Defaults to "peak_set".
+            Default is :obj:`False`.
+        overwrite: :obj:`bool`
+            Whether to overwrite existing files if `distributed` is True.
 
+            Default is :obj:`True`.
         **kwargs : :obj:`dict`
-            Additional keyword arguments will be passed to `ngs_toolkit.utils.submit_job` if `distributed` is True.
+            Additional keyword arguments will be passed to
+            `ngs_toolkit.utils.submit_job` if `distributed` is True,
             and on to a divvy submission template.
-            Pass for example: computing_configuration="slurm", jobname="job", cores=2, mem=8000, partition="longq".
+            Pass for example: computing_configuration="slurm", jobname="job",
+            cores=2, mem=8000, partition="longq".
 
         Raises
         ----------
         IOError
-            If not `permissive` and the 'aligned_filtered_bam' file attribute of a sample is not readable.
+            If not `permissive` and the 'aligned_filtered_bam'
+            file attribute of a sample is not readable.
             Or if `permissive` but none of the samples has an existing file.
 
         Attributes
         ----------
         matrix_raw : :class:`pandas.DataFrame`
-            The dataframe of raw coverage values (counts) of shape (n_features, m_samples).
+            The dataframe of raw coverage values (counts) of
+            shape (n_features, m_samples).
 
         Returns
         -------
@@ -671,29 +688,8 @@ class ATACSeqAnalysis(Analysis):
         if not distributed:
             # Count reads with pysam
             # make strings with intervals
-            if isinstance(sites, pybedtools.BedTool):
-                sites_str = [
-                    str(i.chrom) + ":" + str(i.start) + "-" + str(i.stop)
-                    for i in self.sites
-                ]
-            elif isinstance(sites, pd.core.frame.DataFrame):
-                sites_str = (
-                    (
-                        sites.iloc[:, 0]
-                        + ":"
-                        + sites.iloc[:, 1].astype(str)
-                        + "-"
-                        + sites.iloc[:, 2].astype(str)
-                    )
-                    .astype(str)
-                    .tolist()
-                )
-            elif isinstance(sites, str):
-                sites_str = [
-                    str(i.chrom) + ":" + str(i.start) + "-" + str(i.stop)
-                    for i in pybedtools.BedTool(sites)
-                ]
-
+            from ngs_toolkit.utils import to_bed_index
+            sites_str = to_bed_index(sites).tolist()
             # count, create dataframe
             matrix_raw = pd.DataFrame(
                 map(
@@ -721,17 +717,20 @@ class ATACSeqAnalysis(Analysis):
                     os.makedirs(output_dir)
 
                 job_name = "{}.{}_coverage".format(peak_set_name, s.name)
-                output_file = os.path.join(
-                    output_dir, s.name + ".{}_coverage.bed".format(peak_set_name)
-                )
-                log_file = os.path.join(
-                    output_dir, s.name + ".{}_coverage.log".format(peak_set_name)
-                )
-                job_file = os.path.join(
-                    output_dir, s.name + ".{}_coverage.sh".format(peak_set_name)
-                )
+                prefix = os.path.join(output_dir, s.name + ".{}_coverage"
+                                      .format(peak_set_name))
+                output_file = prefix + ".bed"
+                log_file = prefix + ".log".format(peak_set_name)
+                job_file = prefix + ".sh".format(peak_set_name)
+                if not overwrite:
+                    if os.path.exists(output_file):
+                        continue
                 cmd = (
-                    "date\nbedtools coverage -counts -a {bed} -b {bam} > {out}\ndate"
+                    "bedtools coverage \\\n"
+                    "-sorted -counts \\\n"
+                    "-a {bed} \\\n"
+                    "-b {bam} \\\n"
+                    "> {out}"
                     .format(bam=s.aligned_filtered_bam, bed=sites.fn, out=output_file))
 
                 for k, v in [("cores", 1), ("mem", 8000), ("time", "04:00:00")]:

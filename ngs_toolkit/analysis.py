@@ -4856,7 +4856,7 @@ class Analysis(object):
             intersections["size2"] - intersections["intersection"]
         )
         intersections.loc[:, "d"] = total - intersections[
-            ["size1", "size2", "intersection"]
+            ["b", "c", "intersection"]
         ].sum(axis=1)
 
         for i, row in intersections.loc[:, ["a", "b", "c", "d"]].astype(int).iterrows():

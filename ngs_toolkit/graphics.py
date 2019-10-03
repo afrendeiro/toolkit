@@ -44,7 +44,7 @@ def barmap(x, figsize=None, square=False, row_colors=None, z_score=None, ylims=N
     x : :obj:`pandas.DataFrame`
         DataFrame with numerical values to plot.
         If DataFrame, indexes will be used as labels.
-    figsize : tuple
+    figsize : :obj:`tuple`
         Size in inches (width, height) of figure to produce.
     square: :obj:`bool`
         Whether resulting figure should be square.
@@ -55,13 +55,13 @@ def barmap(x, figsize=None, square=False, row_colors=None, z_score=None, ylims=N
 
     Returns
     ----------
-    matplotlib.Figure
+    :class:`matplotlib.pyplot.Figure`
         Figure object
 
     Raises
     ----------
-    AssertionError:
-        if length of `row_colors` does not match size of provided Y axis from matrix `x`.
+    :obj:`ValueError`
+        If length of ``row_colors`` does not match size of provided Y axis from matrix ``x``.
     """
     from scipy.stats import zscore
 
@@ -72,13 +72,13 @@ def barmap(x, figsize=None, square=False, row_colors=None, z_score=None, ylims=N
         msg = "Length of row_colors does not match size of provided Y axis."
         if not len(row_colors) == y_size:
             _LOGGER.error(msg)
-            raise AssertionError(msg)
+            raise ValueError(msg)
 
     # Z-score transform
     if z_score is not None:
         if z_score not in [1, 0]:
             _LOGGER.error("z_score must be one of 0 (row-wise) or 1 (column-wise).")
-            raise AssertionError(msg)
+            raise ValueError(msg)
         rows, cols = x.index, x.columns
         x = zscore(x, axis=z_score)
         x = pd.DataFrame(x, index=rows, columns=cols)
@@ -157,7 +157,8 @@ def radar_plot(
         scale_to_max=True,
 ):
     """
-    
+
+    Heavy inspiration from here: https://matplotlib.org/examples/api/radar_chart.html
 
     Parameters
     ----------
@@ -169,8 +170,6 @@ def radar_plot(
         Matplotlib colormap to use.
     scale_to_max: :obj:`bool`
         Whether values will be scaled
-
-    Heavy inspiration from here: https://matplotlib.org/examples/api/radar_chart.html
     """
     from matplotlib.projections.polar import PolarAxes
     from matplotlib.path import Path

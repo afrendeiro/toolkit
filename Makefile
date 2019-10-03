@@ -103,11 +103,6 @@ all: \
 	build \
 	pypitest \
 	pypi \
-	clean_test \
-	clean_cov \
-	clean_docs \
-	clean_dist \
-	clean_build \
 	clean
 
 .PHONY: \

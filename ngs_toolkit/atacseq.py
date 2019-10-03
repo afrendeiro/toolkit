@@ -136,11 +136,21 @@ class ATACSeqAnalysis(Analysis):
         only_these_keys : :obj:`list`, optional
             Iterable of analysis attributes to load up.
             Possible attributes:
-                "matrix_raw", "matrix_norm", "matrix_features",
-                "sites", "support", "nuc", "coverage_gc_corrected",
-                "gene_annotation", "region_annotation", "region_annotation_b",
-                "chrom_state_annotation", "chrom_state_annotation_b",
-                "stats", differential_results".
+
+                * "matrix_raw"
+                * "matrix_norm"
+                * "matrix_features"
+                * "sites"
+                * "support"
+                * "nuc"
+                * "coverage_gc_corrected"
+                * "gene_annotation"
+                * "region_annotation"
+                * "region_annotation_b"
+                * "chrom_state_annotation"
+                * "chrom_state_annotation_b"
+                * "stats"
+                * "differential_results"
 
             Default is all of the above.
         prefix : :obj:`str`, optional
@@ -286,48 +296,54 @@ class ATACSeqAnalysis(Analysis):
         """
         Get consensus (union) of enriched sites (peaks) across samples.
         There are two modes possible, defined by the value of ``region_type``:
-         - peaks: simple union of all sites
-         - summits: peak summits are extended by ``extension`` and a union is made,
+
+         * peaks: simple union of all sites;
+         * summits: peak summits are extended by ``extension`` and a union is made.
 
         Parameters
         ----------
         samples : :obj:`list`
-            Iterable of peppy.Sample objects to restrict to.
-            Must have a `peaks` attribute set.
-            Defaults to all samples in the analysis (`samples` attribute).
+            Iterable of :class:`peppy.Sample` objects to restrict to.
+            Must have a ``peaks`` attribute set.
 
+            Defaults to all samples in the analysis (``samples`` attribute).
         region_type : :obj:`str`
-            The type of region to use to create the consensus region set - one of `summits` or `peaks`.
+            The type of region to use to create the consensus region set - one of "summits" or "peaks".
             If `summits`, peak summits will be extended by `extension` before union.
             Otherwise sample peaks will be used with no modification.
 
+            Default is "summits".
         extension : :obj:`int`
             Amount to extend peaks summits by in both directions.
 
+            Default is 250.
         blacklist_bed : :obj:`str`
             A (3 column) BED file with genomic positions to exclude from consensus peak set.
 
+            Default is to download a blacklisted file for the analysis ``genome``.
         filter_mito_chr: :obj:`bool`
             Whether to exclude 'chrM' from peak set.
 
+            Default is :obj:`True`.
         permissive: :obj:`bool`
-            Whether Samples that which `region_type` attribute file does not exist
+            Whether Samples that which ``region_type`` attribute file does not exist
             should be simply skipped or an error thrown.
 
+            Default is :obj:`True`.
         **kwargs
-            Not used. Provided for compatibility with ChIPSeqAnalysis class.
+            Not used. Provided for compatibility with :class:`ngs_toolkit.ChIPSeqAnalysis` class.
 
         Raises
         ----------
-        IOError
-            If not `permissive` and either the `peaks` or `summits` file
-            of a sample is not readable, or if `permissive`
+        :obj:`IOError`
+            If not ``permissive`` and either the ``peaks`` or ``summits`` file
+            of a sample is not readable, or if ``permissive``
             but none of the samples has an existing file.
 
         Attributes
         ----------
         sites : :class:`pybedtools.BedTool`
-            Sets a `sites` variable with consensus peak set.
+            Sets a ``sites`` variable with consensus peak set.
         """
         from tqdm import tqdm
         import pybedtools
@@ -464,18 +480,21 @@ class ATACSeqAnalysis(Analysis):
         Parameters
         ----------
         samples : :obj:`list`
-            Iterable of peppy.Sample objects to restrict to.
-            Must have a `peaks` attribute set.
+            Iterable of :class:`peppy.Sample` objects to restrict to.
+            Must have a ``peaks`` attribute set.
 
-            Defaults to all samples in the analysis (`samples` attribute).
+            Defaults to all samples in the analysis (``samples`` attribute).
         region_type : :obj:`str`
             The type of region to use to create the consensus region set.
-            One of `summits` or `peaks`.
-            If `summits`, peak summits will be extended by `extension` before union.
+            One of "summits" or "peaks".
+            If `summits`, peak summits will be extended by ``extension`` before union.
             Otherwise sample peaks will be used with no modification.
+
+            Default is "summits".
         permissive: :obj:`bool`
             Whether Samples that which `region_type` attribute file does
             not exist should be simply skipped or an error thrown.
+
         comparison_table: :obj:`pandas.DataFrame`
             Not used. Provided for compatibility with ChIPSeqAnalysis class.
         peak_dir: :obj:`str`
@@ -484,8 +503,8 @@ class ATACSeqAnalysis(Analysis):
         Raises
         ----------
         IOError
-            If not `permissive` and either the `peaks` or `summits` file of a sample is not readable.
-            Or if `permissive` but none of the samples has an existing file.
+            If not ``permissive`` and either the ``peaks`` or ``summits`` file of a sample is not readable.
+            Or if ``permissive`` but none of the samples has an existing file.
 
         Attributes
         ----------
@@ -561,7 +580,7 @@ class ATACSeqAnalysis(Analysis):
         Parameters
         ----------
         samples : :obj:`list`
-            Iterable of peppy.Sample objects to restrict to.
+            Iterable of :class:`peppy.Sample` objects to restrict to.
 
         **kwargs
             Not used. Provided for compatibility with ChIPSeqAnalysis class.
@@ -598,10 +617,10 @@ class ATACSeqAnalysis(Analysis):
         Parameters
         ----------
         samples : :obj:`list`
-            Iterable of peppy.Sample objects to restrict to.
+            Iterable of :class:`peppy.Sample` objects to restrict to.
             Must have a `aligned_filtered_bam` attribute set.
 
-            Defaults to all samples in the analysis (`samples` attribute).
+            Defaults to all samples in the analysis (``samples`` attribute).
         sites : {:class:`pybedtools.BedTool`, :class:`pandas.DataFrame`, :obj:`str`}
             Sites in the genome to quantify, usually a pybedtools.BedTool
             from analysis.get_consensus_sites()
@@ -651,9 +670,9 @@ class ATACSeqAnalysis(Analysis):
         Raises
         ----------
         IOError
-            If not `permissive` and the 'aligned_filtered_bam'
+            If not ``permissive`` and the 'aligned_filtered_bam'
             file attribute of a sample is not readable.
-            Or if `permissive` but none of the samples has an existing file.
+            Or if ``permissive`` but none of the samples has an existing file.
 
         Attributes
         ----------
@@ -760,8 +779,8 @@ class ATACSeqAnalysis(Analysis):
         Parameters
         ----------
         samples : :obj:`list`
-            Iterable of peppy.Sample objects to restrict to.
-            If not provided (`None` is passed) if will default to all samples in the analysis (`samples` attribute).
+            Iterable of :class:`peppy.Sample` objects to restrict to.
+            If not provided (`None` is passed) if will default to all samples in the analysis (``samples`` attribute).
 
         assign: :obj:`bool`
             Whether to assign the matrix to an attribute of self named `coverage`.
@@ -791,8 +810,8 @@ class ATACSeqAnalysis(Analysis):
         Raises
         ----------
         IOError
-            If not `permissive` and the coverage file of a sample is not readable or is empty.
-            Or if `permissive` but none of the samples has an existing file or are empty.
+            If not ``permissive`` and the coverage file of a sample is not readable or is empty.
+            Or if ``permissive`` but none of the samples has an existing file or are empty.
 
         Attributes
         ----------
@@ -947,40 +966,48 @@ class ATACSeqAnalysis(Analysis):
 
         return self.nuc
 
-    def normalize_cqn(self, matrix="matrix_raw", samples=None, save=True, assign=True):
+    def normalize_cqn(
+            self,
+            matrix="matrix_raw", samples=None,
+            save=True, assign=True):
         """
         Conditional quantile normalization (CQN) of a matrix.
         It uses GC content and length of regulatory elements as covariates.
 
         Requires the R package "cqn" to be installed:
-            >>> source('http://bioconductor.org/biocLite.R')
-            >>> biocLite('cqn')
+
+        .. highlight:: R
+        .. code-block:: R
+
+            if (!requireNamespace("BiocManager", quietly = TRUE))
+                install.packages("BiocManager")
+            BiocManager::install("cqn")
 
         Parameters
         ----------
         matrix : :obj:`str`
             Attribute name of matrix to normalize.
 
-            Defaults to 'matrix_raw'.
+            Defaults to "matrix_raw".
         samples : :obj:`list`
-            Iterable of peppy.Sample objects to restrict matrix to.
+            Iterable of :class:`peppy.Sample` objects to restrict matrix to.
 
             Defaults to all samples in analysis.
         save: :obj:`bool`
             Whether to write normalized DataFrame to disk.
 
-            Default is :obj:`None`.
+            Default is :obj:`True`.
         assign: :obj:`bool`
-            Whether to assign the normalized DataFrame to an attribute ``.
+            Whether to assign the normalized DataFrame to an attribute `matrix_norm`.
 
-            Default is :obj:`None`.
+            Default is :obj:`True`.
 
         Attributes
         ----------
         matrix_norm : :class:`pandas.DataFrame`
             If `assign`, the dataframe with normalized values.
         norm_method : :obj:`str`
-            If `assign`, it is the name of method used to normalize: "cqn".
+            If ``assign``, it is the name of method used to normalize: "cqn".
         """
         def cqn(cov, gc_content, lengths):
             # install R package
@@ -1290,13 +1317,14 @@ class ATACSeqAnalysis(Analysis):
             output_prefix="",
             assign=True):
         """
-        Annotates a consensus peak set (``sites`` attribute of analysis) with their chromatin
-        state context. This would be given, for example by a chromatin state segmentation
+        Annotates a consensus peak set (``sites`` attribute of analysis)
+        with their chromatin state context.
+        This would be given, for example by a chromatin state segmentation
         file from projects such as Roadmap Epigenomics.
 
-        See examples of such files for various cell types/assemblies here:
-        https://egg2.wustl.edu/roadmap/data/byFileType/chromhmmSegmentations/ChmmModels/coreMarks/jointModel/final/
-        (the *_dense.bed.gz files are optimal).
+        See examples of such files for various cell types/assemblies
+        `in this website <https://egg2.wustl.edu/roadmap/data/byFileType/chromhmmSegmentations/ChmmModels/coreMarks/jointModel/final/>`_
+        (the "dense.bed.gz" files are optimal).
 
         Parameters
         ----------
@@ -2382,30 +2410,35 @@ class ATACSeqAnalysis(Analysis):
         output_dir="{results_dir}",
     ):
         """
-        Characterize a subset of the regions (e.g. differential regions) in terms of their genomic context.
+        Characterize a subset of the regions (e.g. differential regions)
+        in terms of their genomic context.
 
         Parameters
         ----------
-        regions : {list, pandas.DataFrame, pandas.Index}
+        regions : {:obj:`list`, :obj:`pandas.DataFrame`, :obj:`pandas.Index`}
             Subset of regions of interest to analysis.
-            Must be a subset of the universe (i.e. `sites` attribute).
+            Must be a subset of the universe (i.e. ``sites`` attribute).
 
         steps : :obj:`list`, optional
             Steps of enrichment to perform.
-            Defaults to all available: ['genomic_region', 'chromatin_state']
+            Defaults to all available: 'genomic_region' and 'chromatin_state'.
 
         background : :obj:`str`, optional
             Which set to consider as backgroud.
             Options are:
-                region_set: the consensus region_set of the analysis
-                genome: a randomized set of size as region_set across the genome
+
+                * "region_set": the consensus region_set of the analysis
+                * "genome": a randomized set of size as region_set across the genome
 
         prefix : :obj:`str`, optional
             Prefix for saved files.
-            Default is `region_type_enrichment`.
 
+            Default is "region_type_enrichment".
         output_dir : :obj:`str`, optional
             Directory to write results to.
+            Can be formatted with Analysis attributes.
+
+            Default is "{results_dir}".
 
         Returns
         ---------
@@ -2535,9 +2568,10 @@ class ATACSeqAnalysis(Analysis):
         steps=["region", "lola", "meme", "homer", "enrichr"],
     ):
         """
-        Performs a range of functional enrichments of a set of regions given in `differential`
-        (a dataframe which is typically a subset of an annotated coverage dataframe).
-        Will extract regions, their underlying sequence, associated genes, perform enrichment of
+        Performs a range of functional enrichments of a set of regions
+        given in ``differential`` (a dataframe which is typically a subset
+        of an annotated coverage dataframe). Will extract regions,
+        their underlying sequence, associated genes, perform enrichment of
         genomic regions, chromatin states against a background, motif enrichment,
         location overlap analysis (LOLA), and gene set enrichment (using the Enrichr API).
 
@@ -2545,7 +2579,9 @@ class ATACSeqAnalysis(Analysis):
             - MEME suite (AME)
             - HOMER suite (findMotifsGenome.pl)
             - LOLA (R library)
-        Additionally, some genome-specific databases are needed to run these programs.
+
+        Additionally, some genome-specific databases are needed
+        to run these programs.
 
         Parameters
         ----------
@@ -2559,16 +2595,18 @@ class ATACSeqAnalysis(Analysis):
             Prefix to use for output files.
 
         universe_file : :obj:`str`, optional
-            Path to BED file with set of universe regions where differential were selected from.
-            Default is analysis.sites.
+            Path to BED file with set of universe regions where
+            differential were selected from.
 
+            Default is ``sites`` attribute of Analysis.
         run: :obj:`bool`, optional
-            Whether to run enrichment commands now or to simply prepare the input files for it.
+            Whether to run enrichment commands now or to simply
+            prepare the input files for it.
             Default is :obj:`True`.
 
         genome : :obj:`str`, optional
             Genome assembly of analysis.
-            Default is analysis' genome assembly.
+            Default is genome genome assembly of analysis (``genome`` attribute).
 
         steps : :obj:`list`, optional
             Which steps of the analysis to perform.

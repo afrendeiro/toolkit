@@ -226,7 +226,7 @@ class Analysis(object):
     @staticmethod
     def _overwride_sample_representation():
         """
-        Make peppy.Sample objects have a more pretty representation.
+        Make :class:`peppy.Sample` objects have a more pretty representation.
         """
         from peppy import Sample
 
@@ -247,7 +247,7 @@ class Analysis(object):
 
         Returns
         ----------
-        bool
+        :obj:`bool`
             Whether data_type is supported.
         """
         supported = _CONFIG["supported_data_types"]
@@ -265,7 +265,7 @@ class Analysis(object):
 
         Returns
         ----------
-        str
+        :obj:`str`
             A supported data_type.
         """
         if data_type is None:
@@ -300,7 +300,7 @@ class Analysis(object):
         f : function, optional
             Function to reduce output across samples.
 
-            Defaults to `all`.
+            Defaults to :obj:`all`.
         samples : :obj:`list`, optional
             Samples to consider.
 
@@ -308,12 +308,12 @@ class Analysis(object):
 
         Returns
         ----------
-        bool
+        :obj:`bool`
             Whether samples have file.
 
         Raises
         -------
-        AttributeError:
+        :obj:`AttributeError`
             If attribute does not exist in samples
         """
         if samples is None:
@@ -344,11 +344,11 @@ class Analysis(object):
         Returns
         -------
         list
-            List of peppy.Sample objects.
+            List of :class:`peppy.Sample` objects.
 
         Raises
         -------
-        AttributeError:
+        :obj:`AttributeError`
             If attribute does not exist in samples
         """
         if samples is None:
@@ -374,11 +374,11 @@ class Analysis(object):
         Returns
         -------
         list
-            List of peppy.Sample objects.
+            List of :class:`peppy.Sample` objects.
 
         Raises
         -------
-        AttributeError:
+        :obj:`AttributeError`
             If attribute does not exist in samples
         """
         if samples is None:
@@ -412,11 +412,11 @@ class Analysis(object):
         Returns
         -------
         list
-            List of peppy.Sample objects.
+            List of :class:`peppy.Sample` objects.
 
         Raises
         -------
-        IOError
+        :obj:`IOError`
             If not permissive and not all sample input files are found.
         """
         if samples is None:
@@ -460,12 +460,12 @@ class Analysis(object):
 
         Returns
         ----------
-        str
+        :obj:`str`
             Formated string.
 
         Raises
         -------
-        ValueError
+        :obj:`ValueError`
             If not all patterns are set environment variables.
         """
         if string is None:
@@ -491,12 +491,12 @@ class Analysis(object):
 
         Returns
         ----------
-        str
+        :obj:`str`
             Formated string.
 
         Raises
         -------
-        ValueError
+        :obj:`ValueError`
             If not all patterns are analysis variables.
         """
         if string is None:
@@ -524,7 +524,7 @@ class Analysis(object):
         Attributes
         ----------
         prj : :obj:`peppy.Project`
-            peppy.Project from given PEP configuration file.
+            Project object from given PEP configuration file.
         """
         import peppy
 
@@ -533,15 +533,15 @@ class Analysis(object):
 
     def update(self, pickle_file=None):
         """
-        Update all of the object"s attributes with the attributes from a serialized
-        object (ie object stored in a file) object.
+        Update all of the object"s attributes with the attributes
+        from a serialized object (ie object stored in a file) object.
 
         Parameters
         ----------
         pickle_file : :obj:`str`, optional
             Pickle file to load.
 
-            Defaults to the analysis' `pickle_file`.
+            Defaults to the analysis' ``pickle_file``.
         """
         self.__dict__.update(self.from_pickle(pickle_file=pickle_file).__dict__)
 
@@ -590,8 +590,9 @@ class Analysis(object):
 
     def set_project_attributes(self, overwrite=True, subset_to_data_type=True):
         """
-        Set Analysis object attributes ``samples``, ``sample_attributes`` and ``group_atrributes``
-        to the values in the associated Project object if existing.
+        Set Analysis object attributes ``samples``, ``sample_attributes``
+        and ``group_atrributes`` to the values in the associated Project
+        object if existing.
 
         Parameters
         ----------
@@ -600,7 +601,8 @@ class Analysis(object):
 
             Defaults to :obj:`True`.
         subset_to_data_type: :obj:`bool`, optional
-            Whether to subset samples and comparison_table to entries of same data_type as analysis.
+            Whether to subset samples and comparison_table to entries
+            of same ``data_type`` as analysis.
 
             Defaults to :obj:`True`.
 
@@ -693,8 +695,8 @@ class Analysis(object):
     def set_samples_input_files(self, overwrite=True):
         """
         Add input file values to sample objects dependent on data type.
-        These are specified in the `ngs_toolkit` configuration file
-        under "sample_input_files:<data type>:<attribute>".
+        These are specified in the ``ngs_toolkit`` configuration file
+        under ``sample_input_files:<data type>:<attribute>``.
 
         Parameters
         ----------
@@ -703,7 +705,6 @@ class Analysis(object):
 
             Defaults to :obj:`True`.
         """
-
         def _format_string_with_sample_attributes(sample, string):
             """
             Given a string, containing curly braces, format it with the
@@ -869,7 +870,13 @@ class Analysis(object):
             Default is the required to read the keys in ``only_these_keys``.
         only_these_keys : :obj:`list`, optional
             Iterable of analysis attributes to load up.
-            Possible attributes: "matrix_raw", "matrix_norm", "matrix_features", "differential_results", "differential_enrichment".
+            Possible attributes:
+
+                * "matrix_raw"
+                * "matrix_norm"
+                * "matrix_features"
+                * "differential_results"
+                * "differential_enrichment"
 
             Default is all of the above.
         prefix : :obj:`str`, optional
@@ -885,12 +892,12 @@ class Analysis(object):
         Attributes
         ----------
         <various> : :class:`pandas.DataFrame`
-            Dataframes holding the respective data, available as attributes described
-            in the ``only_these_keys`` parameter.
+            Dataframes holding the respective data, available as attributes
+            described in the ``only_these_keys`` parameter.
 
         Raises
         ----------
-        IOError
+        :obj:`IOError`
             If not permissive and a file is not found.
         """
         from ngs_toolkit.utils import fix_dataframe_header, get_this_file_or_timestamped
@@ -1171,10 +1178,11 @@ class Analysis(object):
         steps : :obj:`list`, optional
             What kind of annotations to get.
             Options are:
-                 - "genome": Genome sequence (2bit format)
-                 - "blacklist": Locations of blacklisted regions for genome
-                 - "tss": Locations of gene"s TSSs
-                 - "genomic_context": Genomic context of genome
+
+                 * "genome": Genome sequence (2bit format)
+                 * "blacklist": Locations of blacklisted regions for genome
+                 * "tss": Locations of gene"s TSSs
+                 * "genomic_context": Genomic context of genome
 
             Defaults to ["blacklist", "tss", "genomic_context"].
         organism : :obj:`str`, optional
@@ -1283,10 +1291,10 @@ class Analysis(object):
 
             Defaults to "matrix_raw".
         samples : :obj:`list`, optional
-            Iterable of peppy.Sample objects to restrict matrix to.
+            Iterable of :class:`peppy.Sample` objects to restrict matrix to.
 
             Defaults to all samples in matrix.
-        mult_factor : float, optional
+        mult_factor : :obj:`float`, optional
             A constant to multiply values for.
 
             Defaults to 1e6.
@@ -1294,7 +1302,7 @@ class Analysis(object):
             Whether to log transform values or not.
 
             Defaults to :obj:`True`.
-        pseudocount : {int, float}, optional
+        pseudocount : {:obj:`int`, :obj:`float`}, optional
             A constant to add to values.
 
             Defaults to 1.
@@ -1303,14 +1311,16 @@ class Analysis(object):
 
             Defaults to :obj:`True`.
         assign: :obj:`bool`, optional
-            Whether to assign the normalized DataFrame to an attribute ``.
+            Whether to assign the normalized DataFrame to ``matrix_norm``.
 
             Defaults to :obj:`True`.
 
         Attributes
         ----------
         matrix_norm : :class:`pandas.DataFrame`
-            If `assign` is True, a pandas DataFrame normalized with respective method.
+            If ``assign`` is True, a :class:`pandas.DataFrame` normalized with respective method.
+        norm_method : :obj:`str`
+            If ``assign``, it is the name of method used to normalize: "rpm".
 
         Returns
         -------
@@ -1360,11 +1370,11 @@ class Analysis(object):
 
             Defaults to "matrix_raw".
         samples : :obj:`list`, optional
-            Iterable of peppy.Sample objects to restrict matrix to.
+            Iterable of :class:`peppy.Sample` objects to restrict matrix to.
 
             Defaults to all in matrix.
         implementation : :obj:`str`, optional
-            One of `"Python"` or `"R"`.
+            One of ``Python`` or ``R``.
             Dictates which implementation is to be used.
             The R implementation comes from the `preprocessCore` package,
             and the Python one is from https://github.com/ShawnLYU/Quantile_Normalize.
@@ -1392,6 +1402,8 @@ class Analysis(object):
         ----------
         matrix_norm : :class:`pandas.DataFrame`
             If `assign` is True, a pandas DataFrame normalized with respective method.
+        norm_method : :obj:`str`
+            If ``assign``, it is the name of method used to normalize: "quantile".
 
         Returns
         -------
@@ -1471,14 +1483,16 @@ class Analysis(object):
 
             Defaults to :obj:`True`.
         assign: :obj:`bool`, optional
-            Whether results should be assigned to Analysis object.
+            Whether to assign the normalized DataFrame to an attribute `matrix_norm`.
 
-            Defaults to :obj:`True`.
+            Default is :obj:`True`.
 
         Attributes
         ----------
         matrix_norm : :class:`pandas.DataFrame`
             If `assign` is True, a pandas DataFrame normalized with respective method.
+        norm_method : :obj:`str`
+            If ``assign``, it is the name of method used to normalize: "median".
 
         Returns
         -------
@@ -1529,14 +1543,16 @@ class Analysis(object):
 
             Defaults to :obj:`True`.
         assign: :obj:`bool`, optional
-            Whether results should be assigned to Analysis object.
+            Whether to assign the normalized DataFrame to an attribute `matrix_norm`.
 
-            Defaults to :obj:`True`.
+            Default is :obj:`True`.
 
         Attributes
         ----------
         matrix_norm : :class:`pandas.DataFrame`
             If `assign` is True, a pandas DataFrame normalized with respective method.
+        norm_method : :obj:`str`
+            If ``assign``, it is the name of method used to normalize: "pca".
 
         Returns
         -------
@@ -1584,14 +1600,14 @@ class Analysis(object):
         ----------
         method : :obj:`str`, optional
             Normalization method to apply. One of:
-             - `rpm`: Reads per million normalization (RPM).
-             - `quantile`: Quantile normalization and log2 transformation.
-             - `cqn`: Conditional quantile normalization (uses `cqn` R package).
-                      Not available for RNA-seq.
-             - `median`: Substraction of median per feature.
+             - ``rpm``: Reads per million normalization (RPM).
+             - ``quantile``: Quantile normalization and log2 transformation.
+             - ``cqn``: Conditional quantile normalization (uses ``cqn`` R package).
+                      Only available for ATAC-seq.
+             - ``median``: Substraction of median per feature.
                       Only useful for CNV.
-             - `pca`: Subtraction of Principal Component from matrix.
-                      Requires which PC to subtract. `pc` must be passed as kwarg.
+             - ``pca``: Subtraction of Principal Component from matrix.
+                      Requires which PC to subtract. ``pc`` must be passed as kwarg.
 
             Defaults to "quantile".
         matrix : :obj:`str`, optional
@@ -1599,22 +1615,24 @@ class Analysis(object):
 
             Defaults to "matrix_raw".
         samples : :obj:`list`, optional
-            Iterable of peppy.Sample objects to restrict matrix to.
+            Iterable of :class:`peppy.Sample` objects to restrict matrix to.
 
             Default is all samples in matrix.
         save: :obj:`bool`, optional
             Whether to write normalized DataFrame to disk.
 
             Defaults to :obj:`True`.
-        assign: :obj:`bool`
-            Whether to assign the result to "matrix_norm".
+        assign: :obj:`bool`, optional
+            Whether to assign the normalized DataFrame to an attribute `matrix_norm`.
 
-            Defaults to :obj:`True`.
+            Default is :obj:`True`.
 
         Attributes
         ----------
         matrix_norm : :class:`pandas.DataFrame`
             If `assign` is True, a pandas DataFrame normalized with respective method.
+        norm_method : :obj:`str`
+            If ``assign``, it is the ``method`` used to normalize.
 
         Returns
         -------
@@ -1690,7 +1708,7 @@ class Analysis(object):
 
             Defaults to "matrix_norm".
         samples : :obj:`list`
-            Iterable of peppy.Sample objects to restrict matrix to.
+            Iterable of :class:`peppy.Sample` objects to restrict matrix to.
 
             Default (:obj:`None` is passed) is not to subset matrix.
         save: :obj:`bool`, optional
@@ -1706,6 +1724,7 @@ class Analysis(object):
             Not implemented yet.
 
             Defaults to :obj:`True`.
+
         Returns
         -------
         :class:`pandas.DataFrame`
@@ -1760,7 +1779,7 @@ class Analysis(object):
         matrix : {str, pandas.DataFrame}
             The name of the attribute with the matrix or a DataFrame already.
         samples : :obj:`list`
-            Iterable of peppy.Sample objects to restrict matrix to.
+            Iterable of :class:`peppy.Sample` objects to restrict matrix to.
 
             Default (:obj:`None` is passed) is not to subset matrix.
 
@@ -1876,7 +1895,7 @@ class Analysis(object):
         Parameters
         ----------
         samples : :obj:`list`
-            Iterable of peppy.Sample objects to restrict matrix to.
+            Iterable of :class:`peppy.Sample` objects to restrict matrix to.
             Calculated metrics will be restricted to these samples.
 
             Defaults to all in analysis (the matrix will not be subsetted).

@@ -104,7 +104,7 @@ def get_this_file_or_timestamped(file, permissive=True):
 def is_analysis_descendent(exclude_functions=None):
     """
     Check whether any call in the traceback comes from a function part of a
-    ``ngs_toolkit.Analysis`` object.
+    :meth:`ngs_toolkit.Analysis` object.
 
     Parameters
     ----------
@@ -153,7 +153,7 @@ def record_analysis_output(file_name, **kwargs):
     file_name : :obj:`str`
         File name of analysis output to record.
     **kwargs : :obj:`bool`
-        Keyword arguments passed to ``is_analysis_descendent``.
+        Keyword arguments passed to :meth:`ngs_toolkit.utils.is_analysis_descendent`.
     """
     out = is_analysis_descendent(**kwargs)
     if out:
@@ -181,7 +181,7 @@ def submit_job(
 
         Defaults to `job_file` with ".log" ending.
     computing_configuration : :obj:`str`
-        Name of `divvy` computing configuration to use.
+        Name of :class:`divvy` computing configuration to use.
 
         Defaults to 'default' which is to run job in localhost.
     dry_run: :obj:`bool`
@@ -559,15 +559,22 @@ def signed_max(x, f=0.66, axis=0):
 
 def log_pvalues(x, f=0.1):
     """
-    Calculate -log10(p-value) replacing infinite values with:
-        ``max(x) + max(x) * f``
-        (`f` % more than the maximum)
+    Calculate -log10(p-value) of array.
+
+    Replaces infinite values with:
+
+    .. highlight:: python
+    .. code-block:: python
+
+        max(x) + max(x) * f
+
+    that is, fraction ``f`` more than the maximum non-infinite -log10(p-value).
 
     Parameters
     ----------
-    x : pandas.Series
+    x : :class:`pandas.Series`
         Series with numeric values
-    f : float
+    f : :obj:`float`
         Fraction to augment the maximum value by if ``x`` contains infinite values.
 
         Defaults to 0.1.
@@ -575,7 +582,7 @@ def log_pvalues(x, f=0.1):
     Returns
     -------
     :class:`pandas.Series`
-        Transformed values
+        Transformed values.
     """
     ll = -np.log10(x)
     rmax = ll[ll != np.inf].max()
@@ -612,6 +619,7 @@ def fix_dataframe_header(df, force_dtypes=float):
 
 
 def r2pandas_df(r_df):
+    """Make :class:`pandas.DataFrame` from a ``R`` dataframe given by :class:`rpy`."""
     df = pd.DataFrame(np.asarray(r_df)).T
     df.columns = [str(x) for x in r_df.colnames]
     df.index = [str(x) for x in r_df.rownames]
@@ -619,6 +627,7 @@ def r2pandas_df(r_df):
 
 
 def recarray2pandas_df(recarray):
+    """Make :class:`pandas.DataFrame` from :class:`numpy.recarray`."""
     df = pd.DataFrame.from_records(
         recarray, index=list(range(recarray.shape[0])))
     return df
@@ -783,10 +792,7 @@ def collect_md5_sums(df):
 def decompress_file(file, output_file=None):
     """
     Decompress a gzip-compressed file out-of-memory.
-    """
-    """
-    # test:
-    file = "file.bed.gz"
+    Output default is same as ``file`` without ".gz" ending.
     """
     import shutil
     import gzip
@@ -810,10 +816,7 @@ def decompress_file(file, output_file=None):
 def compress_file(file, output_file=None):
     """
     Compress a gzip-compressed file out-of-memory.
-    """
-    """
-    # test:
-    file = "file.bed.gz"
+    Output default is same as ``file`` but with ".gz" ending.
     """
     import shutil
     import gzip
@@ -855,53 +858,26 @@ def download_file(url, output_file, chunk_size=1024):
             outfile.writelines(response.iter_content(chunk_size=chunk_size))
 
 
-def download_gzip_file(url, output_file):
+def download_gzip_file(url, output_file, **kwargs):
+    """
+    Download a gzip compressed file and write uncompressed
+    file to disk in chunks (not in memory).
+
+    Parameters
+    ----------
+    url : :obj:`str`
+        URL to download from.
+    output_file : :obj:`str`
+        Path to file as output.
+    **kwargs : :obj:`dict`
+        Additional keyword arguments are passed to :meth:`ngs_toolkit.utils.download_file`.
+    """
     if not output_file.endswith(".gz"):
         output_file += ".gz"
-    download_file(url, output_file)
+    download_file(url, output_file, **kwargs)
     decompress_file(output_file)
     if os.path.exists(output_file) and os.path.exists(output_file.replace(".gz", "")):
         os.remove(output_file)
-
-
-def series_matrix2csv(matrix_url, prefix=None):
-    """
-    matrix_url: gziped URL with GEO series matrix.
-    """
-    import gzip
-    import subprocess
-
-    subprocess.call("wget {}".format(matrix_url).split(" "))
-    filename = matrix_url.split("/")[-1]
-
-    with gzip.open(filename, "rb") as f:
-        file_content = f.read()
-
-    # separate lines with only one field (project-related)
-    # from lines with >2 fields (sample-related)
-    prj_lines = dict()
-    sample_lines = dict()
-
-    for line in file_content.decode("utf-8").strip().split("\n"):
-        line = line.strip().split("\t")
-        if len(line) == 2:
-            prj_lines[line[0].replace('"', "")] = line[1].replace('"', "")
-        elif len(line) > 2:
-            sample_lines[line[0].replace('"', "")] = [
-                x.replace('"', "") for x in line[1:]
-            ]
-
-    prj = pd.Series(prj_lines)
-    prj.index = prj.index.str.replace("!Series_", "")
-
-    samples = pd.DataFrame(sample_lines)
-    samples.columns = samples.columns.str.replace("!Sample_", "")
-
-    if prefix is not None:
-        prj.to_csv(os.path.join(prefix + ".project_annotation.csv"), index=True)
-        samples.to_csv(os.path.join(prefix + ".sample_annotation.csv"), index=False)
-
-    return prj, samples
 
 
 def deseq_results_to_bed_file(
@@ -1078,7 +1054,7 @@ def homer_call_chipseq_peak_job(
 def bed_to_fasta(input_bed, output_fasta, genome_file):
     """
     Retrieves DNA sequence underlying specific region.
-    Names of FASTA entries will be of form "chr:start-end".
+    Names of FASTA entries will be of form ``chr:start-end``.
 
     Parameters
     ----------
@@ -1264,28 +1240,34 @@ def normalize_quantiles_p(df_input):
     return df
 
 
-def count_bam_file_length(bam_file):
+def count_bam_file_length(bam_file: str) -> int:
+    """Get length of BAM indexed file"""
     import pysam
     return pysam.AlignmentFile(bam_file).count()
 
 
-def count_lines(file):
+def count_lines(file: str) -> int:
+    """Count lines of plain text file"""
+    i = -1
     with open(file, 'r') as f:
         for i, _ in enumerate(f):
             pass
     return i + 1
 
 
-def get_total_region_area(bed_file):
+def get_total_region_area(bed_file: str) -> int:
+    """Get sum of BED records"""
     peaks = pd.read_csv(bed_file, sep="\t", header=None)
-    return (peaks.iloc[:, 2] - peaks.iloc[:, 1]).sum()
+    return int((peaks.iloc[:, 2] - peaks.iloc[:, 1]).sum())
 
 
-def get_region_lengths(bed_file):
+def get_region_lengths(bed_file: str) -> pd.Series:
+    """Get length of each record in BED file"""
     peaks = pd.read_csv(bed_file, sep="\t", header=None)
     return peaks.iloc[:, 2] - peaks.iloc[:, 1]
 
 
-def get_regions_per_chromosomes(bed_file):
+def get_regions_per_chromosomes(bed_file: str) -> pd.Series:
+    """Count record per chromosome in BED file"""
     peaks = pd.read_csv(bed_file, sep="\t", header=None)
     return peaks.iloc[:, 0].value_counts()

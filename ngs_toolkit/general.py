@@ -1954,7 +1954,7 @@ def project_to_geo(
 ):
     """
     Prepare raw sequencing files for submission to GEO.
-    Files will be copied or generated in a new directory `output_dir`.
+    Files will be copied or generated in a new directory ``output_dir``.
     It will get the raw BAM file(s) of each sample, and in case of
     ATAC-seq/ChIP-seq samples, the bigWig and peak files. If multiple BAM
     files exist for each sample, all will be copied and sequencially named
@@ -1964,35 +1964,46 @@ def project_to_geo(
 
     A pandas DataFrame with info on the sample's files and md5sums will be returned.
 
+    Attributes
+    ----------
     project : :obj:`peppy.Project`
-        A peppy Project object to process.
+        A :class:`peppy.Project` object to process.
 
     output_dir : :obj:`str`, optional
         Directory to create output. Will be created/overwriten if existing.
+
         Defaults to "geo_submission".
-
     samples : :obj:`list`, optional
-        List of peppy.Sample objects in project to restrict to.
+        List of :class:`peppy.Sample` objects in project to restrict to.
+
         Defaults to all samples in project.
-
     distributed: :obj:`bool`, optional
-        Whether processing should be distributed as jobs in a computing cluster for each sample.
+        Whether processing should be distributed as jobs in a
+        computing cluster for each sample.
         Currently available implementation supports a SLURM cluster only.
-        Defaults to :obj:`False`.
 
+        Defaults is :obj:`False`.
     dry_run: :obj:`bool`, optional
-        Whether copy/execution/submisison commands should be not be run to test.
-        Default is :obj:`False`.
+        Whether copy/execution/submisison commands should be not be run, to test.
 
+        Default is :obj:`False`.
     **kwargs : :obj:`dict`
-        Additional keyword arguments will be passed to `ngs_toolkit.utils.submit_job` if `distributed` is True.
-        and on to a divvy submission template.
-        Pass for example: computing_configuration="slurm", jobname="job", cores=2, mem=8000, partition="longq".
+        Additional keyword arguments will be passed to
+        :meth:`ngs_toolkit.utils.submit_job` if ``distributed`` is :obj:`True`,
+        and on to a :class:`divvy` submission template.
+        Pass for example:
+
+            * computing_configuration="slurm"
+            * jobname="job"
+            * cores=2
+            * mem=8000
+            * partition="longq"
 
     Returns
-    -------
-    pandas.DataFrame
-        Annotation of samples and their BAM, BigWig, narrowPeak files and respective md5sums.
+    ----------
+    :class:`pandas.DataFrame`
+        Annotation of samples and their BAM, BigWig,
+        narrowPeak files and respective md5sums.
     """
     from ngs_toolkit.utils import submit_job
 
@@ -2089,46 +2100,51 @@ def project_to_geo(
 
 
 def rename_sample_files(
-    annotation_mapping,
-    old_sample_name_column="old_sample_name",
-    new_sample_name_column="new_sample_name",
-    tmp_prefix="rename_sample_files",
-    results_dir="results_pipeline",
-    dry_run=False,
-):
+        annotation_mapping,
+        old_sample_name_column="old_sample_name",
+        new_sample_name_column="new_sample_name",
+        tmp_prefix="rename_sample_files",
+        results_dir="results_pipeline",
+        dry_run=False):
     """
-    Rename existing directories with pipeline outputs for samples based on mapping of
-    old/new sample names.
+    Rename existing directories with pipeline outputs for samples
+    based on mapping of old/new sample names.
+
     All files within the directory with the old sample name will be renamed recursively.
     Old and new sample names can overlap - this procedure will handle these cases correctly
-    by a 2-step process with temporary sample names with prefix `prefix`.
+    by a 2-step process with temporary sample names with prefix ``tmp_prefix``.
 
-    NEEDS TESTING!
+    .. caution:: NEEDS TESTING!
+        This function has not been used in a while and needs more testing.
 
+    Attributes
+    ----------
     annotation_mapping : :obj:`pandas.DataFrame`
-        DataFrame with mapping of old (column "previous_sample_name") vs new ("new_sample_name") sample names.
+        DataFrame with mapping of old (column "previous_sample_name")
+        vs new ("new_sample_name") sample names.
 
     old_sample_name_column : :obj:`str`, optional
         Name of column with old sample names.
-        Defaults to "old_sample_name"
 
+        Defaults to "old_sample_name".
     new_sample_name_column : :obj:`str`, optional
         Name of column with new sample names.
-        Defaults to "new_sample_name"
 
+        Defaults to "new_sample_name".
     tmp_prefix : :obj:`str`, optional
         Prefix for temporary files to avoid overlap between old and new names.
-        Defaults to "rename_sample_files"
 
+        Defaults to "rename_sample_files".
     results_dir : :obj:`str`, optional
         Pipeline output directory containing sample output directories.
-        Defaults to "results_pipeline"
 
+        Defaults to "results_pipeline".
     dry_run: :obj:`bool`, optional
-        Whether to print commands instead of running them. Defaults to False
+        Whether to print commands instead of running them.
+
+        Defaults to :obj:`False`.
     """
     import subprocess
-
     # TODO: test
     cmds = list()
     # 1) move to tmp name
@@ -2196,7 +2212,11 @@ def rename_sample_files(
                 raise OSError("Command '{}' failed.".format(cmd))
 
 
-def query_biomart(attributes=None, species="hsapiens", ensembl_version="grch37", max_api_retries=5):
+def query_biomart(
+        attributes=None,
+        species="hsapiens",
+        ensembl_version="grch37",
+        max_api_retries=5):
     """
     Query Biomart (https://www.ensembl.org/biomart/martview/).
 

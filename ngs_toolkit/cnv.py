@@ -134,24 +134,32 @@ class CNVAnalysis(Analysis):
         ----------
         output_map : :obj:`dict`
             Dictionary with {attribute_name: (file_path, kwargs)} to load the files.
-            The kwargs in the tuple will be passed to pandas.read_csv.
-            The default is the required to read the keys in `only_these_keys`.
+            The kwargs in the tuple will be passed to :meth:`pandas.read_csv`.
 
+            Defaults to the required to read the keys in ``only_these_keys``.
         only_these_keys : :obj:`list`, optional
             Iterable of analysis attributes to load up.
             Possible attributes:
-                "matrix_raw"
-                "matrix_norm"
-                "matrix_features"
-                "differential_results"
 
+                * "matrix_raw"
+                * "matrix_norm"
+                * "matrix_features"
+                * "differential_results"
+
+            Defaults to all of the above.
+
+        resolutions: :obj:`list`
+            List of resolution strings to get data for.
+
+            Defaults to value of ``resolutions`` attribute of Analysis.
         prefix : :obj:`str`, optional
             String prefix of files to load.
             Variables in curly braces will be formated with attributes of analysis.
-            Defaults to "{results_dir}/{name}".
 
-        bool : permissive, optional
+            Defaults to "{results_dir}/{name}".
+        permissive : :obj:`bool`, optional
             Whether an error should be ignored if reading a file causes IOError.
+
             Default is :obj:`True`.
 
         Attributes

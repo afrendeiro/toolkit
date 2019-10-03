@@ -1,8 +1,6 @@
 #! /usr/bin/env python
 
 import sys
-import os
-import glob
 
 
 def parse_requirements(req_file):

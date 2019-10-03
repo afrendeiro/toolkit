@@ -60,4 +60,4 @@ jobs:
       run: |
         python3 -m coverage xml
         python3 -m codecov -f coverage.xml
-        python3 -m codacy-coverage -r coverage.xml
+        python3 -m codacy -r coverage.xml

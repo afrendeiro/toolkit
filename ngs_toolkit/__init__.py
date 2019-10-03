@@ -26,7 +26,7 @@ def setup_logger(level="INFO", logfile=None):
     logfile : :obj:`str`, optional
         File to write log to.
 
-        Defaults to ``~/.ngs_toolkit.log.txt``.
+        Defaults to "~/.ngs_toolkit.log.txt".
 
     Returns
     -------
@@ -89,7 +89,7 @@ def setup_config(custom_yaml_config=None):
 
     Returns
     -------
-    dict
+    :obj:`dict`
         Dictionary with configurations.
     """
     import pkg_resources
@@ -218,13 +218,16 @@ def check_bedtools_version():
         [str(x) for x in version])
     msg = "Bedtools does not seem to be installed or is not in $PATH."
     if v == '':
-        raise Exception(msg)
+        _LOGGER.warning(msg)
+        return None
 
     # too low version
     msg = "Bedtools version '{}' is smaller than 2.26.".format(v)
     msg += " Please upgrade to newer version."
     if (version[0] < 2) or (version[1] < 26):
-        raise Exception(msg)
+        _LOGGER.warning(msg)
+        return None
+    return v
 
 
 # setup

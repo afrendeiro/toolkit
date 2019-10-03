@@ -88,7 +88,7 @@ def parse_homer(homer_dir):
         # Parse table with motif info
         info_table = content[
             re.search("""<TABLE border="1" cellpading="0" cellspacing="0">""", content)
-            .end() : re.search("</TABLE>", content)
+            .end(): re.search("</TABLE>", content)
             .start()
         ].strip()
 
@@ -104,7 +104,7 @@ def parse_homer(homer_dir):
 
         # Add most probable known motif name
         info_table["known_motif"] = content[
-            re.search("<H4>", content).end() : re.search("</H4>", content).start()
+            re.search("<H4>", content).end(): re.search("</H4>", content).start()
         ]
 
         # append

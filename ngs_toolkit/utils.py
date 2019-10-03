@@ -1084,6 +1084,16 @@ def bed_to_fasta(input_bed, output_fasta, genome_file):
         raise ValueError(msg)
 
 
+def read_bed_file_three_columns(input_bed: str) -> pd.DataFrame:
+    """Read BED file into dataframe, make 'name' field from location."""
+    bed = pd.read_csv(
+        input_bed,
+        sep="\t", header=None,
+        usecols=[0, 1, 2], names=['chrom', 'start', 'end'])
+    bed["name"] = bed_to_index(bed)
+    return bed
+
+
 def bed_to_fasta_through_2bit(input_bed, output_fasta, genome_2bit):
     """
     Retrieves DNA sequence underlying specific region.
@@ -1104,14 +1114,11 @@ def bed_to_fasta_through_2bit(input_bed, output_fasta, genome_2bit):
     import subprocess
 
     tmp_bed = input_bed + ".tmp.bed"
-    # write name column
-    bed = pd.read_csv(input_bed, sep="\t", header=None)
-    bed["name"] = bed[0] + ":" + bed[1].astype(str) + "-" + bed[2].astype(str)
-    bed[1] = bed[1].astype(int)
-    bed[2] = bed[2].astype(int)
+    bed = read_bed_file_three_columns(input_bed)
     bed.to_csv(tmp_bed, sep="\t", header=None, index=False)
 
-    cmd = "twoBitToFa {0} -bed={1} {2}".format(genome_2bit, tmp_bed, output_fasta)
+    cmd = "twoBitToFa {0} -bed={1} {2}".format(
+        genome_2bit, tmp_bed, output_fasta)
     subprocess.call(cmd.split(" "))
     os.remove(tmp_bed)
 
@@ -1119,7 +1126,7 @@ def bed_to_fasta_through_2bit(input_bed, output_fasta, genome_2bit):
 def bed_to_fasta_through_fasta(input_bed, output_fasta, genome_fasta):
     """
     Retrieves DNA sequence underlying specific region.
-    Uses bedtools getfasta (internally through pybedtools.BedTool.sequence).
+    Uses ``bedtools getfasta`` (internally through pybedtools.BedTool.sequence).
     Names of FASTA entries will be of form "chr:start-end".
 
     Parameters
@@ -1135,11 +1142,8 @@ def bed_to_fasta_through_fasta(input_bed, output_fasta, genome_fasta):
     """
     import pybedtools
 
-    bed = pd.read_csv(input_bed, sep="\t", header=None)
-    bed["name"] = bed[0] + ":" + bed[1].astype(str) + "-" + bed[2].astype(str)
-    bed[1] = bed[1].astype(int)
-    bed[2] = bed[2].astype(int)
-    bed = pybedtools.BedTool.from_dataframe(bed.iloc[:, [0, 1, 2]])
+    bed = read_bed_file_three_columns(input_bed)
+    bed = pybedtools.BedTool.from_dataframe(bed)
     bed.sequence(fi=genome_fasta, fo=output_fasta, name=True)
 
 

@@ -69,6 +69,12 @@ gh-release: install
 		push \
 		docker.pkg.github.com/afrendeiro/toolkit/ngs-toolkit:$(VERSION)
 
+clean_pyc:
+	find . -name \*.pyc -delete
+
+clean_mypy:
+	rm -rf .mypy_cache/
+
 clean_test:
 	rm -rf .pytest_cache/
 	find . -name "__pycache__" -exec rm -r {} \;
@@ -86,10 +92,11 @@ clean_dist:
 clean_build:
 	rm -fr build/
 	rm -fr ngs_toolkit.egg-info
-	find . -name \*.pyc -delete
 	rm -fr .eggs
 
 clean: \
+	clean_pyc \
+	clean_mypy \
 	clean_test \
 	clean_cov \
 	clean_docs \

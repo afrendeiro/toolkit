@@ -91,6 +91,8 @@ clean_dist:
 
 clean_build:
 	rm -fr build/
+
+clean_eggs:
 	rm -fr ngs_toolkit.egg-info
 	rm -fr .eggs
 
@@ -101,7 +103,8 @@ clean: \
 	clean_cov \
 	clean_docs \
 	clean_dist \
-	clean_build
+	clean_build \
+	clean_eggs
 
 all: \
 	test \
@@ -119,9 +122,12 @@ all: \
 	build \
 	pypitest \
 	pypi \
+	clean_pyc \
+	clean_mypy \
 	clean_test \
 	clean_cov \
 	clean_docs \
 	clean_dist \
 	clean_build \
+	clean_eggs \
 	clean

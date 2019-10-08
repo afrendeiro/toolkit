@@ -1172,12 +1172,8 @@ def count_reads_in_intervals(bam, intervals):
 
     bam = pysam.AlignmentFile(bam, mode="rb")
 
-    chroms = ["chr" + str(x) for x in range(1, 23)] + ["chrX", "chrY"]
-
     for interval in intervals:
-        if interval.split(":")[0] not in chroms:
-            continue
-        counts[interval] = bam.count(region=interval.split("|")[0])
+        counts[interval] = bam.count(region=interval)
     bam.close()
 
     return counts

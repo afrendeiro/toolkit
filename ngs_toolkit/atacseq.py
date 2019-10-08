@@ -186,10 +186,7 @@ class ATACSeqAnalysis(Analysis):
             output_map = {
                 "sites": (prefix + ".peak_set.bed", {}),
                 "matrix_raw": (prefix + ".matrix_raw.csv", kwargs),
-                "matrix_norm": (
-                    prefix + ".matrix_norm.csv",
-                    {"index_col": 0, "header": None},
-                ),
+                "matrix_norm": (prefix + ".matrix_norm.csv", kwargs),
                 "matrix_features": (prefix + ".matrix_features.csv", kwargs),
                 "support": (prefix + ".support.csv", kwargs),
                 "nuc": (prefix + ".gccontent_length.csv", kwargs),

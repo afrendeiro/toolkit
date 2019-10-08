@@ -900,7 +900,7 @@ class Analysis(object):
         :obj:`IOError`
             If not permissive and a file is not found.
         """
-        from ngs_toolkit.utils import fix_dataframe_header, get_this_file_or_timestamped
+        from ngs_toolkit.utils import get_this_file_or_timestamped
 
         prefix = self._format_string_with_attributes(prefix)
 
@@ -908,10 +908,7 @@ class Analysis(object):
             kwargs = {"index_col": 0}
             output_map = {
                 "matrix_raw": (prefix + ".matrix_raw.csv", kwargs),
-                "matrix_norm": (
-                    prefix + ".matrix_norm.csv",
-                    {"index_col": 0, "header": None},
-                ),
+                "matrix_norm": (prefix + ".matrix_norm.csv", kwargs),
                 "matrix_features": (prefix + ".matrix_features.csv", kwargs),
                 "differential_results": (
                     os.path.join(
@@ -936,9 +933,19 @@ class Analysis(object):
 
                 # Fix possible multiindex for matrix_norm
                 if name == "matrix_norm":
-                    if not isinstance(getattr(self, name).columns, pd.MultiIndex):
-                        _LOGGER.debug("Trying to fix 'matrix_norm' dataframe header.")
-                        setattr(self, name, fix_dataframe_header(getattr(self, name)))
+                    if not getattr(self, name).dtypes.all().name == "float64":
+                        msg = (
+                            "`matrix_norm` value has non-float values."
+                            " This is likely because it is a pandas.DataFrame"
+                            " with MultiIndex columns.\n"
+                            " Since the length and type of MultiIndex values"
+                            " cannot be safely inferred from the CSV format"
+                            " please determine the number of rows part of the "
+                            " MultiIndex and read in the file explicitely:\n"
+                            "``analysis.matrix_norm = pandas.read_csv('{file}'"
+                            ", index_col=0, header=list(range(6)))``"
+                        ).format(file=output_map['matrix_norm'][0])
+                        _LOGGER.error(msg)
             except IOError as e:
                 if not permissive:
                     raise e

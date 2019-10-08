@@ -58,6 +58,7 @@ def main() -> int:
     # make sure there is an entry for each region in input file
     input_bed = read_bed_file_three_columns(args.bed_file).set_index("name")
     res = input_bed.join(pd.Series(res, name="sample")).fillna(0)
+    res.loc[:, "sample"] = res.loc[:, "sample"].astype(int)
 
     print("Saving results.")
     res.to_csv(args.output_bed, index=False, header=False, sep="\t")

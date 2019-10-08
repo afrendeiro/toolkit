@@ -286,7 +286,7 @@ class ATACSeqAnalysis(Analysis):
         region_type="summits",
         extension=250,
         blacklist_bed=None,
-        filter_chrs=None,
+        filter_chroms=None,
         permissive=False,
         save=True,
         assign=True,
@@ -324,7 +324,7 @@ class ATACSeqAnalysis(Analysis):
             to exclude from consensus peak set.
 
             Default is to use a blacklist file for the analysis ``genome``.
-        filter_chrs: {:obj:`list`, :obj:`str`}
+        filter_chroms : {:obj:`list`, :obj:`str`}
             A list of chromosomes to filter out or
             a string with a pattern to match to exclude chromosomes.
             Uses Pandas string methods :class:`pandas.Series.str.match`.
@@ -332,7 +332,7 @@ class ATACSeqAnalysis(Analysis):
             character and a "chrM" chromosome.
 
             Default is not to filter anything.
-        permissive: :obj:`bool`
+        permissive : :obj:`bool`
             Whether Samples that which ``region_type`` attribute file does not exist
             should be simply skipped or an error thrown.
 
@@ -420,12 +420,12 @@ class ATACSeqAnalysis(Analysis):
             sites = sites.intersect(v=True, b=blacklist)
 
         # # filter requested chromosomes
-        if filter_chrs is not None:
-            if isinstance(filter_chrs, list):
-                sites = sites.filter(lambda x: x.chrom not in filter_chrs).saveas()
-            elif isinstance(filter_chrs, str):
+        if filter_chroms is not None:
+            if isinstance(filter_chroms, list):
+                sites = sites.filter(lambda x: x.chrom not in filter_chroms).saveas()
+            elif isinstance(filter_chroms, str):
                 s = sites.to_dataframe()
-                sites = pybedtools.BedTool.from_dataframe(s.loc[~s['chrom'].str.match(filter_chrs)])
+                sites = pybedtools.BedTool.from_dataframe(s.loc[~s['chrom'].str.match(filter_chroms)])
 
         # Save and assign
         if save:

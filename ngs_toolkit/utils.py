@@ -438,7 +438,7 @@ def bed_to_index(df):
             "DataFrame does not have '{}' columns.".format("', '".join(cols))
         )
     index = (
-        df["chrom"]
+        df["chrom"].astype(str)
         + ":"
         + df["start"].astype(int).astype(str)
         + "-"
@@ -474,6 +474,23 @@ def to_bed_index(sites):
         return bedtool_to_index(sites)
     else:
         raise ValueError(msg)
+
+
+def sort_bed_nicely(bed_file):
+    """Sorts BED file but in sorted_nicely order"""
+    import pybedtools
+    import tempfile
+    from ngs_toolkit.utils import sorted_nicely
+
+    if isinstance(bed_file, str):
+        sites = pybedtools.BedTool(bed_file)
+    elif isinstance(bed_file, pybedtools.BedTool):
+        pass
+    chrom_names = tempfile.NamedTemporaryFile()
+    with open(chrom_names.name, "w") as handle:
+        for chrom in sorted_nicely(sites.to_dataframe()['chrom'].unique()):
+            handle.write(chrom + "\n")
+    return sites.sort(g=chrom_names.name)
 
 
 def timedelta_to_years(x):

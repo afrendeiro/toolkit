@@ -689,7 +689,6 @@ class ATACSeqAnalysis(Analysis):
         :class:`pandas.DataFrame`
             Pandas DataFrame with read counts of shape (n_sites, m_samples).
         """
-        # TODO: add method to run only samples with missing output
         import sys
         import multiprocessing
         import parmap
@@ -886,14 +885,15 @@ class ATACSeqAnalysis(Analysis):
 
         if fast_and_unsafe:
             _LOGGER.warning("Using a concatenation method that is not 100% safe.")
-            matrix_raw = pd.concat(matrix_raw, axis=1, sort=False).sort_index()
-            matrix_raw = matrix_raw.loc[:, ~matrix_raw.columns.duplicated()].set_index(["chrom", "start", "end"])
+            matrix_raw = pd.concat(matrix_raw, axis=1, sort=False).dropna().sort_index()
+            matrix_raw = matrix_raw.loc[:, ~matrix_raw.columns.duplicated()].set_index(["chrom", "start", "end"]).astype(int)
         else:
             matrix_raw = (
                 pd.concat(matrix_raw, axis=0, sort=False)
                 .melt(id_vars=["chrom", "start", "end"])
                 .pivot_table(
-                    index=["chrom", "start", "end"], columns="variable", values="value"
+                    index=["chrom", "start", "end"], columns="variable",
+                    values="value", fill_value=0
                 )
                 .astype(int)
             )

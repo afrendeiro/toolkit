@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 
 try:
     # Even though there is no "ngs_toolkit/_version" file,

@@ -400,7 +400,7 @@ class Analysis(object):
         ----------
         input_file : :obj:`str`
             Attribute to check.
-        permissive: :obj:`bool`, optional
+        permissive : :obj:`bool`, optional
             Whether to allow returning a subset of samples if not all have file.
 
             Defaults to :obj:`False`.
@@ -1313,11 +1313,11 @@ class Analysis(object):
             A constant to add to values.
 
             Defaults to 1.
-        save: :obj:`bool`, optional
+        save : :obj:`bool`, optional
             Whether to write normalized DataFrame to disk.
 
             Defaults to :obj:`True`.
-        assign: :obj:`bool`, optional
+        assign : :obj:`bool`, optional
             Whether to assign the normalized DataFrame to ``matrix_norm``.
 
             Defaults to :obj:`True`.
@@ -1396,11 +1396,11 @@ class Analysis(object):
             A constant to add before log transformation.
 
             Default is 1.
-        save: :obj:`bool`, optional
+        save : :obj:`bool`, optional
             Whether to write normalized DataFrame to disk.
 
             Default is :obj:`True`.
-        assign: :obj:`bool`, optional
+        assign : :obj:`bool`, optional
             Whether to assign the normalized DataFrame to an attribute `matrix_norm`.
 
             Default is :obj:`True`.
@@ -1485,11 +1485,11 @@ class Analysis(object):
             Whether to fill NaN with zero.
 
             Defaults to :obj:`True`.
-        save: :obj:`bool`, optional
+        save : :obj:`bool`, optional
             Whether results should be saved to disc.
 
             Defaults to :obj:`True`.
-        assign: :obj:`bool`, optional
+        assign : :obj:`bool`, optional
             Whether to assign the normalized DataFrame to an attribute `matrix_norm`.
 
             Default is :obj:`True`.
@@ -1545,11 +1545,11 @@ class Analysis(object):
             Samples to restrict analysis to.
 
             Defaults to all samples.
-        save: :obj:`bool`, optional
+        save : :obj:`bool`, optional
             Whether results should be saved to disc.
 
             Defaults to :obj:`True`.
-        assign: :obj:`bool`, optional
+        assign : :obj:`bool`, optional
             Whether to assign the normalized DataFrame to an attribute `matrix_norm`.
 
             Default is :obj:`True`.
@@ -1625,11 +1625,11 @@ class Analysis(object):
             Iterable of :class:`peppy.Sample` objects to restrict matrix to.
 
             Default is all samples in matrix.
-        save: :obj:`bool`, optional
+        save : :obj:`bool`, optional
             Whether to write normalized DataFrame to disk.
 
             Defaults to :obj:`True`.
-        assign: :obj:`bool`, optional
+        assign : :obj:`bool`, optional
             Whether to assign the normalized DataFrame to an attribute `matrix_norm`.
 
             Default is :obj:`True`.
@@ -1718,11 +1718,11 @@ class Analysis(object):
             Iterable of :class:`peppy.Sample` objects to restrict matrix to.
 
             Default (:obj:`None` is passed) is not to subset matrix.
-        save: :obj:`bool`, optional
+        save : :obj:`bool`, optional
             Whether to write normalized DataFrame to disk.
 
             Defaults to :obj:`True`.
-        assign: :obj:`bool`
+        assign : :obj:`bool`
             Whether to assign the result to "matrix_norm".
 
             Defaults to :obj:`True`.
@@ -1746,6 +1746,13 @@ class Analysis(object):
             raise NotImplementedError(msg)
 
         matrix = self.get_matrix(matrix, samples=samples)
+
+        # Include only variables with variance
+        std = matrix.std(axis=1)
+        if any(std == 0):
+            msg = "Matrix contains features with zero variance. Removing those."
+            _LOGGER.warning(msg)
+            matrix = matrix.loc[std > 0, :]
 
         # make vector of factor to remove
         if samples is None:
@@ -1825,15 +1832,15 @@ class Analysis(object):
             Subset of samples to use.
 
             Defaults to all in analysis.
-        save: :obj:`bool`, optional
+        save : :obj:`bool`, optional
             Whether to write the annotated DataFrame to disk.
 
             Default is :obj:`True`.
-        output_prefix: :obj:`str`, optional
+        output_prefix : :obj:`str`, optional
             Prefix to add to output file when save is True.
 
             Default is "matrix_features".
-        assign: :obj:`bool`, optional
+        assign : :obj:`bool`, optional
             Whether to assign the annoatated DataFrame to "matrix_features".
 
             Default is :obj:`True`.
@@ -1916,19 +1923,19 @@ class Analysis(object):
             Default is ["gene_annotation", "region_annotation", "chrom_state_annotation", "support", "stats"]
             for ATAC-seq and ChIP-seq and ["stats"] for all others.
 
-        permissive: :obj:`bool`
+        permissive : :obj:`bool`
             Whether DataFrames that do not exist should be simply skipped or an error will be thrown.
 
             Defaults to :obj:`True`.
-        save: :obj:`bool`, optional
+        save : :obj:`bool`, optional
             Whether to write the annotated DataFrame to disk.
 
             Default is :obj:`True`.
-        assign: :obj:`bool`, optional
+        assign : :obj:`bool`, optional
             Whether to assign the annoatated DataFrame to "matrix_features".
 
             Default is :obj:`True`.
-        output_prefix: :obj:`str`, optional
+        output_prefix : :obj:`str`, optional
             Prefix to add to output file when ``save`` is :obj:`True`.
 
             Default is "matrix_features".
@@ -2029,11 +2036,11 @@ class Analysis(object):
             Attributes which are numeric even though they
             might be so in the samples" attributes. Will attempt
             to convert values to numeric.
-        save: :obj:`bool`, optional
+        save : :obj:`bool`, optional
             Whether to write normalized DataFrame to disk.
 
             Default is :obj:`True`.
-        assign: :obj:`bool`, optional
+        assign : :obj:`bool`, optional
             Whether to assign the normalized DataFrame to "matrix_norm".
 
             Default is :obj:`True`.
@@ -3240,15 +3247,15 @@ class Analysis(object):
             Prefix of the in-/output files.
 
             Defaults for both is "differential_analysis".
-        permissive: :obj:`bool`, optional
+        permissive : :obj:`bool`, optional
             Whether non-existing files should be skipped or an error be thrown.
 
             Defaults to :obj:`True`.
-        save: :obj:`bool`, optional
+        save : :obj:`bool`, optional
             Whether to save results to disk.
 
             Defaults to :obj:`True`.
-        assign: :obj:`bool`, optional
+        assign : :obj:`bool`, optional
             Whether to add results to a `differential_results` attribute.
 
             Defaults to :obj:`True`.
@@ -5490,7 +5497,7 @@ class Analysis(object):
             File prefix of input/output files.
 
             Defaults to "differential_analysis".
-        permissive: :obj:`bool`, optional
+        permissive : :obj:`bool`, optional
             Whether to skip non-existing files, giving a warning.
 
             Defaults to :obj:`True`.

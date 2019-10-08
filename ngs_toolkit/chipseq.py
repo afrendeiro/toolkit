@@ -484,47 +484,68 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
             region_type="summits",
             extension=250,
             blacklist_bed=None,
-            filter_mito_chr=True,
+            filter_chroms=True,
             permissive=False,
+            save=True,
+            assign=True,
             **kwargs):
         """
         Get consensus (union) of enriched sites (peaks) across all comparisons.
-        If `region_type` is "summits, regions used will be peak summits which will be extended by `extension`
-        before union. Otherwise sample peaks will be used with no modification.
+        There are two modes possible, defined by the value of ``region_type``:
+
+         * peaks: simple union of all sites;
+         * summits: peak summits are extended by ``extension`` and a union is made.
+
+        For ChIP-seq, the ``comparison_table`` keyword argument or a
+        ``comparison_table`` attribute set is required. Peaks/summits will be
+        aggregated for the peaks called in each sample comparison.
 
         Parameters
         ----------
         samples : :obj:`list`
-            Iterable of peppy.Sample objects to restrict to.
-            Must have a `peaks` attribute set.
-            Defaults to all samples in the analysis (`samples` attribute).
+            Iterable of :class:`peppy.Sample` objects to restrict to.
+            Must have a ``peaks`` attribute set.
 
+            Defaults to all samples in the analysis (``samples`` attribute).
         region_type : :obj:`str`
-            The type of region to use to create the consensus region set - one of `summits` or `peaks`.
-            If `summits`, peak summits will be extended by `extension` before union.
-            Otherwise sample peaks will be used with no modification.
+            The type of region to use to create the consensus region set
+            - one of "summits" or "peaks".
+            If "summits", peak summits will be extended by ``extension``
+            before union.
+            If "peaks", sample peaks will be used with no modification prior to
+            union.
 
+            Default is "summits".
         extension : :obj:`int`
             Amount to extend peaks summits by in both directions.
 
-        blacklist_bed : :obj:`str`
-            A (3 column) BED file with genomic positions to exclude from consensus peak set.
+            Default is 250.
+        blacklist_bed : {:obj:`False`, :obj:`str`}
+            Either :obj:`False` or a path to a BED file with genomic positions
+            to exclude from consensus peak set.
 
-        filter_mito_chr: :obj:`bool`
-            Whether to exclude 'chrM' from peak set.
+            Default is to use a blacklist file for the analysis ``genome``.
+        filter_chroms : {:obj:`list`, :obj:`str`}
+            A list of chromosomes to filter out or
+            a string with a pattern to match to exclude chromosomes.
+            Uses Pandas string methods :class:`pandas.Series.str.match`.
+            Pass for example `'.*_.*|chrM'` to filter out chromosomes with a "_"
+            character and a "chrM" chromosome.
 
-        permissive: :obj:`bool`
-            Whether Samples that which `region_type` attribute file does not exist
-            should be simply skipped or an error thrown.
+            Default is not to filter anything.
+        permissive : :obj:`bool`
+            Whether Samples that which ``region_type`` attribute file
+            does not exist should be simply skipped or an error thrown.
 
         comparison_table : :obj:`pandas.DataFrame`, optional
-            DataFrame with signal/background combinations used to call peaks
+            DataFrame with signal/background combinations used to call peaks.
+            Part of kwargs.
 
-            Defaults to analysis' own `comparison_table`.
+            Defaults to analysis own ``comparison_table``.
         peak_dir : :obj:`str`, optional
-            Path to peaks output directory.
+            Path to peaks output directory. Part of kwargs.
 
-            Defaults to `{analysis.results_dir}/chipseq_peaks`.
+            Defaults to "{analysis.results_dir}/chipseq_peaks".
 
         Attributes
         ----------
@@ -535,6 +556,7 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
         from ngs_toolkit.general import get_blacklist_annotations
         import pybedtools
         from tqdm import tqdm
+        import tempfile
 
         if "comparison_table" not in kwargs:
             comparison_table = self.comparison_table
@@ -559,85 +581,81 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
                 _LOGGER.error(msg)
                 raise AttributeError(msg)
 
-        first = True
         comps = comparison_table["comparison_name"].drop_duplicates()
-        for comparison in tqdm(comps, total=len(comps), desc="Comparison"):
-            peak_files = [
-                os.path.join(peak_dir, comparison, comparison + "_peaks.narrowPeak"),
-                os.path.join(
-                    peak_dir, comparison, comparison + "_homer_peaks.factor.bed"
-                ),
-                os.path.join(
-                    peak_dir, comparison, comparison + "_homer_peaks.histone.bed"
-                ),
-            ]
-            for peak_file in peak_files:
-                genome = (
-                    comparison_table.loc[
-                        comparison_table["comparison_name"] == comparison,
-                        "comparison_genome",
-                    ]
-                    .drop_duplicates()
-                    .squeeze()
-                )
 
-                msg = "Could not determine genome of comparison '{}'.".format(
-                    comparison
-                )
-                if not isinstance(genome, str):
-                    _LOGGER.error(msg)
-                    raise AssertionError(msg)
+        f = tempfile.NamedTemporaryFile()
+        with open(f.name, "a") as handle:
+            for comparison in tqdm(comps, total=len(comps), desc="Comparison"):
+                peak_files = [
+                    os.path.join(peak_dir, comparison, comparison + "_peaks.narrowPeak"),
+                    os.path.join(
+                        peak_dir, comparison, comparison + "_homer_peaks.factor.bed"
+                    ),
+                    os.path.join(
+                        peak_dir, comparison, comparison + "_homer_peaks.histone.bed"
+                    ),
+                ]
+                for peak_file in peak_files:
+                    genome = (
+                        comparison_table.loc[
+                            comparison_table["comparison_name"] == comparison,
+                            "comparison_genome",
+                        ]
+                        .drop_duplicates()
+                        .squeeze()
+                    )
 
-                # Get peaks
-                if region_type == "summits":
+                    msg = "Could not determine genome of comparison '{}'.".format(
+                        comparison
+                    )
+                    if not isinstance(genome, str):
+                        _LOGGER.error(msg)
+                        raise AssertionError(msg)
+
+                    # Get peak file
                     try:
                         f = re.sub("_peaks.narrowPeak", "_summits.bed", peak_file)
-                        peaks = pybedtools.BedTool(f).slop(b=extension, genome=genome)
-                    except ValueError:
+                        file = (
+                            pybedtools.BedTool(f)
+                            .slop(b=extension, genome=genome).fn
+                            if region_type == "summits"
+                            else peak_file)
+                    except (ValueError, FileNotFoundError):
                         _LOGGER.warning(
-                            "Summits for comparison {} ({}) not found!".format(
-                                comparison, f
-                            )
-                        )
+                            "Input file for comparison {} ({}) not found!"
+                            .format(comparison, f))
                         if not permissive:
                             raise
-                else:
-                    try:
-                        peaks = pybedtools.BedTool(peak_file)
-                    except ValueError:
-                        _LOGGER.warning(
-                            "Peaks for comparison {} ({}) not found!".format(
-                                comparison, peak_file
-                            )
-                        )
-                        if not permissive:
-                            raise
-                # Merge overlaping peaks within a comparison
-                peaks = peaks.merge()
-                if first:
-                    sites = peaks
-                    first = False
-                else:
-                    # Concatenate all peaks
-                    sites = sites.cat(peaks)
+
+                    for line in open(file, 'r'):
+                        handle.write(line)
 
         # Merge overlaping peaks across comparisons
-        sites = sites.merge()
+        sites = pybedtools.BedTool(f.name).sort().merge()
 
         # Filter
-        # remove blacklist regions
-        blacklist = pybedtools.BedTool(
-            os.path.join(self.data_dir, "external", blacklist_bed)
-        )
-        # remove chrM peaks and save
-        sites.intersect(v=True, b=blacklist).filter(lambda x: x.chrom != "chrM").saveas(
-            os.path.join(self.results_dir, self.name + ".peak_set.bed")
-        )
+        # # remove blacklist regions
+        if blacklist_bed is not False:
+            if not isinstance(blacklist_bed, pybedtools.BedTool):
+                blacklist = pybedtools.BedTool(blacklist_bed)
+            sites = sites.intersect(v=True, b=blacklist)
 
-        # Read up again
-        self.sites = pybedtools.BedTool(
-            os.path.join(self.results_dir, self.name + ".peak_set.bed")
-        )
+        # # filter requested chromosomes
+        if filter_chroms is not None:
+            if isinstance(filter_chroms, list):
+                sites = sites.filter(lambda x: x.chrom not in filter_chroms).saveas()
+            elif isinstance(filter_chroms, str):
+                s = sites.to_dataframe()
+                sites = pybedtools.BedTool.from_dataframe(s.loc[~s['chrom'].str.match(filter_chroms)])
+
+        # Save and assign
+        if save:
+            output_file = os.path.join(self.results_dir, self.name + ".peak_set.bed")
+            sites.saveas(output_file)
+            sites = pybedtools.BedTool(output_file)
+        if assign:
+            self.sites = sites
+        return sites
 
     def calculate_peak_support(
             self, samples=None, region_type="summits", permissive=False,

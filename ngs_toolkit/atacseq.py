@@ -289,8 +289,10 @@ class ATACSeqAnalysis(Analysis):
         region_type="summits",
         extension=250,
         blacklist_bed=None,
-        filter_mito_chr=True,
+        filter_chrs=None,
         permissive=False,
+        save=True,
+        assign=True,
         **kwargs
     ):
         """
@@ -308,23 +310,31 @@ class ATACSeqAnalysis(Analysis):
 
             Defaults to all samples in the analysis (``samples`` attribute).
         region_type : :obj:`str`
-            The type of region to use to create the consensus region set - one of "summits" or "peaks".
-            If `summits`, peak summits will be extended by `extension` before union.
-            Otherwise sample peaks will be used with no modification.
+            The type of region to use to create the consensus region set
+            - one of "summits" or "peaks".
+            If "summits", peak summits will be extended by ``extension``
+            before union.
+            If "peaks", sample peaks will be used with no modification prior to
+            union.
 
             Default is "summits".
         extension : :obj:`int`
             Amount to extend peaks summits by in both directions.
 
             Default is 250.
-        blacklist_bed : :obj:`str`
-            A (3 column) BED file with genomic positions to exclude from consensus peak set.
+        blacklist_bed : {:obj:`False`, :obj:`str`}
+            Either :obj:`False` or a path to a BED file with genomic positions
+            to exclude from consensus peak set.
 
-            Default is to download a blacklisted file for the analysis ``genome``.
-        filter_mito_chr: :obj:`bool`
-            Whether to exclude 'chrM' from peak set.
+            Default is to use a blacklist file for the analysis ``genome``.
+        filter_chrs: {:obj:`list`, :obj:`str`}
+            A list of chromosomes to filter out or
+            a string with a pattern to match to exclude chromosomes.
+            Uses Pandas string methods :class:`pandas.Series.str.match`.
+            Pass for example `'.*_.*|chrM'` to filter out chromosomes with a "_"
+            character and a "chrM" chromosome.
 
-            Default is :obj:`True`.
+            Default is not to filter anything.
         permissive: :obj:`bool`
             Whether Samples that which ``region_type`` attribute file does not exist
             should be simply skipped or an error thrown.
@@ -335,18 +345,26 @@ class ATACSeqAnalysis(Analysis):
 
         Raises
         ----------
-        :obj:`IOError`
+        :obj:`ValueError`
             If not ``permissive`` and either the ``peaks`` or ``summits`` file
             of a sample is not readable, or if ``permissive``
             but none of the samples has an existing file.
+        :obj:`AttributeError`
+            If analysis does not have ``organism`` and ``genome`` attributes.
 
         Attributes
         ----------
         sites : :class:`pybedtools.BedTool`
-            Sets a ``sites`` variable with consensus peak set.
+            Sets a ``sites`` variable with the consensus peak set.
+
+        Returns
+        ----------
+        sites : :class:`pybedtools.BedTool`
+            The consensus peak set.
         """
         from tqdm import tqdm
         import pybedtools
+        import tempfile
 
         if region_type not in ["summits", "peaks"]:
             msg = "`region_type` attribute must be one of 'summits' or 'peaks'!"
@@ -361,7 +379,7 @@ class ATACSeqAnalysis(Analysis):
             region_type, permissive=permissive, samples=samples
         )
 
-        if blacklist_bed is None:
+        if (blacklist_bed is not False and blacklist_bed is None):
             _LOGGER.info("Blacklist file not provided. Downloading...")
             try:
                 blacklist_bed = self.get_resources(steps=["blacklist"])[
@@ -369,72 +387,57 @@ class ATACSeqAnalysis(Analysis):
                 ]
             except AttributeError:
                 msg = "Blacklist file was not provided and cannot be"
-                msg += " get one without analysis having `organism` and `genome` set."
+                msg += " get one without `organism` and `genome` set."
                 _LOGGER.error(msg)
                 raise AttributeError(msg)
 
-        for i, sample in tqdm(enumerate(samples), total=len(samples), desc="Sample"):
-            # print(sample.name)
-            if region_type == "summits":
+        f = tempfile.NamedTemporaryFile()
+        with open(f.name, "a") as handle:
+            for i, sample in tqdm(enumerate(samples), total=len(samples), desc="Sample"):
                 try:
-                    peaks = pybedtools.BedTool(sample.summits).slop(
-                        b=extension, genome=sample.genome
-                    )
-                except ValueError as e:
-                    if permissive:
-                        _LOGGER.warning(
-                            "Summits for sample {} ({}) not found!".format(
-                                sample, sample.summits
-                            )
-                        )
-                        continue
+                    file = pybedtools.BedTool(sample.summits) \
+                        .slop(b=extension, genome=sample.genome).fn \
+                        if region_type == "summits" else sample.peaks
+                except (ValueError, FileNotFoundError):
+                    if not permissive:
+                        raise
                     else:
-                        raise e
-            else:
-                try:
-                    peaks = pybedtools.BedTool(sample.peaks)
-                except ValueError as e:
-                    if permissive:
                         _LOGGER.warning(
-                            "Peaks for sample {} ({}) not found!".format(
-                                sample, sample.peaks
-                            )
-                        )
+                            "Peaks for sample {} ({}) not found!"
+                            .format(sample, sample.peaks))
                         continue
-                    else:
-                        raise e
-            # Merge overlaping peaks within a sample
-            peaks = peaks.merge()
-            if i == 0:
-                sites = peaks
-            else:
-                # Concatenate all peaks
-                sites = sites.cat(peaks)
+                for line in open(file, 'r'):
+                    handle.write(line)
 
-        if "sites" not in locals():
-            msg = "Couldn't read peak file for any sample."
-            _LOGGER.error(msg)
-            raise ValueError(msg)
-        # Merge overlaping peaks across samples
-        sites = sites.merge()
+        # NCBI genome FASTA files are sorted naturally while Ensembl are not
+        # depending on that you might want to sort the resulting BED file
+        # accordingly with the following:
+        #     sites = sort_bed(f.name).merge()
+        sites = pybedtools.BedTool(f.name).sort().merge()
 
         # Filter
         # # remove blacklist regions
         if blacklist_bed is not False:
             if not isinstance(blacklist_bed, pybedtools.BedTool):
                 blacklist = pybedtools.BedTool(blacklist_bed)
-                sites = sites.intersect(v=True, b=blacklist)
-        # # remove chrM peaks
-        if filter_mito_chr:
-            sites = sites.filter(lambda x: x.chrom != "chrM")
+            sites = sites.intersect(v=True, b=blacklist)
 
-        # Save
-        sites.saveas(os.path.join(self.results_dir, self.name + ".peak_set.bed"))
+        # # filter requested chromosomes
+        if filter_chrs is not None:
+            if isinstance(filter_chrs, list):
+                sites = sites.filter(lambda x: x.chrom not in filter_chrs).saveas()
+            elif isinstance(filter_chrs, str):
+                s = sites.to_dataframe()
+                sites = pybedtools.BedTool.from_dataframe(s.loc[~s['chrom'].str.match(filter_chrs)])
 
-        # Read up again
-        self.sites = pybedtools.BedTool(
-            os.path.join(self.results_dir, self.name + ".peak_set.bed")
-        )
+        # Save and assign
+        if save:
+            output_file = os.path.join(self.results_dir, self.name + ".peak_set.bed")
+            sites.saveas(output_file)
+            sites = pybedtools.BedTool(output_file)
+        if assign:
+            self.sites = sites
+        return sites
 
     def set_consensus_sites(self, bed_file, overwrite=True):
         """
@@ -545,7 +548,8 @@ class ATACSeqAnalysis(Analysis):
             OverflowError,
         ):
             _LOGGER.debug(
-                "Could not convert support intersection directly to dataframe, saving/reading temporary file."
+                "Could not convert support intersection directly to dataframe,"
+                "saving/reading temporary file."
             )
             t = tempfile.NamedTemporaryFile()
             support.saveas(t.name)
@@ -765,8 +769,8 @@ class ATACSeqAnalysis(Analysis):
     def collect_coverage(
         self,
         samples=None,
-        assign=True,
         save=True,
+        assign=True,
         output_file=None,
         permissive=False,
         peak_set_name="peak_set",
@@ -782,16 +786,16 @@ class ATACSeqAnalysis(Analysis):
             Iterable of :class:`peppy.Sample` objects to restrict to.
             If not provided (`None` is passed) if will default to all samples in the analysis (``samples`` attribute).
 
-        assign: :obj:`bool`
-            Whether to assign the matrix to an attribute of self named `coverage`.
-
         save: :obj:`bool`
-            Whether to save to disk the coverage matrix with filename `output_file`.
+            Whether to save to disk the coverage matrix with filename ``output_file``.
+
+        assign: :obj:`bool`
+            Whether to assign the matrix to an attribute of self named ``coverage``.
 
         output_file : :obj:`str`
             A path to a CSV file with coverage output.
-            Default is `self.results_dir/self.name + ".raw_coverage.csv"`.
 
+            Default is "{results_dir}/{name}.raw_coverage.csv".
         permissive: :obj:`bool`
             Whether Samples without an existing coverage file does not exist
             should be simply skipped or an error thrown.
@@ -805,7 +809,7 @@ class ATACSeqAnalysis(Analysis):
             If the order of all rows in all samples is the same then the result should be the same.
             The default, slower method assures that all rows are matched and is therefore slower.
 
-            Defaults to False.
+            Defaults to :obj:`False`.
 
         Raises
         ----------

@@ -1874,14 +1874,14 @@ class Analysis(object):
         return metrics
 
     def annotate_features(
-        self,
-        samples=None,
-        matrix="matrix_norm",
-        feature_tables=None,
-        permissive=True,
-        save=True,
-        output_prefix="matrix_features",
-        assign=True,
+            self,
+            samples=None,
+            matrix="matrix_norm",
+            feature_tables=None,
+            permissive=True,
+            save=True,
+            assign=True,
+            output_prefix="matrix_features",
     ):
         """
         Annotates analysis features (regions/genes) by aggregating annotations
@@ -1917,14 +1917,14 @@ class Analysis(object):
             Whether to write the annotated DataFrame to disk.
 
             Default is :obj:`True`.
-        output_prefix: :obj:`str`, optional
-            Prefix to add to output file when save is True.
-
-            Default is "matrix_features".
         assign: :obj:`bool`, optional
             Whether to assign the annoatated DataFrame to "matrix_features".
 
             Default is :obj:`True`.
+        output_prefix: :obj:`str`, optional
+            Prefix to add to output file when ``save`` is :obj:`True`.
+
+            Default is "matrix_features".
 
         Raises
         ----------
@@ -2888,9 +2888,13 @@ class Analysis(object):
         are installed.
 
         Requires the R package "DESeq2" to be installed:
-            >>> if (!requireNamespace("BiocManager", quietly = TRUE))
-            >>>     install.packages("BiocManager")
-            >>> BiocManager::install("DESeq2")
+
+        .. highlight:: R
+        .. code-block:: R
+
+            if (!requireNamespace("BiocManager", quietly = TRUE))
+                install.packages("BiocManager")
+            BiocManager::install("DESeq2")
 
         For other implementations of differential analysis see
         `ngs_toolkit.general.least_squares_fit`
@@ -3201,16 +3205,16 @@ class Analysis(object):
                     pass
 
     def collect_differential_analysis(
-        self,
-        comparison_table=None,
-        input_dir="{results_dir}/differential_analysis_{data_type}",
-        input_prefix="differential_analysis",
-        output_dir="{results_dir}/differential_analysis_{data_type}",
-        output_prefix="differential_analysis",
-        permissive=True,
-        assign=True,
-        save=True,
-        overwrite=False,
+            self,
+            comparison_table=None,
+            input_dir="{results_dir}/differential_analysis_{data_type}",
+            input_prefix="differential_analysis",
+            output_dir="{results_dir}/differential_analysis_{data_type}",
+            output_prefix="differential_analysis",
+            permissive=True,
+            save=True,
+            assign=True,
+            overwrite=False,
     ):
         """
         Collect results from DESeq2 differential analysis.
@@ -3235,12 +3239,12 @@ class Analysis(object):
             Whether non-existing files should be skipped or an error be thrown.
 
             Defaults to :obj:`True`.
-        assign: :obj:`bool`, optional
-            Whether to add results to a `differential_results` attribute.
-
-            Defaults to :obj:`True`.
         save: :obj:`bool`, optional
             Whether to save results to disk.
+
+            Defaults to :obj:`True`.
+        assign: :obj:`bool`, optional
+            Whether to add results to a `differential_results` attribute.
 
             Defaults to :obj:`True`.
         overwrite: :obj:`bool`, optional

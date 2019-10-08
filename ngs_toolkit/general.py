@@ -1931,7 +1931,7 @@ def run_enrichment_jobs(
                     name + "_enrichr",
                     os.path.join(dir_, name + ".enrichr.log"),
                     os.path.join(dir_, name + ".enrichr.sh"),
-                    ("shortq", 1, 4000),
+                    ("shortq", 1, 4000, "08:00:00"),
                     "{e} -m ngs_toolkit.recipes.enrichr {f} {o}".format(
                         e=sys.executable, f=file, o=output_
                     ),

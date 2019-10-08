@@ -3077,13 +3077,11 @@ class Analysis(object):
         # Check whether the is a complex design
         complx = (comparison_table.groupby('sample_name')['sample_group'].nunique() > 1).any()
 
-        if complx:
+        if complx and (not distributed):
             distributed = True
-            if "computing_configuration" not in kwargs:
-                msg = "Detected complex design with samples in various groups."
-                msg += " Will run analysis in distributed mode, but running in 'localhost'."
-                _LOGGER.info(msg)
-                kwargs['computing_configuration'] = "localhost"
+            msg = "Detected complex design with samples in various groups."
+            msg += " Will run analysis in distributed mode."
+            _LOGGER.info(msg)
 
         # Make formula for DESeq2
         formula = "~ {}sample_group".format(
@@ -3203,7 +3201,7 @@ class Analysis(object):
                     jobname=job_name,
                     **kwargs)
                 try:
-                    if kwargs["computing_configuration"] == "localhost":
+                    if kwargs["computing_configuration"] in ["localhost", "default"]:
                         _LOGGER.info("Collecting differential results.")
                         return self.collect_differential_analysis(
                             comparison_table=comparison_table,

@@ -602,8 +602,8 @@ class ATACSeqAnalysis(Analysis):
         self,
         samples=None,
         sites=None,
-        assign=True,
         save=True,
+        assign=True,
         peak_set_name="peak_set",
         output_file="{results_dir}/{name}.matrix_raw.csv",
         permissive=False,
@@ -633,15 +633,15 @@ class ATACSeqAnalysis(Analysis):
             If a string assumes a path to a BED file.
 
             Defaults to `sites` attribute of analysis object.
-        assign: :obj:`bool`
-            Whether to assign the matrix to an attribute named `coverage`.
-
-            Default is :obj:`True`.
-        save: :obj:`bool`
+        save : :obj:`bool`
             Whether to save to disk the coverage matrix with filename `output_file`.
 
             Default is :obj:`True`.
-        peak_set_name: :obj:`bool`
+        assign : :obj:`bool`
+            Whether to assign the matrix to an attribute named `coverage`.
+
+            Default is :obj:`True`.
+        peak_set_name : :obj:`bool`
             Suffix to files containing coverage of `distributed` is True.
 
             Defaults to "peak_set".
@@ -649,19 +649,19 @@ class ATACSeqAnalysis(Analysis):
             A path to a CSV file with coverage output.
 
             Default is `self.results_dir/self.name + ".raw_coverage.csv"`.
-        permissive: :obj:`bool`
+        permissive : :obj:`bool`
             Whether Samples that which `region_type` attribute file does not exist
             should be simply skipped or an error thrown.
 
             Default is :obj:`False`.
-        distributed: :obj:`bool`
+        distributed : :obj:`bool`
             Whether it should be run as jobs for each sample
             separately in parallel.
             Currently only implemented for a SLURM cluster.
 
             Default is :obj:`False`.
-        overwrite: :obj:`bool`
-            Whether to overwrite existing files if `distributed` is True.
+        overwrite : :obj:`bool`
+            Whether to overwrite existing files if ``distributed`` is True.
 
             Default is :obj:`True`.
         **kwargs : :obj:`dict`
@@ -689,11 +689,12 @@ class ATACSeqAnalysis(Analysis):
         :class:`pandas.DataFrame`
             Pandas DataFrame with read counts of shape (n_sites, m_samples).
         """
+        # TODO: add method to run only samples with missing output
+        import sys
         import multiprocessing
         import parmap
-        import pybedtools
 
-        from ngs_toolkit.utils import count_reads_in_intervals, submit_job
+        from ngs_toolkit.utils import count_reads_in_intervals, submit_job, to_bed_index
 
         if samples is None:
             samples = self.samples
@@ -711,7 +712,6 @@ class ATACSeqAnalysis(Analysis):
         if not distributed:
             # Count reads with pysam
             # make strings with intervals
-            from ngs_toolkit.utils import to_bed_index
             sites_str = to_bed_index(sites)
             # count, create dataframe
             matrix_raw = pd.DataFrame(
@@ -748,14 +748,19 @@ class ATACSeqAnalysis(Analysis):
                 if not overwrite:
                     if os.path.exists(output_file):
                         continue
-                cmd = (
-                    "bedtools coverage \\\n"
-                    "-sorted -counts \\\n"
-                    "-a {bed} \\\n"
-                    "-b {bam} \\\n"
-                    "> {out}"
-                    .format(bam=s.aligned_filtered_bam, bed=sites.fn, out=output_file))
 
+                cmd = (
+                    "\\\n".join([
+                        "{executable} -m ngs_toolkit.recipes.coverage ",
+                        "--no-overwrite" if not overwrite else "",
+                        "{input_bed} {input_bam} {output_bed}"])
+                    .format(
+                        executable=sys.executable,
+                        input_bed=sites.fn,
+                        input_bam=s.aligned_filtered_bam,
+                        output_bed=output_file
+                    )
+                )
                 for k, v in [("cores", 1), ("mem", 8000), ("time", "04:00:00")]:
                     if k not in kwargs:
                         kwargs[k] = v

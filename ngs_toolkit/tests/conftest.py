@@ -3,7 +3,6 @@
 
 import os
 
-from peppy import Project
 import pytest
 
 from ngs_toolkit import Analysis, ATACSeqAnalysis
@@ -142,14 +141,9 @@ def atac_analysis(tmp_path):
     # first edit the defaul path to the annotation sheet
     config = os.path.join(
         tmp_path, project_name, "metadata", "project_config.yaml")
-    prj_path = os.path.join(
-        tmp_path, project_name)
 
     # project and associated analysis
-    analysis = ATACSeqAnalysis(
-        name=project_name,
-        prj=Project(config),
-        results_dir=os.path.join(prj_path, "results"))
+    analysis = ATACSeqAnalysis(from_pep=config)
     analysis.load_data()
 
     return analysis
@@ -270,14 +264,9 @@ def atac_analysis_many_factors(tmp_path):
     # first edit the defaul path to the annotation sheet
     config = os.path.join(
         tmp_path, project_name, "metadata", "project_config.yaml")
-    prj_path = os.path.join(
-        tmp_path, project_name)
 
     # project and associated analysis
-    analysis = ATACSeqAnalysis(
-        name=project_name,
-        prj=Project(config),
-        results_dir=os.path.join(prj_path, "results"))
+    analysis = ATACSeqAnalysis(from_pep=config)
     analysis.load_data()
     analysis.normalize(method="rpm")
     analysis.annotate_samples()
@@ -319,15 +308,9 @@ def rnaseq_analysis(tmp_path):
     # first edit the defaul path to the annotation sheet
     config = os.path.join(
         tmp_path, project_name, "metadata", "project_config.yaml")
-    prj_path = os.path.join(
-        tmp_path, project_name)
 
     # project and associated analysis
-    analysis = ATACSeqAnalysis(
-        name=project_name,
-        prj=Project(config),
-        results_dir=os.path.join(prj_path, "results"),
-    )
+    analysis = ATACSeqAnalysis(from_pep=config)
     analysis.load_data()
 
     return analysis
@@ -373,15 +356,9 @@ def various_analysis(tmp_path):
                     config = os.path.join(
                         tmp_path, project_name,
                         "metadata", "project_config.yaml")
-                    prj_path = os.path.join(
-                        tmp_path, project_name)
 
                     # project and associated analysis
-                    analysis = ATACSeqAnalysis(
-                        name=project_name,
-                        prj=Project(config),
-                        results_dir=os.path.join(prj_path, "results"),
-                    )
+                    analysis = ATACSeqAnalysis(from_pep=config)
                     # make sure the object is loaded with its dataframes
                     analysis.load_data()
 

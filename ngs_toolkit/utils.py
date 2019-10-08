@@ -1164,10 +1164,13 @@ def bed_to_fasta_through_fasta(input_bed, output_fasta, genome_fasta):
     bed.sequence(fi=genome_fasta, fo=output_fasta, name=True)
 
 
-def count_reads_in_intervals(bam, intervals):
+def count_reads_in_intervals(bam, intervals, permissive=True):
     """
     Count total number of reads in a iterable holding strings
     representing genomic intervals of the form ``"chrom:start-end"``.
+
+    Please make sure both ``intervals`` and ``bam`` file are
+    zero- or one-indexed.
 
     Parameters
     ----------
@@ -1184,14 +1187,31 @@ def count_reads_in_intervals(bam, intervals):
         Dict of read counts for each interval.
     """
     import pysam
+    from ngs_toolkit import _LOGGER
 
     counts = dict()
 
     bam = pysam.AlignmentFile(bam, mode="rb")
 
+    errors = 0
     for interval in intervals:
-        counts[interval] = bam.count(region=interval)
+        try:
+            counts[interval] = bam.count(region=interval)
+        except ValueError:
+            if permissive:
+                errors += 1
+            else:
+                raise
+            # if fix_off_by_one:
+            #     i = interval.split(":")[1]
+            #     s = (
+            #         interval.split(":")[0] +
+            #         ":" + str(int(i.split("-")[0]) + 1) +
+            #         "-" + str(int(i.split("-")[1]) + 1))
+            #     counts[interval] = bam.count(region=s)
     bam.close()
+    if errors > 0:
+        _LOGGER.warning("There have been {} errors. Beware.")
 
     return counts
 

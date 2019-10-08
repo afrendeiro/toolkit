@@ -188,6 +188,7 @@ def create_project(
     implied_attributes:
         organism:
             {genome_assemblies}
+    compute_packages: null
     # compute_packages:
     #     submission_template: slurm_template.sub
     #     submission_command: sbatch

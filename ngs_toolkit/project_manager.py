@@ -188,11 +188,9 @@ def create_project(
     implied_attributes:
         organism:
             {genome_assemblies}
-    pipeline_config:
-        atacseq: null
-    compute:
-        submission_template: slurm_template.sub
-        submission_command: sbatch
+    # compute_packages:
+    #     submission_template: slurm_template.sub
+    #     submission_command: sbatch
     trackhubs:
         trackhub_dir: /data/groups/lab_bock/public_html/{username}/{project_name}/
         url: {url}""".format(

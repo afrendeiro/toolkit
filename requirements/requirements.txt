@@ -19,3 +19,4 @@ requests>=2.21.0
 jinja2>=2.10.1
 rpy2==3.1.0
 natsort>=6.0.0
+yacman==0.6.0

@@ -15,12 +15,17 @@ from ngs_toolkit.decorators import check_has_attributes
 # TODO: Add function to complete comparison_table information such as "comparison_genome" and "data_type" and call it when setting automatically
 # TODO: Add function to create comparison_table from samples' group_attributes
 
-# TODO: add DEseq variance stabilization as normalization method
+# TODO: Make recipe to get all (or subset through CLI) resources
 
 # TODO: idea: make Analysis.annotate() call both annotate_features(), annotate_samples() and their ancestors with `steps`
 # TODO: Idea: merging analysis. If same type, merge matrices, otherwise use dicts?
 # TODO: Idea: if genome of analysis is set, get required static files for that genome assembly automatically
 # TODO: Idea: Analysis.load_data: get default output_map by having functions declare what they output perhaps also with a dict of kwargs to pass to pandas.read_csv
+
+
+# Code:
+# TODO: add type hinting (this implies adding all imports up in the file)
+# TODO: replace _LOGGER.message("Message: {}".format("value")) with _LOGGER.message("Message: %s", "value")
 
 
 class Analysis(object):
@@ -32,8 +37,10 @@ class Analysis(object):
     has a :func:`~ngs_toolkit.atacseq.ATACSeqAnalysis.get_consensus_sites` function to generate a peak consensus map).
 
     Objects of this type can be used to store data (e.g. dataframes), variables
-    (e.g. paths to files or configurations) and are easily serializable (saved
-    to a file as an object) for rapid loading and cross-environment portability.
+    (e.g. paths to files or configurations) and can easily be filled with
+    existing data using :func:`~ngs_toolkit.analysis.Analysis.load_data`
+    for cross-environment portability, or serialized (saved to a file as a
+    pickle object) for rapid loading in the same environment.
     See the :func:`~ngs_toolkit.analysis.Analysis.to_pickle`,
     :func:`~ngs_toolkit.analysis.Analysis.from_pickle` and
     :func:`~ngs_toolkit.analysis.Analysis.update` functions for this.
@@ -1526,7 +1533,7 @@ class Analysis(object):
         return matrix_norm
 
     def normalize_pca(
-            self, pc, matrix="matrix_raw", samples=None, save=True, assign=True
+            self, pc, matrix="matrix_raw", samples=None, save=True, assign=True, **kwargs
     ):
         """
         Normalization of a matrix by subtracting the
@@ -1554,6 +1561,10 @@ class Analysis(object):
 
             Default is :obj:`True`.
 
+        **kwargs : :obj:`dict`, optional
+            Additional keyword arguments will be passed to
+            :class:`ngs_toolkit.general.subtract_principal_component`.
+
         Attributes
         ----------
         matrix_norm : :class:`pandas.DataFrame`
@@ -1578,7 +1589,12 @@ class Analysis(object):
             matrix, samples=samples, save=False, assign=False
         )
         # then remove the PC
-        matrix_norm = subtract_principal_component(to_norm.T.fillna(0), pc=pc).T
+        default_kwargs = {
+            "plot_name":
+                os.path.join(self.results_dir, "PCA_based_batch_correction.svg")}
+        default_kwargs.update(kwargs)
+        matrix_norm = subtract_principal_component(
+            to_norm.T.fillna(0), pc=pc, **default_kwargs).T
 
         if save:
             matrix_norm.to_csv(
@@ -1588,6 +1604,74 @@ class Analysis(object):
         if assign:
             self.matrix_norm = matrix_norm
             self.norm_method = "pca"
+
+        return matrix_norm
+
+    def normalize_vst(
+            self, matrix="matrix_raw", samples=None, save=True, assign=True
+    ):
+        """
+        Normalization of a matrix using
+        Variance Stabilization Transformation (VST) method from DESeq2.
+
+        Parameters
+        ----------
+        matrix : :obj:`str`, optional
+            Attribute name of dictionary of matrices to normalize.
+
+            Defaults to "matrix_raw".
+        samples : :obj:`list`, optional
+            Samples to restrict analysis to.
+
+            Defaults to all samples.
+        save : :obj:`bool`, optional
+            Whether results should be saved to disc.
+
+            Defaults to :obj:`True`.
+        assign : :obj:`bool`, optional
+            Whether to assign the normalized DataFrame to an attribute `matrix_norm`.
+
+            Default is :obj:`True`.
+
+        Attributes
+        ----------
+        matrix_norm : :class:`pandas.DataFrame`
+            If `assign` is True, a DataFrame normalized with VST method.
+        norm_method : :obj:`str`
+            If ``assign``, it is the name of method used to normalize: "vst".
+
+        Returns
+        -------
+        :class:`pandas.DataFrame`
+            Normalized pandas DataFrame.
+        """
+        import warnings
+
+        from rpy2.rinterface import RRuntimeWarning
+        from rpy2.robjects import numpy2ri
+        import rpy2.robjects as robjects
+
+        numpy2ri.activate()
+        warnings.filterwarnings("ignore", category=RRuntimeWarning)
+
+        robjects.r('suppressMessages(library("DESeq2"))')
+        _varianceStabilizingTransformation = robjects.r("varianceStabilizingTransformation")
+
+        matrix = self.get_matrix(matrix, samples=samples)
+
+        # Apply VST
+        matrix_norm = pd.DataFrame(
+            _varianceStabilizingTransformation(matrix.values),
+            index=matrix.index, columns=matrix.columns)
+
+        if save:
+            matrix_norm.to_csv(
+                os.path.join(self.results_dir, self.name + ".matrix_norm.csv"),
+                index=True,
+            )
+        if assign:
+            self.matrix_norm = matrix_norm
+            self.norm_method = "vst"
 
         return matrix_norm
 
@@ -1677,6 +1761,10 @@ class Analysis(object):
                 save=save,
                 assign=assign,
                 pc=kwargs["pc"],
+            )
+        elif method == "vst":
+            return self.normalize_vst(
+                matrix=matrix, samples=samples, save=save, assign=assign
             )
         else:
             msg = "Requested normalization method is not available!"

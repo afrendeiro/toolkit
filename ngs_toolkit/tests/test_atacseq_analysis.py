@@ -63,13 +63,19 @@ def test_set_consensus_set(various_analysis):
 def test_rpm_normalization(various_analysis):
     for analysis in various_analysis:
         qnorm = analysis.normalize_rpm(save=False)
-        assert qnorm.dtypes.all() == np.float
         assert hasattr(analysis, "matrix_norm")
+        assert isinstance(qnorm, pd.DataFrame)
+        assert qnorm.dtypes.all() == np.float
+        assert qnorm.isnull().sum().sum() == 0
         rpm_file = os.path.join(
             analysis.results_dir, analysis.name + ".matrix_norm.csv"
         )
         assert not file_exists(rpm_file)
         qnorm = analysis.normalize_rpm(save=True)
+        assert hasattr(analysis, "matrix_norm")
+        assert isinstance(qnorm, pd.DataFrame)
+        assert qnorm.dtypes.all() == np.float
+        assert qnorm.isnull().sum().sum() == 0
         assert file_exists_and_not_empty(rpm_file)
         assert hasattr(analysis, "matrix_norm")
 
@@ -79,15 +85,19 @@ def test_quantile_normalization(various_analysis):
         f = os.path.join(
             analysis.results_dir, analysis.name + ".matrix_norm.csv")
         qnorm_p = analysis.normalize_quantiles(implementation="Python", save=1)
-        assert isinstance(qnorm_p, pd.DataFrame)
         assert hasattr(analysis, "matrix_norm")
+        assert isinstance(qnorm_p, pd.DataFrame)
+        assert qnorm_p.dtypes.all() == np.float
+        assert qnorm_p.isnull().sum().sum() == 0
         assert file_exists_and_not_empty(f)
         del analysis.matrix_norm
         os.remove(get_this_file_or_timestamped(f))
 
         qnorm_r = analysis.normalize_quantiles(implementation="R", save=True)
-        assert isinstance(qnorm_r, pd.DataFrame)
         assert hasattr(analysis, "matrix_norm")
+        assert isinstance(qnorm_r, pd.DataFrame)
+        assert qnorm_r.dtypes.all() == np.float
+        assert qnorm_r.isnull().sum().sum() == 0
         assert file_exists_and_not_empty(f)
 
         # cors = list()
@@ -99,22 +109,49 @@ def test_quantile_normalization(various_analysis):
 @pytest.mark.skipif(CI, reason="CQN normalization not testable in CI")
 def test_cqn_normalization(atac_analysis):
     qnorm = atac_analysis.normalize_cqn()
+    assert hasattr(atac_analysis, "matrix_norm")
+    assert isinstance(qnorm, pd.DataFrame)
     assert qnorm.dtypes.all() == np.float
+    assert qnorm.isnull().sum().sum() == 0
+    file = os.path.join(
+        atac_analysis.results_dir, atac_analysis.name + ".matrix_norm.csv")
+    assert file_exists_and_not_empty(file)
+
+
+def test_pca_normalization(atac_analysis):
+    qnorm = atac_analysis.normalize_pca(pc=1)
+    assert hasattr(atac_analysis, "matrix_norm")
+    assert isinstance(qnorm, pd.DataFrame)
+    assert qnorm.dtypes.all() == np.float
+    assert qnorm.isnull().sum().sum() == 0
+    file = os.path.join(
+        atac_analysis.results_dir, atac_analysis.name + ".matrix_norm.csv")
+    assert file_exists_and_not_empty(file)
+    plot = os.path.join(atac_analysis.results_dir, "PCA_based_batch_correction.svg")
+    assert file_exists_and_not_empty(plot)
+
+
+def test_vst_normalization(atac_analysis):
+    qnorm = atac_analysis.normalize_vst()
+    assert hasattr(atac_analysis, "matrix_norm")
+    assert isinstance(qnorm, pd.DataFrame)
+    assert qnorm.dtypes.all() == np.float
+    assert qnorm.isnull().sum().sum() == 0
     file = os.path.join(
         atac_analysis.results_dir, atac_analysis.name + ".matrix_norm.csv")
     assert file_exists_and_not_empty(file)
 
 
 def test_normalize(atac_analysis):
-    qnorm = atac_analysis.normalize_rpm(save=False)
-    assert isinstance(qnorm, pd.DataFrame)
+    rpmnorm = atac_analysis.normalize_rpm(save=False)
+    assert isinstance(rpmnorm, pd.DataFrame)
     assert hasattr(atac_analysis, "matrix_norm")
     del atac_analysis.matrix_norm
 
-    qnorm_d = atac_analysis.normalize(method="rpm", save=False)
-    assert isinstance(qnorm_d, pd.DataFrame)
+    rpmnorm_d = atac_analysis.normalize(method="rpm", save=False)
+    assert isinstance(rpmnorm_d, pd.DataFrame)
     assert hasattr(atac_analysis, "matrix_norm")
-    assert np.array_equal(qnorm_d, qnorm)
+    assert np.array_equal(rpmnorm_d, rpmnorm)
     del atac_analysis.matrix_norm
 
     qnorm = atac_analysis.normalize_quantiles(save=False)
@@ -131,6 +168,14 @@ def test_normalize(atac_analysis):
         norm = atac_analysis.normalize(method="cqn", save=False)
         assert isinstance(norm, pd.DataFrame)
         assert hasattr(atac_analysis, "matrix_norm")
+
+    qnorm = atac_analysis.normalize(method="pca", pc=1, save=False)
+    assert hasattr(atac_analysis, "matrix_norm")
+    del atac_analysis.matrix_norm
+
+    qnorm = atac_analysis.normalize(method="vst", save=False)
+    assert hasattr(atac_analysis, "matrix_norm")
+    del atac_analysis.matrix_norm
 
 
 def test_get_matrix_stats(various_analysis):

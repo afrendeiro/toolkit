@@ -165,7 +165,7 @@ class ATACSeqAnalysis(Analysis):
 
         Attributes
         ----------
-        sites : :class:`pybedtools.BedTool`
+        sites : :class:`pybedtools.bedtool.BedTool`
             Sets a `sites` variable.
 
         pandas.DataFrame
@@ -328,7 +328,7 @@ class ATACSeqAnalysis(Analysis):
             A list of chromosomes to filter out or
             a string with a pattern to match to exclude chromosomes.
             Uses Pandas string methods :class:`pandas.Series.str.match`.
-            Pass for example `'.*_.*|chrM'` to filter out chromosomes with a "_"
+            Pass for example `".*_.*|chrM"` to filter out chromosomes with a "_"
             character and a "chrM" chromosome.
 
             Default is not to filter anything.
@@ -351,12 +351,12 @@ class ATACSeqAnalysis(Analysis):
 
         Attributes
         ----------
-        sites : :class:`pybedtools.BedTool`
+        sites : :class:`pybedtools.bedtool.BedTool`
             Sets a ``sites`` variable with the consensus peak set.
 
         Returns
         ----------
-        sites : :class:`pybedtools.BedTool`
+        sites : :class:`pybedtools.bedtool.BedTool`
             The consensus peak set.
         """
         from tqdm import tqdm
@@ -611,7 +611,7 @@ class ATACSeqAnalysis(Analysis):
         """
         Measure read coverage (counts) of each sample in each region
         in consensus sites.
-        Uses parallel computing using the `parmap` library.
+        Uses parallel computing using the :class:`parmap` library.
         However, for many samples (hundreds), parallelization in a
         computing cluster is possible with the `distributed` option.
 
@@ -619,35 +619,35 @@ class ATACSeqAnalysis(Analysis):
         ----------
         samples : :obj:`list`
             Iterable of :class:`peppy.Sample` objects to restrict to.
-            Must have a `aligned_filtered_bam` attribute set.
+            Must have a ``aligned_filtered_bam`` attribute set.
 
             Defaults to all samples in the analysis (``samples`` attribute).
-        sites : {:class:`pybedtools.BedTool`, :class:`pandas.DataFrame`, :obj:`str`}
-            Sites in the genome to quantify, usually a pybedtools.BedTool
-            from analysis.get_consensus_sites()
+        sites : {:class:`pybedtools.bedtool.BedTool`, :class:`pandas.DataFrame`, :obj:`str`}
+            Sites in the genome to quantify, usually a :class:`pybedtools.bedtool.BedTool`
+            from :class:`ngs_toolkit.atacseq.ATACSeqAnalysis.get_consensus_sites`.
             If a DataFrame, will try to convert to BED format assuming first
             three columns are chr,start,end.
             If a string assumes a path to a BED file.
 
-            Defaults to `sites` attribute of analysis object.
+            Defaults to ``sites`` attribute of analysis object.
         save : :obj:`bool`
-            Whether to save to disk the coverage matrix with filename `output_file`.
+            Whether to save to disk the coverage matrix with filename ``output_file``.
 
             Default is :obj:`True`.
         assign : :obj:`bool`
-            Whether to assign the matrix to an attribute named `coverage`.
+            Whether to assign the matrix to an attribute named ``coverage``.
 
             Default is :obj:`True`.
         peak_set_name : :obj:`bool`
-            Suffix to files containing coverage of `distributed` is True.
+            Suffix to files containing coverage of ``distributed`` is True.
 
             Defaults to "peak_set".
         output_file : :obj:`str`
             A path to a CSV file with coverage output.
 
-            Default is `self.results_dir/self.name + ".raw_coverage.csv"`.
+            Default is "{results_dir}/{name}.raw_coverage.csv".
         permissive : :obj:`bool`
-            Whether Samples that which `region_type` attribute file does not exist
+            Whether Samples for which ``region_type`` attribute file does not exist
             should be simply skipped or an error thrown.
 
             Default is :obj:`False`.

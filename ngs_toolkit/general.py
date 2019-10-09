@@ -2352,7 +2352,7 @@ def subtract_principal_component(
     norm=False,
     plot=True,
     plot_name="PCA_based_batch_correction.svg",
-    pcs_to_plot=6,
+    max_pcs_to_plot=6,
 ):
     """
     Given a matrix (n_samples, n_variables), remove `pc` (1-based) from matrix.
@@ -2360,6 +2360,7 @@ def subtract_principal_component(
     import matplotlib.pyplot as plt
     from sklearn.decomposition import PCA
     from sklearn.preprocessing import StandardScaler
+    from ngs_toolkit.graphics import savefig
 
     pc -= 1
 
@@ -2374,11 +2375,13 @@ def subtract_principal_component(
     # Remove PC
     x2 = x - np.outer(x_hat[:, pc], pca.components_[pc, :])
 
+    max_pcs_to_plot = min(max_pcs_to_plot, x2.shape[0]) - 1
+
     # plot
     if plot:
         x2_hat = pca.fit_transform(x2)
-        fig, axis = plt.subplots(pcs_to_plot, 2, figsize=(4 * 2, 4 * pcs_to_plot))
-        for pc in range(pcs_to_plot):
+        fig, axis = plt.subplots(max_pcs_to_plot, 2, figsize=(4 * 2, 4 * max_pcs_to_plot))
+        for pc in range(max_pcs_to_plot):
             # before
             for j, _ in enumerate(x.index):
                 axis[pc, 0].scatter(
@@ -2393,7 +2396,7 @@ def subtract_principal_component(
                 )
             axis[pc, 1].set_xlabel("PC{}".format(pc + 1))
             axis[pc, 1].set_ylabel("PC{}".format(pc + 2))
-        fig.savefig(plot_name)
+        savefig(fig, plot_name)
 
     return x2
 

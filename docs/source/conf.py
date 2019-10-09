@@ -41,7 +41,9 @@ extensions = [
     "sphinx.ext.coverage",
     "sphinx.ext.viewcode",
     # "numpydoc",
-    'sphinx.ext.napoleon'
+    'sphinx.ext.napoleon',
+    # 'sphinx_autodoc_typehints' <- this would be handy when whole codebase has typehinting
+    # "sphinxcontrib.jupyter", <- this could be useful to make jupyter NBs
 ]
 
 napoleon_numpy_docstring = True

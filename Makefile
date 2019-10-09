@@ -77,8 +77,9 @@ clean_mypy:
 
 clean_test:
 	rm -rf .pytest_cache/
-	find . -name "__pycache__" -exec rm -r {} \;
-	rm .coverage*
+	find . -name "__pycache__" -exec rm -rf {} \;
+	rm -rf .coverage*
+	rm -rf .tox/
 
 clean_cov: clean_test
 	rm -fr coverage.xml htmlcov

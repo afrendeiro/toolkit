@@ -132,7 +132,7 @@ def test_pca_normalization(atac_analysis):
 
 
 def test_vst_normalization(atac_analysis):
-    qnorm = atac_analysis.normalize_vst()
+    qnorm = atac_analysis.normalize_vst(fitType="mean")
     assert hasattr(atac_analysis, "matrix_norm")
     assert isinstance(qnorm, pd.DataFrame)
     assert qnorm.dtypes.all() == np.float
@@ -169,11 +169,11 @@ def test_normalize(atac_analysis):
         assert isinstance(norm, pd.DataFrame)
         assert hasattr(atac_analysis, "matrix_norm")
 
-    qnorm = atac_analysis.normalize(method="pca", pc=1, save=False)
+    norm = atac_analysis.normalize(method="pca", pc=1, save=False)
     assert hasattr(atac_analysis, "matrix_norm")
     del atac_analysis.matrix_norm
 
-    qnorm = atac_analysis.normalize(method="vst", save=False)
+    norm = atac_analysis.normalize(method="vst", save=False, fitType="mean")
     assert hasattr(atac_analysis, "matrix_norm")
     del atac_analysis.matrix_norm
 

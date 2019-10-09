@@ -1608,7 +1608,8 @@ class Analysis(object):
         return matrix_norm
 
     def normalize_vst(
-            self, matrix="matrix_raw", samples=None, save=True, assign=True
+            self, matrix="matrix_raw", samples=None, save=True, assign=True,
+            **kwargs
     ):
         """
         Normalization of a matrix using
@@ -1633,6 +1634,10 @@ class Analysis(object):
 
             Default is :obj:`True`.
 
+        **kwargs : :obj:`dict`
+            Additional keywork arguments will be passed
+            to `DESeq2::varianceStabilizingTransformation`.
+
         Attributes
         ----------
         matrix_norm : :class:`pandas.DataFrame`
@@ -1649,9 +1654,11 @@ class Analysis(object):
 
         from rpy2.rinterface import RRuntimeWarning
         from rpy2.robjects import numpy2ri
+        from rpy2.robjects import pandas2ri
         import rpy2.robjects as robjects
 
         numpy2ri.activate()
+        pandas2ri.activate()
         warnings.filterwarnings("ignore", category=RRuntimeWarning)
 
         robjects.r('suppressMessages(library("DESeq2"))')
@@ -1661,7 +1668,7 @@ class Analysis(object):
 
         # Apply VST
         matrix_norm = pd.DataFrame(
-            _varianceStabilizingTransformation(matrix.values),
+            _varianceStabilizingTransformation(matrix.values, **kwargs),
             index=matrix.index, columns=matrix.columns)
 
         if save:
@@ -1717,6 +1724,9 @@ class Analysis(object):
             Whether to assign the normalized DataFrame to an attribute `matrix_norm`.
 
             Default is :obj:`True`.
+        **kwargs : :obj:`dict`
+            Additional keyword arguments will be passed to the respective
+            normalization function.
 
         Attributes
         ----------
@@ -1764,7 +1774,8 @@ class Analysis(object):
             )
         elif method == "vst":
             return self.normalize_vst(
-                matrix=matrix, samples=samples, save=save, assign=assign
+                matrix=matrix, samples=samples, save=save, assign=assign,
+                **kwargs
             )
         else:
             msg = "Requested normalization method is not available!"

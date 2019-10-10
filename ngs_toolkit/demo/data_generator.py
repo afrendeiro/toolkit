@@ -17,11 +17,6 @@ import pybedtools
 import yaml
 
 
-from numpy.random import MT19937
-from numpy.random import RandomState, SeedSequence
-rs = RandomState(MT19937(SeedSequence(123456789)))
-
-
 def generate_count_matrix(
         n_factors=1,
         n_replicates=4,
@@ -476,6 +471,7 @@ def get_random_genomic_locations(
 
 def get_random_genes(n_genes, genome_assembly="hg38"):
     """Get ``n_genes`` number of random genes from the set of genes of the ``genome_assembly``"""
+
     m = {"hg19": "grch37", "hg38": "grch38", "mm10": "grcm38"}
     o = {"hg19": "hsapiens", "hg38": "hsapiens", "mm10": "mmusculus"}
 

@@ -22,6 +22,7 @@ from ngs_toolkit.decorators import check_has_attributes
 # TODO: Idea: if genome of analysis is set, get required static files for that genome assembly automatically
 # TODO: Idea: Analysis.load_data: get default output_map by having functions declare what they output perhaps also with a dict of kwargs to pass to pandas.read_csv
 
+# TODO: for recipes.ngs_analysis implement steps, build lock file system to measure progress, allow continuing
 
 # Code:
 # TODO: add type hinting (this implies adding all imports up in the file)

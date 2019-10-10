@@ -14,11 +14,11 @@ def outputs(analysis_with_differential):
         "differential_analysis.",
     )
     outputs = [
-        prefix + "diff_region.samples.clustermap.corr.svg",
-        prefix + "diff_region.samples.clustermap.svg",
-        prefix + "diff_region.samples.clustermap.z0.svg",
-        prefix + "diff_region.samples.sorted.clustermap.svg",
-        prefix + "diff_region.samples.sorted.clustermap.z0.svg",
+        # prefix + "diff_region.samples.clustermap.corr.svg",
+        # prefix + "diff_region.samples.clustermap.svg",
+        # prefix + "diff_region.samples.clustermap.z0.svg",
+        # prefix + "diff_region.samples.sorted.clustermap.svg",
+        # prefix + "diff_region.samples.sorted.clustermap.z0.svg",
         prefix + "log2FoldChange.distribution.per_comparison.svg",
         prefix + "log2FoldChange.distribution.svg",
         prefix + "ma_plots.svg",

@@ -6,7 +6,7 @@ import os
 import pytest
 
 from ngs_toolkit import Analysis, ATACSeqAnalysis
-from .data_generator import generate_project
+from ngs_toolkit.demo import generate_project
 
 
 CI = ("TRAVIS" in os.environ) or ("GITHUB_WORKFLOW" in os.environ)
@@ -109,50 +109,26 @@ def analysis(tmp_path):
 
 @pytest.fixture
 def atac_analysis(tmp_path):
-    tmp_path = str(tmp_path)  # for Python2
+    tmp_path = str(tmp_path)
+    kwargs = {
+        'data_type': "ATAC-seq",
+        'organism': "human",
+        'genome_assembly': "hg38",
+        'n_factors': 1,
+        'n_features': 250,
+        'n_replicates': 2}
+    kwargs.update({
+        "project_name": "test-project_" + "_".join(
+            str(x) for x in kwargs.values()),
+        "output_dir": tmp_path})
 
-    # Let's make several "reallish" test projects
-    project_prefix_name = "test-project"
-    data_type = "ATAC-seq"
-    organism, genome_assembly = ("human", "hg38")
-
-    n_factors = 1
-    n_variables = 1000
-    n_replicates = 3
-    project_name = "_".join(
-        str(x) for x in [
-            project_prefix_name,
-            data_type,
-            genome_assembly,
-            n_factors,
-            n_variables,
-            n_replicates])
-
-    generate_project(
-        output_dir=tmp_path,
-        project_name=project_name,
-        organism=organism,
-        genome_assembly=genome_assembly,
-        data_type=data_type,
-        n_factors=n_factors,
-        n_replicates=n_replicates,
-        n_variables=n_variables)
-
-    # first edit the defaul path to the annotation sheet
-    config = os.path.join(
-        tmp_path, project_name, "metadata", "project_config.yaml")
-
-    # project and associated analysis
-    analysis = ATACSeqAnalysis(from_pep=config)
-    analysis.load_data()
-
-    return analysis
+    return generate_project(**kwargs)
 
 
 @pytest.fixture
-def atac_analysis_with_input_files(atac_analysis):
+def atac_analysis_with_input_files(tmp_path):
     from ngs_toolkit import _CONFIG
-    from .data_generator import generate_sample_input_files
+    from ngs_toolkit.demo.data_generator import generate_sample_input_files
 
     c = {
         "sample_input_files": {
@@ -168,11 +144,24 @@ def atac_analysis_with_input_files(atac_analysis):
                 "aligned_filtered_bam": "{data_dir}/{sample_name}/mapped/{sample_name}.trimmed.bowtie2.filtered.bam",
                 "bitseq_counts": "{data_dir}/{sample_name}/bowtie1_{genome}/bitSeq/{sample_name}.counts"}}}
     _CONFIG.update(c)
-    atac_analysis.set_samples_input_files()
 
-    generate_sample_input_files(atac_analysis)
+    tmp_path = str(tmp_path)
+    kwargs = {
+        'data_type': "ATAC-seq",
+        'organism': "human",
+        'genome_assembly': "hg38",
+        'n_factors': 1,
+        'n_features': 10,
+        'n_replicates': 2}
+    kwargs.update({
+        "project_name": "test-project_" + "_".join(
+            str(x) for x in kwargs.values()),
+        "output_dir": tmp_path})
+    an = generate_project(**kwargs)
+    an.set_samples_input_files()
+    generate_sample_input_files(an, an.matrix_raw)
 
-    return atac_analysis
+    return an
 
 
 @pytest.fixture
@@ -213,7 +202,7 @@ def analysis_with_differential(analysis_normalized):
     analysis_normalized.annotate_features()
     analysis_normalized.annotate_samples()
     analysis_normalized.differential_analysis(
-        filter_support=False, deseq_kwargs={"fitType": "mean"})
+        filter_support=False)
     return analysis_normalized
 
 
@@ -232,88 +221,43 @@ def analysis_with_differential_enrichment(analysis_with_differential):
 
 @pytest.fixture
 def atac_analysis_many_factors(tmp_path):
-    tmp_path = str(tmp_path)  # for Python2
+    tmp_path = str(tmp_path)
+    kwargs = {
+        'data_type': "ATAC-seq",
+        'organism': "human",
+        'genome_assembly': "hg38",
+        'n_factors': 4,
+        'n_features': 100,
+        'n_replicates': 4}
+    kwargs.update({
+        "project_name": "test-project_" + "_".join(
+            str(x) for x in kwargs.values()),
+        "output_dir": tmp_path})
 
-    # Let's make several "reallish" test projects
-    project_prefix_name = "test-project"
-    data_type = "ATAC-seq"
-    organism, genome_assembly = ("human", "hg38")
+    an = generate_project(**kwargs)
+    an.load_data()
+    an.normalize(method="rpm")
+    an.annotate_samples()
 
-    n_factors = 4
-    n_variables = 1000
-    n_replicates = 4
-    project_name = "_".join(
-        str(x) for x in [
-            project_prefix_name,
-            data_type,
-            genome_assembly,
-            n_factors,
-            n_variables,
-            n_replicates])
-
-    generate_project(
-        output_dir=tmp_path,
-        project_name=project_name,
-        organism=organism,
-        genome_assembly=genome_assembly,
-        data_type=data_type,
-        n_factors=n_factors,
-        n_replicates=n_replicates,
-        n_variables=n_variables)
-
-    # first edit the defaul path to the annotation sheet
-    config = os.path.join(
-        tmp_path, project_name, "metadata", "project_config.yaml")
-
-    # project and associated analysis
-    analysis = ATACSeqAnalysis(from_pep=config)
-    analysis.load_data()
-    analysis.normalize(method="rpm")
-    analysis.annotate_samples()
-
-    return analysis
+    return an
 
 
 @pytest.fixture
 def rnaseq_analysis(tmp_path):
-    tmp_path = str(tmp_path)  # for Python2
+    tmp_path = str(tmp_path)
+    kwargs = {
+        'data_type': "RNA-seq",
+        'organism': "human",
+        'genome_assembly': "hg38",
+        'n_factors': 1,
+        'n_features': 100,
+        'n_replicates': 3}
+    kwargs.update({
+        "project_name": "test-project_" + "_".join(
+            str(x) for x in kwargs.values()),
+        "output_dir": tmp_path})
 
-    # Let's make several "reallish" test projects
-    project_prefix_name = "test-project"
-    data_type = "RNA-seq"
-    organism, genome_assembly = ("human", "hg38")
-
-    n_factors = 1
-    n_variables = 100
-    n_replicates = 1
-    project_name = "_".join(
-        str(x) for x in [
-            project_prefix_name,
-            data_type,
-            genome_assembly,
-            n_factors,
-            n_variables,
-            n_replicates])
-
-    generate_project(
-        output_dir=tmp_path,
-        project_name=project_name,
-        organism=organism,
-        genome_assembly=genome_assembly,
-        data_type=data_type,
-        n_factors=n_factors,
-        n_replicates=n_replicates,
-        n_variables=n_variables)
-
-    # first edit the defaul path to the annotation sheet
-    config = os.path.join(
-        tmp_path, project_name, "metadata", "project_config.yaml")
-
-    # project and associated analysis
-    analysis = ATACSeqAnalysis(from_pep=config)
-    analysis.load_data()
-
-    return analysis
+    return generate_project(**kwargs)
 
 
 @pytest.fixture
@@ -326,12 +270,12 @@ def various_analysis(tmp_path):
     data_type = "ATAC-seq"
     genome_assemblies = [("human", "hg38"), ("mouse", "mm10")]  # ("human", "hg19")
     factors = [1]  # 2, 5
-    variables = [100]  # 1000, 10000
-    replicates = [3]  # 5
+    features = [100]  # 1000, 10000
+    replicates = [2]  # 5
 
     for organism, genome_assembly in genome_assemblies:
         for n_factors in factors:
-            for n_variables in variables:
+            for n_features in features:
                 for n_replicates in replicates:
                     project_name = "_".join(
                         str(x) for x in [
@@ -339,10 +283,10 @@ def various_analysis(tmp_path):
                             data_type,
                             genome_assembly,
                             n_factors,
-                            n_variables,
+                            n_features,
                             n_replicates])
 
-                    generate_project(
+                    an = generate_project(
                         output_dir=tmp_path,
                         project_name=project_name,
                         organism=organism,
@@ -350,19 +294,9 @@ def various_analysis(tmp_path):
                         data_type=data_type,
                         n_factors=n_factors,
                         n_replicates=n_replicates,
-                        n_variables=n_variables)
-
-                    # first edit the defaul path to the annotation sheet
-                    config = os.path.join(
-                        tmp_path, project_name,
-                        "metadata", "project_config.yaml")
-
-                    # project and associated analysis
-                    analysis = ATACSeqAnalysis(from_pep=config)
-                    # make sure the object is loaded with its dataframes
-                    analysis.load_data()
-
-                    to_test.append(analysis)
+                        n_features=n_features)
+                    an.load_data()
+                    to_test.append(an)
     return to_test
 
 

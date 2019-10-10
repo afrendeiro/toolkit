@@ -412,8 +412,8 @@ def location_index_to_bed(index):
         TypeError(msg)
     bed.loc[:, "chrom"] = index.str.split(":").str[0]
     index2 = index.str.split(":").str[1]
-    bed.loc[:, "start"] = index2.str.split("-").str[0]
-    bed.loc[:, "end"] = index2.str.split("-").str[1]
+    bed.loc[:, "start"] = index2.str.split("-").str[0].astype(int)
+    bed.loc[:, "end"] = index2.str.split("-").str[1].astype(int)
     return bed
 
 
@@ -1224,11 +1224,15 @@ def count_reads_in_intervals(bam, intervals, permissive=True):
 def normalize_quantiles_r(array):
     """
     Quantile normalization with a R implementation.
-    Requires the "rpy2" library and the R library "preprocessCore".
 
-    Requires the R package "cqn" to be installed:
-        >>> source('http://bioconductor.org/biocLite.R')
-        >>> biocLite('preprocessCore')
+    Requires the R package "preprocessCore" to be installed:
+
+    .. highlight:: R
+    .. code-block:: R
+
+        if (!requireNamespace("BiocManager", quietly = TRUE))
+            install.packages("BiocManager")
+        BiocManager::install("preprocessCore")
 
     Parameters
     ----------
@@ -1240,17 +1244,14 @@ def normalize_quantiles_r(array):
     :class:`numpy.ndarray`
         Normalized numeric array.
     """
-    import rpy2.robjects as robjects
-    import rpy2.robjects.numpy2ri
-    import warnings
-    from rpy2.rinterface import RRuntimeWarning
+    from rpy2.robjects import numpy2ri, pandas2ri, r
+    from rpy2.robjects.packages import importr
+    numpy2ri.activate()
+    pandas2ri.activate()
 
-    warnings.filterwarnings("ignore", category=RRuntimeWarning)
-    rpy2.robjects.numpy2ri.activate()
+    importr("preprocessCore")
 
-    robjects.r('require("preprocessCore")')
-    normq = robjects.r("normalize.quantiles")
-    return np.array(normq(array))
+    return np.array(r("normalize.quantiles")(array))
 
 
 def normalize_quantiles_p(df_input):

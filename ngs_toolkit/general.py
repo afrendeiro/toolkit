@@ -786,25 +786,15 @@ def deseq_analysis(
     pandas.DataFrame
         Data frame with results, statistics for each feature.
     """
-    import warnings
-
-    from rpy2.rinterface import RRuntimeWarning
-    from rpy2.robjects import numpy2ri, pandas2ri
-    import rpy2.robjects as robjects
     from tqdm import tqdm
-
     from ngs_toolkit.utils import r2pandas_df, recarray2pandas_df
 
+    from rpy2.robjects import numpy2ri, pandas2ri, r
+    from rpy2.robjects.packages import importr
     numpy2ri.activate()
     pandas2ri.activate()
-    warnings.filterwarnings("ignore", category=RRuntimeWarning)
 
-    robjects.r('suppressMessages(library("DESeq2"))')
-    _as_formula = robjects.r("as.formula")
-    _DESeqDataSetFromMatrix = robjects.r("DESeqDataSetFromMatrix")
-    _DESeq = robjects.r("DESeq")
-    _results = robjects.r("results")
-    _as_data_frame = robjects.r("as.data.frame")
+    importr("DESeq2")
 
     # order experiment and count matrices in same way
     experiment_matrix = experiment_matrix.set_index("sample_name").loc[
@@ -833,12 +823,12 @@ def deseq_analysis(
     comparison_table = comparison_table.replace("-", "_")
 
     # Run DESeq analysis
-    dds = _DESeqDataSetFromMatrix(
+    dds = r.DESeqDataSetFromMatrix(
         countData=count_matrix.astype(int),
         colData=experiment_matrix,
-        design=_as_formula(formula),
+        design=r("as.formula")(formula),
     )
-    dds = _DESeq(dds, parallel=True, **kwargs)
+    dds = r.DESeq(dds, parallel=True, **kwargs)
     # _save(dds, file=os.path.join(output_dir, output_prefix + ".deseq_dds_object.Rdata"))
 
     results = list()
@@ -879,8 +869,8 @@ def deseq_analysis(
 
         contrast = np.array(["sample_group", a, b])
         try:
-            res = _as_data_frame(
-                _results(
+            res = r("as.data.frame")(
+                r.results(
                     dds,
                     contrast=contrast,
                     alpha=alpha,
@@ -893,8 +883,8 @@ def deseq_analysis(
             _LOGGER.error(e)
             contrast = ["sample_group" + a, "sample_group" + b]
             try:
-                res = _as_data_frame(
-                    _results(
+                res = r("as.data.frame")(
+                    r.results(
                         dds,
                         contrast=contrast,
                         alpha=alpha,
@@ -1322,8 +1312,13 @@ def lola(bed_files, universe_file, output_folder, genome, output_prefixes=None, 
     LOLA::writeCombinedEnrichment writes.
 
     Requires the R package "LOLA" to be installed:
-        >>> source('http://bioconductor.org/biocLite.R')
-        >>> biocLite('LOLA')
+
+    .. highlight:: R
+    .. code-block:: R
+
+        if (!requireNamespace("BiocManager", quietly = TRUE))
+            install.packages("BiocManager")
+        BiocManager::install("LOLA")
 
     Parameters
     ----------
@@ -1347,24 +1342,13 @@ def lola(bed_files, universe_file, output_folder, genome, output_prefixes=None, 
         Number of CPUs/threads to use.
         Defaults to 8
     """
-    import warnings
-
-    from rpy2.rinterface import RRuntimeWarning
-    from rpy2.robjects import numpy2ri, pandas2ri
-    import rpy2.robjects as robjects
-
     from ngs_toolkit.utils import r2pandas_df
-
+    from rpy2.robjects import numpy2ri, pandas2ri, r
+    from rpy2.robjects.packages import importr
     numpy2ri.activate()
     pandas2ri.activate()
-    warnings.filterwarnings("ignore", category=RRuntimeWarning)
 
-    _LOGGER.info("Loading LOLA R library thorugh rpy2.")
-    robjects.r('suppressMessages(require("LOLA"))')
-    _loadRegionDB = robjects.r("LOLA::loadRegionDB")
-    _readBed = robjects.r("LOLA::readBed")
-    _runLOLA = robjects.r("LOLA::runLOLA")
-    # _writeCombinedEnrichment = robjects.r('LOLA::writeCombinedEnrichment')
+    importr("LOLA")
 
     # Get region databases from config
     _LOGGER.info(
@@ -1408,14 +1392,14 @@ def lola(bed_files, universe_file, output_folder, genome, output_prefixes=None, 
             output_prefixes = ["."]
 
     _LOGGER.info("Reading up universe file '{}'.".format(universe_file))
-    universe = _readBed(universe_file)
+    universe = r("LOLA::readBed")(universe_file)
     _LOGGER.info("Loading region set databases.")
-    _regionDB = _loadRegionDB(np.array(databases))
+    _regionDB = r("LOLA::loadRegionDB")(np.array(databases))
     for suffix, bed_file in zip(output_prefixes, bed_files):
         _LOGGER.info("Reading up BED file '{}'.".format(bed_file))
-        user_set = _readBed(bed_file)
+        user_set = r("LOLA::readBed")(bed_file)
         _LOGGER.info("Running LOLA testing for file '{}'.".format(bed_file))
-        _lola_results = _runLOLA(user_set, universe, _regionDB, cores=cpus)
+        _lola_results = r("LOLA::runLOLA")(user_set, universe, _regionDB, cores=cpus)
         _LOGGER.info("Converting results from R to Python")
         lola_results = r2pandas_df(_lola_results)
         _LOGGER.info("Saving all results for file '{}'.".format(bed_file))
@@ -2432,8 +2416,13 @@ def fix_batch_effect_limma(matrix, batch_variable="batch", covariates=None):
     Fix batch effect in matrix using limma.
 
     Requires the R package "limma" to be installed:
-        >>> source('http://bioconductor.org/biocLite.R')
-        >>> biocLite('limma')
+
+    .. highlight:: R
+    .. code-block:: R
+
+        if (!requireNamespace("BiocManager", quietly = TRUE))
+            install.packages("BiocManager")
+        BiocManager::install("limma")
 
     Parameters
     ----------
@@ -2449,19 +2438,13 @@ def fix_batch_effect_limma(matrix, batch_variable="batch", covariates=None):
     pandas.DataFrame
         Regressed out matrix
     """
-    import warnings
-
     import patsy
-    from rpy2.rinterface import RRuntimeWarning
-    from rpy2.robjects import numpy2ri, pandas2ri
-    import rpy2.robjects as robjects
-
-    warnings.filterwarnings("ignore", category=RRuntimeWarning)
+    from rpy2.robjects import numpy2ri, pandas2ri, r
+    from rpy2.robjects.packages import importr
     numpy2ri.activate()
     pandas2ri.activate()
 
-    robjects.r('suppressMessages(require("limma"))')
-    _removeBatchEffect = robjects.r("removeBatchEffect")
+    importr("limma")
 
     if covariates is None:
         covariates = []
@@ -2470,13 +2453,13 @@ def fix_batch_effect_limma(matrix, batch_variable="batch", covariates=None):
         cov = patsy.dmatrix(
             "~{} - 1".format(" + ".join(covariates)), matrix.columns.to_frame()
         )
-        fixed = _removeBatchEffect(
+        fixed = r("removeBatchEffect")(
             x=matrix.values,
             batch=matrix.columns.get_level_values(batch_variable),
             design=cov,
         )
     else:
-        fixed = _removeBatchEffect(
+        fixed = r("removeBatchEffect")(
             x=matrix.values, batch=matrix.columns.get_level_values(batch_variable)
         )
     fixed = pd.DataFrame(np.asarray(fixed), index=matrix.index, columns=matrix.columns)

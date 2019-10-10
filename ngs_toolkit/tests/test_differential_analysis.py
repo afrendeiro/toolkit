@@ -23,11 +23,11 @@ def outputs(atac_analysis):
     output_dir = os.path.join(atac_analysis.results_dir, "differential_analysis_ATAC-seq")
     prefix = os.path.join(output_dir, "differential_analysis.")
     outputs = [
-        os.path.join(output_dir, "Factor_a_2vs1"),
+        os.path.join(output_dir, "Factor_A_2vs1"),
         os.path.join(
             output_dir,
-            "Factor_a_2vs1",
-            "differential_analysis.deseq_result.Factor_a_2vs1.csv",
+            "Factor_A_2vs1",
+            "differential_analysis.deseq_result.Factor_A_2vs1.csv",
         ),
         prefix + "comparison_table.tsv",
         prefix + "count_matrix.tsv",
@@ -42,7 +42,7 @@ def outputs(atac_analysis):
 #     output_dir = os.path.join(analysis.results_dir, "differential_analysis_ATAC-seq")
 #     prefix = os.path.join(output_dir, "differential_analysis.")
 #     outputs = [
-#         prefix + "deseq_result.Factor_a_2vs1.csv",
+#         prefix + "deseq_result.Factor_A_2vs1.csv",
 #         prefix + "comparison_table.tsv",
 #         prefix + "count_matrix.tsv",
 #         prefix + "deseq_result.all_comparisons.csv",
@@ -51,39 +51,26 @@ def outputs(atac_analysis):
 
 
 def test_deseq_functionality():
-    import warnings
-
     import pandas as pd
-
-    from rpy2.rinterface import RRuntimeWarning
-    from rpy2.robjects import numpy2ri, pandas2ri
-    import rpy2.robjects as robjects
-
     from ngs_toolkit.utils import recarray2pandas_df
 
+    from rpy2.robjects import numpy2ri, pandas2ri, r
+    from rpy2.robjects.packages import importr
     numpy2ri.activate()
     pandas2ri.activate()
-    warnings.filterwarnings("ignore", category=RRuntimeWarning)
 
-    robjects.r('suppressMessages(library("DESeq2"))')
-    _makeExampleDESeqDataSet = robjects.r("DESeq2::makeExampleDESeqDataSet")
-    _estimateSizeFactors = robjects.r("DESeq2::estimateSizeFactors")
-    _estimateDispersions = robjects.r("DESeq2::estimateDispersions")
-    _nbinomWaldTest = robjects.r("DESeq2::nbinomWaldTest")
-    _DESeq = robjects.r("DESeq2::DESeq")
-    _results = robjects.r("DESeq2::results")
-    _as_data_frame = robjects.r("as.data.frame")
+    importr("DESeq2")
 
-    dds = _makeExampleDESeqDataSet()
-    dds = _estimateSizeFactors(dds)
-    dds = _estimateDispersions(dds)
-    dds = _nbinomWaldTest(dds)
-    res = recarray2pandas_df(_as_data_frame(_results(dds)))
+    dds = r.makeExampleDESeqDataSet()
+    dds = r.estimateSizeFactors(dds)
+    dds = r.estimateDispersions(dds)
+    dds = r.nbinomWaldTest(dds)
+    res = recarray2pandas_df(r("as.data.frame")(r("DESeq2::results")(dds)))
     assert isinstance(res, pd.DataFrame)
 
-    dds = _makeExampleDESeqDataSet()
-    dds = _DESeq(dds)
-    res = recarray2pandas_df(_as_data_frame(_results(dds)))
+    dds = r.makeExampleDESeqDataSet()
+    dds = r.DESeq(dds)
+    res = recarray2pandas_df(r("as.data.frame")(r("DESeq2::results")(dds)))
     assert isinstance(res, pd.DataFrame)
 
 

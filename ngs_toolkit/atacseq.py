@@ -717,7 +717,7 @@ class ATACSeqAnalysis(Analysis):
                         count_reads_in_intervals,
                         [sample.aligned_filtered_bam for sample in samples],
                         sites_str,
-                        parallel=True,
+                        pm_parallel=True,
                     ),
                 ),
                 index=[sample.name for sample in samples],

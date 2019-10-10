@@ -13,18 +13,18 @@ def outputs(analysis_with_differential):
     )
     outputs = [
         os.path.join(
-            prefix, "Factor_a_2vs1.down/differential_analysis.gene_symbols.txt"
+            prefix, "Factor_A_2vs1.down/differential_analysis.gene_symbols.txt"
         ),
-        os.path.join(prefix, "Factor_a_2vs1.down/differential_analysis_regions.bed"),
-        os.path.join(prefix, "Factor_a_2vs1.down/differential_analysis_regions.tsv"),
+        os.path.join(prefix, "Factor_A_2vs1.down/differential_analysis_regions.bed"),
+        os.path.join(prefix, "Factor_A_2vs1.down/differential_analysis_regions.tsv"),
         os.path.join(
-            prefix, "Factor_a_2vs1.down/differential_analysis.enrichr.csv"
+            prefix, "Factor_A_2vs1.down/differential_analysis.enrichr.csv"
         ),
-        os.path.join(prefix, "Factor_a_2vs1.up/differential_analysis.gene_symbols.txt"),
-        os.path.join(prefix, "Factor_a_2vs1.up/differential_analysis_regions.bed"),
-        os.path.join(prefix, "Factor_a_2vs1.up/differential_analysis_regions.tsv"),
+        os.path.join(prefix, "Factor_A_2vs1.up/differential_analysis.gene_symbols.txt"),
+        os.path.join(prefix, "Factor_A_2vs1.up/differential_analysis_regions.bed"),
+        os.path.join(prefix, "Factor_A_2vs1.up/differential_analysis_regions.tsv"),
         os.path.join(
-            prefix, "Factor_a_2vs1.up/differential_analysis.enrichr.csv"
+            prefix, "Factor_A_2vs1.up/differential_analysis.enrichr.csv"
         ),
         os.path.join(prefix, "differential_analysis.enrichr.csv"),
     ]

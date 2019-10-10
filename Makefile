@@ -77,6 +77,7 @@ clean_mypy:
 
 clean_test:
 	rm -rf .pytest_cache/
+	rm -rf /tmp/pytest*
 	find . -name "__pycache__" -exec rm -rf {} \;
 	rm -rf .coverage*
 	rm -rf .tox/

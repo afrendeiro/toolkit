@@ -308,7 +308,7 @@ def test_plot_raw_coverage(various_analysis):
         )
         assert file_exists_and_not_empty(output)
 
-        attr = "a"
+        attr = "A"
         analysis.plot_raw_coverage(by_attribute=attr)
         output = os.path.join(
             analysis.results_dir,

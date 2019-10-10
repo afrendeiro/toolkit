@@ -6732,3 +6732,17 @@ class Analysis(object):
                             ),
                             z_score=z_score,
                         )
+
+    def run_full_analysis_recipe(self, **kwargs):
+        """
+        Run the :class:`ngs_toolkit.recipes.ngs_analysis` recipe on the current
+        Analysis object.
+
+        Parameters
+        ----------
+        **kwargs : :obj:`dict`
+            Additional keyword arguments are passed to
+            :func:`ngs_toolkit.recipes.ngs_analysis.main_analysis_pipeline`.
+        """
+        from ngs_toolkit.recipes.ngs_analysis import main_analysis_pipeline
+        main_analysis_pipeline(self)

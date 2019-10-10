@@ -937,6 +937,7 @@ class ATACSeqAnalysis(Analysis):
             Dataframe with length and GC-content of each feature.
         """
         import pybedtools
+        from ngs_toolkit.utils import bed_to_index
 
         if bed_file is None:
             sites = self.sites
@@ -958,12 +959,10 @@ class ATACSeqAnalysis(Analysis):
             ["score", "blockStarts"]
         ]
         nuc.columns = ["gc_content", "length"]
-        nuc.index = [
-            str(i.chrom) + ":" + str(i.start) + "-" + str(i.stop) for i in sites
-        ]
+        nuc.index = bed_to_index(sites)
 
         # get only the sites matching the coverage (not overlapping blacklist)
-        self.nuc = nuc.ix[self.matrix_raw.index]
+        self.nuc = nuc.loc[self.matrix_raw.index]
 
         self.nuc.to_csv(
             os.path.join(self.results_dir, self.name + ".gccontent_length.csv"),
@@ -1015,32 +1014,7 @@ class ATACSeqAnalysis(Analysis):
         norm_method : :obj:`str`
             If ``assign``, it is the name of method used to normalize: "cqn".
         """
-        def cqn(cov, gc_content, lengths):
-            # install R package
-            # source('http://bioconductor.org/biocLite.R')
-            # biocLite('cqn')
-            from rpy2 import robjects
-            from rpy2.rinterface import RRuntimeWarning
-            import rpy2.robjects.pandas2ri
-            import warnings
-
-            warnings.filterwarnings("ignore", category=RRuntimeWarning)
-            robjects.numpy2ri.deactivate()
-            rpy2.robjects.pandas2ri.activate()
-
-            robjects.r('require("cqn")')
-            cqn = robjects.r("cqn")
-
-            cqn_out = cqn(cov, x=gc_content, lengths=lengths)
-
-            y_r = cqn_out[list(cqn_out.names).index("y")]
-            y = pd.DataFrame(np.array(y_r), index=cov.index, columns=cov.columns)
-            offset_r = cqn_out[list(cqn_out.names).index("offset")]
-            offset = pd.DataFrame(
-                np.array(offset_r), index=cov.index, columns=cov.columns
-            )
-
-            return y + offset
+        from ngs_toolkit.utils import cqn
 
         # Perform quantile normalization first
         if not hasattr(self, "nuc"):
@@ -1051,7 +1025,7 @@ class ATACSeqAnalysis(Analysis):
             self.get_peak_gccontent_length()
 
         matrix_norm = cqn(
-            cov=self.get_matrix(matrix=matrix, samples=samples),
+            matrix=self.get_matrix(matrix=matrix, samples=samples),
             gc_content=self.nuc["gc_content"],
             lengths=self.nuc["length"],
         )

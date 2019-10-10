@@ -424,7 +424,7 @@ def bed_to_index(df):
 
     Parameters
     ----------
-    df : :class:`pandas.DataFrame`
+    df : {:class:`pandas.DataFrame`, :class:`pybedtools.bedtool.BedTool`, :obj:`str`}
         DataFrame with columns "chrom", "start" and "end".
 
     Returns
@@ -432,6 +432,11 @@ def bed_to_index(df):
     :class:`pandas.Index`
         Pandas index.
     """
+    import pybedtools
+    if isinstance(df, pybedtools.BedTool):
+        df = df.to_dataframe()
+    elif isinstance(df, str):
+        df = pybedtools.BedTool(df).to_dataframe()
     cols = ["chrom", "start", "end"]
     if not all([x in df.columns for x in cols]):
         raise AttributeError(
@@ -1275,6 +1280,53 @@ def normalize_quantiles_p(df_input):
         t = np.searchsorted(np.sort(df[col]), df[col])
         df[col] = [rank[i] for i in t]
     return df
+
+
+def cqn(matrix, gc_content, lengths):
+    """
+    Conditional quantile normalization (CQN) with the ``cqn`` R library.
+    It uses GC content and length of regulatory elements as covariates.
+
+    Requires the R package "cqn" to be installed:
+
+    .. highlight:: R
+    .. code-block:: R
+
+        if (!requireNamespace("BiocManager", quietly = TRUE))
+            install.packages("BiocManager")
+        BiocManager::install("cqn")
+
+    Parameters
+    ----------
+    matrix : :class:`pandas.DataFrame`
+        DataFrame to normalize.
+    gc_content : :class:`pandas.Series`
+        Series with GC content of each feature in ``matrix``.
+    lengths : :class:`pandas.Series`
+        Series with length of each feature in ``matrix``.
+
+    Returns
+    ----------
+    :class:`pandas.DataFrame`
+        Normalized DataFrame
+    """
+    from rpy2.robjects import numpy2ri, pandas2ri, r
+    from rpy2.robjects.packages import importr
+    numpy2ri.activate()
+    pandas2ri.activate()
+
+    importr("cqn")
+
+    cqn_out = r.cqn(matrix, x=gc_content, lengths=lengths)
+
+    y_r = cqn_out[list(cqn_out.names).index("y")]
+    y = pd.DataFrame(np.array(y_r), index=matrix.index, columns=matrix.columns)
+    offset_r = cqn_out[list(cqn_out.names).index("offset")]
+    offset = pd.DataFrame(
+        np.array(offset_r), index=matrix.index, columns=matrix.columns
+    )
+
+    return y + offset
 
 
 def count_bam_file_length(bam_file: str) -> int:

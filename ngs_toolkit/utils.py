@@ -1193,7 +1193,7 @@ def count_reads_in_intervals(bam, intervals, permissive=True):
 
     bam = pysam.AlignmentFile(bam, mode="rb")
 
-    errors = 0
+    errors: int = 0
     for interval in intervals:
         try:
             counts[interval] = bam.count(region=interval)
@@ -1211,7 +1211,7 @@ def count_reads_in_intervals(bam, intervals, permissive=True):
             #     counts[interval] = bam.count(region=s)
     bam.close()
     if errors > 0:
-        _LOGGER.warning("There have been {} errors. Beware.")
+        _LOGGER.warning("There have been %i errors. Beware.", errors)
 
     return counts
 

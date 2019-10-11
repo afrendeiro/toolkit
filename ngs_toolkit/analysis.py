@@ -150,10 +150,11 @@ class Analysis(object):
 
         # Generate from PEP configuration file
         if from_pep is not False:
+            from peppy import Project
             from ngs_toolkit.utils import filter_kwargs_by_callable
             self.from_pep(
                 pep_config=from_pep,
-                **filter_kwargs_by_callable(kwargs, Analysis, exclude=["kwargs"]))
+                **filter_kwargs_by_callable(kwargs, Project))
 
         # Store projects attributes in self
         _LOGGER.debug("Trying to set analysis attributes.")

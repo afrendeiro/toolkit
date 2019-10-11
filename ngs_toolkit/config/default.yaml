@@ -13,9 +13,9 @@ preferences:
   default_genome_assemblies:
     - human: hg38
     - mouse: mm10
-  # The next item is the default computing configuration to use from divvy
-  # options are: 'default', 'slurm', lsf', 'sge'
-  # see more here: http://code.databio.org/divvy/
+  # The next item is the default computing configuration to use from divvy.
+  # Run "divvy list" to see all options.
+  # See more here: http://code.databio.org/divvy/
   computing_configuration: 'default'
   report:
     record_figures: True

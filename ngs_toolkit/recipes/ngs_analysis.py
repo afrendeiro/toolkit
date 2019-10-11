@@ -32,7 +32,8 @@ def add_args(parser):
     """
     Global options for analysis.
     """
-    parser.add_argument(dest="config_file", help="YAML project configuration file.", type=str)
+    parser.add_argument(
+        dest="config_file", help="YAML project configuration file.", type=str)
     parser.add_argument(
         "-n",
         "--analysis-name",
@@ -47,7 +48,8 @@ def add_args(parser):
         "--results-output",
         default="results",
         dest="results_dir",
-        help="Directory for analysis output files. " "Default is 'results' under the project roort directory.",
+        help="Directory for analysis output files. "
+             "Default is 'results' under the project roort directory.",
         type=str,
     )
     parser.add_argument(
@@ -56,7 +58,8 @@ def add_args(parser):
         default=None,
         choices=["ATAC-seq", "RNA-seq", "ChIP-seq"],
         dest="data_type",
-        help="Data type to restrict analysis to. " "Default is to run separate analysis for each data type.",
+        help="Data type to restrict analysis to. "
+             "Default is to run separate analysis for each data type.",
         type=str,
     )
     parser.add_argument(
@@ -64,10 +67,12 @@ def add_args(parser):
         "--pass-qc",
         action="store_true",
         dest="pass_qc",
-        help="Whether only samples with a 'pass_qc' value of '1' " "in the annotation sheet should be used.",
+        help="Whether only samples with a 'pass_qc' value of '1' "
+             "in the annotation sheet should be used.",
     )
     parser.add_argument(
-        "-a", "--alpha", default=0.05, dest="alpha", help="Alpha value of confidence for supervised analysis.", type=str
+        "-a", "--alpha", default=0.05, dest="alpha",
+        help="Alpha value of confidence for supervised analysis.", type=str
     )
     parser.add_argument(
         "-f",
@@ -148,7 +153,10 @@ def main():
                 name=args.name + "_rnaseq", **kwargs
             )
 
-        main_analysis_pipeline(analysis, alpha=args.alpha, abs_fold_change=args.abs_fold_change)
+        print("Running main analysis.")
+        main_analysis_pipeline(
+            analysis, alpha=args.alpha, abs_fold_change=args.abs_fold_change)
+        print("`ngs_analysis` recipe completed successfully!")
 
 
 def main_analysis_pipeline(a, alpha=0.05, abs_fold_change=0):
@@ -159,7 +167,8 @@ def main_analysis_pipeline(a, alpha=0.05, abs_fold_change=0):
 
     if len(genomes) != 1:
         raise ValueError(
-            "Samples under analysis have more than one genome assembly: '{}'.".format("', '".join(genomes))
+            "Samples under analysis have more than"
+            "one genome assembly: '{}'.".format("', '".join(genomes))
         )
 
     if isinstance(a, ATACSeqAnalysis):
@@ -170,7 +179,7 @@ def main_analysis_pipeline(a, alpha=0.05, abs_fold_change=0):
         a.calculate_peak_support()
 
         # GET CHROMATIN OPENNESS MEASUREMENTS, PLOT
-        # Get coverage values for each peak in each sample of ATAC-seq and ChIPmentation
+        # Get coverage values for each peak in each sample
         a.measure_coverage()
         # normalize coverage values
         a.normalize(method="vst")
@@ -244,10 +253,16 @@ def main_analysis_pipeline(a, alpha=0.05, abs_fold_change=0):
         group_wise_colours=True,
     )
 
-    a.differential_enrichment(directional=True, max_diff=1000, sort_var="pvalue", as_jobs=False)
+    a.differential_enrichment(
+        # TODO: have a way to automatically check what is callable
+        steps=['enrichr'],
+        directional=True,
+        max_diff=1000,
+        sort_var="pvalue",
+        distributed=False)
 
     # TODO: is this actually needed? vvv
-    a.collect_differential_enrichment(directional=True, permissive=False)
+    # a.collect_differential_enrichment(directional=True, permissive=False)
 
     a.plot_differential_enrichment(direction_dependent=True, top_n=5)
 

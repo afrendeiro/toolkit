@@ -26,16 +26,19 @@ def generate_count_matrix(
         coefficient_stds=0.4,
         size_factors=None,
         size_factors_std=0.1,
-        dispersion_function=None
+        dispersion_function=None,
 ):
+    """
+    Generate count matrix for groups of samples by sampling from a
+    negative binomiaal distribution.
+    """
     import patsy
 
     if isinstance(coefficient_stds, (int, float)):
         coefficient_stds = [coefficient_stds] * n_factors
 
     if dispersion_function is None:
-        def dispersion_function(x):
-            return 4 / x + .1
+        dispersion_function = disp
 
     # Build sample vs factors table
     dcat = pd.DataFrame(
@@ -48,7 +51,7 @@ def generate_count_matrix(
         dcat = pd.concat(
             [dcat for _ in range(int(np.ceil(n_replicates / 2)))]
         ).sort_values(dcat.columns.tolist()).reset_index(drop=True)
-    dcat.index = ["S{}_{}".format(i + 1, dcat.loc[i, :].sum()) for i in dcat.index]
+    dcat.index = ["S{}_{}".format(str(i + 1).zfill(2), dcat.loc[i, :].sum()) for i in dcat.index]
     m_samples = dcat.shape[0]
 
     # make model design table
@@ -288,9 +291,6 @@ def generate_project(
                 output_dir, project_name, "results", project_name + ".matrix_raw.csv"
             )
         )
-    if not initialize:
-        return config_file
-
     prev_level = _LOGGER.getEffectiveLevel()
     _LOGGER.setLevel("ERROR")
     an = initialize_analysis_of_data_type(data_type, config_file)
@@ -298,6 +298,8 @@ def generate_project(
     if sample_input_files:
         generate_sample_input_files(an, dnum)
     _LOGGER.setLevel(prev_level)
+    if not initialize:
+        return config_file
     return an
 
 
@@ -498,3 +500,7 @@ def get_genomic_bins(n_bins, distribution="normal", genome_assembly="hg38"):
         genome=genome_assembly, w=sum([i.length for i in bed]) / n_bins
     ).to_dataframe()
     return bed_to_index(w.head(n_bins))
+
+
+def disp(x):
+    return 4 / x + .1

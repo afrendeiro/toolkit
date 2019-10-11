@@ -766,6 +766,11 @@ class ATACSeqAnalysis(Analysis):
                     jobname=job_name,
                     logfile=log_file,
                     **kwargs)
+            if getattr(kwargs, "computing_configuration", None) in ["localhost", "default"]:
+                _LOGGER.info("Collecting job results.")
+                return self.collect_coverage(
+                    samples=samples, save=save, assign=assign,
+                    output_file=output_file, permissive=permissive)
 
     def collect_coverage(
         self,

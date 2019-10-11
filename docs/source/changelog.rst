@@ -1,85 +1,177 @@
+=============================
 Changelog
-******************************
+=============================
 
-- **v1.0** (*2019-XX-XX*):
+All notable changes to this project will be documented in this file.
 
-  - New release, with new API.
+The format is based on `Keep a Changelog <https://keepachangelog.com/en/1.0.0/>`_
+and this project adheres to `Semantic Versioning <https://semver.org/spec/v2.0.0.html>`_.
 
-------------
 
-- **v0.17** (development, pre-1.0):
+Unreleased
+*****************************
+
+
+
+0.19.2
+*****************************
+
+Added
+-----------------------------
+  
+  - New module :class:`ngs_toolkit.demo` which generates random data for PEP-formatted projects
+  - New :class:`ngs_toolkit.recipes.generate_project` recipe to generate a new project using CLI
+
+Changed
+-----------------------------
+
+  - Generator of random data now based on proper negative-binomial model
+  - change default of :func:`ngs_toolkit.analysis.Analysis.differential_analysis` to `filter_support=False`.
+
+
+0.17
+*****************************
+
+Changed
+-----------------------------
 
   - Required bedtools version is now 2.17.1
 
 
-- **v0.16** (development, pre-1.0):
+0.16
+*****************************
+
+Changed
+-----------------------------
 
   - Fixed bug in general.get_genomic_context due to a bug in the timestamping workflow
   - Distributing tests with library for more portable testing
 
-- **v0.15** (development, pre-1.0):
+0.15
+*****************************
+
+Changed
+-----------------------------
 
   - Shortlived, shipped with bug - please ignore
 
-- **v0.14** (development, pre-1.0):
+0.14
+*****************************
+
+Added
+-----------------------------
 
   - Add recording of analysis outputs under Analysis.output_files
   - Add timestamping of table and figure Analysis outputs
   - Add HTML report with continuous generation
 
-- **v0.13** (development, pre-1.0):
+0.13
+*****************************
+
+Added
+-----------------------------
+
+  - add analysis.remove_factor for Combat removal of batch effects
+
+
+Changed
+-----------------------------
 
   - Now testing on Ubuntu 18.04 for Python 3.6 and 3.7 only.
-  - add analysis.remove_factor for Combat removal of batch effects
-  - CNV module update
-  - recipe update
+  - CNV module updated
+  - recipe updated
 
-- **v0.12** (development, pre-1.0):
+0.12
+*****************************
+
+Changed
+-----------------------------
 
   - change of unsupervised_analysis API call: homogeneization with remaining functions
   - optional saving of embeddings and loadings of PCA and manifolds in unsupervised_analysis
 
-- **v0.11** (development, pre-1.0):
+0.11
+*****************************
+
+Added
+-----------------------------
+
+  - support for additional keyword arguments passed to Project initialization when using `from_pep`
+
+Changed
+-----------------------------
 
   - adapt to latest versions of pepkit stack
   - better colouring of sample group levels in get_level_colors
-  - add support for additional keyword arguments passed to Project initialization when using `from_pep`
 
-- **v0.10** (development, pre-1.0):
+0.10
+*****************************
+
+Added
+-----------------------------
+
+  - ``normalize_by_background`` function to ChIPSeqAnalysis to normalize over background samples
+
+
+Changed
+-----------------------------
 
   - revamp RNASeqAnalysis
   - adapt ChIPSeqAnalysis to new API
-  - add ``normalize_by_background`` function to ChIPSeqAnalysis to normalize over background samples
   - fix logger due to accidental deactivation
 
-- **v0.9** (development, pre-1.0):
+0.9
+*****************************
 
-  - rename annotate to annotate_features and annotate_with_sample_metadata to annotate_samples
+Added
+-----------------------------
+
   - add annotate_matrix to call both above.
 
-- **v0.8** (development, pre-1.0):
+
+Changed
+-----------------------------
+
+  - rename annotate to annotate_features and annotate_with_sample_metadata to annotate_samples
+
+0.8
+*****************************
+
+Changed
+-----------------------------
 
   - usage of the same interpreter running ngs_toolkit to run jobs
   - revamp recipes, usage of recipes for common work functions that run in distributed mode
   - allow import of classes from root of library.
 
-- **v0.7** (development, pre-1.0):
+0.7
+*****************************
+
+Added
+-----------------------------
 
   - implement running of local or distributed jobs using ``divvy``
 
-- **v0.6** (development, pre-1.0):
+0.6
+*****************************
+
+Changed
+-----------------------------
 
   - rename merge_table to sample_subannotation
 
-- **v0.5** (development, pre-1.0):
+0.5
+*****************************
+
+Changed
+-----------------------------
 
   - major API changes
   - implementing only two types of matrices: matrix_raw, matrix_norm
   - unify normalization methods, each overwrites matrix_norm and sets flag with name of method used
 
-------------
-
-- **v0.2.1** (*2018-12-13*):
+0.2.1 - 2018-12-13
+*****************************
 
   - minor:
 
@@ -106,20 +198,21 @@ Changelog
     - fix mistake in requirements for peppy
     - fix some security issues
 
-------------
+0.1.6.0 - 2018-12-05
+*****************************
 
-- **v0.1.6.0** (*2018-12-05*):
+  - major:
 
-  - New CNV module
-  - many fixes and improvements to run various enrichment analysis in serial
-  - add specific attributes to classes - this will be the basis of the new API revamp
-  - add support for running specific steps of enrichment analysis
-  - better utf8 encoding support to all Enrichr inputs/outputs
-  - add support for plotting 1 attribute in unsupervised_analysis
-  - add support for limma regression without covariates; more help messages
-  - fix bug in plot_differential when plotting scatter with colours per p-value
-  - improved general.query_biomart to handle fields with multiple values  
-  - update requirements
+    - New CNV module
+    - many fixes and improvements to run various enrichment analysis in serial
+    - add specific attributes to classes - this will be the basis of the new API revamp
+    - add support for running specific steps of enrichment analysis
+    - better utf8 encoding support to all Enrichr inputs/outputs
+    - add support for plotting 1 attribute in unsupervised_analysis
+    - add support for limma regression without covariates; more help messages
+    - fix bug in plot_differential when plotting scatter with colours per p-value
+    - improved general.query_biomart to handle fields with multiple values  
+    - update requirements
 
   - minor:
 
@@ -137,9 +230,8 @@ Changelog
     - add verbosity to manager programs
     - reporting more info for plot_differential
 
-------------
-
-- **v0.1.5.1** (*2018-11-25*):
+0.1.5.1 - 2018-11-25
+*****************************
 
   - add config file support for better system-independent operation (specially for enrichment analysis)
   - add logger through "logging" library
@@ -150,10 +242,9 @@ Changelog
   - add better colorbars
   - add serial processing of peak commands as option for ChIP-seq peak calling
 
-------------
 
-
-- **v0.1.4.2** (*2018-10-29*):
+0.1.4.2 - 2018-10-29
+*****************************
 
   - fix important lack of ngs_toolkit.recipes module in setup.py: recipes should now be correctly added to $PATH
   - fix and add full support to comparison_table in recipes.ngs_analysis
@@ -190,11 +281,10 @@ Changelog
 
     - add more descriptive labels to tqdm loops;
 
-------------
+0.1.4 - 2018-09-25
+*****************************
 
-- **v0.1.4** (*2018-09-25*):
-
-  - Update to peppy version v0.9.1
+  - Update to peppy version 0.9.1
 
   - fixes/improvements:
 
@@ -216,9 +306,8 @@ Changelog
 
     - docs for the region_set_frip, merge_signal and call_peaks recipes
 
-------------
-
-- **v0.1.3.6** (*2018-08-05*):
+0.1.3.6 - 2018-08-05
+*****************************
 
   - add two new recipes:
 
@@ -241,17 +330,15 @@ Changelog
   - improve atacseq.get_gene_level_accessibility
   - add 2D support to general.signed_mean
 
-------------
-
-- **v0.1.3.5.3b** (*2018-06-12*):
+0.1.3.5.3b - 2018-06-12
+*****************************
 
   - Fixes:
 
     - general.deseq_analysis: fix hyphen character conversion; better contrasts for DESeq2
 
-------------
-
-- **v0.1.3.5.3** (*2018-05-31*):
+0.1.3.5.3 - 2018-05-31
+*****************************
 
   - Fixes:
 
@@ -259,9 +346,8 @@ Changelog
     - ngs_analysis recipe: change selection of samples on "pass_qc"; do differential_overlap only when >1 comparison
 
 
-------------
-
-- **v0.1.3.5.2** (*2018-05-30*):
+0.1.3.5.2 - 2018-05-30
+*****************************
 
   - Fixes:
 
@@ -274,9 +360,8 @@ Changelog
     - General `ngs_analysis` recipe for general analysis of NGS projects.
 
 
-------------
-
-- Major release: **v0.1.3.5** (*2018-05-15*):
+- Major release: 0.1.3.5 - 2018-05-15
+*****************************
 
   - New:
 

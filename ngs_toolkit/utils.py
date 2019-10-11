@@ -41,6 +41,17 @@ def is_running_inside_ipython():
         return False
 
 
+def filter_kwargs_by_callable(kwargs, callabl, exclude=None):
+    from inspect import signature
+
+    args = signature(callabl).parameters.keys()
+    return {
+        k: v
+        for k, v in kwargs.items()
+        if (k in args)
+        and k not in (exclude or [])}
+
+
 def get_timestamp(fmt='%Y-%m-%d-%H:%M:%S'):
     """Get current timestamp in ``fmt`` format."""
     from datetime import datetime

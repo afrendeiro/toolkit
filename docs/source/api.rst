@@ -7,11 +7,6 @@ It provides a rich but abstract :class:`~ngs_toolkit.analysis.Analysis` object a
 
 In addition, the :mod:`~ngs_toolkit.general` module contains several analysis-independent methods and the :mod:`~ngs_toolkit.utils` module provides low-level functions of general use.
 
-ngs_toolkit
------------------------
-.. automodule:: ngs_toolkit
-    :members:
-
 ngs_toolkit.analysis
 -----------------------
 .. automodule:: ngs_toolkit.analysis
@@ -37,6 +32,11 @@ ngs_toolkit.rnaseq
 .. automodule:: ngs_toolkit.rnaseq
     :members:
 
+ngs_toolkit.demo
+-----------------------
+.. automodule:: ngs_toolkit.demo
+    :members:
+
 ngs_toolkit.general
 -----------------------
 .. automodule:: ngs_toolkit.general
@@ -55,4 +55,9 @@ ngs_toolkit.utils
 ngs_toolkit.parsers
 -----------------------
 .. automodule:: ngs_toolkit.parsers
+    :members:
+
+ngs_toolkit
+-----------------------
+.. automodule:: ngs_toolkit
     :members:

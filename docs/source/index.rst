@@ -13,7 +13,7 @@ Its goals are to provide a highly customizable set of objects and tools that int
 
 ``ngs-toolkit`` is reaching maturity, with a stable API (from version 0.14.0 on), improving documentation and increasing test coverage.
 
-Head to the :doc:`Introduction <intro>` to see installation instructions and quick use, or have a look at the catalogue of available functions in the :doc:`API <api>`.
+Head to the :doc:`Installation <install_test>` to see installation instructions and to :doc:`Usage <usage>` for quick use, or have a look at the catalogue of available functions in the :doc:`API <api>`.
 
 Contents
 ^^^^^^^^
@@ -21,14 +21,17 @@ Contents
 .. toctree::
     :maxdepth: 1
 
-    intro
+    install
+    usage
     examples
     concepts
     log_config
     report
+    distributed
     manager_programs
     recipes
     api
+    test
     changelog
 
 

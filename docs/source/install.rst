@@ -1,11 +1,8 @@
-Introduction
+Installation
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Installation
-=============================
-
 With pip
------------------------------
+=============================
 
 ``ngs_toolkit`` is available for Python 3 only. Is is tested in Python 3.6 and 3.7.
 
@@ -28,7 +25,7 @@ To install the latest development version:
 
 
 Using a conda environment
------------------------------
+=============================
 
 Get the `latest Python 3 installation of miniconda from the conda website <https://docs.conda.io/en/latest/miniconda.html>`_ and follow the instructions for installation and activation of the environment.
 
@@ -56,8 +53,8 @@ And then install the ``ngs-toolkit`` library with pip (available only through Py
 	pip install ngs-toolkit
 
 
-**Non-Python requirements**
------------------------------
+Non-Python requirements
+=============================
 
 
 ``ngs_toolkit`` makes use of some non-Python dependencies.
@@ -67,33 +64,32 @@ And then install the ``ngs-toolkit`` library with pip (available only through Py
 The following are highly recommended only for some data or analysis types:
 
  - `R <https://www.r-project.org/>`_ and some bioconductor libraries (optional):
+   - `DESeq2 <https://bioconductor.org/packages/release/bioc/html/DESeq2.html>`_ (optional): used for differential testing of genes/regulatory elements and variance stabilization transformation of data.
    - `cqn <https://bioconductor.org/packages/release/bioc/html/cqn.html>`_ (optional): used for GC-content aware normalization of NGS data.
-   - `DESeq2 <https://bioconductor.org/packages/release/bioc/html/DESeq2.html>`_ (optional): used for differential testing of genes/regulatory elements.
- - `Kent tools <https://github.com/ENCODE-DCC/kentUtils>`_ (optional): the 'twoBitToFa' binary from UCSC's Kent bioinformatics toolkit is used to convert between the 2bit and FASTA formats.
+ - `Kent tools <https://github.com/ENCODE-DCC/kentUtils>`_ (optional):
+   - the ``twoBitToFa`` binary from UCSC's Kent bioinformatics toolkit is used to convert between the 2bit and FASTA formats.
+
+For region-based enrichment analysis, you may also want to have the following software installed (entirely optional):
+
+ - `MEME suite <http://meme-suite.org/>`_
+ - `HOMER motif analysis <http://homer.ucsd.edu/homer/motif/>`_
+ - `LOLA R package <http://code.databio.org/LOLA/>`_
+
+You can see how to install all requirements in an Ubuntu-based system in the provided `Dockerfile <https://github.com/afrendeiro/toolkit/blob/master/Dockerfile>`_.
 
 
-Testing
+Docker
 =============================
 
-To make sure everything is correctly configured, the user is encouraged to test the library prior to use.
+A Docker image containing ``ngs_toolkit`` and its dependencies is also available: https://hub.docker.com/r/afrendeiro/ngs-toolkit
 
-In order to do this, install testing requirements and simply run ``pytest``:
+To pull the image and run a module for example in this way:
 
 .. code-block:: bash
 
-   pip install ngs-toolkit[testing]
-   pytest --pyargs ngs_toolkit
+   docker pull afrendeiro/ngs-toolkit
+   docker run ngs-toolkit python3 -m ngs_toolkit.recipes.ngs_analysis --help
 
+You can also run an interactive session of ``ngs_toolkit`` `based on the docker image on Gitpod <https://gitpod.io/#https://github.com/afrendeiro/toolkit>`_.
 
-Pytest will output summary results (`see for example <https://travis-ci.org/afrendeiro/toolkit/jobs/580167563>`_) and further outputs can be seen in ``${TMPDIR}/pytest-of-${USER}/`` or ``/tmp/pytest-of-${USER}/`` if $TMPDIR is not defined.
-
-
-API usage
-=============================
-
-To use a particular class or function from the toolkit, import it like this from within Python/iPython:
-
-.. code-block:: python
-
-   from ngs_toolkit import ATACSeqAnalysis
-   from ngs_toolkit.utils import log_pvalues
+The Dockerfile that produced the image is available in the github repository: https://github.com/afrendeiro/toolkit/blob/master/Dockerfile

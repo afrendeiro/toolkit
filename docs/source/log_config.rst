@@ -7,7 +7,7 @@ Configuration, logging and versioning
 Configuration
 =============================
 
-`ngs_toolkit` uses a YAML configuration file.
+``ngs_toolkit`` uses a YAML configuration file.
 
 While entirely optional, this allows the user to specify preferences, patterns and allows usage across different computing environments.
 
@@ -72,7 +72,7 @@ However, the configuration file does not need to include all fields. Below is a 
 Logging
 =============================
 
-`ngs_toolkit` will log its operations and errors using the Python standard logging library.
+``ngs_toolkit`` will log its operations and errors using the Python standard logging library.
 
 This will happen by default to standard output (sys.stdout) but also to a file in ``$HOME/.ngs_toolkit.log.txt``.
 
@@ -84,7 +84,7 @@ The location of the log file and the level of events to be reported can be custo
 Versioning
 =============================
 
-`ngs_toolkit` will by default timestamp every output it produces (CSV and figure files).
+``ngs_toolkit`` will by default timestamp every output it produces (CSV and figure files).
 
 This behaviour can be controlled independently for tables and figures by setting the respective values of the configuration file:
 

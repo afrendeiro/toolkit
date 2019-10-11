@@ -150,12 +150,10 @@ class Analysis(object):
 
         # Generate from PEP configuration file
         if from_pep is not False:
-            from inspect import signature
-            from peppy import Project
-
-            args = signature(Project).parameters.keys()
-            prj_kwargs = {k: v for k, v in kwargs.items() if k in args}
-            self.from_pep(pep_config=from_pep, **prj_kwargs)
+            from ngs_toolkit.utils import filter_kwargs_by_callable
+            self.from_pep(
+                pep_config=from_pep,
+                **filter_kwargs_by_callable(kwargs, Analysis, exclude=["kwargs"]))
 
         # Store projects attributes in self
         _LOGGER.debug("Trying to set analysis attributes.")
@@ -1651,25 +1649,18 @@ class Analysis(object):
         :class:`pandas.DataFrame`
             Normalized pandas DataFrame.
         """
-        import warnings
-
-        from rpy2.rinterface import RRuntimeWarning
-        from rpy2.robjects import numpy2ri
-        from rpy2.robjects import pandas2ri
-        import rpy2.robjects as robjects
-
+        from rpy2.robjects import numpy2ri, pandas2ri, r
+        from rpy2.robjects.packages import importr
         numpy2ri.activate()
         pandas2ri.activate()
-        warnings.filterwarnings("ignore", category=RRuntimeWarning)
 
-        robjects.r('suppressMessages(library("DESeq2"))')
-        _varianceStabilizingTransformation = robjects.r("varianceStabilizingTransformation")
+        importr("DESeq2")
 
         matrix = self.get_matrix(matrix, samples=samples)
 
         # Apply VST
         matrix_norm = pd.DataFrame(
-            _varianceStabilizingTransformation(matrix.values, **kwargs),
+            r.varianceStabilizingTransformation(matrix.values, **kwargs),
             index=matrix.index, columns=matrix.columns)
 
         if save:
@@ -2986,7 +2977,7 @@ class Analysis(object):
         comparison_table=None,
         samples=None,
         covariates=None,
-        filter_support=True,
+        filter_support=False,
         output_dir="{results_dir}/differential_analysis_{data_type}",
         output_prefix="differential_analysis",
         overwrite=True,
@@ -3307,14 +3298,14 @@ class Analysis(object):
                     log_file=log_file,
                     jobname=job_name,
                     **kwargs)
-                try:
-                    if kwargs["computing_configuration"] in ["localhost", "default"]:
-                        _LOGGER.info("Collecting differential results.")
-                        return self.collect_differential_analysis(
-                            comparison_table=comparison_table,
-                            overwrite=overwrite)
-                except KeyError:
-                    pass
+            try:
+                if kwargs["computing_configuration"] in ["localhost", "default"]:
+                    _LOGGER.info("Collecting differential results.")
+                    return self.collect_differential_analysis(
+                        comparison_table=comparison_table,
+                        overwrite=overwrite)
+            except KeyError:
+                pass
 
     def collect_differential_analysis(
             self,

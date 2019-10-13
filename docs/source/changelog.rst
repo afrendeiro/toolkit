@@ -23,7 +23,7 @@ Changed
   - More simplicity and abstraction for functions in main :class:`ngs_toolkit.analysis.Analysis` class.
 
 
-[0.19.2] - 2019-10-XX
+[0.19.2] - 2019-10-13
 *****************************
 
 Added

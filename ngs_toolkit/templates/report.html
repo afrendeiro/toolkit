@@ -199,6 +199,7 @@
                         <li>Python version: {{ python_version }}</li>
                         <li>ngs-toolkit version: {{ library_version }}</li>
 
+                        {% if library|length > 0 %}
                         <p>
                           <a class="btn btn-primary"
                              data-toggle="collapse"
@@ -208,7 +209,6 @@
                              aria-controls="versioning-additional">
                           Additional Python libraries</a>
                         </p>
-                        {% if library|length > 0 %}
                         <div class="row collapse" id="versioning-additional">
                             {% for library in freeze %}
                                 <div id="versioning-{{library}}" class="col-2">

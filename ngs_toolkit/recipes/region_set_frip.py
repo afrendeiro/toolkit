@@ -16,10 +16,12 @@ from ngs_toolkit.atacseq import ATACSeqAnalysis
 from ngs_toolkit.chipseq import ChIPSeqAnalysis
 
 
-def add_args(parser):
+def parse_arguments():
     """
     Global options for analysis.
     """
+    parser = ArgumentParser(
+        prog="python -m ngs_toolkit.recipes.region_set_frip", description=__doc__)
     parser.add_argument(
         dest="config_file", help="YAML project configuration file.", type=str
     )
@@ -86,11 +88,7 @@ def add_args(parser):
 
 
 def main():
-    parser = ArgumentParser(
-        prog="region_set_frip", description=__doc__
-    )
-    parser = add_args(parser)
-    args = parser.parse_args()
+    args = parse_arguments().parse_args()
     # args = parser.parse_args('-t ATAC-seq metadata/project_config.yaml'.split(" "))
 
     # Start project

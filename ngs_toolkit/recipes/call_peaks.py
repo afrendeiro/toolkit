@@ -14,10 +14,12 @@ import pandas as pd
 from ngs_toolkit.chipseq import ChIPSeqAnalysis
 
 
-def add_args(parser):
+def parse_arguments():
     """
     Global options for analysis.
     """
+    parser = ArgumentParser(
+        prog="python -m ngs_toolkit.recipes.call_peaks", description=__doc__)
     parser.add_argument(
         dest="config_file", help="YAML project configuration file.", type=str
     )
@@ -66,10 +68,7 @@ def add_args(parser):
 
 
 def main():
-    parser = ArgumentParser(prog="call_peaks_recipe", description=__doc__)
-    parser = add_args(parser)
-    args = parser.parse_args()
-    # args = parser.parse_args('-t metadata/project_config.yaml'.split(" "))
+    args = parse_arguments().parse_args()
 
     # Analysis
     print(
@@ -79,7 +78,7 @@ def main():
         from_pep=args.config_file, results_dir=args.results_dir
     )
     chip_data_types = ["ChIP-seq", "ChIPmentation"]
-    analysis.samples = [s for s in analysis.samples if (s.protocol == chip_data_types)]
+    analysis.samples = [s for s in analysis.samples if s.protocol == chip_data_types]
 
     # Samples
     # # filter QC if needed
@@ -87,7 +86,7 @@ def main():
         analysis.samples = [
             s for s in analysis.samples if s.pass_qc not in ["0", 0, "False", False]
         ]
-    if len(analysis.samples) > 0:
+    if analysis.samples:
         print(
             "Samples under consideration: '{}'. ".format(
                 ",".join([s.name for s in analysis.samples])
@@ -116,7 +115,7 @@ def main():
         ]
 
     comps = analysis.comparison_table["comparison_name"].unique()
-    if len(comps) > 0:
+    if comps:
         print(
             "comparisons under consideration: '{}'. ".format(",".join(comps))
             + "Total of {} comparisons.".format(len(comps))

@@ -5,7 +5,7 @@ A helper script to run enrichment analysis
 of a single region set in region-based set of annotations.
 """
 
-import argparse
+from argparse import ArgumentParser
 import os
 import sys
 from ngs_toolkit.atacseq import ATACSeqAnalysis
@@ -17,8 +17,8 @@ def parse_arguments():
     """
     Argument Parsing.
     """
-    parser = argparse.ArgumentParser(
-        description=__doc__)
+    parser = ArgumentParser(
+        prog="python -m ngs_toolkit.recipes.region_enrichment", description=__doc__)
     parser.add_argument(
         dest="bed_file",
         help="BED file with regions.")
@@ -36,15 +36,13 @@ def parse_arguments():
         action="store_true",
         default=False,
         help="Don't overwrite any existing directory or file.")
-    args = parser.parse_args()
-
-    return args
+    return parser
 
 
 def main():
     print("Region type analysis")
     # Parse command-line arguments.
-    args = parse_arguments()
+    args = parse_arguments().parse_args()
     if os.path.exists(args.output_file) and (not args.overwrite):
         print("Output exists and `overwrite` is False, so not doing anything.")
         return 0

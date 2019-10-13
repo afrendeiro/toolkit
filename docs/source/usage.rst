@@ -3,7 +3,7 @@ Quick usage
 
 
 Interactive usage through the API
------------------------------
+---------------------------------
 
 To use a particular class or function from the toolkit, simply import it
 following the structure of the library:
@@ -34,7 +34,7 @@ various methods through an OOP interface:
 
 
 Running recipes through the command-line interface
------------------------------
+--------------------------------------------------
 
 ``ngs_toolkit`` also has some command-line programs on some commonly used
 workflows (here called ``recipes``), which can be run in the following manner:

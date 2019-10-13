@@ -42,9 +42,13 @@ extensions = [
     "sphinx.ext.viewcode",
     # "numpydoc",
     'sphinx.ext.napoleon',
+    "sphinx_issues",
+    'sphinxarg.ext',  # for CLI parsing of arguments
     # 'sphinx_autodoc_typehints' <- this would be handy when whole codebase has typehinting
     # "sphinxcontrib.jupyter", <- this could be useful to make jupyter NBs
 ]
+
+issues_github_path = "afrendeiro/toolkit"
 
 napoleon_numpy_docstring = True
 napoleon_google_docstring = False

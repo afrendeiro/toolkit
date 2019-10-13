@@ -47,7 +47,7 @@ These options must match fields available to format of the currently selected
 ``compute_configuration``. 
 
 Sending jobs and collecting output
------------------------------
+----------------------------------
 
 Performing a taks in a distributed manner can therefore be as simple as calling 
 the desired function with ``distributed=True``. Jobs will be sent to the

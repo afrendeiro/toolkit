@@ -6,7 +6,7 @@ in regions from a BED file.
 Ensures the same order and number of lines as input BED file.
 """
 
-import argparse
+from argparse import ArgumentParser
 import os
 import sys
 
@@ -19,7 +19,8 @@ def parse_arguments():
     """
     Argument Parsing.
     """
-    parser = argparse.ArgumentParser()
+    parser = ArgumentParser(
+        prog="python -m ngs_toolkit.recipes.coverage", description=__doc__)
     parser.add_argument(
         dest="bed_file",
         help="Input BED file with regions to quantify.",
@@ -36,15 +37,14 @@ def parse_arguments():
         dest="overwrite",
         help="Whether results should not be overwritten if existing."
     )
-    args = parser.parse_args()
-
-    return args
+    return parser
 
 
 def main() -> int:
     """Measure coverage of BAM file in BED file regions."""
     print("Parsing CLI.")
-    args = parse_arguments()
+    args = parse_arguments().parse_args()
+
     if os.path.exists(args.output_bed) and (not args.overwrite):
         print("Output exists and `overwrite` is False, so not doing anything.")
         return 0

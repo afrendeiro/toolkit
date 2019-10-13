@@ -5,7 +5,7 @@ A helper script to run Location Overlap Analysis (LOLA)
 of a single region set in various sets of region-based annotations.
 """
 
-import argparse
+from argparse import ArgumentParser
 import os
 import sys
 from ngs_toolkit.general import lola
@@ -15,7 +15,8 @@ def parse_arguments():
     """
     Argument Parsing.
     """
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = ArgumentParser(
+        prog="python -m ngs_toolkit.recipes.lola", description=__doc__)
     parser.add_argument(dest="bed_file", help="BED file with query set regions.")
     parser.add_argument(
         dest="universe_file",
@@ -37,14 +38,12 @@ def parse_arguments():
         help="Number of CPUS/threads to use for analysis.",
         type=int,
     )
-    args = parser.parse_args()
-
-    return args
+    return parser
 
 
 def main():
     print("LOLA analysis")
-    args = parse_arguments()
+    args = parse_arguments().parse_args()
 
     output_file = os.path.join(args.output_folder, "allEnrichments.tsv")
     if os.path.exists(output_file) and (not args.overwrite):

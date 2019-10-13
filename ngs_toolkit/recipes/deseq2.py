@@ -5,7 +5,7 @@ Perform differential expression using DESeq2
 by comparing sample groups using a formula.
 """
 
-import argparse
+from argparse import ArgumentParser
 import os
 import sys
 from ngs_toolkit.general import deseq_analysis
@@ -13,8 +13,8 @@ import pandas as pd
 
 
 def parse_arguments():
-    parser = argparse.ArgumentParser(
-        description=__doc__)
+    parser = ArgumentParser(
+        prog="python -m ngs_toolkit.recipes.deseq2", description=__doc__)
     parser.add_argument(
         dest="work_dir",
         help="Working directory. Should contain required files for DESeq2.")
@@ -53,13 +53,11 @@ def parse_arguments():
     # To enable the loop to pass args directly on to the pipelines...
 
     # args = parser.parse_args("--output_prefix differential_analysis --formula '~sample_group' --overwrite /scratch/lab_bock/shared/projects/baf-time_course/results/differential_analysis_ATAC-seq/ARID2_KO".split(" "))
-    args = parser.parse_args()
-
-    return args
+    return parser
 
 
 def main():
-    args = parse_arguments()
+    args = parse_arguments().parse_args()
 
     # sample annotation
     print("Reading experiment_matrix")

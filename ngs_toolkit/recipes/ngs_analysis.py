@@ -3,10 +3,16 @@
 """
 Perform full end-to-end analysis of ATAC-seq, ChIP-seq or RNA-seq data.
 
-Producdes quantification matrices, normalizes them,
+Produces quantification matrices, normalizes them,
 performes unsupervised and supervised analysis as
 well as enrichment analyisis of differential features,
 all accompaigned with powerful visualizations.
+
+Supervised analysis will only be performed if PEP configuration file contains a
+`comparison table <https://ngs-toolkit.readthedocs.io/en/latest/comparison_table.html>`_ field.
+
+In addition, this recipe uses variables provided in the project configuration
+file ``project_name``, ``sample_attributes`` and ``group_attributes``.
 """
 
 
@@ -28,10 +34,12 @@ sns.set(context="paper", style="ticks", palette="colorblind", color_codes=True)
 matplotlib.rc("text", usetex=False)
 
 
-def add_args(parser):
+def parse_arguments():
     """
     Global options for analysis.
     """
+    parser = ArgumentParser(
+        prog="python -m ngs_toolkit.recipes.ngs_analysis", description=__doc__)
     parser.add_argument(
         dest="config_file", help="YAML project configuration file.", type=str)
     parser.add_argument(
@@ -86,10 +94,7 @@ def add_args(parser):
 
 
 def main():
-    parser = ArgumentParser(prog="ngs_analysis_recipe")
-    parser = add_args(parser)
-    args = parser.parse_args()
-    # args = parser.parse_args('-q -t metadata/project_config.yaml'.split(" "))
+    args = parse_arguments().parse_args()
 
     # Start project
     print("Starting peppy project with project"

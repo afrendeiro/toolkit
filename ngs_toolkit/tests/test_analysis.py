@@ -17,19 +17,19 @@ class TestAnalysis:
     def test_analysis_representation(self):
         name = "test_analysis"
 
-        a = Analysis(name=name)
-        assert a.__repr__() == "Analysis '{}'.".format(name)
-        assert "samples" not in a.__repr__()
+        an = Analysis(name=name)
+        assert an.__repr__() == "Analysis '{}'.".format(name)
+        assert "samples" not in an.__repr__()
 
     def test_with_object_as(self):
         name = "test_analysis"
 
-        a = Analysis(name=name)
-        with a as a_:
-            assert a is a_
-            assert a == a_
-            assert a_.__repr__() == "Analysis '{}'.".format(name)
-            assert "samples" not in a_.__repr__()
+        an = Analysis(name=name)
+        with an as _an:
+            assert an is _an
+            assert an == _an
+            assert _an.__repr__() == "Analysis '{}'.".format(name)
+            assert "samples" not in _an.__repr__()
 
     def test_analysis_creation(self, tmp_path):
         from ngs_toolkit.demo.data_generator import generate_project
@@ -161,9 +161,9 @@ class TestAnalysis:
         assert not Analysis._check_data_type_is_supported("Microarray")
 
     def test__get_data_type(self, atac_analysis):
-        assert "ATAC-seq" == atac_analysis._get_data_type()
-        assert "ATAC-seq" == atac_analysis._get_data_type(data_type="ATAC-seq")
-        assert "RNA-seq" == atac_analysis._get_data_type(data_type="RNA-seq")
+        assert atac_analysis._get_data_type() == "ATAC-seq"
+        assert atac_analysis._get_data_type(data_type="ATAC-seq") == "ATAC-seq"
+        assert atac_analysis._get_data_type(data_type="RNA-seq") == "RNA-seq"
 
         with pytest.raises(ValueError):
             atac_analysis._get_data_type(data_type="Microarray")
@@ -185,15 +185,15 @@ class TestAnalysis:
         assert not atac_analysis._check_samples_have_file("sample_name")
 
     def test__get_samples_have_file(self, atac_analysis):
-        assert 0 == len(atac_analysis._get_samples_have_file("sample_name"))
+        assert not atac_analysis._get_samples_have_file("sample_name")
 
     def test__get_samples_missing_file(self, atac_analysis):
         with pytest.raises(AttributeError):
             atac_analysis._get_samples_have_file("NOTEXISTING")
 
-        assert 0 == len(atac_analysis._get_samples_have_file("sample_name"))
+        assert not atac_analysis._get_samples_have_file("sample_name")
 
-        assert 0 == len(atac_analysis._get_samples_have_file("aligned_filtered_bam"))
+        assert not atac_analysis._get_samples_have_file("aligned_filtered_bam")
 
     def test__get_samples_with_input_file(self, atac_analysis):
         with pytest.raises(AttributeError):
@@ -205,9 +205,9 @@ class TestAnalysis:
         with pytest.raises(IOError):
             atac_analysis._get_samples_with_input_file("aligned_filtered_bam")
 
-        assert 0 == len(atac_analysis._get_samples_with_input_file("aligned_filtered_bam", permissive=True))
-        assert 0 == len(atac_analysis._get_samples_with_input_file("peaks", permissive=True))
-        assert 0 == len(atac_analysis._get_samples_with_input_file("summits", permissive=True))
+        assert not atac_analysis._get_samples_with_input_file("aligned_filtered_bam", permissive=True)
+        assert not atac_analysis._get_samples_with_input_file("peaks", permissive=True)
+        assert not atac_analysis._get_samples_with_input_file("summits", permissive=True)
 
     @pytest.mark.parametrize(
         "env_var,string",

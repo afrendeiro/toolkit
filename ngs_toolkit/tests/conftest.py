@@ -2,22 +2,27 @@
 
 
 import os
+from functools import partialmethod
 
 import pytest
 
 from ngs_toolkit import Analysis, ATACSeqAnalysis
 from ngs_toolkit.demo import generate_project
 
+# TODO: test having no config set
+# TODO: test differential analysis with many factors
+# TODO: test subproject initialization
 
+# Environment-specific
 CI = ("TRAVIS" in os.environ) or ("GITHUB_WORKFLOW" in os.environ)
 
 CI_NAME = None
 BUILD_DIR = os.path.abspath(os.path.curdir)
 if CI:
-    if ("TRAVIS" in os.environ):
+    if "TRAVIS" in os.environ:
         CI_NAME = "TRAVIS"
         BUILD_DIR = os.environ['TRAVIS_BUILD_DIR']
-    elif ("GITHUB_WORKFLOW" in os.environ):
+    elif "GITHUB_WORKFLOW" in os.environ:
         CI_NAME = "GITHUB"
         BUILD_DIR = os.path.join(
             "home", "runner", "work", "toolkit", "toolkit")
@@ -33,9 +38,19 @@ except KeyError:
     o = subprocess.check_output("git status".split(" "))
     DEV = "dev" in o.decode().split("\n")[0]
 
-# TODO: test having no config set
-# TODO: test differential analysis with many factors
-# TODO: test subproject initialization
+
+# Test-specifc options
+# # Note:
+# # The DESeq2 1.24.0 version in Debian archives
+# # differs from the DESeq2 1.24.0 version in bioconductor version 3.9
+# # If estimateDispersions with default fitType="parametric" fails,
+# # (as often happens with the quickly generated synthetic data from tests),
+# # it tries to use local fit using the locfit package, but in Debian
+# # version this is not a valid choice of fit, causing failure.
+# # Due to this, and since I'm using Debian packages for faster testing
+# # I'm manually setting fitType="mean" for testing only.
+Analysis.differential_analysis = partialmethod(
+    Analysis.differential_analysis, deseq_kwargs={"fitType": "mean"})
 
 
 def is_internet_connected(hostname="www.google.com"):
@@ -55,21 +70,18 @@ def is_internet_connected(hostname="www.google.com"):
 
 
 def file_exists(file):
-    import os
     from ngs_toolkit.utils import get_this_file_or_timestamped
 
     return os.path.exists(get_this_file_or_timestamped(file))
 
 
 def file_not_empty(file):
-    import os
     from ngs_toolkit.utils import get_this_file_or_timestamped
 
     return os.stat(get_this_file_or_timestamped(file)).st_size > 0
 
 
 def file_exists_and_not_empty(file):
-    import os
     from ngs_toolkit.utils import get_this_file_or_timestamped
 
     f = get_this_file_or_timestamped(file)
@@ -85,25 +97,25 @@ def empty_analysis():
 
 @pytest.fixture
 def null_analysis():
-    analysis = ATACSeqAnalysis()
-    analysis.organism = None
-    analysis.genome = None
-    analysis.sites = None
-    return analysis
+    an = ATACSeqAnalysis()
+    an.organism = None
+    an.genome = None
+    an.sites = None
+    return an
 
 
 @pytest.fixture
 def full_analysis():
-    analysis = ATACSeqAnalysis()
-    analysis.organism = "human"
-    analysis.genome = "hg38"
-    analysis.sites = "hg38"
-    analysis.samples = []
-    return analysis
+    an = ATACSeqAnalysis()
+    an.organism = "human"
+    an.genome = "hg38"
+    an.sites = "hg38"
+    an.samples = []
+    return an
 
 
 @pytest.fixture
-def analysis(tmp_path):
+def analysis():
     return Analysis(name="test-project")
 
 
@@ -130,20 +142,25 @@ def atac_analysis_with_input_files(tmp_path):
     from ngs_toolkit import _CONFIG
     from ngs_toolkit.demo.data_generator import generate_sample_input_files
 
-    c = {
+    new_config = {
         "sample_input_files": {
             "ATAC-seq": {
-                "aligned_filtered_bam": "{data_dir}/{sample_name}/mapped/{sample_name}.trimmed.bowtie2.filtered.bam",
+                "aligned_filtered_bam":
+                    "{data_dir}/{sample_name}/mapped/{sample_name}.trimmed.bowtie2.filtered.bam",
                 "peaks": "{data_dir}/{sample_name}/peaks/{sample_name}_peaks.narrowPeak",
                 "summits": "{data_dir}/{sample_name}/peaks/{sample_name}_summits.bed"},
             "ChIP-seq": {
-                "aligned_filtered_bam": "{data_dir}/{sample_name}/mapped/{sample_name}.trimmed.bowtie2.filtered.bam"},
+                "aligned_filtered_bam":
+                    "{data_dir}/{sample_name}/mapped/{sample_name}.trimmed.bowtie2.filtered.bam"},
             "CNV": {
-                "aligned_filtered_bam": "{data_dir}/{sample_name}/mapped/{sample_name}.trimmed.bowtie2.filtered.bam"},
+                "aligned_filtered_bam":
+                    "{data_dir}/{sample_name}/mapped/{sample_name}.trimmed.bowtie2.filtered.bam"},
             "RNA-seq": {
-                "aligned_filtered_bam": "{data_dir}/{sample_name}/mapped/{sample_name}.trimmed.bowtie2.filtered.bam",
-                "bitseq_counts": "{data_dir}/{sample_name}/bowtie1_{genome}/bitSeq/{sample_name}.counts"}}}
-    _CONFIG.update(c)
+                "aligned_filtered_bam":
+                    "{data_dir}/{sample_name}/mapped/{sample_name}.trimmed.bowtie2.filtered.bam",
+                "bitseq_counts":
+                    "{data_dir}/{sample_name}/bowtie1_{genome}/bitSeq/{sample_name}.counts"}}}
+    _CONFIG.update(new_config)
 
     tmp_path = str(tmp_path)
     kwargs = {

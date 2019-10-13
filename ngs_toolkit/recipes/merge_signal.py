@@ -22,10 +22,12 @@ from peppy import Project
 from ngs_toolkit import _LOGGER, _CONFIG, __version__
 
 
-def add_args(parser):
+def parse_arguments():
     """
     Global options for analysis.
     """
+    parser = ArgumentParser(
+        prog="python -m ngs_toolkit.recipes.merge_signal", description=__doc__)
     parser.add_argument(
         dest="config_file", help="YAML project configuration file.", type=str
     )
@@ -98,27 +100,20 @@ def add_args(parser):
 
 
 def main():
-    parser = ArgumentParser(prog="merge_signal", description=__doc__)
-    parser = add_args(parser)
-    args = parser.parse_args()
+    args = parse_arguments().parse_args()
     # args = parser.parse_args('-t ATAC-seq metadata/project_config.yaml'.split(" "))
 
     _LOGGER.info(
-        "This is the 'merge_signal' recipe from ngs_toolkit, version: {}".format(
-            __version__
-        )
+        "This is the 'merge_signal' recipe from ngs_toolkit, version: %s", __version__
     )
     # Start project
     _LOGGER.debug(
-        "Starting peppy project with project configuration file: '{}'".format(
-            args.config_file
-        )
+        "Starting peppy project with project configuration file: '%s'", args.config_file
     )
     prj = Project(args.config_file)
     _LOGGER.debug(
-        "Changing directory to project root directory: '{}'.".format(
-            prj.metadata.output_dir
-        )
+        "Changing directory to project root directory: '%s'.",
+        prj.metadata.output_dir
     )
     os.chdir(prj.metadata.output_dir)
     if args.pass_qc:
@@ -147,7 +142,7 @@ def main():
                 sample.paths.sample_root, "peaks", sample.name + "_peaks.narrowPeak"
             )
 
-    if len(prj.samples) > 0:
+    if prj.samples:
         print(
             "Samples under consideration: '{}'. ".format(
                 ",".join([s.name for s in prj.samples])
@@ -163,10 +158,10 @@ def main():
     sheet = sheet.loc[sheet["sample_name"].isin([s.name for s in prj.samples])]
     _LOGGER.info(
         "Selecting samples with appropriate data type."
-        + "\nSamples under consideration: '{}'. ".format(
-            ",".join(sheet["sample_name"].tolist())
-        )
-        + "\nTotal of {} samples.".format(sheet.shape[0])
+        "\nSamples under consideration: '%s'. "
+        "\nTotal of %i samples.",
+        ",".join(sheet["sample_name"].tolist()),
+        sheet.shape[0]
     )
 
     # Get default attributes if not set
@@ -175,9 +170,9 @@ def main():
             args.attributes = prj.group_attributes
         else:
             _LOGGER.error(
-                "Sample attributes to group by were not set and none could be found in project \
-                          configuration file!"
-                + "\nAborting!"
+                "Sample attributes to group by were not set and none could be"
+                " found in project configuration file!"
+                "\nAborting!"
             )
             return 1
     else:
@@ -187,10 +182,9 @@ def main():
             args.attributes = [args.attributes]
 
     _LOGGER.info(
-        "Using the following attributes to merge samples: '{}', resulting in a total of {} groups.".format(
-            ", ".join(args.attributes),
-            len(sheet.groupby(args.attributes).groups.items()),
-        )
+        "Using the following attributes to merge samples: '%s', resulting in a total of %i groups.",
+        ", ".join(args.attributes),
+        len(sheet.groupby(args.attributes).groups.items())
     )
 
     merge_signal(
@@ -208,16 +202,16 @@ def main():
 
 
 def merge_signal(
-    sheet,
-    samples,
-    attributes,
-    output_dir="merged",
-    normalize=True,
-    nucleosome=False,
-    overwrite=False,
-    cpus=8,
-    as_job=False,
-    dry_run=False,
+        sheet,
+        samples,
+        attributes,
+        output_dir="merged",
+        normalize=True,
+        nucleosome=False,
+        overwrite=False,
+        cpus=8,
+        as_job=False,
+        dry_run=False,
 ):
     """
     """

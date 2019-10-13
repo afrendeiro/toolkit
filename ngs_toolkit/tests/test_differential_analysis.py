@@ -22,7 +22,7 @@ from .conftest import file_exists, file_exists_and_not_empty
 def outputs(atac_analysis):
     output_dir = os.path.join(atac_analysis.results_dir, "differential_analysis_ATAC-seq")
     prefix = os.path.join(output_dir, "differential_analysis.")
-    outputs = [
+    outs = [
         os.path.join(output_dir, "Factor_A_2vs1"),
         os.path.join(
             output_dir,
@@ -34,7 +34,7 @@ def outputs(atac_analysis):
         prefix + "deseq_result.all_comparisons.csv",
         prefix + "experiment_matrix.tsv",
     ]
-    return outputs
+    return outs
 
 
 # @pytest.fixture
@@ -78,8 +78,7 @@ class Test_differential_analysis:
     def test_simple_design(self, atac_analysis, outputs):
         import pandas as pd
 
-        atac_analysis.differential_analysis(
-            filter_support=False, deseq_kwargs={"fitType": "mean"})
+        atac_analysis.differential_analysis()
         assert file_exists(
             os.path.join(atac_analysis.results_dir, "differential_analysis_ATAC-seq")
         )
@@ -105,8 +104,7 @@ class Test_differential_analysis:
     def test_complex_design(self, atac_analysis, outputs):
         import pandas as pd
 
-        atac_analysis.differential_analysis(
-            filter_support=False, deseq_kwargs={"fitType": "mean"})
+        atac_analysis.differential_analysis()
         assert file_exists(
             os.path.join(atac_analysis.results_dir, "differential_analysis_ATAC-seq")
         )

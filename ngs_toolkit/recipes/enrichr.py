@@ -5,7 +5,7 @@ A helper script to run enrichment analysis using
 the Enrichr API on a gene set.
 """
 
-import argparse
+from argparse import ArgumentParser
 import os
 import sys
 
@@ -17,7 +17,8 @@ def parse_arguments():
     """
     Argument Parsing.
     """
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = ArgumentParser(
+        prog="python -m ngs_toolkit.recipes.enrichr", description=__doc__)
     parser.add_argument(
         dest="input_file",
         help="Input file with gene names.",
@@ -33,14 +34,13 @@ def parse_arguments():
         "--no-overwrite", action="store_false",
         dest="overwrite", help="Whether results should not be overwritten if existing."
     )
-    args = parser.parse_args()
-
-    return args
+    return parser
 
 
 def main():
     print("Enrichr analysis")
-    args = parse_arguments()
+    args = parse_arguments().parse_args()
+
     if os.path.exists(args.output_file) and (not args.overwrite):
         print("Output exists and `overwrite` is False, so not doing anything.")
         return 0

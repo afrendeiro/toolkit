@@ -4,7 +4,7 @@
 A helper script to generate synthetic data for a project in PEP format.
 """
 
-import argparse
+from argparse import ArgumentParser
 import sys
 
 from ngs_toolkit.demo import generate_project
@@ -17,9 +17,10 @@ def parse_arguments():
     """
     import inspect
 
-    sig = inspect.signature(generate_project)
-    parser = argparse.ArgumentParser()
+    parser = ArgumentParser(
+        prog="python -m ngs_toolkit.recipes.generate_project", description=__doc__)
 
+    sig = inspect.signature(generate_project)
     for arg in sig.parameters:
         if arg in ["kwargs", "initialize"]:
             continue
@@ -31,14 +32,12 @@ def parse_arguments():
                 "--" + arg.replace("_", "-"),
                 default=d, type=type(d))
     parser.add_argument("--debug", action="store_true")
-    args = parser.parse_args()
-
-    return args
+    return parser
 
 
 def main() -> int:
     """Generate synthetic data for a project in PEP format."""
-    args = parse_arguments()
+    args = parse_arguments().parse_args()
     if args.debug:
         print(args)
     kwargs = {k: v for k, v in args.__dict__.items() if v is not None}

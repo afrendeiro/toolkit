@@ -34,7 +34,7 @@ ngs_toolkit.rnaseq
 
 ngs_toolkit.demo
 -----------------------
-.. automodule:: ngs_toolkit.demo
+.. automodule:: ngs_toolkit.demo.data_generator
     :members:
 
 ngs_toolkit.general

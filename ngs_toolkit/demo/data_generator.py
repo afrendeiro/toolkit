@@ -30,7 +30,7 @@ def generate_count_matrix(
 ):
     """
     Generate count matrix for groups of samples by sampling from a
-    negative binomiaal distribution.
+    negative binomial distribution.
     """
     import patsy
 
@@ -38,7 +38,7 @@ def generate_count_matrix(
         coefficient_stds = [coefficient_stds] * n_factors
 
     if dispersion_function is None:
-        dispersion_function = disp
+        dispersion_function = _disp
 
     # Build sample vs factors table
     dcat = pd.DataFrame(
@@ -118,8 +118,8 @@ def generate_data(
 
         Default is "hg38"
     **kwargs : :obj:`dict`
-        Additional keyword arguments will be passed to the
-        makeExampleDESeqDataSet function of DESeq2.
+        Additional keyword arguments will be passed to
+        :func:`ngs_toolkit.demo.data_generator.generate_count_matrix`.
 
     Returns
     -------
@@ -239,7 +239,8 @@ def generate_project(
     dcat["protocol"] = data_type
     dcat["organism"] = organism
     # now save it
-    dcat.to_csv(os.path.join(output_dir, project_name, "metadata", "annotation.csv"))
+    dcat.to_csv(
+        os.path.join(output_dir, project_name, "metadata", "annotation.csv"))
 
     # Make comparison table
     comp_table_file = os.path.join(
@@ -249,7 +250,9 @@ def generate_project(
     factors = list(string.ascii_uppercase[: n_factors])
     for factor in factors:
         for side, f in [(1, "2"), (0, "1")]:
-            ct2 = dcat.query("{} == '{}'".format(factor, factor + f)).index.to_frame()
+            ct2 = dcat.query(
+                "{} == '{}'".format(factor, factor + f)
+            ).index.to_frame()
             ct2["comparison_side"] = side
             ct2["comparison_name"] = "Factor_" + factor + "_" + "2vs1"
             ct2["sample_group"] = "Factor_" + factor + f
@@ -280,7 +283,8 @@ def generate_project(
             bed = location_index_to_bed(dnum.index)
             bed.to_csv(
                 os.path.join(
-                    output_dir, project_name, "results", project_name + ".peak_set.bed"
+                    output_dir, project_name, "results",
+                    project_name + ".peak_set.bed"
                 ),
                 index=False,
                 sep="\t",
@@ -288,7 +292,8 @@ def generate_project(
             )
         dnum.to_csv(
             os.path.join(
-                output_dir, project_name, "results", project_name + ".matrix_raw.csv"
+                output_dir, project_name, "results",
+                project_name + ".matrix_raw.csv"
             )
         )
     prev_level = _LOGGER.getEffectiveLevel()
@@ -452,8 +457,7 @@ def initialize_analysis_of_data_type(data_type, pep_config, *args, **kwargs):
 
 
 def get_random_genomic_locations(
-    n_regions, width_mean=500, width_std=400, min_width=300, genome_assembly="hg38"
-):
+        n_regions, width_mean=500, width_std=400, min_width=300, genome_assembly="hg38"):
     """Get `n_regions`` number of random genomic locations respecting the boundaries of the ``genome_assembly``"""
     from ngs_toolkit.utils import bed_to_index
 
@@ -502,5 +506,5 @@ def get_genomic_bins(n_bins, distribution="normal", genome_assembly="hg38"):
     return bed_to_index(w.head(n_bins))
 
 
-def disp(x):
+def _disp(x):
     return 4 / x + .1

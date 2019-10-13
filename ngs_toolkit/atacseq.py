@@ -431,6 +431,7 @@ class ATACSeqAnalysis(Analysis):
         if save:
             output_file = os.path.join(self.results_dir, self.name + ".peak_set.bed")
             sites.saveas(output_file)
+            self.record_output_file(output_file, "consensus_sites")
             sites = pybedtools.BedTool(output_file)
         if assign:
             self.sites = sites

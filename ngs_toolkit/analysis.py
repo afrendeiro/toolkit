@@ -1040,9 +1040,11 @@ class Analysis(object):
             Default is :obj:`True`.
         """
         import time
+        import sys
+        from collections import OrderedDict
+
         from jinja2 import Template
         import pkg_resources
-        import sys
         from ngs_toolkit import __version__
 
         try:
@@ -1059,8 +1061,9 @@ class Analysis(object):
 
         # Lets reorganize the output_files
         # into a dict of {name: list(file_names)}
-
-        keys = {x[0] for x in self.output_files}
+        keys = OrderedDict()
+        for x in self.output_files:
+            keys[x[0]] = x[1]
         outputs = {k: list() for k in keys}
 
         # get relative paths:
@@ -1124,7 +1127,7 @@ class Analysis(object):
             csvs=csvs,
             python_version=sys.version,
             library_version=__version__,
-            freeze=[] if not pip_versions else freeze.freeze()
+            freeze=[] if not pip_versions else list(freeze.freeze())
         )
 
         # Write

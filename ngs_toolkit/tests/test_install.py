@@ -73,9 +73,17 @@ def test_all_requirements_are_importable():
     replace = {"scikit-learn": "sklearn"}
 
     # handle github stuff
-    requirements = [
-        x.split("=")[0].replace(">", "")
-        for x in data if "extra" not in x]
+    requirements = list()
+    for x in data:
+        for sep in ['>=', '<=', '=', ">", "<"]:
+            x = x.split(sep)
+            if len(x) == 2:
+                x = x[0].replace("=", "").replace(">", "").replace("<", "")
+            else:
+                x = x[0]
+        if "extra" not in x:
+            requirements.append(x)
+
     # remove commnets
     requirements = [x[:x.index("  #")] if "#" in x else x
                     for x in requirements]

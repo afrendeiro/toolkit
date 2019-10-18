@@ -37,7 +37,8 @@ class RNASeqAnalysis(Analysis):
     root_dir : :obj:`str`, optional
         Base directory for the project.
 
-        Defaults to current directory or to what is specified in PEP if :attr:`~ngs_toolkit.analysis.Analysis.from_pep`.
+        Defaults to current directory or to what is specified in PEP if
+        :attr:`~ngs_toolkit.analysis.Analysis.from_pep`.
     data_dir : :obj:`str`, optional
         Directory containing processed data (e.g. by looper) that will
         be input to the analysis. This is in principle not required.
@@ -56,7 +57,8 @@ class RNASeqAnalysis(Analysis):
 
         Defaults to :obj:`None`.
     kwargs : :obj:`dict`, optional
-        Additional keyword arguments will be passed to parent class :class:`~ngs_toolkit.analysis.Analysis`.
+        Additional keyword arguments will be passed to parent class
+        :class:`~ngs_toolkit.analysis.Analysis`.
     """
     _data_type = "RNA-seq"
 
@@ -195,9 +197,7 @@ class RNASeqAnalysis(Analysis):
 
         first = True
         for sample in samples:
-            msg = "Sample {} is missing.".format(sample.name)
             try:
-                # read the "tr" file of one sample to get indexes
                 c = pd.read_csv(
                     os.path.join(
                         sample.paths.sample_root,
@@ -206,12 +206,14 @@ class RNASeqAnalysis(Analysis):
                     ),
                     sep="\t",
                 )
-            except IOError(msg) as e:
+            except IOError:
                 if permissive:
-                    _LOGGER.warning(e)
+                    _LOGGER.warning(
+                        "Sample '%s' is missing file: %s",
+                        sample.name, sample.counts)
                     continue
                 else:
-                    raise e
+                    raise
             # extract only gene ID and counts
             c = c[["Symbol", "Exp1"]]
             c = c.rename(
@@ -555,6 +557,9 @@ def knockout_plot(
     """
     Plot expression of knocked-out genes in all samples.
 
+    Parameters
+    ----------
+
     analysis : :class:`.RNASeqAnalysis`, optional
         Analysis object.
 
@@ -562,7 +567,8 @@ def knockout_plot(
     knockout_genes : :obj:`list`, optional
         List of perturbed genes to plot.
 
-        Defaults to the set of `knockout` attributes in the analysis' samples if `analysis` is given. Otherwise must be given.
+        Defaults to the set of `knockout` attributes in the analysis'
+        samples if `analysis` is given. Otherwise must be given.
     matrix : str, optional
         Matrix with expression values to use.
 

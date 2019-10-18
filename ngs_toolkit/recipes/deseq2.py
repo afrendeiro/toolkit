@@ -5,11 +5,12 @@ Perform differential expression using DESeq2
 by comparing sample groups using a formula.
 """
 
-from argparse import ArgumentParser
 import os
-import sys
-from ngs_toolkit.general import deseq_analysis
 import pandas as pd
+import sys
+
+from argparse import ArgumentParser
+from ngs_toolkit.general import deseq_analysis
 
 
 def parse_arguments():

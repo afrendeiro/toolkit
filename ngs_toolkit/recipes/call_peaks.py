@@ -6,8 +6,9 @@ mapping foreground-background relationships between samples.
 """
 
 
-from argparse import ArgumentParser
 import sys
+
+from argparse import ArgumentParser
 
 import pandas as pd
 

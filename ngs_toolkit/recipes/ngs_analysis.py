@@ -16,17 +16,19 @@ file ``project_name``, ``sample_attributes`` and ``group_attributes``.
 """
 
 
-from argparse import ArgumentParser
 import os
 import sys
+
+from argparse import ArgumentParser
 
 import matplotlib
 import seaborn as sns
 
 import peppy
+
 from ngs_toolkit.atacseq import ATACSeqAnalysis
-from ngs_toolkit.rnaseq import RNASeqAnalysis
 from ngs_toolkit.chipseq import ChIPSeqAnalysis
+from ngs_toolkit.rnaseq import RNASeqAnalysis
 
 
 # Set settings

@@ -4,8 +4,9 @@
 A helper script to generate synthetic data for a project in PEP format.
 """
 
-from argparse import ArgumentParser
 import sys
+
+from argparse import ArgumentParser
 
 from ngs_toolkit.demo import generate_project
 from ngs_toolkit.utils import filter_kwargs_by_callable

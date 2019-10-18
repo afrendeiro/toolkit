@@ -7,11 +7,13 @@ from several samples.
 """
 
 
-from argparse import ArgumentParser
 import os
 import sys
 
-from peppy import Project
+from argparse import ArgumentParser
+
+import pybedtools
+
 from ngs_toolkit.atacseq import ATACSeqAnalysis
 from ngs_toolkit.chipseq import ChIPSeqAnalysis
 

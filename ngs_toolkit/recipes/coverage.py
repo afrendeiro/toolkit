@@ -6,13 +6,16 @@ in regions from a BED file.
 Ensures the same order and number of lines as input BED file.
 """
 
-from argparse import ArgumentParser
 import os
 import sys
 
+from argparse import ArgumentParser
+
 import pandas as pd
-from ngs_toolkit.utils import to_bed_index, count_reads_in_intervals, \
-    read_bed_file_three_columns
+
+from ngs_toolkit.utils import count_reads_in_intervals
+from ngs_toolkit.utils import read_bed_file_three_columns
+from ngs_toolkit.utils import to_bed_index
 
 
 def parse_arguments():
@@ -40,7 +43,7 @@ def parse_arguments():
     return parser
 
 
-def main() -> int:
+def main():
     """Measure coverage of BAM file in BED file regions."""
     print("Parsing CLI.")
     args = parse_arguments().parse_args()

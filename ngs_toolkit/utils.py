@@ -190,7 +190,7 @@ def submit_job(
     log_file : :obj:`str`
         Log file to write job output to.
 
-        Defaults to `job_file` with ".log" ending.
+        Defaults to ``job_file`` with ".log" ending.
     computing_configuration : :obj:`str`
         Name of :class:`divvy` computing configuration to use.
 
@@ -198,12 +198,12 @@ def submit_job(
     dry_run: :obj:`bool`
         Whether not to actually run job.
 
-        Defaults to False.
+        Defaults to :obj:`False`.
     limited_number: :obj:`bool`
         Whether to restrict jobs to a maximum number.
         Currently only possible if using "slurm".
 
-        Defaults to False.
+        Defaults to :obj:`False`.
     total_job_lim : :obj:`int`
         Maximum number of jobs to restrict to.
 
@@ -290,7 +290,7 @@ def submit_job(
 
 def chunks(l, n):
     """
-    Partition iterable in chunks of size `n`.
+    Partition iterable `l` in chunks of size `n`.
 
     Parameters
     ----------

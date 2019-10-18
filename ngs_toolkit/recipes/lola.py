@@ -5,9 +5,10 @@ A helper script to run Location Overlap Analysis (LOLA)
 of a single region set in various sets of region-based annotations.
 """
 
-from argparse import ArgumentParser
 import os
 import sys
+
+from argparse import ArgumentParser
 from ngs_toolkit.general import lola
 
 

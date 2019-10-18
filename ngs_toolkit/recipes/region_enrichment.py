@@ -5,12 +5,13 @@ A helper script to run enrichment analysis
 of a single region set in region-based set of annotations.
 """
 
-from argparse import ArgumentParser
 import os
+import pandas as pd
 import sys
+
+from argparse import ArgumentParser
 from ngs_toolkit.atacseq import ATACSeqAnalysis
 from ngs_toolkit.utils import bed_to_index
-import pandas as pd
 
 
 def parse_arguments():

@@ -12,14 +12,17 @@ It is also capable of parallelizing work in jobs.
 """
 
 
-from argparse import ArgumentParser
 import os
 import sys
 
+from argparse import ArgumentParser
+
 import pandas as pd
 
+from ngs_toolkit import _CONFIG
+from ngs_toolkit import _LOGGER
+from ngs_toolkit import __version__
 from peppy import Project
-from ngs_toolkit import _LOGGER, _CONFIG, __version__
 
 
 def parse_arguments():

@@ -20,4 +20,5 @@ jinja2>=2.10.1
 natsort>=6.0.0
 rpy2==3.0.0
 
+tzlocal
 cffi<1.13.0

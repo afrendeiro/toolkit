@@ -23,6 +23,15 @@ Changed
   - More simplicity and abstraction for functions in main :class:`ngs_toolkit.analysis.Analysis` class.
 
 
+[0.19.3] - 2019-10-18
+*****************************
+
+Changed
+-----------------------------
+
+  - Pin cffi version to fix `bug in rpy2 with specific cffi version <https://bitbucket.org/rpy2/rpy2/issues/591/>`_.
+
+
 [0.19.2] - 2019-10-13
 *****************************
 

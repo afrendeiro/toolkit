@@ -17,7 +17,7 @@ divvy>=0.4.0
 attmap>=0.12.9
 requests>=2.21.0
 jinja2>=2.10.1
-rpy2==3.2.0
 natsort>=6.0.0
+rpy2==3.0.0
 
 cffi<1.13.0

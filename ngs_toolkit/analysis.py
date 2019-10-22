@@ -1188,7 +1188,8 @@ class Analysis(object):
             overwrite=False,
     ):
         """
-        Get genome-centric resources used by several `ngs_toolkit` analysis functions.
+        Get genome-centric resources used by several ``ngs_toolkit`` analysis
+        functions.
 
         Parameters
         ----------
@@ -1214,8 +1215,9 @@ class Analysis(object):
         output_dir : :obj:`str`, optional
             Directory to save results to.
 
-            Defaults to the value of ``preferences:root_reference_dir`` in the configuration,
-            if that is not set, to a directory called "reference" in the analysis root directory.
+            Defaults to the value of ``preferences:root_reference_dir`` in the
+            configuration, if that is not set, to a directory called "reference"
+             in the analysis root directory.
         overwrite: :obj:`bool`, optional
             Whether existing files should be overwritten by new ones.
             Otherwise they will be kept and no action is made.
@@ -1225,9 +1227,11 @@ class Analysis(object):
         Returns
         -------
         : dict
-            Dictionary with keys same as the options as steps, containing paths to the requested files.
-            The values of the 'genome' step are also a dictionary with keys "2bit" and "fasta" for
-            each file type respectively.
+            Dictionary with keys same as the options as steps, containing paths
+            to the requested files.
+
+            The values of the 'genome' step are also a dictionary with keys
+            "2bit" and "fasta" for each file type respectively.
         """
         from ngs_toolkit.general import (
             get_genome_reference,
@@ -1335,14 +1339,14 @@ class Analysis(object):
         Attributes
         ----------
         matrix_norm : :class:`pandas.DataFrame`
-            If ``assign`` is True, a :class:`pandas.DataFrame` normalized with respective method.
+            If ``assign``, a :class:`pandas.DataFrame` normalized with respective method.
         norm_method : :obj:`str`
             If ``assign``, it is the name of method used to normalize: "rpm".
 
         Returns
         -------
         :class:`pandas.DataFrame`
-            Normalized pandas DataFrame.
+            Normalized dataframe.
         """
         to_norm = self.get_matrix(matrix=matrix, samples=samples)
         # apply normalization over total
@@ -1418,14 +1422,14 @@ class Analysis(object):
         Attributes
         ----------
         matrix_norm : :class:`pandas.DataFrame`
-            If `assign` is True, a pandas DataFrame normalized with respective method.
+            If ``assign``, a pandas DataFrame normalized with respective method.
         norm_method : :obj:`str`
             If ``assign``, it is the name of method used to normalize: "quantile".
 
         Returns
         -------
         :class:`pandas.DataFrame`
-            Normalized pandas DataFrame.
+            Normalized dataframe.
         """
         from ngs_toolkit.utils import normalize_quantiles_r, normalize_quantiles_p
 
@@ -1507,14 +1511,14 @@ class Analysis(object):
         Attributes
         ----------
         matrix_norm : :class:`pandas.DataFrame`
-            If `assign` is True, a pandas DataFrame normalized with respective method.
+            If ``assign``, a pandas DataFrame normalized with respective method.
         norm_method : :obj:`str`
             If ``assign``, it is the name of method used to normalize: "median".
 
         Returns
         -------
         :class:`pandas.DataFrame`
-            Normalized pandas DataFrame.
+            Normalized dataframe.
         """
         matrix = self.get_matrix(matrix, samples=samples)
 
@@ -1571,14 +1575,14 @@ class Analysis(object):
         Attributes
         ----------
         matrix_norm : :class:`pandas.DataFrame`
-            If `assign` is True, a pandas DataFrame normalized with respective method.
+            If ``assign``, a pandas DataFrame normalized with respective method.
         norm_method : :obj:`str`
             If ``assign``, it is the name of method used to normalize: "pca".
 
         Returns
         -------
         :class:`pandas.DataFrame`
-            Normalized pandas DataFrame.
+            Normalized dataframe.
         """
         from ngs_toolkit.general import subtract_principal_component
 
@@ -1644,14 +1648,14 @@ class Analysis(object):
         Attributes
         ----------
         matrix_norm : :class:`pandas.DataFrame`
-            If `assign` is True, a DataFrame normalized with VST method.
+            If ``assign``, a DataFrame normalized with VST method.
         norm_method : :obj:`str`
             If ``assign``, it is the name of method used to normalize: "vst".
 
         Returns
         -------
         :class:`pandas.DataFrame`
-            Normalized pandas DataFrame.
+            Normalized dataframe.
         """
         from rpy2.robjects import numpy2ri, pandas2ri, r
         from rpy2.robjects.packages import importr
@@ -1695,6 +1699,7 @@ class Analysis(object):
         method : :obj:`str`, optional
             Normalization method to apply. One of:
              - ``rpm``: Reads per million normalization (RPM).
+             - ``vst``: Variance stabilization transformation (uses ``DESeq2`` R package).
              - ``quantile``: Quantile normalization and log2 transformation.
              - ``cqn``: Conditional quantile normalization (uses ``cqn`` R package).
                       Only available for ATAC-seq.
@@ -1727,14 +1732,14 @@ class Analysis(object):
         Attributes
         ----------
         matrix_norm : :class:`pandas.DataFrame`
-            If `assign` is True, a pandas DataFrame normalized with respective method.
+            If ``assign``, a pandas DataFrame normalized with respective method.
         norm_method : :obj:`str`
             If ``assign``, it is the ``method`` used to normalize.
 
         Returns
         -------
         :class:`pandas.DataFrame`
-            Normalized pandas DataFrame.
+            Normalized dataframe.
         """
         if method == "rpm":
             return self.normalize_rpm(
@@ -1812,7 +1817,7 @@ class Analysis(object):
         samples : :obj:`list`
             Iterable of :class:`peppy.Sample` objects to restrict matrix to.
 
-            Default (:obj:`None` is passed) is not to subset matrix.
+            Default is not to subset matrix.
         save : :obj:`bool`, optional
             Whether to write normalized DataFrame to disk.
 
@@ -1890,7 +1895,7 @@ class Analysis(object):
         samples : :obj:`list`
             Iterable of :class:`peppy.Sample` objects to restrict matrix to.
 
-            Default (:obj:`None` is passed) is not to subset matrix.
+            Default is not to subset matrix.
 
         Returns
         -------

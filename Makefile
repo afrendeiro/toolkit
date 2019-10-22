@@ -93,6 +93,7 @@ clean_dist:
 
 clean_build:
 	rm -fr build/
+	rm -rf ngs_toolkit/_version.py
 
 clean_eggs:
 	rm -fr ngs_toolkit.egg-info

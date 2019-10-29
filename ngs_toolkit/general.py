@@ -44,7 +44,7 @@ def get_genome_reference(
     overwrite: :obj:`bool`, optional
         Whether existing files should be overwritten by new ones.
         Otherwise they will be kept and no action is made.
-        Defaults to True.
+        Defaults to :obj:`True`.
 
     Returns
     -------
@@ -265,7 +265,7 @@ def get_blacklist_annotations(
     overwrite: :obj:`bool`, optional
         Whether existing files should be overwritten by new ones.
         Otherwise they will be kept and no action is made.
-        Defaults to True.
+        Defaults to :obj:`True`.
 
     Returns
     -------
@@ -304,7 +304,12 @@ def get_blacklist_annotations(
             genome_assembly
         )
 
-    download_gzip_file(url, output_file)
+    try:
+        download_gzip_file(url, output_file)
+    except OSError:
+        msg = "Could not download file: {}".format(url)
+        _LOGGER.error(msg)
+        raise OSError(msg)
     return output_file
 
 
@@ -334,7 +339,7 @@ def get_tss_annotations(
 
     save: :obj:`bool`, optional
         Whether to save to disk under ``output_dir``.
-        Defaults to True.
+        Defaults to :obj:`True`.
 
     output_dir : :obj:`str`, optional
         Directory to write output to.
@@ -352,7 +357,7 @@ def get_tss_annotations(
     overwrite: :obj:`bool`, optional
         Whether existing files should be overwritten by new ones.
         Otherwise they will be kept and no action is made.
-        Defaults to True.
+        Defaults to :obj:`True`.
 
     Returns
     -------
@@ -514,7 +519,7 @@ def get_genomic_context(
 
     save: :obj:`bool`, optional
         Whether to save to disk under ``output_dir``.
-        Defaults to True.
+        Defaults to :obj:`True`.
 
     output_dir : :obj:`str`, optional
         Directory to write output to.
@@ -531,7 +536,7 @@ def get_genomic_context(
     overwrite: :obj:`bool`, optional
         Whether existing files should be overwritten by new ones.
         Otherwise they will be kept and no action is made.
-        Defaults to True.
+        Defaults to :obj:`True`.
 
     Returns
     -------
@@ -724,6 +729,69 @@ def get_genomic_context(
     return annot
 
 
+def get_chromosome_sizes(
+    organism, genome_assembly=None, output_dir=None, overwrite=True
+):
+    """
+    Get a file with the sizes of chromosomes in a given organism/genome assembly.
+    Saves results to disk and returns a path to a text file.
+
+    Parameters
+    ----------
+    organism : :obj:`str`
+        Organism to get chromosome sizes for.
+        Currently supported: "human" and "mouse".
+
+    genome_assembly : :obj:`str`, optional
+        Ensembl assembly/version to use.
+        Default for "human" is "hg19/grch37" and for "mouse" is "mm10/grcm38".
+
+    output_dir : :obj:`str`, optional
+        Directory to write output to.
+
+        Defaults to "reference" in current directory.
+    overwrite: :obj:`bool`, optional
+        Whether existing files should be overwritten by new ones.
+        Otherwise they will be kept and no action is made.
+
+        Defaults to :obj:`True`.
+
+    Returns
+    -------
+    str
+        Path to text file with chromosome sizes.
+    """
+    import pybedtools
+
+    if output_dir is None:
+        output_dir = os.path.join(os.path.abspath(os.path.curdir), "reference")
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+    organisms = {"human": "hg19", "mouse": "mm10"}
+    if genome_assembly is None:
+        genome_assembly = organisms[organism]
+        _LOGGER.warning(
+            "Genome assembly not selected. Using assembly '{}' for '{}'.".format(
+                genome_assembly, organism
+            )
+        )
+
+    output_file = os.path.join(
+        output_dir, "{}.{}.chromosome_sizes.txt".format(organism, genome_assembly)
+    )
+    if os.path.exists(output_file) and (not overwrite):
+        msg = "Annotation file already exists and 'overwrite' is set to False."
+        hint = " Returning existing annotation file: {}".format(output_file)
+        _LOGGER.warning(msg + hint)
+        return output_file
+
+    sizes = pybedtools.get_chromsizes_from_ucsc(genome_assembly)
+    with open(output_file, "w") as handle:
+        for chrom, (_, size) in sizes.items():
+            handle.write("{}\t{}\n".format(chrom, size))
+    return output_file
+
+
 def deseq_analysis(
         count_matrix,
         experiment_matrix,
@@ -768,7 +836,7 @@ def deseq_analysis(
         Prefix to add to produced files.
 
     overwrite: :obj:`bool`, optional
-        Whether files existing should be overwritten. Defaults to True.
+        Whether files existing should be overwritten. Defaults to :obj:`True`.
 
     alpha : number, optional
         Significance level to reject null hypothesis.
@@ -961,7 +1029,7 @@ def least_squares_fit(
         Null model design in R/patsy notation. Defaults to "~ 1".
 
     standardize_data: :obj:`bool`, optional
-        Whether data should be standardized prior to fitting. Defaults to True.
+        Whether data should be standardized prior to fitting. Defaults to :obj:`True`.
 
     multiple_correction_method : :obj:`str`, optional
         Method to use for multiple test correction.

@@ -528,11 +528,13 @@ def timedelta_to_years(x):
 
 def signed_max(x, f=0.66, axis=0):
     """
-    Return maximum or minimum of array `x` depending on the sign of the majority of values.
-    If there isn't a clear majority (at least `f` fraction in one side), return mean of values.
-    If given a pandas DataFrame or 2D numpy array, will apply this across rows (columns-wise, axis=0)
-    or across columns (row-wise, axis=1).
-    Will return NaN for non-numeric values.
+    Return maximum or minimum of array ``x`` depending on the sign of the
+    majority of values.
+    If there isn't a clear majority (at least ``f`` fraction in one side),
+    return mean of values.
+    If given a pandas DataFrame or 2D numpy array, will apply this across rows
+    (columns-wise, axis=0) or across columns (row-wise, axis=1).
+    Will return :obj:`numpy.nan` for non-numeric values.
 
     Parameters
     ----------
@@ -543,7 +545,8 @@ def signed_max(x, f=0.66, axis=0):
 
         Default is 0.66.
     axis : :obj:`int`
-        Whether to apply across rows (0, column-wise) or across columns (1, row-wise).
+        Whether to apply across rows (0, column-wise) or
+        across columns (1, row-wise).
 
         Default is 0.
 
@@ -585,7 +588,7 @@ def signed_max(x, f=0.66, axis=0):
             x = x.T
         res = pd.Series(np.empty(x.shape[1]), index=x.columns)
         for v in x.columns:
-            res[v] = signed_max(x.loc[:, v])
+            res[v] = signed_max(x.loc[:, v], f=f)
 
         return res
 

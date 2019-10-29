@@ -1181,7 +1181,7 @@ class Analysis(object):
     @check_has_attributes(['organism', 'genome'])
     def get_resources(
             self,
-            steps=["blacklist", "tss", "genomic_context"],
+            steps=["blacklist", "tss", "genomic_context", "chromosome_sizes"],
             organism=None,
             genome_assembly=None,
             output_dir=None,
@@ -1201,6 +1201,7 @@ class Analysis(object):
                  * "blacklist": Locations of blacklisted regions for genome
                  * "tss": Locations of gene"s TSSs
                  * "genomic_context": Genomic context of genome
+                 * "chromosome_sizes": Sizes of chromosomes
 
             Defaults to ["blacklist", "tss", "genomic_context"].
         organism : :obj:`str`, optional
@@ -1238,6 +1239,7 @@ class Analysis(object):
             get_blacklist_annotations,
             get_tss_annotations,
             get_genomic_context,
+            get_chromosome_sizes,
         )
         from ngs_toolkit.utils import get_this_file_or_timestamped
 
@@ -1252,7 +1254,7 @@ class Analysis(object):
             if output_dir is None:
                 output_dir = os.path.join(self.root_dir, "reference")
 
-        args = {
+        kwargs = {
             "organism": organism,
             "genome_assembly": genome_assembly,
             "output_dir": output_dir,
@@ -1264,19 +1266,19 @@ class Analysis(object):
         if "genome" in steps:
             output["genome_file"] = dict()
             output["genome_file"]["2bit"] = get_genome_reference(
-                file_format="2bit", **args
+                file_format="2bit", **kwargs
             )
             fasta = output["genome_file"]["2bit"].replace(".2bit", ".fa")
             if os.path.exists(fasta):
                 output["genome_file"]["fasta"] = fasta
             else:
                 output["genome_file"]["fasta"] = get_genome_reference(
-                    file_format="fasta", **args
+                    file_format="fasta", **kwargs
                 )
         if "blacklist" in steps:
-            output["blacklist_file"] = get_blacklist_annotations(**args)
+            output["blacklist_file"] = get_blacklist_annotations(**kwargs)
         if "tss" in steps:
-            get_tss_annotations(**args)
+            get_tss_annotations(**kwargs)
             output["tss_file"] = get_this_file_or_timestamped(os.path.join(
                 output_dir,
                 "{}.{}.gene_annotation.protein_coding.tss.bed".format(
@@ -1284,12 +1286,14 @@ class Analysis(object):
                 ),
             ))
         if "genomic_context" in steps:
-            get_genomic_context(**args)
+            get_genomic_context(**kwargs)
             output["genomic_context_file"] = os.path.join(
                 output_dir,
                 "{}.{}.genomic_context.bed".format(self.organism, mapping[self.genome]),
             )
 
+        if "chromosome_sizes" in steps:
+            output["chromosome_sizes_file"] = get_chromosome_sizes(**kwargs)
         return output
 
     def normalize_rpm(

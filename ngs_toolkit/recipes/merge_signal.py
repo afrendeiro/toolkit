@@ -9,6 +9,12 @@ is also capable of producing this for nucleosomal/nucleosomal free signal
 based on fragment length distribution if data is paired-end sequenced.
 This signal may optionally be normalized for each group.
 It is also capable of parallelizing work in jobs.
+
+Software requirements:
+
+ * samtools
+ * sambamba
+ * deeptools
 """
 
 
@@ -19,10 +25,10 @@ from argparse import ArgumentParser
 
 import pandas as pd
 
-from ngs_toolkit import _CONFIG
 from ngs_toolkit import _LOGGER
 from ngs_toolkit import __version__
-from peppy import Project
+from ngs_toolkit import Analysis
+from ngs_toolkit.general import get_chromosome_sizes
 
 
 def parse_arguments():
@@ -69,7 +75,7 @@ def parse_arguments():
         "--normalize",
         action="store_true",
         dest="normalize",
-        help="Whether tracks should be normalized to total sequenced " "depth.",
+        help="Whether tracks should be normalized to total sequenced depth.",
     )
     parser.add_argument(
         "--nucleosome",
@@ -104,61 +110,43 @@ def parse_arguments():
 
 def main():
     args = parse_arguments().parse_args()
-    # args = parser.parse_args('-t ATAC-seq metadata/project_config.yaml'.split(" "))
-
     _LOGGER.info(
-        "This is the 'merge_signal' recipe from ngs_toolkit, version: %s", __version__
+        "This is the 'merge_signal' recipe from ngs_toolkit, "
+        "version: %s", __version__
     )
     # Start project
     _LOGGER.debug(
-        "Starting peppy project with project configuration file: '%s'", args.config_file
+        "Starting Analysis with PEP project configuration file: "
+        "'%s'", args.config_file
     )
-    prj = Project(args.config_file)
-    _LOGGER.debug(
-        "Changing directory to project root directory: '%s'.",
-        prj.metadata.output_dir
-    )
-    os.chdir(prj.metadata.output_dir)
+    an = Analysis(from_pep=args.config_file)
     if args.pass_qc:
         _LOGGER.info(
-            "Filtering samples out which didn't pass QC as specified in sample \
-                      annotation in column 'pass_qc'"
+            "Filtering samples out which didn't pass QC as specified in sample "
+            "annotation in column 'pass_qc'"
         )
-        prj._samples = [
-            s for s in prj._samples if s.pass_qc not in ["0", 0, "False", False]
+        an.samples = [
+            s for s in an.samples if s.pass_qc not in ["0", 0, "False", False]
         ]
-    _LOGGER.debug("Setting location of sample files dependent on sample types.")
-    for sample in prj.samples:
-        if hasattr(sample, "protocol"):
-            sample.library = sample.protocol
 
-        if sample.library in ["ATAC-seq", "ChIP-seq", "ChIPmentation"]:
-            sample.mapped = os.path.join(
-                sample.paths.sample_root, "mapped", sample.name + ".trimmed.bowtie2.bam"
-            )
-            sample.filtered = os.path.join(
-                sample.paths.sample_root,
-                "mapped",
-                sample.name + ".trimmed.bowtie2.filtered.bam",
-            )
-            sample.peaks = os.path.join(
-                sample.paths.sample_root, "peaks", sample.name + "_peaks.narrowPeak"
-            )
-
-    if prj.samples:
+    if an.samples:
         print(
             "Samples under consideration: '{}'. ".format(
-                ",".join([s.name for s in prj.samples])
+                ",".join([s.name for s in an.samples])
             )
-            + "\nTotal of {} samples.".format(len([s.name for s in prj.samples]))
+            + "\nTotal of {} samples.".format(len([s.name for s in an.samples]))
         )
     else:
         raise ValueError("There were no valid samples after filtering for quality!")
 
     # Get only samples with signal
-    key = "protocol" if "protocol" in prj.sheet.columns else "library"
-    sheet = prj.sheet[prj.sheet[key].isin(["ATAC-seq", "ChIP-seq", "ChIPmentation"])]
-    sheet = sheet.loc[sheet["sample_name"].isin([s.name for s in prj.samples])]
+    an.samples = [
+        s for s in an.samples
+        if getattr(s, "protocol", None)
+        in ["ATAC-seq", "ChIP-seq", "ChIPmentation"]]
+    an.set_organism_genome()
+    sheet = an.prj.sheet.reindex([s.name for s in an.samples])
+
     _LOGGER.info(
         "Selecting samples with appropriate data type."
         "\nSamples under consideration: '%s'. "
@@ -169,13 +157,13 @@ def main():
 
     # Get default attributes if not set
     if args.attributes is None:
-        if "group_attributes" in prj:
-            args.attributes = prj.group_attributes
+        if an.group_attributes:
+            args.attributes = an.group_attributes
         else:
             _LOGGER.error(
                 "Sample attributes to group by were not set and none could be"
                 " found in project configuration file!"
-                "\nAborting!"
+                " Aborting!"
             )
             return 1
     else:
@@ -185,15 +173,19 @@ def main():
             args.attributes = [args.attributes]
 
     _LOGGER.info(
-        "Using the following attributes to merge samples: '%s', resulting in a total of %i groups.",
-        ", ".join(args.attributes),
+        "Using the following attributes to merge samples: '%s',"
+        "resulting in a total of %i groups.",
+        "', '".join(args.attributes),
         len(sheet.groupby(args.attributes).groups.items())
     )
 
+    chrom_sizes_file = get_chromosome_sizes(an.organism, an.genome)
+
     merge_signal(
         sheet,
-        prj.samples,
+        an.samples,
         args.attributes,
+        chrom_sizes_file,
         output_dir=args.output_dir,
         normalize=args.normalize,
         nucleosome=args.nucleosome,
@@ -208,6 +200,7 @@ def merge_signal(
         sheet,
         samples,
         attributes,
+        chrom_sizes_file,
         output_dir="merged",
         normalize=True,
         nucleosome=False,
@@ -234,16 +227,14 @@ def merge_signal(
         os.makedirs(output_dir)
 
     for attrs, index in sheet.groupby(attributes).groups.items():
-        if isinstance(attrs, list):
-            name = "_".join([a for a in attrs if not pd.isnull(a)])
-        else:
-            name = attrs
+        name = "_".join([a for a in attrs if not pd.isnull(a)])
+        print(name)
         name = re.sub(r"_{2}", "_", name)
         name = re.sub(r"_$", "", name)
         sample_subset = [
             s for s in samples if s.name in sheet.loc[index, "sample_name"].tolist()
         ]
-        bams = [s.filtered for s in sample_subset]
+        bams = [s.aligned_filtered_bam for s in sample_subset]
 
         genomes = list(set(s.genome for s in sample_subset))
         if len(genomes) != 1:
@@ -269,70 +260,40 @@ def merge_signal(
 
         # Get region databases from config
         _LOGGER.debug(
-            "Getting genome assembly chromosome sizes for genome '{}' from configuration.".format(
-                genome
-            )
-        )
-
-        msg = "Genome assembly chromosome sizes database values in configuration could not be found or understood. "
-        msg += "Please add a path to this file to this section 'resources:genomes:chrom_sizes:{}'. ".format(
+            "Getting genome assembly chromosome sizes for genome "
+            "'%s' from configuration.",
             genome
         )
-        msg += "For an example, see https://github.com/afrendeiro/toolkit/tree/master/ngs_toolkit/config/example.yaml"
-        try:
-            chrom_sizes = _CONFIG["resources"]["genomes"]["chrom_sizes"][genome]
-        except KeyError:
-            _LOGGER.error(msg)
-            return
-        transient_file = os.path.abspath(re.sub(r"\.bigWig", "", output_bigwig))
 
         # Prepare commands
         cmds = ["#!/bin/sh", "date"]
 
         # # merge bams
-        cmd = """samtools merge {0} {1}; sambamba sort -t 8 {0}""".format(
-            output_bam, " ".join(bams)
+        # # # (these two commands are joined because I want to point only
+        # # # to the target of the second)
+        cmd = """samtools merge \\\n{0} \\\n{1};\n\nsambamba sort -t 8 \\\n{0}\n""".format(
+            output_bam, " \\\n".join(bams)
         )
         cmds += [add_cmd(cmd, target=output_sorted_bam, overwrite=overwrite)]
 
         # # bigWig file
-        cmd = "\n".join(
-            [
-                "bedtools bamtobed -i {0} |".format(output_sorted_bam)
-                + " bedtools slop -i stdin -g {0} -s -l 0 -r 130 |".format(chrom_sizes)
-                + " fix_bedfile_genome_boundaries.py {0} |".format(genome)
-                + " genomeCoverageBed -bg -g {0} -i stdin > {1}.cov".format(
-                    chrom_sizes, transient_file
-                ),
-                "awk 'NR==FNR{{sum+= $4; next}}{{ $4 = ($4 / sum) * 1000000; print}}' {0}.cov {0}.cov > {0}.normalized.cov".format(
-                    transient_file
-                )
-                if normalize
-                else "",
-                "bedGraphToBigWig {0}{1}.cov {2} {3}".format(
-                    transient_file,
-                    ".normalized" if normalize else "",
-                    chrom_sizes,
-                    output_bigwig,
-                ),
-                "if [[ -s {0}.cov ]]\nthen rm {0}.cov\nfi".format(transient_file),
-                "if [[ -s {0}.normalized.cov ]]\nthen rm {0}.normalized.cov\nfi".format(
-                    transient_file
-                ),
-            ]
-        )
+        cmd = bam_to_bigwig(output_sorted_bam, output_bigwig, genome) + "\n"
         cmds += [add_cmd(cmd, target=output_bigwig, overwrite=overwrite)]
 
         if nucleosome:
-            cmd = """sambamba view -f bam -t {} -o {} -F "(template_length < 100) and (template_length > -100)" {}""".format(
-                cpus, output_nucleosome_free_reads, output_sorted_bam
-            )
+            cmd = (
+                "sambamba view -f bam \\\n"
+                "-t {} \\\n-o {} \\\n-F '(template_length < 100) "
+                "and (template_length > -100)' \\\n{}\n"
+            ).format(cpus, output_nucleosome_free_reads, output_sorted_bam)
             cmds += [
                 add_cmd(cmd, target=output_nucleosome_free_reads, overwrite=overwrite)
             ]
-            cmd = """sambamba view -f bam -t {} -o {} -F "((template_length > 180) and (template_length < 247)) or ((template_length < -180) and (template_length > -247))" {}""".format(
-                cpus, output_nucleosome_reads, output_sorted_bam
-            )
+            cmd = (
+                "sambamba view -f bam -t {} \\\n-o {} \\\n"
+                "-F '((template_length > 180) and (template_length < 247)) \\"
+                "or ((template_length < -180) and (template_length > -247))' \\\n{}\n"
+            ).format(cpus, output_nucleosome_reads, output_sorted_bam)
             cmds += [add_cmd(cmd, target=output_nucleosome_reads, overwrite=overwrite)]
 
         job = "\n".join(cmds + ["date"]) + "\n"
@@ -344,13 +305,39 @@ def merge_signal(
             continue
         if as_job:
             subprocess.call(
-                "sbatch -p longq --time 4-00:00:00 "
-                + "-J merge_signal.{} -o {} -c {} --mem 80000 {}".format(
-                    name, log_file, cpus, job_file
-                ).split(" ")
+                (
+                    "sbatch -p longq --time 4-00:00:00 "
+                    "-J merge_signal.{} -o {} -c {} --mem 80000 {}")
+                .format(name, log_file, cpus, job_file)
+                .split(" ")
             )
         else:
             subprocess.call("sh {}".format(job_file).split(" "))
+
+
+def bam_to_bigwig(
+        input_bam, output_bigwig, genome_assembly,
+        normalization_method="RPGC"):
+    from collections import defaultdict
+
+    if genome_assembly not in ['hg19', 'hg38', 'mm10', 'mm9']:
+        print(
+            "Genome assembly is not known."
+            "Using size of human genome. Beware.")
+
+    genome_size = defaultdict(lambda: 3300000000)
+    for g in ['mm9', 'mm10']:
+        genome_size[g] = 2800000000
+
+    cmd = "bamCoverage \\\n--bam {bam_file} \\\n-o {bigwig} \\\n"
+    cmd += " -p max --binSize 10  --normalizeUsing {norm} "
+    cmd += "--effectiveGenomeSize {genome_size} --extendReads 175"""
+    cmd = cmd.format(
+        bam_file=input_bam,
+        bigwig=output_bigwig,
+        norm=normalization_method,
+        genome_size=genome_size[genome_assembly])
+    return cmd
 
 
 if __name__ == "__main__":

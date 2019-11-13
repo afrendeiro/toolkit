@@ -108,8 +108,8 @@ def parse_arguments():
     return parser
 
 
-def main():
-    args = parse_arguments().parse_args()
+def main(cli=None):
+    args = parse_arguments().parse_args(cli)
     _LOGGER.info(
         "This is the 'merge_signal' recipe from ngs_toolkit, "
         "version: %s", __version__
@@ -254,8 +254,14 @@ def merge_signal(
         output_nucleosome_free_reads = os.path.join(
             output_dir, name + ".nucleosome_free_reads.bam"
         )
+        output_nucleosome_free_reads_bigwig = os.path.join(
+            output_dir, name + ".nucleosome_free_reads.bigWig"
+        )
         output_nucleosome_reads = os.path.join(
-            output_dir, name + ".nucleosome_free_reads.bam"
+            output_dir, name + ".nucleosome_reads.bam"
+        )
+        output_nucleosome_reads_bigwig = os.path.join(
+            output_dir, name + ".nucleosome_reads.bigWig"
         )
 
         # Get region databases from config
@@ -291,10 +297,26 @@ def merge_signal(
             ]
             cmd = (
                 "sambamba view -f bam -t {} \\\n-o {} \\\n"
-                "-F '((template_length > 180) and (template_length < 247)) \\"
+                "-F '((template_length > 180) and (template_length < 247)) "
                 "or ((template_length < -180) and (template_length > -247))' \\\n{}\n"
             ).format(cpus, output_nucleosome_reads, output_sorted_bam)
             cmds += [add_cmd(cmd, target=output_nucleosome_reads, overwrite=overwrite)]
+
+            cmd = bam_to_bigwig(
+                output_nucleosome_reads,
+                output_nucleosome_reads_bigwig, genome) + "\n"
+            cmds += [add_cmd(
+                cmd,
+                target=output_nucleosome_reads_bigwig,
+                overwrite=overwrite)]
+
+            cmd = bam_to_bigwig(
+                output_nucleosome_free_reads,
+                output_nucleosome_free_reads_bigwig, genome) + "\n"
+            cmds += [add_cmd(
+                cmd,
+                target=output_nucleosome_free_reads_bigwig,
+                overwrite=overwrite)]
 
         job = "\n".join(cmds + ["date"]) + "\n"
 

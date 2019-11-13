@@ -1181,7 +1181,7 @@ class Analysis(object):
     @check_has_attributes(['organism', 'genome'])
     def get_resources(
             self,
-            steps=["blacklist", "tss", "genomic_context", "chromosome_sizes"],
+            steps=["blacklist", "tss", "genomic_context"],
             organism=None,
             genome_assembly=None,
             output_dir=None,

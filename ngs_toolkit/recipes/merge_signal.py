@@ -28,12 +28,11 @@ import pandas as pd
 from ngs_toolkit import _LOGGER
 from ngs_toolkit import __version__
 from ngs_toolkit import Analysis
-from ngs_toolkit.general import get_chromosome_sizes
 
 
 def parse_arguments():
     """
-    Global options for analysis.
+    Global options for recipe.
     """
     parser = ArgumentParser(
         prog="python -m ngs_toolkit.recipes.merge_signal", description=__doc__)
@@ -72,10 +71,13 @@ def parse_arguments():
         help="CPUs/Threads to use per job if `--as-jobs` is on.",
     )
     parser.add_argument(
-        "--normalize",
-        action="store_true",
-        dest="normalize",
-        help="Whether tracks should be normalized to total sequenced depth.",
+        "--normalization-method",
+        dest="normalization_method",
+        default="RPGC",
+        help="Method to normalize tracks regarding sequenced depth. "
+        "One of the methods in https://deeptools.readthedocs.io/en/develop/"
+        "content/tools/bamCoverage.html#"
+        "Read%20coverage%20normalization%20options",
     )
     parser.add_argument(
         "--nucleosome",
@@ -126,7 +128,7 @@ def main(cli=None):
             "annotation in column 'pass_qc'"
         )
         an.samples = [
-            s for s in an.samples if s.pass_qc not in ["0", 0, "False", False]
+            s for s in an.samples if getattr(s, "pass_qc") not in ["0", 0, "False", False]
         ]
 
     if an.samples:
@@ -179,15 +181,12 @@ def main(cli=None):
         len(sheet.groupby(args.attributes).groups.items())
     )
 
-    chrom_sizes_file = get_chromosome_sizes(an.organism, an.genome)
-
     merge_signal(
         sheet,
         an.samples,
         args.attributes,
-        chrom_sizes_file,
         output_dir=args.output_dir,
-        normalize=args.normalize,
+        normalization_method=args.normalization_method,
         nucleosome=args.nucleosome,
         overwrite=args.overwrite,
         cpus=args.cpus,
@@ -200,9 +199,8 @@ def merge_signal(
         sheet,
         samples,
         attributes,
-        chrom_sizes_file,
         output_dir="merged",
-        normalize=True,
+        normalization_method="RPGC",
         nucleosome=False,
         overwrite=False,
         cpus=8,
@@ -210,6 +208,7 @@ def merge_signal(
         dry_run=False,
 ):
     """
+    Merge signal for ``samples`` aggregated by the attributes in ``attributes``.
     """
     import re
     import subprocess
@@ -283,7 +282,12 @@ def merge_signal(
         cmds += [add_cmd(cmd, target=output_sorted_bam, overwrite=overwrite)]
 
         # # bigWig file
-        cmd = bam_to_bigwig(output_sorted_bam, output_bigwig, genome) + "\n"
+        cmd = bam_to_bigwig(
+            output_sorted_bam,
+            output_bigwig,
+            genome,
+            normalization_method=normalization_method,
+            cpus=cpus) + "\n"
         cmds += [add_cmd(cmd, target=output_bigwig, overwrite=overwrite)]
 
         if nucleosome:
@@ -339,7 +343,31 @@ def merge_signal(
 
 def bam_to_bigwig(
         input_bam, output_bigwig, genome_assembly,
-        normalization_method="RPGC"):
+        normalization_method="RPGC", cpus="8"):
+    """
+    Convert BAM file to BigWig format using deeptools bamCoverage.
+
+    Parameters
+    ----------
+    input_bam : str
+        Input BAM file.
+    output_bigwig : str
+        Output BigWig file.
+    genome_assembly : str
+        Genome assembly of the BAM file.
+        One of 'hg19', 'hg38', 'mm10', 'mm9'.
+        Otherwise will assume size of human genome.
+    normalization_method : {str}, optional
+        Method to normalize tracks regarding sequenced depth.
+        One of the methods in https://deeptools.readthedocs.io/en/develop/content/tools/bamCoverage.html#Read%20coverage%20normalization%20options
+
+        Default is "RPGC".
+
+    Returns
+    -------
+    str
+        Command to execute.
+    """
     from collections import defaultdict
 
     if genome_assembly not in ['hg19', 'hg38', 'mm10', 'mm9']:
@@ -348,17 +376,18 @@ def bam_to_bigwig(
             "Using size of human genome. Beware.")
 
     genome_size = defaultdict(lambda: 3300000000)
-    for g in ['mm9', 'mm10']:
-        genome_size[g] = 2800000000
+    for gen in ['mm9', 'mm10']:
+        genome_size[gen] = 2800000000
 
     cmd = "bamCoverage \\\n--bam {bam_file} \\\n-o {bigwig} \\\n"
-    cmd += " -p max --binSize 10  --normalizeUsing {norm} "
+    cmd += "-p {cpus} --binSize 10  --normalizeUsing {norm} \\\n"
     cmd += "--effectiveGenomeSize {genome_size} --extendReads 175"""
     cmd = cmd.format(
         bam_file=input_bam,
         bigwig=output_bigwig,
         norm=normalization_method,
-        genome_size=genome_size[genome_assembly])
+        genome_size=genome_size[genome_assembly],
+        cpus=cpus)
     return cmd
 
 

@@ -390,7 +390,7 @@ class ATACSeqAnalysis(Analysis):
 
         f = tempfile.NamedTemporaryFile()
         with open(f.name, "a") as handle:
-            for i, sample in tqdm(enumerate(samples), total=len(samples), desc="Sample"):
+            for sample in tqdm(samples, total=len(samples), desc="Sample"):
                 try:
                     file = pybedtools.BedTool(sample.summits) \
                         .slop(b=extension, genome=sample.genome).fn \
@@ -740,8 +740,8 @@ class ATACSeqAnalysis(Analysis):
                 prefix = os.path.join(output_dir, s.name + ".{}_coverage"
                                       .format(peak_set_name))
                 output_file = prefix + ".bed"
-                log_file = prefix + ".log".format(peak_set_name)
-                job_file = prefix + ".sh".format(peak_set_name)
+                log_file = prefix + ".log"
+                job_file = prefix + ".sh"
                 if not overwrite:
                     if os.path.exists(output_file):
                         continue
@@ -859,7 +859,7 @@ class ATACSeqAnalysis(Analysis):
 
         # Read in counts
         matrix_raw = list()
-        for i, sample in tqdm(enumerate(samples), total=len(samples)):
+        for sample in tqdm(samples, total=len(samples)):
             cov = pd.read_csv(
                 sample._coverage,
                 sep="\t",

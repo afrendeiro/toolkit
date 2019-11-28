@@ -1369,15 +1369,17 @@ def differential_from_bivariate_fit(
 #     plt.show()
 
 
-def lola(bed_files, universe_file, output_folder, genome, output_prefixes=None, cpus=8):
+def lola(
+        bed_files, universe_file, output_folder, genome,
+        output_prefixes=None, cpus=8):
     """
     Perform location overlap analysis (LOLA).
 
-    If bed_files is a list with more than one element, use ``output_prefixes`` to pass a list of
-    prefixes to label the output files for each input BED file.
+    If bed_files is a list with more than one element, use ``output_prefixes``
+    to pass a list of prefixes to label the output files for each input BED file.
 
-    Files will be created in ``output_folder`` mimicking the output that the R function
-    LOLA::writeCombinedEnrichment writes.
+    Files will be created in ``output_folder`` mimicking the output that the
+    R function LOLA::writeCombinedEnrichment writes.
 
     Requires the R package "LOLA" to be installed:
 
@@ -1390,25 +1392,29 @@ def lola(bed_files, universe_file, output_folder, genome, output_prefixes=None, 
 
     Parameters
     ----------
-    bed_files : str,list
+    bed_files : {str, list}
         A string path to a BED file or a list of paths.
 
     universe_file : :obj:`str`
-        A path to a BED file representing the universe from where the BED file(s) come from.
+        A path to a BED file representing the universe from where the BED
+        file(s) come from.
 
     output_folder : :obj:`str`
         Output folder for resulting files.
 
     genome : :obj:`str`, optional
         Genome assembly from which the BED files come from.
-        This is used to get the LOLA databases from the ngs_toolkit._CONFIG parameters.
+        This is used to get the LOLA databases from the
+        :obj:`ngs_toolkit._CONFIG` parameters.
 
     output_prefixes : :obj:`list`, optional
-        A list of strings with prefixes to be used in case ``bed_files`` is a list.
+        A list of strings with prefixes to be used in case
+        ``bed_files`` is a list.
 
     cpus : :obj:`int`, optional
         Number of CPUs/threads to use.
-        Defaults to 8
+
+        Defaults to 8.
     """
     from ngs_toolkit.utils import r2pandas_df
     from rpy2.robjects import numpy2ri, pandas2ri, r
@@ -1420,26 +1426,26 @@ def lola(bed_files, universe_file, output_folder, genome, output_prefixes=None, 
 
     # Get region databases from config
     _LOGGER.info(
-        "Getting LOLA databases for genome '{}' from configuration.".format(genome)
-    )
+        "Getting LOLA databases for genome '%s' from configuration.", genome)
 
-    msg = "LOLA database values in configuration could not be found or understood. "
-    msg += "Please add a list of value(s) to this section 'resources:lola:region_databases:{}'. ".format(
-        genome
-    )
-    msg += "For an example, see https://github.com/afrendeiro/toolkit/tree/master/ngs_toolkit/config/example.yaml"
+    msg = (
+        "LOLA database values in configuration could not be found or understood. "
+        "Please add a list of value(s) to this section "
+        "'resources:lola:region_databases:%s'. "
+        "For an example, see "
+        "https://github.com/afrendeiro/toolkit/tree/master/ngs_toolkit/config/example.yaml")
     try:
         databases = _CONFIG["resources"]["lola"]["region_databases"][genome]
     except KeyError:
-        _LOGGER.error(msg)
+        _LOGGER.error(msg, genome)
         raise
 
     if not isinstance(databases, list):
         if isinstance(databases, str):
             databases = list(databases)
         else:
-            _LOGGER.error(msg)
-            raise KeyError(msg)
+            _LOGGER.error(msg, genome)
+            raise KeyError(msg % genome)
 
     if len(databases) < 1:
         _LOGGER.error(msg)
@@ -1449,12 +1455,17 @@ def lola(bed_files, universe_file, output_folder, genome, output_prefixes=None, 
         bed_files = [bed_files]
     if output_prefixes is None:
         if len(bed_files) > 1:
-            msg = "Running more than one BED file at once while only specifying `output_folder` argument"
-            msg += " will cause output files to be named in the form '{output_folder}/{region_database}.{input_file}.tsv'."
-            msg += " To prevent this behaviour, pass a list of arguments to `output_prefixes`."
+            msg = (
+                "Running more than one BED file at once while only specifying "
+                "`output_folder` argument will cause output files to be named "
+                "in the form "
+                "'{output_folder}/{region_database}.{input_file}.tsv'."
+                " To prevent this behaviour, pass a list of arguments to "
+                "`output_prefixes`.")
             _LOGGER.warning(msg)
             output_prefixes = [
-                r.replace(os.path.sep, "__").replace(".bed", ".") for r in bed_files
+                rr.replace(os.path.sep, "__").replace(".bed", ".")
+                for rr in bed_files
             ]
         else:
             output_prefixes = ["."]
@@ -1477,7 +1488,7 @@ def lola(bed_files, universe_file, output_folder, genome, output_prefixes=None, 
             sep="\t",
         )
         for region_set in lola_results["collection"].drop_duplicates():
-            _LOGGER.info("Saving results for collection '{}' only.".format(region_set))
+            _LOGGER.info("Saving results for collection '%s' only.", region_set)
             lola_results[lola_results["collection"] == region_set].to_csv(
                 os.path.join(output_folder, "col_" + region_set + suffix + "tsv"),
                 index=False,
@@ -1497,26 +1508,27 @@ def meme_ame(
     if motif_database_file is None:
         # Get region databases from config
         _LOGGER.info(
-            "Getting 2bit reference genome for genome '{}' from configuration.".format(
-                organism
-            )
-        )
-
-        msg = "Reference genome in 2bit format value in configuration could not be found or understood. "
-        msg += "Please add a list of value(s) to this section 'resources:meme:motif_databases:{}'. ".format(
+            "Getting 2bit reference genome for genome '%s' from configuration.",
             organism
         )
-        msg += "For an example, see https://github.com/afrendeiro/toolkit/tree/master/ngs_toolkit/config/example.yaml"
+
+        msg = (
+            "Reference genome in 2bit format value in configuration could not"
+            "be found or understood. "
+            "Please add a list of value(s) to this section "
+            "'resources:meme:motif_databases:%s'. "
+            "For an example, see "
+            "https://github.com/afrendeiro/toolkit/tree/master/ngs_toolkit/config/example.yaml")
         try:
             motif_database_file = _CONFIG["resources"]["meme"]["motif_databases"][
                 organism
             ]
         except KeyError:
-            _LOGGER.error(msg)
+            _LOGGER.error(msg, organism)
             return
 
         if not isinstance(motif_database_file, str):
-            _LOGGER.error(msg)
+            _LOGGER.error(msg, organism)
             return
 
     # shuffle input in no background is provided
@@ -1529,10 +1541,10 @@ def meme_ame(
         )
         subprocess.call(cmd.split(" "))
 
-    cmd = """
-    ame --bgformat 1 --scoring avg --method ranksum --pvalue-report-threshold 0.05 \\
-    --control {0} -o {1} {2} {3}
-    """.format(
+    cmd = (
+        "ame --bgformat 1 --scoring avg --method ranksum "
+        "--pvalue-report-threshold 0.05 --control {0} -o {1} {2} {3}"
+    ).format(
         background_fasta if background_fasta is not None else shuffled,
         output_dir,
         input_fasta,

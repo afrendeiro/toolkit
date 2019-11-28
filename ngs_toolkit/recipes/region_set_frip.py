@@ -28,23 +28,6 @@ def parse_arguments():
         dest="config_file", help="YAML project configuration file.", type=str
     )
     parser.add_argument(
-        "-d",
-        "--data-type",
-        dest="data_type",
-        default=None,
-        help="Data types to perform analysis on. Will be done separately for each.",
-        type=str,
-    )
-    parser.add_argument(
-        "-n",
-        "--analysis-name",
-        dest="name",
-        default=None,
-        help="Name of analysis. Will be the prefix of output_files. "
-        "By default it will be the name of the Project given in the YAML configuration.",
-        type=str,
-    )
-    parser.add_argument(
         "-r",
         "--region-set",
         dest="region_set",
@@ -63,196 +46,82 @@ def parse_arguments():
         "in the annotation sheet should be used.",
     )
     parser.add_argument(
-        "-j",
-        "--as-jobs",
+        "--distributed",
         action="store_true",
-        dest="as_job",
+        dest="distributed",
         help="Whether jobs should be created for each sample, or "
         "it should run in serial mode.",
     )
     parser.add_argument(
-        "-o",
-        "--results-output",
-        default="results",
-        dest="output_dir",
-        help="Directory for analysis output files. "
-        "Default is 'results' under the project roort directory.",
-        type=str,
+        "--computing-configuration",
+        dest="computing_configuration",
+        help="Which `divvy` computing configuration to use for distributed jobs."
+        " Type divvy list to see all options. Defaults to the value in the "
+        "ngs_toolkit configuration.",
     )
     parser.add_argument(
-        "-s",
-        "--strict",
+        "--permissive",
         action="store_true",
-        dest="strict",
-        help="Whether to throw an error in case files cannot be created or not.",
+        dest="permissive",
+        help="Whether to allow errors and proceed with whatever works.",
     )
     return parser
 
 
-def main():
-    args = parse_arguments().parse_args()
-    # args = parser.parse_args('-t ATAC-seq metadata/project_config.yaml'.split(" "))
+def main(cli=None):
+    args = parse_arguments().parse_args(cli)
 
-    # Start project
-    print(
-        "Starting peppy project with project configuration file: '{}'".format(
-            args.config_file
-        )
-    )
-    prj = Project(args.config_file)
-    print(
-        "Changing directory to project root directory: '{}'.".format(
-            prj.metadata.output_dir
-        )
-    )
-    os.chdir(prj.metadata.output_dir)
-    if args.pass_qc:
-        print(
-            "Filtering samples out which didn't pass QC as specified in sample annotation in column 'pass_qc'"
-        )
-        prj._samples = [
-            s for s in prj._samples if s.pass_qc not in ["0", 0, "False", False]
-        ]
-    print("Setting location of sample files dependent on sample types.")
-    for sample in prj.samples:
-        if hasattr(sample, "protocol"):
-            sample.library = sample.protocol
+    for data_type, clax in [
+            ("ATAC-seq", ATACSeqAnalysis),
+            ("ChIP-seq", ChIPSeqAnalysis),
+    ]:
+        an = clax(from_pep=args.config_file)
 
-        if sample.library in ["ATAC-seq", "ChIP-seq", "ChIPmentation"]:
-            sample.mapped = os.path.join(
-                sample.paths.sample_root, "mapped", sample.name + ".trimmed.bowtie2.bam"
-            )
-            sample.filtered = os.path.join(
-                sample.paths.sample_root,
-                "mapped",
-                sample.name + ".trimmed.bowtie2.filtered.bam",
-            )
-            sample.peaks = os.path.join(
-                sample.paths.sample_root, "peaks", sample.name + "_peaks.narrowPeak"
-            )
+        if not an.samples:
+            continue
 
-    # ANALYSIS
-    if args.data_type is None:
-        print(
-            "Type of analysis not specified. Will run independent analysis for all types of data in the sample annotation sheet."
-        )
-        data_types = sorted(list(set([s.library for s in prj.samples])))
-        print("Sample data types: '{}'.".format(",".join(data_types)))
-    else:
-        print(
-            "Type of analysis specified. Will run only analysis for samples of type '{}'.".format(
-                args.data_type
-            )
-        )
-        data_types = [args.data_type]
-        print("Sample data types: '{}'.".format(",".join(data_types)))
-    if args.name is None:
-        print(
-            "Analysis name not specified, will use name in project configuration file: '{}'.".format(
-                prj.project_name
-            )
-        )
-        args.name = prj.project_name
+        if args.pass_qc:
+            an.samples = [
+                s for s in an.samples
+                if getattr(s, "pass_qc", None) in ['1', '1.0', 1]
+            ]
 
-    for data_type in data_types:
-        print("Starting analysis for samples of type: '{}'.".format(data_type))
-        samples = [s for s in prj.samples if (s.library == data_type)]
-        if len(samples) > 0:
-            print(
-                "Samples under consideration: '{}'. ".format(
-                    ",".join([s.name for s in samples])
-                )
-                + "Total of {} samples.".format(len([s.name for s in samples]))
+        if data_type == "ChIP-seq" and not hasattr(an, "comparison_table"):
+            msg = (
+                "ChIP-seq analysis must have comparison_table specified in "
+                "the project config in order to relate"
+                " foreground and backgound sample groups."
             )
-        else:
-            raise ValueError("There were no valid samples for this analysis type!")
+            print(msg)
+            raise ValueError(msg)
 
-        if data_type in ["ATAC-seq"]:
-            print("Initializing ATAC-seq analysis")
-            analysis = ATACSeqAnalysis(
-                name=args.name + "_atacseq",
-                prj=prj,
-                samples=samples,
-                results_dir=args.output_dir,
-            )
-        elif data_type in ["ChIP-seq", "ChIPmentation"]:
-            print("Initializing ChIP-seq analysis")
-            analysis = ChIPSeqAnalysis(
-                name=args.name + "_chipseq",
-                prj=prj,
-                samples=samples,
-                results_dir=args.output_dir,
-            )
-
-        region_set_frip = None
         if args.region_set is not None:
-            print("Using given region set in BED format: '{}'".format(args.region_set))
-            # Use given region set if passed
-            region_set_frip = calculate_region_set_frip(
-                analysis,
-                region_set=args.region_set,
-                samples=samples,
-                as_job=args.as_job,
-                permissive=not args.strict,
-            )
+            print("Loading given region set: '{}'".format(args.region_set))
+            an.sites = pybedtools.BedTool(args.region_set)
         else:
-            # try to load an analysis object that contains a `sites` attribute
-            print(
-                "Trying to load an existing analysis object from pickle file: '{}'".format(
-                    analysis.pickle
-                )
-            )
-            try:
-                analysis = analysis.from_pickle()
-            except IOError:
-                print("Couldn't load an existing analysis object")
-                continue
+            print("Trying to load existing consensus region set.")
+            an.load_data(only_these_keys=["sites"])
 
-            # if it has, use it
-            if hasattr(analysis, "sites"):
-                print(
-                    "Using existing regions set from analysis. Contains {} regions.".format(
-                        len(analysis.sites)
-                    )
-                )
-                region_set_frip = calculate_region_set_frip(
-                    analysis,
-                    region_set=analysis.sites,
-                    samples=samples,
-                    as_job=args.as_job,
-                    permissive=not args.strict,
-                )
-            else:
-                print("Existing analysis does not have an existing region set.")
+        if not hasattr(an, "sites"):
+            print("Not found. Producing a new consensus region set.")
+            an.get_consensus_sites()
+        else:
+            print("Using region set in BED format: '{}'".format(an.sites.fn))
 
-        if region_set_frip is None:
-            print("Generating a new region set for this analysis.")
-            # if none worked, make one
-            analysis.get_consensus_sites()
-
-            # and use it
-            print("Using generated new region set for this analysis.")
-            region_set_frip = calculate_region_set_frip(
-                analysis,
-                region_set=analysis.sites,
-                samples=samples,
-                as_job=args.as_job,
-                permissive=not args.strict,
-            )
+        calculate_region_set_frip(
+            region_set=an.sites.fn,
+            samples=an.samples,
+            distributed=args.distributed,
+            permissive=args.permissive,
+        )
 
 
 def calculate_region_set_frip(
-    analysis, region_set=None, samples=None, as_job=False, cpus=8, permissive=True
+        region_set, samples, distributed=False, permissive=True
 ):
     """
     """
-    import subprocess
-
-    if region_set is None:
-        region_set = analysis.sites
-
-    if samples is None:
-        samples = analysis.samples
+    from ngs_toolkit.utils import submit_job
 
     for sample in samples:
         inside_reads = os.path.join(
@@ -262,51 +131,27 @@ def calculate_region_set_frip(
             sample.paths.sample_root, "region_set_frip.all_reads.txt"
         )
 
-        log_file = os.path.join(sample.paths.sample_root, "region_set_frip.log")
-        job_file = os.path.join(sample.paths.sample_root, "region_set_frip.sh")
+        job_name = sample.name + ".region_set_frip"
+        log_file = os.path.join(sample.paths.sample_root, job_name + ".log")
+        job_file = os.path.join(sample.paths.sample_root, job_name + ".sh")
         sample_stats = os.path.join(sample.paths.sample_root, "stats.tsv")
 
-        job = "\n".join(
+        cmd = "\n".join(
             [
-                "#!/bin/sh",
-                "date",
-                """samtools view -@ {} -c -L {} {} > {}""".format(
-                    cpus, region_set, sample.filtered, inside_reads
+                """samtools view -c -L {} {} > {}""".format(
+                    region_set, sample.aligned_filtered_bam, inside_reads
                 ),
-                """samtools view -@ {} -c {} > {}""".format(
-                    cpus, sample.filtered, all_reads
+                """samtools view -c {} > {}""".format(
+                    sample.aligned_filtered_bam, all_reads
                 ),
                 'calc(){ awk "BEGIN { print "$*" }"; }',
                 "IN=`cat {}`".format(inside_reads),
                 "ALL=`cat {}`".format(all_reads),
                 "FRIP=`calc $IN/$ALL`",
-                'echo -e "region_set_frip\\t$FRIP\\t." >> {}'.format(sample_stats),
-                "date",
+                'echo "region_set_frip\\t$FRIP\\t." >> {}'.format(sample_stats),
             ]
         )
-
-        try:
-            with open(job_file, "w") as handle:
-                handle.write(job)
-        except IOError as e:
-            if permissive:
-                print("Couldn't write job for sample '{}'.".format(sample.name))
-                continue
-            else:
-                raise e
-
-        if as_job:
-            subprocess.call(
-                "sbatch -p shortq -J region_set_frip.{} -o {} -c {} --mem 8000 {}".format(
-                    sample.name, log_file, cpus, job_file
-                ).split(
-                    " "
-                )
-            )
-        else:
-            subprocess.call("sh {}".format(job_file).split(" "))
-
-    return 0
+        submit_job(cmd, job_file, log_file, jobname=job_name)
 
 
 if __name__ == "__main__":

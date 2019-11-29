@@ -110,10 +110,10 @@ def get_genome_reference(
         raise ValueError(msg)
 
     if genome_provider == "UCSC":
-        organisms = {
-            "human": "hg19",
-            "hsapiens": "hg19",
-            "homo_sapiens": "hg19",
+        default_organisms = {
+            "human": "hg38",
+            "hsapiens": "hg38",
+            "homo_sapiens": "hg38",
             "mouse": "mm10",
             "mmusculus": "mm10",
             "mus_musculus": "mm10",
@@ -126,24 +126,24 @@ def get_genome_reference(
         )
         base_link += ".fa.gz" if file_format == "fasta" else ".2bit"
         if genome_assembly is None:
-            genome_assembly = organisms[organism]
+            genome_assembly = default_organisms[organism]
         url = base_link.format(assembly=genome_assembly)
 
     elif genome_provider == "Ensembl":
-        organisms = {
+        default_organisms = {
             "human": {
                 "long_species": "homo_sapiens",
-                "version": "grch37",
+                "version": "grch38",
                 "release": "75",
             },
             "hsapiens": {
                 "long_species": "homo_sapiens",
-                "version": "grch37",
+                "version": "grch38",
                 "release": "75",
             },
             "homo_sapiens": {
                 "long_species": "homo_sapiens",
-                "version": "grch37",
+                "version": "grch38",
                 "release": "75",
             },
             "mouse": {
@@ -178,13 +178,13 @@ def get_genome_reference(
             },
         }
         if genome_assembly is None:
-            genome_assembly = organisms[organism]["version"].replace("grc", "GRC")
+            genome_assembly = default_organisms[organism]["version"].replace("grc", "GRC")
         base_link = (
             "ftp://ftp.ensembl.org/pub/release-{release}/fasta/{long_organism}/dna/"
         )
         base_link += "{Clong_organism}.{assembly}."
         base_link += (
-            "{}.".format(organisms[organism]["release"])
+            "{}.".format(default_organisms[organism]["release"])
             if genome_assembly.endswith("37")
             else ""
         )
@@ -192,9 +192,9 @@ def get_genome_reference(
             sequence_type="dna", id_type="primary_assembly", id=""
         )
         url = base_link.format(
-            release=organisms[organism]["release"],
-            long_organism=organisms[organism]["long_species"],
-            Clong_organism=organisms[organism]["long_species"].capitalize(),
+            release=default_organisms[organism]["release"],
+            long_organism=default_organisms[organism]["long_species"],
+            Clong_organism=default_organisms[organism]["long_species"].capitalize(),
             assembly=genome_assembly,
         )
 
@@ -256,7 +256,7 @@ def get_blacklist_annotations(
 
     genome_assembly : :obj:`str`, optional
         Ensembl assembly/version to use.
-       Default for "human" is "hg19/grch37" and for "mouse" is "mm10/grcm38".
+        Default for "human" is "hg38/grch38" and for "mouse" is "mm10/grcm38".
 
     output_dir : :obj:`str`, optional
         Directory to write output to.
@@ -278,9 +278,9 @@ def get_blacklist_annotations(
         output_dir = os.path.join(os.path.abspath(os.path.curdir), "reference")
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
-    organisms = {"human": "hg19", "mouse": "mm10"}
+    default_organisms = {"human": "hg38", "mouse": "mm10"}
     if genome_assembly is None:
-        genome_assembly = organisms[organism]
+        genome_assembly = default_organisms[organism]
         _LOGGER.warning(
             "Genome assembly not selected. Using assembly '{}' for '{}'.".format(
                 genome_assembly, organism
@@ -335,7 +335,7 @@ def get_tss_annotations(
 
     genome_assembly : :obj:`str`, optional
         Ensembl assembly/version to use.
-        Default for "human" is "grch37" and for "mouse" is "grcm38".
+        Default for "human" is "grch38" and for "mouse" is "grcm38".
 
     save: :obj:`bool`, optional
         Whether to save to disk under ``output_dir``.
@@ -361,17 +361,17 @@ def get_tss_annotations(
 
     Returns
     -------
-    pandas.DataFrame
+    :obj:`pandas.DataFrame`
         DataFrame with genome annotations
     """
-    organisms = {
-        "human": {"species": "hsapiens", "ensembl_version": "grch37"},
+    default_organisms = {
+        "human": {"species": "hsapiens", "ensembl_version": "grch38"},
         "mouse": {"species": "mmusculus", "ensembl_version": "grcm38"},
         "yeast": {"species": "scerevisiae", "ensembl_version": "R64"},
     }
 
     if genome_assembly is None:
-        genome_assembly = organisms[organism]["ensembl_version"]
+        genome_assembly = default_organisms[organism]["ensembl_version"]
     if genome_assembly == "hg19":
         genome_assembly = "grch37"
     if genome_assembly == "hg38":
@@ -408,7 +408,7 @@ def get_tss_annotations(
     ]
     res = query_biomart(
         attributes=attributes,
-        species=organisms[organism]["species"],
+        species=default_organisms[organism]["species"],
         ensembl_version=genome_assembly,
     )
 
@@ -515,7 +515,7 @@ def get_genomic_context(
 
     genome_assembly : :obj:`str`, optional
         Ensembl assembly/version to use.
-        Default for "human" is "grch37" and for "mouse" is "grcm38".
+        Default for "human" is "grch38" and for "mouse" is "grcm38".
 
     save: :obj:`bool`, optional
         Whether to save to disk under ``output_dir``.
@@ -540,17 +540,17 @@ def get_genomic_context(
 
     Returns
     -------
-    pandas.DataFrame
+    :obj:`pandas.DataFrame`
         DataFrame with genome annotations
     """
     from pybedtools import BedTool
     import pybedtools
 
-    organisms = {
+    default_organisms = {
         "human": {
             "species": "hsapiens",
-            "ensembl_version": "grch37",
-            "ucsc_version": "hg19",
+            "ensembl_version": "grch38",
+            "ucsc_version": "hg38",
         },
         "mouse": {
             "species": "mmusculus",
@@ -561,8 +561,8 @@ def get_genomic_context(
     }
 
     if genome_assembly is None:
-        genome_assembly = organisms[organism]["ucsc_version"]
-        ensembl_genome_assembly = organisms[organism]["ensembl_version"]
+        genome_assembly = default_organisms[organism]["ucsc_version"]
+        ensembl_genome_assembly = default_organisms[organism]["ensembl_version"]
     elif genome_assembly == "hg19":
         ensembl_genome_assembly = "grch37"
     elif genome_assembly == "hg38":
@@ -609,7 +609,7 @@ def get_genomic_context(
     ]
     res = query_biomart(
         attributes=attrs,
-        species=organisms[organism]["species"],
+        species=default_organisms[organism]["species"],
         ensembl_version=ensembl_genome_assembly,
     )
 
@@ -744,7 +744,7 @@ def get_chromosome_sizes(
 
     genome_assembly : :obj:`str`, optional
         Ensembl assembly/version to use.
-        Default for "human" is "hg19/grch37" and for "mouse" is "mm10/grcm38".
+        Default for "human" is "hg38/grch38" and for "mouse" is "mm10/grcm38".
 
     output_dir : :obj:`str`, optional
         Directory to write output to.
@@ -767,9 +767,9 @@ def get_chromosome_sizes(
         output_dir = os.path.join(os.path.abspath(os.path.curdir), "reference")
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
-    organisms = {"human": "hg19", "mouse": "mm10"}
+    default_organisms = {"human": "hg38", "mouse": "mm10"}
     if genome_assembly is None:
-        genome_assembly = organisms[organism]
+        genome_assembly = default_organisms[organism]
         _LOGGER.warning(
             "Genome assembly not selected. Using assembly '{}' for '{}'.".format(
                 genome_assembly, organism
@@ -821,13 +821,15 @@ def deseq_analysis(
         Data frame of shape (samples, variables) with raw read counts.
 
     experiment_matrix : :obj:`pandas.DataFrame`
-        Data frame with columns "sample_name" and any other variables used in the `formula`.
+        Data frame with columns "sample_name" and any
+        other variables used in the `formula`.
 
     comparison_table : :obj:`pandas.DataFrame`
         Data frame with columns "comparison_name", "sample_group" and sample_name".
 
     formula : :obj:`str`
-        Formula to test in R/patsy notation. Usually something like "~ batch + group".
+        Formula to test in R/patsy notation.
+        Usually something like "~ batch + group".
 
     output_dir : :obj:`str`
         Output directory for produced files.
@@ -851,7 +853,7 @@ def deseq_analysis(
 
     Returns
     -------
-    pandas.DataFrame
+    :obj:`pandas.DataFrame`
         Data frame with results, statistics for each feature.
     """
     from tqdm import tqdm
@@ -1037,7 +1039,7 @@ def least_squares_fit(
 
     Returns
     -------
-    pandas.DataFrame
+    :obj:`pandas.DataFrame`
         Statistics of model fitting and comparison between models for each feature.
 
     :Example:
@@ -1154,7 +1156,7 @@ def differential_from_bivariate_fit(
 
     Returns
     -------
-    pandas.DataFrame
+    :obj:`pandas.DataFrame`
         Results of fitting and comparison between groups for each feature.
     """
     import matplotlib.pyplot as plt
@@ -1554,12 +1556,12 @@ def meme_ame(
     # subprocess.call("rm {}".format(shuffled).split(" "))
 
 
-def homer_motifs(bed_file, output_dir, genome="hg19"):
+def homer_motifs(bed_file, output_dir, genome_assembly):
     import subprocess
 
     cmd = "findMotifsGenome.pl {bed} {genome}r {out_dir} \
     -size 1000 -h -p 2 -len 8,10,12,14 -noknown".format(
-        bed=bed_file, genome=genome, out_dir=output_dir
+        bed=bed_file, genome=genome_assembly, out_dir=output_dir
     )
     subprocess.call(cmd.split(" "))
 
@@ -1576,7 +1578,7 @@ def homer_combine_motifs(
     cpus=8,
     run=True,
     distributed=True,
-    genome="hg19",
+    genome="hg38",
     motif_database=None,
 ):
     """
@@ -1609,7 +1611,7 @@ def homer_combine_motifs(
 
     genome : :obj:`str`
         Genome assembly of the data.
-        Default is 'hg19'.
+        Default is 'hg38'.
 
     motif_database : :obj:`str`
         Motif database to restrict motif matching too.
@@ -1725,7 +1727,7 @@ def enrichr(dataframe, gene_set_libraries=None, kind="genes", max_attempts=5):
 
     Returns
     -------
-    pandas.DataFrame
+    :obj:`pandas.DataFrame`
         Results of enrichment analysis
 
     Raises
@@ -2279,7 +2281,7 @@ def rename_sample_files(
 def query_biomart(
         attributes=None,
         species="hsapiens",
-        ensembl_version="grch37",
+        ensembl_version="grch38",
         max_api_retries=5):
     """
     Query Biomart (https://www.ensembl.org/biomart/martview/).
@@ -2308,7 +2310,7 @@ def query_biomart(
 
     Returns
     -------
-    pandas.DataFrame
+    :obj:`pandas.DataFrame`
         Dataframe with required attributes for each entry.
     """
     import requests
@@ -2515,7 +2517,7 @@ def fix_batch_effect_limma(matrix, batch_variable="batch", covariates=None):
 
     Returns
     -------
-    pandas.DataFrame
+    :obj:`pandas.DataFrame`
         Regressed out matrix
     """
     import patsy

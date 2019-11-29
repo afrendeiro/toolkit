@@ -39,7 +39,7 @@ class TestAnalysis:
         # Let's make several "reallish" test projects
         project_prefix_name = "test-project"
         data_types = ["ATAC-seq", "RNA-seq", "ChIP-seq"]  # "CNV"
-        genome_assemblies = [("human", "hg19"), ("human", "hg38"), ("mouse", "mm10")]
+        genome_assemblies = [("human", "hg38"), ("mouse", "mm10")]  # ("human", "hg19"),
 
         params = {
             "ATAC-seq": {

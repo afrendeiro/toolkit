@@ -23,6 +23,23 @@ Changed
   - More simplicity and abstraction for functions in main :class:`ngs_toolkit.analysis.Analysis` class.
 
 
+[0.20.0] - 2019-11-29
+*****************************
+
+Added
+-----------------------------
+
+  - Add :func:`ngs_toolkit.general.get_chromosome_sizes` to get the size of the chromosomes of a genome assembly
+
+
+Changed
+-----------------------------
+
+  - Change default genome assembly of human to hg38/GRCh38
+  - Improvements to several recipes
+  - Remove cffi from requirements.
+
+
 [0.19.3] - 2019-10-18
 *****************************
 

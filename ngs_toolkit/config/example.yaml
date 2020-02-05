@@ -110,6 +110,7 @@ resources:
       - "Reactome_2016"
       - "BioCarta_2016"
       - "NCI-Nature_2016"
+      - "BioPlanet_2019"
 
 executables:
   twoBitToFa: twoBitToFa

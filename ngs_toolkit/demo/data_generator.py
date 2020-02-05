@@ -58,7 +58,7 @@ def generate_count_matrix(
     design = np.asarray(
         patsy.dmatrix("~ 1 + " + " + ".join(string.ascii_uppercase[:n_factors]), dcat))
 
-    # get 
+    # get means
     beta = np.asarray(
         [np.random.normal(intercept_mean, intercept_std, n_features)] +
         [np.random.normal(0, std, n_features) for std in coefficient_stds]).T

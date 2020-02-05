@@ -42,9 +42,9 @@ def parse_arguments():
     return parser
 
 
-def main():
+def main(cli=None):
     print("LOLA analysis")
-    args = parse_arguments().parse_args()
+    args = parse_arguments().parse_args(cli)
 
     output_file = os.path.join(args.output_folder, "allEnrichments.tsv")
     if os.path.exists(output_file) and (not args.overwrite):

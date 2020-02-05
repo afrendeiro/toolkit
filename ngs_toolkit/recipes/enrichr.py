@@ -37,9 +37,9 @@ def parse_arguments():
     return parser
 
 
-def main():
+def main(cli=None):
     print("Enrichr analysis")
-    args = parse_arguments().parse_args()
+    args = parse_arguments().parse_args(cli)
 
     if os.path.exists(args.output_file) and (not args.overwrite):
         print("Output exists and `overwrite` is False, so not doing anything.")

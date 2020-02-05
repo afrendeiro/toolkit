@@ -8,6 +8,9 @@ import pandas as pd
 from ngs_toolkit import _CONFIG, _LOGGER
 from ngs_toolkit.decorators import check_has_attributes
 
+# Bugs:
+# TODO: unsupervised_analysis plotting fails if only one sample in one group
+# TODO: plot_differential_enrichment fails if only one comparison
 
 # TODO: Add PAGE as enrichment method
 # TODO: Analysis.annotate_samples: reimplement to support CNV dict of resolutions

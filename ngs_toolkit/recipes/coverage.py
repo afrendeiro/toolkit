@@ -43,10 +43,10 @@ def parse_arguments():
     return parser
 
 
-def main():
+def main(cli=None):
     """Measure coverage of BAM file in BED file regions."""
     print("Parsing CLI.")
-    args = parse_arguments().parse_args()
+    args = parse_arguments().parse_args(cli)
 
     if os.path.exists(args.output_bed) and (not args.overwrite):
         print("Output exists and `overwrite` is False, so not doing anything.")

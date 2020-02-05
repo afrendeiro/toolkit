@@ -482,7 +482,9 @@ def to_bed_index(sites):
     """Convert bedtool, BED file or dataframe to list of region identifiers"""
     import pybedtools
     msg = "Input not pybedtools.BedTool, pandas.DataFrame or path to BED file."
-    if isinstance(sites, pybedtools.BedTool):
+    if isinstance(sites, str):
+        return bedtool_to_index(pybedtools.BedTool(sites))
+    elif isinstance(sites, pybedtools.BedTool):
         return bedtool_to_index(sites)
     elif isinstance(sites, pd.core.frame.DataFrame):
         return bed_to_index(sites)
@@ -1276,7 +1278,7 @@ def normalize_quantiles_p(df_input):
     Parameters
     ----------
     df_input : :class:`pandas.DataFrame`
-        Dataframe to normalize.
+        Dataframe to normalize of shape (features, samples).
 
     Returns
     -------

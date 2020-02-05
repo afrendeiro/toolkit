@@ -68,8 +68,8 @@ def parse_arguments():
     return parser
 
 
-def main():
-    args = parse_arguments().parse_args()
+def main(cli=None):
+    args = parse_arguments().parse_args(cli)
 
     # Analysis
     print(

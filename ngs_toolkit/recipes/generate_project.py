@@ -36,9 +36,9 @@ def parse_arguments():
     return parser
 
 
-def main() -> int:
+def main(cli=None):
     """Generate synthetic data for a project in PEP format."""
-    args = parse_arguments().parse_args()
+    args = parse_arguments().parse_args(cli)
     if args.debug:
         print(args)
     kwargs = {k: v for k, v in args.__dict__.items() if v is not None}

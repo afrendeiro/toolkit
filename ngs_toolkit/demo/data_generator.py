@@ -468,7 +468,7 @@ def get_random_genomic_locations(
     df.loc[(df[2] - df[1]) < min_width, 2] += min_width
     bed = (
         pybedtools.BedTool.from_dataframe(df)
-        .shuffle(genome=genome_assembly, chromFirst=True, noOverlapping=True)
+        .shuffle(genome=genome_assembly, chromFirst=True, noOverlapping=True, chrom=True)
         .sort()
         .to_dataframe()
     )

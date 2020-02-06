@@ -1465,7 +1465,12 @@ class ATACSeqAnalysis(Analysis):
         # remove per sample mean
         matrix -= matrix.mean()
 
-        matrix = matrix.assign(chrom=matrix.index.str.extract(r"^(.*):\d+-\d+$").values)
+        chroms = matrix.index.str.extract(r"^(.*):\d+-\d+$").iloc[:, 0].values
+        if not all([x in chroms for x in sex_chroms]):
+            msg = f"Requested sex chromosomes {', '.join(sex_chroms)} not found in matrix."
+            _LOGGER.error(msg)
+            raise ValueError
+        matrix = matrix.assign(chrom=chroms)
         m = matrix.groupby("chrom").mean()
         # remove per chromosome mean
         m = (m.T - m.mean(1)).T

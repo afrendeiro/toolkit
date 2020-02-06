@@ -330,6 +330,19 @@ def test_get_sex_chrom_ratio(analysis_normalized):
             assert file_exists_and_not_empty(f)
 
 
+def test_get_sex_chrom_ratio_wrong_sex_chroms(analysis_normalized):
+    with analysis_normalized as a:
+        with pytest.raises(ValueError):
+            a.get_sex_chrom_ratio(sex_chroms=['qwe13213'])
+
+
+def test_get_sex_chrom_ratio_no_sex_chroms(analysis_normalized):
+    with analysis_normalized as a:
+        matrix = a.matrix_norm.loc[~a.matrix_norm.index.str.contains("chrX|chrY")]
+        with pytest.raises(ValueError):
+            a.get_sex_chrom_ratio(matrix)
+
+
 @pytest.fixture
 def peak_outputs(atac_analysis_with_input_files):
     outputs = [

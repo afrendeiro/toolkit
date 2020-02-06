@@ -6093,37 +6093,36 @@ class Analysis(object):
             )
 
             # pivot table
-            if ("correlation" not in plot_types) and ("heatmap" not in plot_types):
-                return
-            region_pivot = pd.pivot_table(
-                enrichment_table,
-                values="log2_odds_ratio",
-                columns=comp_variable,
-                index="region",
-            ).fillna(0)
+            if any([x in plot_types for x in ("correlation", "heatmaps")]):
+                region_pivot = pd.pivot_table(
+                    enrichment_table,
+                    values="log2_odds_ratio",
+                    columns=comp_variable,
+                    index="region",
+                ).fillna(0)
 
-            # plot correlation
-            if "correlation" in plot_types:
-                enrichment_correlation_plot(
-                    input_df=region_pivot,
-                    label="Correlation of enrichment\nof differential regions",
-                    output_file=os.path.join(
-                        output_dir,
-                        output_prefix + ".region_type_enrichment.correlation.svg",
-                    ),
-                )
+                # plot correlation
+                if "correlation" in plot_types:
+                    enrichment_correlation_plot(
+                        input_df=region_pivot,
+                        label="Correlation of enrichment\nof differential regions",
+                        output_file=os.path.join(
+                            output_dir,
+                            output_prefix + ".region_type_enrichment.correlation.svg",
+                        ),
+                    )
 
-            # plot clustered heatmaps
-            if "heatmap" in plot_types:
-                enrichment_clustermap(
-                    region_pivot,
-                    output_file=os.path.join(
-                        output_dir,
-                        output_prefix + ".region_type_enrichment.cluster_specific.svg",
-                    ),
-                    label="log2(odd ratio) of enrichment\nof differential regions",
-                    params={"cmap": "RdBu_r", "center": 0},
-                )
+                # plot clustered heatmaps
+                if "heatmap" in plot_types:
+                    enrichment_clustermap(
+                        region_pivot,
+                        output_file=os.path.join(
+                            output_dir,
+                            output_prefix + ".region_type_enrichment.cluster_specific.svg",
+                        ),
+                        label="log2(odd ratio) of enrichment\nof differential regions",
+                        params={"cmap": "RdBu_r", "center": 0},
+                    )
 
         if enrichment_type == "lola":
             _LOGGER.info("Plotting enrichments for 'lola'")

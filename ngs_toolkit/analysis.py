@@ -2637,16 +2637,17 @@ class Analysis(object):
         # will be filtered now by the requested samples if needed
         color_dataframe = color_dataframe.loc[x.columns.get_level_values("sample_name"), :]
 
-        projection_kwargs = {k: v for k, v in kwargs.items()
-                             if k in [
-                                "plot_max_dims",
-                                "rasterized",
-                                "plot_group_centroids",
-                                "axis_ticklabels",
-                                "axis_ticklabels_name",
-                                "axis_lines",
-                                "legends",
-                                "always_legend"]}
+        projection_kwargs = {
+            k: v for k, v in kwargs.items()
+            if k in [
+                "plot_max_dims",
+                "rasterized",
+                "plot_group_centroids",
+                "axis_ticklabels",
+                "axis_ticklabels_name",
+                "axis_lines",
+                "legends",
+                "always_legend"]}
 
         if isinstance(x.columns, pd.MultiIndex):
             sample_display_names = x.columns.get_level_values("sample_name")
@@ -3751,10 +3752,11 @@ class Analysis(object):
                 ),
                 index=group_attributes,
                 columns=matrix.columns,
-            )
-            # will be filtered now by the requested samples if needed
-            color_dataframe = color_dataframe[[s.name for s in samples]]
-            color_dataframe = color_dataframe.loc[:, matrix.columns]
+            ).T
+            # will be filtered/ordered now by the requested samples if needed
+            color_dataframe = color_dataframe.loc[matrix.columns, :]
+            color_dataframe = color_dataframe.loc[[s.name for s in samples], :]
+            color_dataframe.index = color_dataframe.index.get_level_values('sample_name')
 
         # Extract significant based on p-value and fold-change
         if fold_change is not None:
@@ -4684,7 +4686,7 @@ class Analysis(object):
                 matrix2 = matrix2.dropna()
             figsize = (max(5, 0.12 * matrix2.shape[1]), 5)
             if group_colours:
-                extra = {"col_colors": color_dataframe.T}
+                extra = {"col_colors": color_dataframe}
             else:
                 extra = {}
 

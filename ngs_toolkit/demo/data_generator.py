@@ -461,10 +461,14 @@ def get_random_genomic_locations(
     """Get `n_regions`` number of random genomic locations respecting the boundaries of the ``genome_assembly``"""
     from ngs_toolkit.utils import bed_to_index
 
-    chrom = (pd.Series(["chr"] * n_regions) + pd.Series(np.random.randint(1, 19, n_regions)).astype(str)).tolist()
+    # weight chroms by their size, excluding others
+    csizes = {k: v[-1] for k, v in dict(pybedtools.chromsizes(genome_assembly)).items() if "_" not in k}
+    gsize = sum(csizes.values())
+    csizes = {k: v / gsize for k, v in csizes.items()}
+    chrom = pd.Series(np.random.choice(a=list(csizes.keys()), size=n_regions, p=list(csizes.values())))
     start = np.array([0] * n_regions)
     end = np.absolute(np.random.normal(width_mean, width_std, n_regions)).astype(int)
-    df = pd.DataFrame([chrom, start.tolist(), end.tolist()]).T
+    df = pd.DataFrame([chrom.tolist(), start.tolist(), end.tolist()]).T
     df.loc[(df[2] - df[1]) < min_width, 2] += min_width
     bed = (
         pybedtools.BedTool.from_dataframe(df)

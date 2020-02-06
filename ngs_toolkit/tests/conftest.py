@@ -9,15 +9,16 @@ import pytest
 from ngs_toolkit import Analysis, ATACSeqAnalysis
 from ngs_toolkit.demo import generate_project
 
-# TODO: test having no config set
-# TODO: test differential analysis with many factors
-# TODO: test subproject initialization
 
 # Environment-specific
-CI = ("TRAVIS" in os.environ) or ("GITHUB_WORKFLOW" in os.environ)
-
+CI: bool = ("TRAVIS" in os.environ) or ("GITHUB_WORKFLOW" in os.environ)
 CI_NAME = None
-BUILD_DIR = os.path.abspath(os.path.curdir)
+BUILD_DIR: str = os.path.abspath(os.path.curdir)
+DEV: bool
+RPY2: bool
+COMBAT: bool
+
+
 if CI:
     if "TRAVIS" in os.environ:
         CI_NAME = "TRAVIS"
@@ -67,6 +68,19 @@ def is_internet_connected(hostname="www.google.com"):
     except OSError:
         pass
     return False
+
+
+def has_module(module):
+    import importlib
+    try:
+        importlib.import_module(module)
+        return True
+    except ModuleNotFoundError:
+        return False
+
+
+RPY2 = has_module('rpy2')
+COMBAT = has_module('combat')
 
 
 def file_exists(file):

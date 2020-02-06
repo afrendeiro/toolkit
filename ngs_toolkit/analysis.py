@@ -12,19 +12,24 @@ from ngs_toolkit.decorators import check_has_attributes
 # TODO: unsupervised_analysis plotting fails if only one sample in one group
 # TODO: plot_differential_enrichment fails if only one comparison
 
+# Improvements:
 # TODO: Add PAGE as enrichment method
 # TODO: Analysis.annotate_samples: reimplement to support CNV dict of resolutions
 # TODO: Analysis.annotate_samples: implement connection to analysis' numeric_attributes or another way of preserving dtypes
 # TODO: Add function to complete comparison_table information such as "comparison_genome" and "data_type" and call it when setting automatically
 # TODO: Add function to create comparison_table from samples' group_attributes
-
 # TODO: Make recipe to get all (or subset through CLI) resources
 
+# Testing:
+# TODO: test having no config set
+# TODO: test differential analysis with many factors
+# TODO: test subproject initialization
+
+# Ideas:
 # TODO: idea: make Analysis.annotate() call both annotate_features(), annotate_samples() and their ancestors with `steps`
 # TODO: Idea: merging analysis. If same type, merge matrices, otherwise use dicts?
 # TODO: Idea: if genome of analysis is set, get required static files for that genome assembly automatically
 # TODO: Idea: Analysis.load_data: get default output_map by having functions declare what they output perhaps also with a dict of kwargs to pass to pandas.read_csv
-
 # TODO: for recipes.ngs_analysis implement steps, build lock file system to measure progress, allow continuing
 
 # Code:
@@ -1197,8 +1202,7 @@ class Analysis(object):
         Parameters
         ----------
         steps : :obj:`list`, optional
-            What kind of annotations to get.
-            Options are:
+            What kind of annotations to get. Options are:
 
                  * "genome": Genome sequence (2bit format)
                  * "blacklist": Locations of blacklisted regions for genome
@@ -1212,16 +1216,16 @@ class Analysis(object):
 
             Defaults to analysis' own organism.
         genome_assembly : :obj:`str`, optional
-            Genome assembly to get for.
+            Genome assembly to get resources for.
             Currently supported are "hg19", "hg38" and "mm10".
 
-            Defaults to analysis' own genome assembly.
+            Defaults to the genome assembly of the analysis.
         output_dir : :obj:`str`, optional
             Directory to save results to.
 
             Defaults to the value of ``preferences:root_reference_dir`` in the
             configuration, if that is not set, to a directory called "reference"
-             in the analysis root directory.
+            in the analysis root directory.
         overwrite: :obj:`bool`, optional
             Whether existing files should be overwritten by new ones.
             Otherwise they will be kept and no action is made.
@@ -1802,7 +1806,14 @@ class Analysis(object):
             make_positive=True
     ):
         """
-        Remove an annotated factor from a matrix.
+        Remove an annotated factor from a matrix using Combat.
+
+        Requires the Python port of "Combat" to be installed. Install for example the following fork:
+
+        .. highlight:: shell
+        .. code-block:: shell
+
+            pip install git+https://github.com/afrendeiro/combat.git
 
         Parameters
         ----------
@@ -2230,7 +2241,7 @@ class Analysis(object):
         """
         Convinience function to create dataframes annotated with feature and samples attributes.
 
-        Simply calls ``Analysis.annotate_features`` and ``analysis.annotate_samples``.
+        Simply calls :func:`Analysis.annotate_features` and :func:`Analysis.annotate_samples`.
 
         Parameters
         ----------
@@ -4532,14 +4543,16 @@ class Analysis(object):
                 columns=comparison_column,
                 values=log_fold_change_column,
             ).fillna(0)
-            p_values = (-np.log10(
-                            pd.pivot_table(
-                                results.loc[all_diff, :].reset_index(),
-                                index=results.index.name,
-                                columns=comparison_column,
-                                values=adjusted_p_value_column,
-                            )
-                        )).fillna(0)
+            p_values = (
+                -np.log10(
+                    pd.pivot_table(
+                        results.loc[all_diff, :].reset_index(),
+                        index=results.index.name,
+                        columns=comparison_column,
+                        values=adjusted_p_value_column,
+                    )
+                )
+            ).fillna(0)
 
             # get a signed p-value
             if fold_changes.shape == p_values.shape:

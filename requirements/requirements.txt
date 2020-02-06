@@ -18,4 +18,3 @@ attmap>=0.12.9
 requests>=2.21.0
 jinja2>=2.10.1
 natsort>=6.0.0
-rpy2>=3.2.0

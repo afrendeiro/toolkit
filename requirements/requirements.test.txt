@@ -4,3 +4,4 @@ pytest-cov
 codecov
 codacy-coverage
 pytest-xdist
+rpy2>=3.2.0

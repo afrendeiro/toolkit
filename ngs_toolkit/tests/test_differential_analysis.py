@@ -4,7 +4,7 @@ import os
 
 import pytest
 
-from .conftest import file_exists, file_exists_and_not_empty
+from .conftest import file_exists, file_exists_and_not_empty, RPY2
 
 
 # Note:
@@ -50,6 +50,9 @@ def outputs(atac_analysis):
 #     return outputs
 
 
+@pytest.mark.skipif(
+    not RPY2,
+    reason="rpy2 not installed")
 def test_deseq_functionality():
     import pandas as pd
     from ngs_toolkit.utils import recarray2pandas_df
@@ -74,6 +77,9 @@ def test_deseq_functionality():
     assert isinstance(res, pd.DataFrame)
 
 
+@pytest.mark.skipif(
+    not RPY2,
+    reason="rpy2 not installed")
 class Test_differential_analysis:
     def test_simple_design(self, atac_analysis, outputs):
         import pandas as pd

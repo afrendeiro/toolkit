@@ -22,22 +22,6 @@ def test_rpm_normalization(various_analysis):
         assert hasattr(analysis, "matrix_norm")
 
 
-def test_quantile_normalization(various_analysis):
-    for analysis in [a for a in various_analysis if a.data_type == "RNA-seq"]:
-        f = os.path.join(analysis.results_dir, analysis.name + ".matrix_norm.csv")
-        qnorm_p = analysis.normalize_quantiles(implementation="Python", save=True)
-        assert isinstance(qnorm_p, pd.DataFrame)
-        assert hasattr(analysis, "matrix_norm")
-        assert file_exists_and_not_empty(f)
-        del analysis.matrix_norm
-        os.remove(f)
-
-        qnorm_r = analysis.normalize_quantiles(implementation="R", save=True)
-        assert isinstance(qnorm_r, pd.DataFrame)
-        assert hasattr(analysis, "matrix_norm")
-        assert file_exists_and_not_empty(f)
-
-
 def test_normalize(rnaseq_analysis):
     qnorm = rnaseq_analysis.normalize_rpm(save=False)
     assert isinstance(qnorm, pd.DataFrame)

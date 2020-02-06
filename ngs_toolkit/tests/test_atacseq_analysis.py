@@ -11,7 +11,7 @@ import pytest
 from ngs_toolkit import _CONFIG
 from ngs_toolkit.atacseq import ATACSeqAnalysis
 from ngs_toolkit.utils import get_this_file_or_timestamped
-from .conftest import file_exists, file_exists_and_not_empty, CI
+from .conftest import file_exists, file_exists_and_not_empty, CI, RPY2
 
 
 def test_get_consensus_sites(various_analysis):
@@ -80,7 +80,7 @@ def test_rpm_normalization(various_analysis):
         assert hasattr(analysis, "matrix_norm")
 
 
-def test_quantile_normalization(various_analysis):
+def test_python_quantile_normalization(various_analysis):
     for analysis in various_analysis:
         f = os.path.join(
             analysis.results_dir, analysis.name + ".matrix_norm.csv")
@@ -90,9 +90,15 @@ def test_quantile_normalization(various_analysis):
         assert qnorm_p.dtypes.all() == np.float
         assert qnorm_p.isnull().sum().sum() == 0
         assert file_exists_and_not_empty(f)
-        del analysis.matrix_norm
-        os.remove(get_this_file_or_timestamped(f))
 
+
+@pytest.mark.skipif(
+    not RPY2,
+    reason="rpy2 not installed")
+def test_r_quantile_normalization(various_analysis):
+    for analysis in various_analysis:
+        f = os.path.join(
+            analysis.results_dir, analysis.name + ".matrix_norm.csv")
         qnorm_r = analysis.normalize_quantiles(implementation="R", save=True)
         assert hasattr(analysis, "matrix_norm")
         assert isinstance(qnorm_r, pd.DataFrame)
@@ -100,10 +106,29 @@ def test_quantile_normalization(various_analysis):
         assert qnorm_r.isnull().sum().sum() == 0
         assert file_exists_and_not_empty(f)
 
-        # cors = list()
-        # for col in qnorm_p.columns:
-        #     cors.append(scipy.stats.pearsonr(qnorm_p[col], qnorm_r[col])[0])
-        # assert all(np.array(cors) > 0.99)
+
+# def test_quantile_normalization(various_analysis):
+#     for analysis in various_analysis:
+#         f = os.path.join(
+#             analysis.results_dir, analysis.name + ".matrix_norm.csv")
+#         qnorm_p = analysis.normalize_quantiles(implementation="Python", save=1)
+#         assert hasattr(analysis, "matrix_norm")
+#         assert isinstance(qnorm_p, pd.DataFrame)
+#         assert qnorm_p.dtypes.all() == np.float
+#         assert qnorm_p.isnull().sum().sum() == 0
+#         assert file_exists_and_not_empty(f)
+
+#         qnorm_r = analysis.normalize_quantiles(implementation="R", save=True)
+#         assert hasattr(analysis, "matrix_norm")
+#         assert isinstance(qnorm_r, pd.DataFrame)
+#         assert qnorm_r.dtypes.all() == np.float
+#         assert qnorm_r.isnull().sum().sum() == 0
+#         assert file_exists_and_not_empty(f)
+
+#         cors = list()
+#         for col in qnorm_p.columns:
+#             cors.append(scipy.stats.pearsonr(qnorm_p[col], qnorm_r[col])[0])
+#         assert all(np.array(cors) > 0.99)
 
 
 @pytest.mark.skipif(CI, reason="CQN normalization not testable in CI")

@@ -44,7 +44,7 @@ def check_has_attributes(attributes=None, object_types=None):
             not_type = pd.Series(
                 [isinstance(getattr(args[0], attr), t) is not None
                  for attr, t in zip(t_attributes, t_object_types)],
-                index=t_attributes)
+                index=t_attributes, dtype=object)
             if not not_type.all():
                 msg = msg.format(
                     ",".join(not_type[~not_type].index),

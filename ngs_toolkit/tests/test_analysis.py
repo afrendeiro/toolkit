@@ -10,7 +10,7 @@ import pytest
 
 from ngs_toolkit.analysis import Analysis
 from ngs_toolkit.utils import get_this_file_or_timestamped
-from .conftest import file_exists, file_not_empty
+from .conftest import file_exists, file_not_empty, COMBAT
 
 
 class TestAnalysis:
@@ -253,6 +253,9 @@ def test_project_with_subprojects(subproject_config):
     assert len(a.samples) > 0
 
 
+@pytest.mark.skipif(
+    not COMBAT,
+    reason="Combat not installed")
 def test_remove_factor(atac_analysis_many_factors):
     import pandas as pd
 

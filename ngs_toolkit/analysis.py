@@ -2945,7 +2945,7 @@ class Analysis(object):
             for var in ["p_value", "adj_pvalue"]:
                 pivot = (
                     associations.groupby(["pc", "attribute"])
-                    .min()[var]
+                    [var].min()
                     .reset_index()
                     .pivot(index="pc", columns="attribute", values=var)
                     .dropna(axis=1)

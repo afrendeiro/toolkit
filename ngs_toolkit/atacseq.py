@@ -1922,14 +1922,7 @@ class ATACSeqAnalysis(Analysis):
         chroms_norm = (chroms / chroms.sum(axis=0)) * 100
 
         if hasattr(self, "organism"):
-            if self.organism == "human":
-                chroms_norm = chroms_norm.loc[
-                    ["chr{}".format(i) for i in list(range(1, 23)) + ["X", "Y", "M"]], :
-                ]
-            elif self.organism == "mouse":
-                chroms_norm = chroms_norm.loc[
-                    ["chr{}".format(i) for i in list(range(1, 19)) + ["X", "Y", "M"]], :
-                ]
+            chroms_norm = chroms_norm.loc[~chroms_norm.index.str.contains("_"), :]
 
             fig, axis = plt.subplots(1, 1, figsize=(8 * 1, 8 * 1))
             sns.heatmap(

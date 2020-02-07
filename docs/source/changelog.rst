@@ -23,6 +23,35 @@ Changed
   - More simplicity and abstraction for functions in main :class:`ngs_toolkit.analysis.Analysis` class.
 
 
+[0.22.0] - 2020-02-07
+*****************************
+
+Changed
+-----------------------------
+
+  - Minor changes to allow pandas==1.0.0
+
+
+[0.21.1] - 2020-02-06
+*****************************
+
+Changed
+-----------------------------
+
+  - Fix bug preventing plotting of all parts in :func:`ngs_toolkit.analysis.Analysis.plot_differential_enrichment`.
+
+
+[0.21.0] - 2020-02-06
+*****************************
+
+Changed
+-----------------------------
+
+  - Remove rpy2 from mandatory requirements
+  - Documentation updates
+  - Compatibility with new naming of Enrichr gene set libraries
+
+
 [0.20.0] - 2019-11-29
 *****************************
 

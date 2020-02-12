@@ -13,6 +13,7 @@ except ImportError:
     __version__ = _get_version(root='..', relative_to=__file__)
 
 
+# Setup joblib memory
 JOBLIB_CACHE_DIR = os.path.join(os.path.expanduser("~"), ".ngs_toolkit")
 MEMORY = Memory(location=JOBLIB_CACHE_DIR, verbose=0)
 
@@ -246,7 +247,8 @@ setup_graphic_preferences()
 setup_timestamping()
 
 
-# easier API
+# Easier API:
+# import all children of Analysis class
 from ngs_toolkit.analysis import Analysis
 from ngs_toolkit.atacseq import ATACSeqAnalysis
 from ngs_toolkit.chipseq import ChIPSeqAnalysis

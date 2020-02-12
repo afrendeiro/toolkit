@@ -452,8 +452,10 @@ def generate_sample_input_files(analysis, matrix):
 def initialize_analysis_of_data_type(data_type, pep_config, *args, **kwargs):
     """Initialize an Analysis object from a PEP config with the appropriate ``data_type``."""
     from ngs_toolkit import Analysis
+    sub = Analysis.__subclasses__()
+    sub += [sc for x in sub for sc in x.__subclasses__()]
 
-    m = {t._data_type: t for t in Analysis.__subclasses__()}
+    m = {t._data_type: t for t in sub}
     return m[data_type](from_pep=pep_config, *args, **kwargs)
 
 

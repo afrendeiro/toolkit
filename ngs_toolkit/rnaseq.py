@@ -9,9 +9,6 @@ from ngs_toolkit import _LOGGER
 from ngs_toolkit.analysis import Analysis
 
 
-# TODO: add matrix_features to RNASeqAnalysis class
-# TODO: rewrite knockout_plot
-
 class RNASeqAnalysis(Analysis):
     """
     Class to model analysis of RNA-seq data.
@@ -544,23 +541,21 @@ class RNASeqAnalysis(Analysis):
             )
 
 
-def knockout_plot(
+def plot_features(
         analysis=None,
         knockout_genes=None,
         matrix="matrix_norm",
         samples=None,
-        comparison_results=None,
+        differential_results=None,
         output_dir=None,
-        output_prefix="knockout_expression",
-        square=True,
-        rasterized=True):
+        output_prefix="knockout_expression",):
     """
-    Plot expression of knocked-out genes in all samples.
+    Plot expression of genes in samples or sample groups.
 
     Parameters
     ----------
 
-    analysis : :class:`.RNASeqAnalysis`, optional
+    analysis : :class:`ngs_toolkit.RNASeqAnalysis`, optional
         Analysis object.
 
         Not required if `matrix` is given.
@@ -577,7 +572,7 @@ def knockout_plot(
         [description]
 
         Defaults to :obj:`None`.
-    comparison_results : [type], optional
+    differential_results : [type], optional
         [description]
 
         Defaults to :obj:`None`.
@@ -589,18 +584,8 @@ def knockout_plot(
         Prefix for output files.
 
         Defaults to "knockout_expression"
-    square : bool, optional
-        Whether heatmap cells should have inforced aspect.
-
-        Defaults to :obj:`True`.
-    rasterized : bool, optional
-        Whether heatmap cells should be rasterized.
-
-        Defaults to :obj:`True`.
     """
-
-    import scipy
-    import seaborn as sns
+    from ngs_toolkit.graphics import clustermap_varieties
 
     if (analysis is None) and (matrix is None):
         raise AssertionError(
@@ -628,11 +613,9 @@ def knockout_plot(
     knockout_genes = sorted(knockout_genes)
 
     missing = [k for k in knockout_genes if k not in matrix.index]
-    msg = "The following `knockout_genes` were not found in the expression matrix: '{}'".format(
-        ", ".join(missing)
-    )
+    msg = "Some `knockout_genes` were not found in the expression matrix: '%s'"
     if len(missing) > 0:
-        _LOGGER.warning(msg)
+        _LOGGER.warning(msg % ", ".join(missing))
     knockout_genes = [k for k in knockout_genes if k in matrix.index]
 
     ko = matrix.loc[knockout_genes, :]
@@ -640,248 +623,61 @@ def knockout_plot(
     if ko.empty:
         _LOGGER.warning(msg)
         return
-    v = np.absolute(scipy.stats.zscore(ko, axis=1)).flatten().max()
-    v += v / 10.0
 
-    g = sns.clustermap(
-        ko,
-        cbar_kws={"label": "Expression"},
-        robust=True,
-        xticklabels=True,
-        yticklabels=True,
-        square=square,
-        rasterized=rasterized,
-    )
-    g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90)
-    g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0)
-    g.savefig(os.path.join(output_dir, output_prefix + ".svg"), bbox_inches="tight")
-
-    g = sns.clustermap(
-        ko,
-        z_score=0,
-        cmap="RdBu_r",
-        vmin=-v,
-        vmax=v,
-        cbar_kws={"label": "Expression Z-score"},
-        rasterized=rasterized,
-        xticklabels=True,
-        yticklabels=True,
-        square=square,
-    )
-    g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90)
-    g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0)
-    g.savefig(
-        os.path.join(output_dir, output_prefix + ".z_score.svg"), bbox_inches="tight"
-    )
-
-    g = sns.clustermap(
-        ko,
-        cbar_kws={"label": "Expression"},
-        row_cluster=False,
-        col_cluster=False,
-        robust=True,
-        xticklabels=True,
-        yticklabels=True,
-        square=square,
-        rasterized=rasterized,
-    )
-    g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90)
-    g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0)
-    g.savefig(
-        os.path.join(output_dir, output_prefix + ".sorted.svg"), bbox_inches="tight"
-    )
-
-    g = sns.clustermap(
-        ko,
-        z_score=0,
-        cmap="RdBu_r",
-        vmin=-v,
-        vmax=v,
-        cbar_kws={"label": "Expression Z-score"},
-        row_cluster=False,
-        col_cluster=False,
-        rasterized=rasterized,
-        xticklabels=True,
-        yticklabels=True,
-        square=square,
-    )
-    g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90)
-    g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0)
-    g.savefig(
-        os.path.join(output_dir, output_prefix + ".z_score.sorted.svg"),
-        bbox_inches="tight",
-    )
+    # expression values
+    clustermap_varieties(ko, output_dir=output_dir, output_prefix=output_prefix)
 
     # p-values and fold-changes for knockout genes
-    if comparison_results is None:
+    if differential_results is None:
+        differential_results = getattr(analysis, "differential_results", None)
+    if differential_results is None:
+        return
+
+    if len(differential_results['comparison_name'].unique()) <= 1:
+        msg = "Could not plot values per comparison as only one found!"
+        _LOGGER.warning(msg)
         return
 
     # p-values
     p_table = pd.pivot_table(
-        comparison_results.loc[knockout_genes, :].reset_index(),
+        differential_results.loc[knockout_genes, :].reset_index(),
         index="comparison_name",
         columns="index",
         values="padj",
     )
     p_table.index.name = "Knockout gene"
     p_table.columns.name = "Gene"
-    p_table = -np.log10(p_table.loc[knockout_genes, knockout_genes].dropna())
+    p_table = -np.log10(p_table.loc[:, knockout_genes].dropna())
     p_table = p_table.replace(np.inf, p_table[p_table != np.inf].max().max())
     p_table = p_table.replace(-np.inf, 0)
 
-    v = np.absolute(scipy.stats.zscore(p_table, axis=1)).flatten().max()
-    v += v / 10.0
-
-    g = sns.clustermap(
-        p_table,
-        cbar_kws={"label": "-log10(FDR p-value)"},
-        xticklabels=True,
-        yticklabels=True,
-        square=square,
-    )
-    g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90)
-    g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0)
-    g.savefig(
-        os.path.join(output_dir, output_prefix + ".p_value.svg"), bbox_inches="tight"
-    )
-
-    g = sns.clustermap(
-        p_table,
-        z_score=0,
-        center=0,
-        cmap="RdBu_r",
-        vmax=v,
-        cbar_kws={"label": "-log10(FDR p-value)\nZ-score"},
-        xticklabels=True,
-        yticklabels=True,
-        square=square,
-    )
-    g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90)
-    g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0)
-    g.savefig(
-        os.path.join(output_dir, output_prefix + ".p_value.z_score.svg"),
-        bbox_inches="tight",
-    )
-
-    g = sns.clustermap(
-        p_table,
-        cbar_kws={"label": "-log10(FDR p-value)"},
-        row_cluster=False,
-        col_cluster=False,
-        xticklabels=True,
-        yticklabels=True,
-        square=square,
-    )
-    g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90)
-    g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0)
-    g.savefig(
-        os.path.join(output_dir, output_prefix + ".p_value.sorted.svg"),
-        bbox_inches="tight",
-    )
-
-    g = sns.clustermap(
-        p_table,
-        z_score=0,
-        cmap="RdBu_r",
-        center=0,
-        vmax=v,
-        cbar_kws={"label": "-log10(FDR p-value)\nZ-score"},
-        row_cluster=False,
-        col_cluster=False,
-        xticklabels=True,
-        yticklabels=True,
-        square=square,
-    )
-    g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90)
-    g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0)
-    g.savefig(
-        os.path.join(output_dir, output_prefix + ".p_value.z_score.sorted.svg"),
-        bbox_inches="tight",
-    )
-
-    g = sns.clustermap(
-        p_table,
-        cbar_kws={"label": "-log10(FDR p-value)"},
-        row_cluster=False,
-        col_cluster=False,
-        xticklabels=True,
-        yticklabels=True,
-        square=square,
-        vmax=1.3 * 5,
-    )
-    g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90)
-    g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0)
-    g.savefig(
-        os.path.join(output_dir, output_prefix + ".p_value.thresholded.svg"),
-        bbox_inches="tight",
-    )
+    clustermap_varieties(
+        p_table, output_dir=output_dir,
+        output_prefix=output_prefix + ".p_value", quantity="-log10(FDR p-value)")
+    clustermap_varieties(
+        p_table, output_dir=output_dir,
+        output_prefix=output_prefix + ".p_value.thresholded",
+        steps=['base', 'sorted'], quantity="-log10(FDR p-value)", vmax=1.3 * 5)
 
     # logfoldchanges
     fc_table = pd.pivot_table(
-        comparison_results.loc[knockout_genes, :].reset_index(),
+        differential_results.loc[knockout_genes, :].reset_index(),
         index="comparison_name",
         columns="index",
         values="log2FoldChange",
     )
     fc_table.index.name = "Knockout gene"
     fc_table.columns.name = "Gene"
-    fc_table = fc_table.loc[knockout_genes, knockout_genes].dropna()
+    fc_table = fc_table.loc[:, knockout_genes].dropna()
 
-    v = np.absolute(scipy.stats.zscore(fc_table, axis=1)).flatten().max()
-    v += v / 10.0
-
-    g = sns.clustermap(
-        fc_table,
-        center=0,
-        cmap="RdBu_r",
-        cbar_kws={"label": "log2(fold-change)"},
-        xticklabels=True,
-        yticklabels=True,
-        square=square,
-    )
-    g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90)
-    g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0)
-    g.savefig(
-        os.path.join(output_dir, output_prefix + ".log_fc.svg"), bbox_inches="tight"
-    )
-
-    g = sns.clustermap(
-        fc_table,
-        center=0,
-        cmap="RdBu_r",
-        cbar_kws={"label": "log2(fold-change)"},
-        row_cluster=False,
-        col_cluster=False,
-        xticklabels=True,
-        yticklabels=True,
-        square=square,
-    )
-    g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90)
-    g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0)
-    g.savefig(
-        os.path.join(output_dir, output_prefix + ".log_fc.sorted.svg"),
-        bbox_inches="tight",
-    )
-
-    g = sns.clustermap(
-        fc_table,
-        center=0,
-        vmin=-2,
-        vmax=2,
-        cmap="RdBu_r",
-        cbar_kws={"label": "log2(fold-change)"},
-        row_cluster=False,
-        col_cluster=False,
-        xticklabels=True,
-        yticklabels=True,
-        square=square,
-    )
-    g.ax_heatmap.set_xticklabels(g.ax_heatmap.get_xticklabels(), rotation=90)
-    g.ax_heatmap.set_yticklabels(g.ax_heatmap.get_yticklabels(), rotation=0)
-    g.savefig(
-        os.path.join(output_dir, output_prefix + ".log_fc.thresholded.sorted.svg"),
-        bbox_inches="tight",
-    )
+    clustermap_varieties(
+        fc_table, output_dir=output_dir,
+        output_prefix=output_prefix + "log_fc",
+        steps=['base', 'sorted'], quantity="log2(fold-change)")
+    clustermap_varieties(
+        fc_table, output_dir=output_dir,
+        output_prefix=output_prefix + "log_fc.thresholded",
+        steps=['base', 'sorted'], quantity="log2(fold-change)", vmin=-2, vmax=2)
 
 
 def assess_cell_cycle(
@@ -914,7 +710,7 @@ def assess_cell_cycle(
     g2m_genes = cc_prots[43:].tolist()
     cc_prots = [x for x in cc_prots if x in matrix.index.tolist()]
 
-    knockout_plot(
+    plot_expression(
         knockout_genes=cc_prots,
         output_prefix=output_prefix + ".gene_expression.zscore0",
         matrix=exp_z,

@@ -35,6 +35,76 @@ def savefig(fig, file_name, **kwargs):
         record_analysis_output(file_name)
 
 
+def clustermap_varieties(
+        df, output_dir, output_prefix,
+        steps=['base', 'z_score', 'sorted'],
+        rasterized=True, labels=False,
+        quantity="Expression", **kwargs):
+    """
+    CLustered heatmaps for various data transformations/orders.
+    Specifically it will plot heatmaps with raw values, zscores,
+    rows and columns clustered or ordered with provided indexes.
+
+    Parameters
+    ----------
+    df : :obj:`pandas.DataFrame`
+        DataFrame to plot.
+    output_dir : :obj:`str`
+        Directory to save plots.
+    output_prefix : :obj:`str`
+        Plot prefix.
+    steps : :obj:`list`, optional
+        Types of plots to produce. Defaults to all possible kinds.
+    rasterized : :obj:`bool`, optional
+        Whether to reasterize heatmaps. The default is True.
+    labels : {:obj:`None`, :obj:`str`}, optional
+        Whether row or column labels should be plotted.
+        Pass a boolean to control both, or "rows" or "columns" to control each.
+    quantity : :obj:`str`, optional
+        A label for the numerical quantity. The default is "Expression".
+    **kwargs : :obj:`dict`, optional
+        Additional keyword arguments are passed to :func:`~seaborn.clustermap`.
+    """
+    import scipy
+    from ngs_toolkit.graphics import (
+        clustermap_fix_label_orientation as fixlabels, savefig)
+
+    v = np.absolute(scipy.stats.zscore(df, axis=1)).flatten().max()
+    v += v / 10.0
+
+    common_kwargs = dict(
+        rasterized=rasterized,
+        xticklabels=True if labels in [True, "cols"] else False,
+        yticklabels=True if labels in [True, "rows"] else False)
+    c_kwargs = dict(cbar_kws={"label": quantity}, robust=True)
+    cz_kwargs = dict(
+        cbar_kws={"label": quantity + " Z-score"},
+        z_score=0, cmap="RdBu_r", vmin=-v, vmax=v, center=0)
+    s_kwargs = dict(**c_kwargs, row_cluster=False, col_cluster=False)
+    sz_kwargs = dict(**cz_kwargs, row_cluster=False, col_cluster=False)
+    sz_kwargs = dict(**cz_kwargs, row_cluster=False, col_cluster=False)
+
+    b = "base" in steps
+    s = "sorted" in steps
+    z = "zscore" in steps
+    t = "threshold" in steps
+    pars = list()
+    if b:
+        pars += [("", c_kwargs)]
+    if s:
+        pars += [(".sorted", s_kwargs)]
+    if z:
+        pars += [(".z_score", cz_kwargs)]
+    if s and z:
+        pars += [(".z_score.sorted", sz_kwargs)]
+    if t:
+        pars += [""]
+
+    for label, params in pars:
+        file = os.path.join(output_dir, output_prefix + label + ".svg")
+        savefig(fixlabels(sns.clustermap(df, **common_kwargs, **params, **kwargs)), file)
+
+
 def barmap(x, figsize=None, square=False, row_colors=None, z_score=None, ylims=None):
     """
     Plot a heatmap-style grid with barplots.

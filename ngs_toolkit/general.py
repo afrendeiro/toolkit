@@ -2309,10 +2309,23 @@ def query_biomart(
         ensembl_version="grch38",
         max_api_retries=5):
     """
-    Query Biomart (https://www.ensembl.org/biomart/martview/).
+    Query Biomart for gene attributes (https://www.ensembl.org/biomart/martview/).
 
-    Query Biomart for gene attributes. Returns pandas dataframe with query results.
-    If a certain field contains commas, it will attemp to return dataframe but it might fail.
+    Available attributes can be see at Biomart. Each should be snakecase
+    (lowecase with only underscore separators) as defined in the Biomart API.
+
+    Common examples:
+
+        * "ensembl_gene_id"
+        * "external_gene_name"
+        * "hgnc_symbol"
+
+    If a certain field multiple values separated by commas,
+    it will attemp to return dataframe but it might fail.
+
+    The output of this function is cached to disk using joblib.
+    To please either call :func:`ngs_toolkit.MEMORY.clear()` or
+    remove the contents of `~/.ngs_toolkit/joblib/general/query_biomart`.
 
     Parameters
     ----------
@@ -2327,11 +2340,11 @@ def query_biomart(
     ensembl_version : :obj:`str`, optional
         Ensembl version to query. Currently "grch37", "grch38" and "grcm38" are tested.
 
-        Defaults to "grch37".
+        Defaults to "grch38".
     max_api_retries : :obj:`int`, optional
         How many times to try .
 
-        Defaults to "grch37".
+        Defaults to 5.
 
     Returns
     -------
@@ -2358,7 +2371,8 @@ def query_biomart(
             """http://{}ensembl.org/biomart/martservice?query=""".format(ens_ver),
             """<?xml version="1.0" encoding="UTF-8"?>""",
             """<!DOCTYPE Query>""",
-            """<Query  virtualSchemaName="default" formatter="CSV" header="0" uniqueRows="0" count="" datasetConfigVersion="0.6" >""",
+            """<Query  virtualSchemaName="default" formatter="CSV" header="0" """
+                """uniqueRows="0" count="" datasetConfigVersion="0.6" >""",
             """<Dataset name="{}_gene_ensembl" interface="default" >""".format(species),
         ]
         + ["""<Attribute name="{}" />""".format(attr) for attr in attributes]
@@ -2382,7 +2396,9 @@ def query_biomart(
             try:
                 content = list(req.iter_lines())
                 success = True
-            except (requests.exceptions.ChunkedEncodingError, requests.urllib3.exceptions.ProtocolError):
+            except (
+                    requests.exceptions.ChunkedEncodingError,
+                    requests.urllib3.exceptions.ProtocolError):
                 msg = "Retrieving Biomart request failed."
                 n_fails += 1
                 if n_fails == max_api_retries:
@@ -2392,15 +2408,15 @@ def query_biomart(
                     _LOGGER.warning(msg + " Retrying.")
                     time.sleep(1)
 
-    if (len(content) == 1) and (content[0].startswith("Query ERROR")):
-        msg = "Request to Biomart API was not successful. Check your input.\n{}".format(
-            content[0]
-        )
-        _LOGGER.error(msg)
-        raise ValueError(msg)
-
     if isinstance(content[0], bytes):
         content = [x.decode("utf-8") for x in content]
+
+    if (len(content) == 1) and (content[0].startswith("Query ERROR")):
+        msg = (
+            "Request to Biomart API was not successful. "
+            "Please check your input: \n\t{}").format(content[0])
+        # _LOGGER.error(msg)
+        raise ValueError(msg)
 
     try:
         mapping = pd.DataFrame(

@@ -1644,7 +1644,10 @@ def homer_combine_motifs(
     else:
         fold_enrichment = " -F " + str(fold_enrichment)
     subprocess.call(
-        "compareMotifs.pl {} {} -reduceThresh {} -matchThresh {}{} -pvalue {} -info {}{} -nofacts -cpu {}".format(
+        "compareMotifs.pl {} {} -reduceThresh {}"
+        " -matchThresh {}{} -pvalue {}"
+        " -info {}{} -nofacts -cpu {}"
+        .format(
             out_file,
             output_dir,
             reduce_threshold,

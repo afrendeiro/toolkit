@@ -396,6 +396,7 @@ def clustermap_fix_label_orientation(grid, fontsize="xx-small", **kwargs):
     grid.ax_heatmap.set_yticklabels(
         grid.ax_heatmap.get_yticklabels(), rotation=0, fontsize=fontsize, **kwargs
     )
+    return grid
 
 
 def clustermap_rasterize_heatmap(grid):

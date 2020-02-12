@@ -87,7 +87,7 @@ def generate_data(
         genome_assembly="hg38",
         **kwargs):
     """
-    Creates real-looking data
+    Creates real-looking data dependent on the data type.
 
     Parameters
     ----------
@@ -138,11 +138,11 @@ def generate_data(
         dnum.index = get_random_genomic_locations(
             n_features, genome_assembly=genome_assembly
         )
-    if data_type in ["RNA-seq"]:
+    elif data_type in ["RNA-seq"]:
         dnum.index = get_random_genes(
             n_features, genome_assembly=genome_assembly
         )
-    if data_type in ["CNV"]:
+    elif data_type in ["CNV"]:
         from ngs_toolkit.utils import z_score
 
         dnum.index = get_genomic_bins(
@@ -451,8 +451,9 @@ def generate_sample_input_files(analysis, matrix):
 
 def initialize_analysis_of_data_type(data_type, pep_config, *args, **kwargs):
     """Initialize an Analysis object from a PEP config with the appropriate ``data_type``."""
-    from ngs_toolkit import ATACSeqAnalysis, ChIPSeqAnalysis, CNVAnalysis, RNASeqAnalysis
-    m = {t._data_type: t for t in [ATACSeqAnalysis, ChIPSeqAnalysis, CNVAnalysis, RNASeqAnalysis]}
+    from ngs_toolkit import Analysis
+
+    m = {t._data_type: t for t in Analysis.__subclasses__()}
     return m[data_type](from_pep=pep_config, *args, **kwargs)
 
 

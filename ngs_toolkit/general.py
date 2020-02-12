@@ -1703,13 +1703,20 @@ def homer_combine_motifs(
 
 
 @MEMORY.cache
+def enrichr(gene_set, gene_set_libraries=None, kind="genes", max_attempts=5):
     """
     Use Enrichr on a list of genes (currently only genes supported through the API).
+    If input contains <NaN> values, they will be ignored.
+
+    The output of this function is cached to disk using joblib.
+    To please either call :func:`ngs_toolkit.MEMORY.clear()` or
+    remove the contents of `~/.ngs_toolkit/joblib/general/enrichr`.
 
     Parameters
     ----------
-    dataframe : :obj:`str`
-        DataFrame with column "gene_name".
+    gene_set : {:obj:`list`, :obj:`set`, :obj:`~pandas.Series`, :obj:`~pandas.DataFrame`}
+        Set of genes to get enrichment for.
+        Can be pandas DataFrame with single column or column "gene_name".
 
     gene_set_libraries : :obj:`list`, optional
         Gene set libraries to use.
@@ -1768,16 +1775,33 @@ def homer_combine_motifs(
             _LOGGER.error(msg)
             return
 
+    # Handle various input types
+    if isinstance(gene_set, (list, set)):
+        genes = [x for x in gene_set if not pd.isnull(x)]
+    elif isinstance(gene_set, pd.Series):
+        genes = gene_set.dropna().tolist()
+    elif isinstance(gene_set, pd.DataFrame):
+        if gene_set.shape[1] == 1:
+            genes = gene_set.squeeze().dropna().tolist()
+        else:
+            try:
+                genes = gene_set["gene_name"].dropna().tolist()
+            except KeyError:
+                msg = "Provided input dataframe does not have a gene_name column!"
+                _LOGGER.error(msg)
+                raise ValueError(msg)
+
     if kind == "genes":
         # Build payload with bed file
-        attr = "\n".join(dataframe["gene_name"].dropna().tolist())
+        attr = "\n".join(genes)
     elif kind == "regions":
+        raise NotImplementedError
         # Build payload with bed file
-        attr = "\n".join(
-            dataframe[["chrom", "start", "end"]]
-            .apply(lambda x: "\t".join([str(i) for i in x]), axis=1)
-            .tolist()
-        )
+        # attr = "\n".join(
+        #     dataframe[["chrom", "start", "end"]]
+        #     .apply(lambda x: "\t".join([str(i) for i in x]), axis=1)
+        #     .tolist()
+        # )
 
     payload = {"list": (None, attr), "description": (None, "")}
     # Request adding gene set

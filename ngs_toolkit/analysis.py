@@ -5511,7 +5511,7 @@ class Analysis(object):
                                     comparison_dir, output_prefix + ".enrichr.csv"
                                 )
                             ):
-                                enr = enrichr(comparison_df.reset_index())
+                                enr = enrichr(comparison_df['gene_name'])
                                 enr.to_csv(
                                     os.path.join(
                                         comparison_dir, output_prefix + ".enrichr.csv"),

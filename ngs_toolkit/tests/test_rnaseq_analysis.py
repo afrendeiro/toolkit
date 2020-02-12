@@ -8,8 +8,8 @@ import pandas as pd
 from .conftest import file_exists, file_exists_and_not_empty
 
 
-def test_rpm_normalization(various_analysis):
-    for analysis in [a for a in various_analysis if a.data_type == "RNA-seq"]:
+def test_rpm_normalization(rnaseq_analysis):
+    with rnaseq_analysis as analysis:
         qnorm = analysis.normalize_rpm(save=False)
         assert qnorm.dtypes.all() == np.float
         assert hasattr(analysis, "matrix_norm")
@@ -67,8 +67,25 @@ def test_annotate_features(rnaseq_analysis):
     assert all([c in rnaseq_analysis.matrix_features.columns.tolist() for c in cols])
 
 
-def test_plot_expression_characteristics(various_analysis):
-    for analysis in [a for a in various_analysis if a.data_type == "RNA-seq"]:
+def test_plot_expression_characteristics(rnaseq_analysis):
+    with rnaseq_analysis as analysis:
         analysis.normalize()
         analysis.plot_expression_characteristics()
         assert file_exists(os.path.join(analysis.results_dir, "quality_control"))
+
+
+def test_plot_features(rnaseq_analysis):
+    from ngs_toolkit.rnaseq import plot_features
+    with rnaseq_analysis as analysis:
+        analysis.normalize_rpm()
+
+        analysis.differential_analysis()
+
+        plot_features(
+            analysis,
+            knockout_genes=analysis.matrix_norm.mean(1).nlargest(20).index.tolist())
+
+        outs = [os.path.join(analysis.results_dir, f) for f in [
+            "knockout_expression.svg", "results/knockout_expression.sorted.svg"]]
+        for f in outs:
+            file_exists_and_not_empty(f)

@@ -18,3 +18,4 @@ attmap>=0.12.9
 requests>=2.21.0
 jinja2>=2.10.1
 natsort>=6.0.0
+joblib>=0.12.5

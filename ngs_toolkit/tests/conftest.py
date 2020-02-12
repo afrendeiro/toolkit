@@ -6,7 +6,7 @@ from functools import partialmethod
 
 import pytest
 
-from ngs_toolkit import Analysis, ATACSeqAnalysis
+from ngs_toolkit import MEMORY, Analysis, ATACSeqAnalysis
 from ngs_toolkit.demo import generate_project
 
 
@@ -332,6 +332,7 @@ def various_analysis(tmp_path):
 
 
 @pytest.fixture
+@MEMORY.cache
 def chrom_file(tmp_path):
     from ngs_toolkit.utils import download_gzip_file
     import pandas as pd
@@ -354,12 +355,15 @@ def chrom_file(tmp_path):
 
 
 @pytest.fixture
+@MEMORY.cache
 def get_crispr_matrix(tmp_path):
     import pandas as pd
 
-    url = "http://liulab.dfci.harvard.edu/Mageck/melanoma.csv.zip"
-    output_file = os.path.join(tmp_path, "Mageck.melanoma.example_data.zip")
+    url = (
+        "https://web.archive.org/web/20190702030135/"
+        "http://liulab.dfci.harvard.edu/Mageck/melanoma.csv.zip")
     b = pd.read_csv(url, index_col=[0, 1])
     assert b.shape == (64076, 9)
+    output_file = os.path.join(tmp_path, "Mageck.melanoma.example_data.zip")
     b.to_csv(output_file)
     return output_file

@@ -6,7 +6,7 @@ import os
 import numpy as np
 import pandas as pd
 
-from ngs_toolkit import _CONFIG, _LOGGER
+from ngs_toolkit import _CONFIG, _LOGGER, MEMORY
 from ngs_toolkit.utils import get_this_file_or_timestamped
 
 
@@ -1702,7 +1702,7 @@ def homer_combine_motifs(
                 subprocess.call(cmd.split(" "))
 
 
-def enrichr(dataframe, gene_set_libraries=None, kind="genes", max_attempts=5):
+@MEMORY.cache
     """
     Use Enrichr on a list of genes (currently only genes supported through the API).
 
@@ -2278,6 +2278,7 @@ def rename_sample_files(
                 raise OSError("Command '{}' failed.".format(cmd))
 
 
+@MEMORY.cache
 def query_biomart(
         attributes=None,
         species="hsapiens",

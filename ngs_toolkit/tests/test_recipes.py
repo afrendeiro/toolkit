@@ -10,6 +10,43 @@ from ngs_toolkit import Analysis
 from .conftest import CI, DEV, file_exists_and_not_empty
 
 
+def test_region_set_frip(pep):
+    import pkgutil
+    # For this test, we need an analysis object with sample attributes pointing
+    # to their input files (just like the atac_analysis_with_input_files parent),
+    # but since it has to be in inside the recipe, so we will temporarily set it
+    # at the home directory level, for this test only
+    config = os.path.join(os.path.expanduser("~"), ".ngs_toolkit.config.yaml")
+    yaml = (
+        pkgutil.get_data("ngs_toolkit", "config/example.yaml")
+        .decode().strip())
+    with open(config, "w") as handle:
+        handle.write(yaml)
+
+    cmd = (
+        "{exe} -m ngs_toolkit.recipes.region_set_frip {pep} "
+        "--computing-configuration default"
+    ).format(exe=sys.executable, pep=pep)
+
+    p = subprocess.Popen(cmd.split(" "))
+    o = p.communicate()
+    assert o == (None, None)
+
+    an = Analysis(from_pep=pep)
+    for sample in an.samples:
+        files = [
+            "region_set_frip.all_reads.txt",
+            "region_set_frip.inside_reads.txt",
+            sample.name + ".region_set_frip.log",
+            sample.name + ".region_set_frip.sh",
+            "stats.tsv"]
+        for f in files:
+            assert file_exists_and_not_empty(
+                os.path.join(sample.paths.sample_root, f))
+
+    os.remove(config)
+
+
 def test_deseq2(tmp_path, atac_analysis_with_input_files):
     an = atac_analysis_with_input_files
     an.differential_analysis(distributed=True, dry_run=True)
@@ -95,29 +132,6 @@ def test_enrichr_bad(tmp_path):
 
     with pytest.raises(pd.errors.EmptyDataError):
         pd.read_csv(output_file)
-
-
-def test_region_set_frip(pep):
-    cmd = (
-        "{exe} -m ngs_toolkit.recipes.region_set_frip {pep} "
-        "--computing-configuration default"
-    ).format(exe=sys.executable, pep=pep)
-
-    p = subprocess.Popen(cmd.split(" "))
-    o = p.communicate()
-    assert o == (None, None)
-
-    an = Analysis(from_pep=pep)
-    for sample in an.samples:
-        files = [
-            "region_set_frip.all_reads.txt",
-            "region_set_frip.inside_reads.txt",
-            sample.name + ".region_set_frip.log",
-            sample.name + ".region_set_frip.sh",
-            "stats.tsv"]
-        for f in files:
-            assert file_exists_and_not_empty(
-                os.path.join(sample.paths.sample_root, f))
 
 
 @pytest.mark.skipif(

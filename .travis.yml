@@ -15,7 +15,7 @@ services:
 
 before_install:
   # Install bedtools
-  - sudo apt-get -y install bedtools samtools
+  - sudo apt-get -y install bedtools samtools gawk
   # Install R
   - sudo apt-get -y install r-base
   # Add bioconductor libraries

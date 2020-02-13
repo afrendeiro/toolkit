@@ -4,6 +4,10 @@
 A helper script to calculate the read coverage of a BAM file
 in regions from a BED file.
 Ensures the same order and number of lines as input BED file.
+
+Software requirements:
+
+ * None
 """
 
 import os

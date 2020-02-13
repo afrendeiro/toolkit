@@ -16,7 +16,7 @@ preferences:
   # The next item is the default computing configuration to use from divvy.
   # Run "divvy list" to see all options.
   # See more here: http://code.databio.org/divvy/
-  computing_configuration: 'slurm'
+  computing_configuration: 'default'
   report:
     record_figures: True
     record_csv: True

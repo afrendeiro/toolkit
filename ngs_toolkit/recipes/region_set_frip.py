@@ -1,9 +1,17 @@
 #!/usr/bin/env python
 
 """
-Compute fraction of reads in peaks (FRiP)
-based on a consensus set of regions derived
-from several samples.
+Compute fraction of reads in peaks (FRiP) based on a consensus set of regions
+derived from several samples.
+
+A consensus region set can be passed, otherwise it will either try to use an
+existing one for that analysis or produce one on the fly.
+
+
+Software requirements:
+
+ * awk
+ * samtools
 """
 
 
@@ -46,13 +54,6 @@ def parse_arguments():
         "in the annotation sheet should be used.",
     )
     parser.add_argument(
-        "--distributed",
-        action="store_true",
-        dest="distributed",
-        help="Whether jobs should be created for each sample, or "
-        "it should run in serial mode.",
-    )
-    parser.add_argument(
         "--computing-configuration",
         dest="computing_configuration",
         help="Which `divvy` computing configuration to use for distributed jobs."
@@ -63,7 +64,7 @@ def parse_arguments():
         "--permissive",
         action="store_true",
         dest="permissive",
-        help="Whether to allow errors and proceed with whatever works.",
+        help="If creating regions set, allow sample files to be missing and use what is present.",
     )
     return parser
 
@@ -104,20 +105,19 @@ def main(cli=None):
 
         if not hasattr(an, "sites"):
             print("Not found. Producing a new consensus region set.")
-            an.get_consensus_sites()
+            an.get_consensus_sites(permissive=args.permissive)
         else:
             print("Using region set in BED format: '{}'".format(an.sites.fn))
 
         calculate_region_set_frip(
             region_set=an.sites.fn,
             samples=an.samples,
-            distributed=args.distributed,
-            permissive=args.permissive,
+            computing_configuration=args.computing_configuration
         )
 
 
 def calculate_region_set_frip(
-        region_set, samples, distributed=False, permissive=True
+        region_set, samples, computing_configuration=None
 ):
     """
     """
@@ -149,9 +149,12 @@ def calculate_region_set_frip(
                 "ALL=`cat {}`".format(all_reads),
                 "FRIP=`calc $IN/$ALL`",
                 'echo "region_set_frip\\t$FRIP\\t." >> {}'.format(sample_stats),
+                "date"
             ]
         )
-        submit_job(cmd, job_file, log_file, jobname=job_name)
+        submit_job(
+            cmd, job_file, log_file, jobname=job_name,
+            computing_configuration=computing_configuration)
 
 
 if __name__ == "__main__":

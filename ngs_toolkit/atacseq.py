@@ -655,7 +655,6 @@ class ATACSeqAnalysis(Analysis):
         distributed : :obj:`bool`
             Whether it should be run as jobs for each sample
             separately in parallel.
-            Currently only implemented for a SLURM cluster.
 
             Default is :obj:`False`.
         overwrite : :obj:`bool`

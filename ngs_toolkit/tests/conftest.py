@@ -6,7 +6,7 @@ from functools import partialmethod
 
 import pytest
 
-from ngs_toolkit import MEMORY, Analysis, ATACSeqAnalysis
+from ngs_toolkit import MEMORY, _LOGGER, Analysis, ATACSeqAnalysis
 from ngs_toolkit.demo import generate_project
 
 
@@ -14,7 +14,7 @@ from ngs_toolkit.demo import generate_project
 CI: bool = ("TRAVIS" in os.environ) or ("GITHUB_WORKFLOW" in os.environ)
 CI_NAME = None
 BUILD_DIR: str = os.path.abspath(os.path.curdir)
-DEV: bool
+DEV: bool = False
 RPY2: bool
 COMBAT: bool
 
@@ -36,8 +36,12 @@ try:
     DEV = os.environ['GITHUB_REF'] == 'dev'
 except KeyError:
     import subprocess
-    o = subprocess.check_output("git status".split(" "))
-    DEV = "dev" in o.decode().split("\n")[0]
+    try:
+        o = subprocess.check_output("git status".split(" "))
+        DEV = "dev" in o.decode().split("\n")[0]
+    except subprocess.CalledProcessError:
+        msg = "Could not detect whether on a development branch."
+        _LOGGER.warning(msg)
 
 
 # Test-specifc options
@@ -289,6 +293,11 @@ def rnaseq_analysis(tmp_path):
         "output_dir": tmp_path})
 
     return generate_project(**kwargs)
+
+
+@pytest.fixture()
+def pep(atac_analysis_with_input_files):
+    return atac_analysis_with_input_files.pep
 
 
 @pytest.fixture

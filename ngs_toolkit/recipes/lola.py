@@ -3,6 +3,11 @@
 """
 A helper script to run Location Overlap Analysis (LOLA)
 of a single region set in various sets of region-based annotations.
+
+
+Software requirements:
+
+ * LOLA
 """
 
 import os

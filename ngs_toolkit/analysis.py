@@ -939,7 +939,7 @@ class Analysis(object):
             }
 
         if only_these_keys is None:
-            only_these_keys = list(output_map.keys())
+            only_these_keys = output_map.keys()
 
         output_map = {k: v for k, v in output_map.items() if k in only_these_keys}
 
@@ -3311,10 +3311,10 @@ class Analysis(object):
                 job_file = os.path.join(out, job_name + ".sh")
                 cmd = (
                     (
-                        "date\n{executable} -m ngs_toolkit.recipes.deseq2 "
+                        "{executable} -m ngs_toolkit.recipes.deseq2 "
                         "--no-save-inputs --output_prefix {output_prefix} "
                         "--formula '{formula}' "
-                        "{overwrite} {out}\ndate")
+                        "{overwrite} {out}")
                     .format(
                         executable=sys.executable,
                         output_prefix=output_prefix,

@@ -3,6 +3,10 @@
 """
 Perform differential expression using DESeq2
 by comparing sample groups using a formula.
+
+Software requirements:
+
+ * DESeq2
 """
 
 import os
@@ -20,7 +24,7 @@ def parse_arguments():
         dest="work_dir",
         help="Working directory. Should contain required files for DESeq2.")
     parser.add_argument(
-        "--output_prefix",
+        "--output-prefix",
         dest="output_prefix",
         default="differential_analysis",
         type=str,
@@ -29,7 +33,7 @@ def parse_arguments():
         "--formula",
         default="~ sample_group",
         type=str,
-        help="R-style formula for differential expression. Default = '~ sample_group'.")
+        help="R-style formula for differential expression. Defaults to '~ sample_group'.")
     parser.add_argument(
         "--alpha",
         default=0.05,

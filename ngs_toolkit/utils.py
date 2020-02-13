@@ -511,6 +511,31 @@ def sort_bed_nicely(bed_file):
     return sites.sort(g=chrom_names.name)
 
 
+def filter_bed_file(input_bed, filter_bed, output_bed):
+    """
+    Filter BED file for entries that overlap another BED file.
+
+    Parameters
+    ----------
+    input_bed : :obj:`str`
+        BED file to filter.
+
+    filter_bed : :obj:`str`
+        BED file with entries to filter from input_bed.
+
+    output_bed : :obj:`str`
+        Output BED file.
+    """
+    import pybedtools
+    input_bed = get_this_file_or_timestamped(input_bed)
+
+    (
+        pybedtools.BedTool(input_bed)
+        .intersect(pybedtools.BedTool(filter_bed), v=True)
+        .saveas(output_bed)
+    )
+
+
 def timedelta_to_years(x):
     """
     Convert a timedelta to years.
@@ -1010,20 +1035,19 @@ def macs2_call_chipseq_peak(
     distributed: :obj:`bool`
         Whether to submit a SLURM job or to return a string with the runnable.
     """
-    output_path = os.path.join(output_dir, name)
-    if not os.path.exists(output_path):
-        os.mkdir(output_path)
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
 
-    runnable = """date\nmacs2 callpeak -t {0} -c {1} -n {2} --outdir {3}\ndate""".format(
+    runnable = """macs2 callpeak -t {0} -c {1} -n {2} --outdir {3}""".format(
         " ".join([s.aligned_filtered_bam for s in signal_samples]),
         " ".join([s.aligned_filtered_bam for s in control_samples]),
         name,
-        output_path,
+        output_dir,
     )
 
     if distributed:
         job_name = "macs2_{}".format(name)
-        job_file = os.path.join(output_path, name + ".macs2.sh")
+        job_file = os.path.join(output_dir, name + ".macs2.sh")
         submit_job(runnable, job_file, cores=4, jobname=job_name)
     else:
         return runnable
@@ -1049,14 +1073,13 @@ def homer_call_chipseq_peak_job(
     name : :obj:`str`
         Name of the MACS2 comparison being performed.
     """
-    output_path = os.path.join(output_dir, name)
-    if not os.path.exists(output_path):
-        os.mkdir(output_path)
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
 
     # make tag directory for the signal and background samples separately
     signal_tag_directory = os.path.join(output_dir, "homer_tag_dir_" + name + "_signal")
     fs = " ".join([s.aligned_filtered_bam for s in signal_samples])
-    runnable = """date\nmakeTagDirectory {0} {1}\n""".format(signal_tag_directory, fs)
+    runnable = """makeTagDirectory {0} {1}\n""".format(signal_tag_directory, fs)
     background_tag_directory = os.path.join(
         output_dir, "homer_tag_dir_" + name + "_background"
     )
@@ -1075,7 +1098,7 @@ def homer_call_chipseq_peak_job(
     output_file = os.path.join(
         output_dir, name, name + "_homer_peaks.histone.narrowPeak"
     )
-    runnable += """findPeaks {signal} -style histone -o {output_file} -i {background}\ndate\n""".format(
+    runnable += """findPeaks {signal} -style histone -o {output_file} -i {background}""".format(
         output_file=output_file,
         background=background_tag_directory,
         signal=signal_tag_directory,
@@ -1083,7 +1106,7 @@ def homer_call_chipseq_peak_job(
 
     if distributed:
         job_name = "homer_findPeaks_{}".format(name)
-        job_file = os.path.join(output_path, name + ".homer.sh")
+        job_file = os.path.join(output_dir, name + ".homer.sh")
         submit_job(runnable, job_file, cores=4, jobname=job_name)
     else:
         return runnable

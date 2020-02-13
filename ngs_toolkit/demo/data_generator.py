@@ -17,6 +17,9 @@ import pybedtools
 import yaml
 
 
+REGION_BASED_DATA_TYPES = ['ATAC-seq', 'ChIP-seq', 'CNV']
+
+
 def generate_count_matrix(
         n_factors=1,
         n_replicates=4,
@@ -279,7 +282,8 @@ def generate_project(
             os.makedirs(d)
 
     if not only_metadata:
-        if data_type == "ATAC-seq":
+        # Add consensus region set
+        if data_type in REGION_BASED_DATA_TYPES:
             bed = location_index_to_bed(dnum.index)
             bed.to_csv(
                 os.path.join(
@@ -411,7 +415,7 @@ def generate_peak_file(peak_set, output_peak, genome_assembly="hg38", summits=Fa
 
 def generate_sample_input_files(analysis, matrix):
     """Generate input files (BAM, peaks) for a sample depending on its data type."""
-    if analysis.data_type == "ATAC-seq":
+    if analysis.data_type in REGION_BASED_DATA_TYPES:
         chrom_sizes_file = tempfile.NamedTemporaryFile().name
         pybedtools.get_chromsizes_from_ucsc(genome=analysis.genome, saveas=chrom_sizes_file)
 

@@ -208,7 +208,8 @@ def setup_timestamping():
     if _CONFIG["preferences"]["report"]["record_csv"]:
         from ngs_toolkit.decorators import (
             read_csv_timestamped,
-            to_csv_timestamped)
+            to_csv_timestamped,
+            timestamped_input)
         import pandas as pd
 
         pd.io.parsers.TextFileReader = read_csv_timestamped(
@@ -216,6 +217,8 @@ def setup_timestamping():
         pd.DataFrame.to_csv = to_csv_timestamped(
             pd.DataFrame.to_csv,
             exclude_functions=["from_dataframe"])
+
+        os.remove = timestamped_input(os.remove)
 
 
 def check_bedtools_version():

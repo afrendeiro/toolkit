@@ -8,6 +8,7 @@ import pandas as pd
 
 from ngs_toolkit import _LOGGER
 from ngs_toolkit.atacseq import ATACSeqAnalysis
+from ngs_toolkit.decorators import check_has_attributes
 
 
 class ChIPSeqAnalysis(ATACSeqAnalysis):
@@ -93,6 +94,118 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
             **kwargs
         )
 
+        if hasattr(self, "comparison_table"):
+            self.set_comparisons()
+        else:
+            msg = "No comparison table was given. Will not prefill peak calling comparisons."
+            _LOGGER.warning(msg)
+
+    def set_comparisons(self, comparison_table=None, peak_dir="{results_dir}/chipseq_peaks"):
+        """
+        Set up an attribute containing information about the
+        sample comparisons necessary for peak calling.
+
+        Structure:
+
+            * comparison_name:
+                * signal_samples
+                * background_samples
+                * directory
+                * prefix
+                * resulting_files
+                    * macs
+                    * homer_histone
+                    * homer_factor
+
+        Parameters
+        ----------
+        comparison_table : :obj:`str`, optional
+            Comparison table wit peak comparisons.
+
+            Defaults to one from PEP project if available.
+        peak_dir : :obj:`str`, optional
+            Directory with peak calls.
+
+            Defaults to "{results_dir}/chipseq_peaks".
+
+        Returns
+        -------
+        :obj:`dict`
+            The dictionary with the attributes.
+
+        Attributes
+        ----------
+        :obj:`dict`
+            The dictionary with the attributes.
+
+        Raises
+        ------
+        ValueError
+            If comparisons are not correctly specified.
+        """
+        if comparison_table is None:
+            comparison_table = self.comparison_table
+
+        comparison_names = (
+            comparison_table.loc[
+                comparison_table['comparison_type'] == 'peaks',
+                "comparison_name"]
+            .drop_duplicates().sort_values()).tolist()
+        if not comparison_names:
+            _LOGGER.warning("Could not find any comparisons of type 'peak'.")
+
+        peak_dir = os.path.abspath(self._format_string_with_attributes(peak_dir))
+
+        self.comparisons = dict()
+        for name in comparison_names:
+            _LOGGER.info("Setting comparison '%s' up", name)
+
+            # If there aren't two sides to each comparison, skip it or throw error
+            if len(set(comparison_table.query("comparison_name == '{}'".format(name))["comparison_side"])) != 2:
+                error = "Comparison '{}' does not contain two sides.".format(name)
+                _LOGGER.error(error)
+                raise ValueError(error)
+
+            # Get the sample names of samples in each side
+            pos_names = comparison_table.loc[
+                (comparison_table["comparison_name"] == name) & (comparison_table["comparison_side"] == 1),
+                "sample_name"].tolist()
+            neg_names = comparison_table.loc[
+                (comparison_table["comparison_name"] == name) & (comparison_table["comparison_side"] < 1),
+                "sample_name"].tolist()
+
+            signal_samples = [s for s in self.samples if s.name in pos_names]
+            control_samples = [s for s in self.samples if s.name in neg_names]
+
+            co = dict()
+            co['signal_samples'] = signal_samples
+            co['control_samples'] = control_samples
+
+            # Additional info
+            co['output_dir'] = os.path.join(peak_dir, name)
+            co['prefix'] = os.path.join(co['output_dir'], name)
+            g = comparison_table.query("comparison_name == '{}'".format(name))['comparison_genome'].drop_duplicates().squeeze()
+            if not isinstance(g, str):
+                msg = "Could not determine genome of comparison '%s'." % g
+                _LOGGER.error(msg)
+                raise AssertionError(msg)
+            co['genome'] = g
+
+            # resulting files files
+            res = dict()
+            res['macs'] = co['prefix'] + "_peaks.narrowPeak"
+            res["homer_factor"] = co['prefix'] + "_homer_peaks.factor.narrowPeak"
+            res["homer_histone"] = co['prefix'] + "_homer_peaks.histone.narrowPeak"
+            co['peak_calls'] = dict()
+            co['peak_calls']["original"] = res
+            co['peak_calls']["filtered"] = {
+                k: v.replace(".narrowPeak", ".filtered.bed")
+                for k, v in res.items()}
+
+            self.comparisons[name] = co
+        return self.comparisons
+
+    @check_has_attributes(["comparisons"], [dict])
     def call_peaks_from_comparisons(
         self,
         comparison_table=None,
@@ -139,6 +252,7 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
         from ngs_toolkit.utils import (
             macs2_call_chipseq_peak,
             homer_call_chipseq_peak_job,
+            filter_kwargs_by_callable
         )
         from tqdm import tqdm
 
@@ -166,100 +280,35 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
             os.makedirs(output_dir)
 
         # For each comparison
-        comps = comparison_table["comparison_name"].drop_duplicates().sort_values()
-        for comparison in tqdm(comps, total=len(comps), desc="Comparison"):
-            # If there aren't two sides to each comparison, skip it or throw error
-            if (
-                len(
-                    set(
-                        comparison_table[
-                            (comparison_table["comparison_name"] == comparison)
-                        ]["comparison_side"].tolist()
-                    )
-                )
-                != 2
-            ):
-                error = "Comparison '{}' does not contain two sides.".format(comparison)
-                if permissive:
-                    _LOGGER.warning(error)
-                    continue
-                else:
-                    _LOGGER.error(error)
-                    raise ValueError(error)
+        for name, comp in tqdm(self.comparisons.items(), total=len(self.comparisons), desc="Comparison"):
 
-            # Get the sample names of samples in each side
-            pos_names = comparison_table[
-                (comparison_table["comparison_name"] == comparison)
-                & (comparison_table["comparison_side"] == 1)
-            ]["sample_name"].tolist()
-            neg_names = comparison_table[
-                (comparison_table["comparison_name"] == comparison)
-                & (comparison_table["comparison_side"] < 1)
-            ]["sample_name"].tolist()
-
-            # Now get the actual samples
-            signal_samples = [s for s in self.samples if s.name in pos_names]
-            control_samples = [s for s in self.samples if s.name in neg_names]
-
-            if (len(signal_samples) == 0) or (len(control_samples) == 0):
-                error = "Comparison side for '{}' comparison does not contain samples.".format(
-                    comparison
-                )
-                if permissive:
-                    print(error)
-                    continue
-                else:
-                    raise ValueError(error)
-
-            print(
+            _LOGGER.info(
                 "Doing comparison '{}' with positive samples '{}' and background samples '{}'".format(
-                    comparison,
-                    [s.name for s in signal_samples],
-                    [s.name for s in control_samples],
+                    name,
+                    [s.name for s in comp['signal_samples']],
+                    [s.name for s in comp['control_samples']],
                 )
             )
             # Call peaks
             cmds = list()
+            bkws = filter_kwargs_by_callable(comp, macs2_call_chipseq_peak)
             kwargs = {
-                "signal_samples": signal_samples, "control_samples": control_samples,
-                "output_dir": output_dir, "name": comparison, "distributed": distributed}
+                "name": name, "distributed": distributed, **bkws}
             if overwrite:
-                cmds += [
-                    macs2_call_chipseq_peak(**kwargs), homer_call_chipseq_peak_job(**kwargs)
-                ]
+                cmds += [macs2_call_chipseq_peak(**kwargs), homer_call_chipseq_peak_job(**kwargs)]
             else:
-                if not os.path.exists(
-                    os.path.join(
-                        output_dir, comparison, comparison + "_peaks.narrowPeak"
-                    )
-                ):
-                    cmds += [
-                        macs2_call_chipseq_peak(**kwargs)
-                    ]
-                if not os.path.exists(
-                    os.path.join(
-                        output_dir, comparison, comparison + "_homer_peaks.narrowPeak"
-                    )
-                ):
-                    cmds += [
-                        homer_call_chipseq_peak_job(**kwargs)
-                    ]
+                if not os.path.exists(comp['peak_calls']['original']['macs']):
+                    cmds += [macs2_call_chipseq_peak(**kwargs)]
+                if not os.path.exists(comp['peak_calls']['original']['homer_factor']):
+                    cmds += [homer_call_chipseq_peak_job(**kwargs)]
                 else:
-                    _LOGGER.warning(
-                        "Peak files for comparison '{}' already exist. Skipping.".format(
-                            comparison
-                        )
-                    )
-
+                    _LOGGER.warning("Peak files for comparison '%s' already exist. Skipping.", name)
             if not distributed:
                 for cmd in cmds:
-                    _LOGGER.info(
-                        "Calling peaks for comparison '{}' with command: '{}'.\n".format(
-                            comparison, cmd
-                        )
-                    )
+                    _LOGGER.info("Calling peaks for comparison '%s' with command: '%s'.\n", (name, cmd))
                     subprocess.call(cmd.split(" "))
 
+    @check_has_attributes(["comparisons"], [dict])
     def filter_peaks(
         self,
         comparison_table=None,
@@ -292,29 +341,7 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
         AttributeError
             If `filter_bed` is not given and failes to be retrieved.
         """
-        import pybedtools
-        from ngs_toolkit.utils import homer_peaks_to_bed
-
-        def _filter(input_bed, filter_bed, output_bed):
-            """
-            Filter BED file for entries that overlap another BED file.
-
-            Parameters
-            ----------
-            input_bed : :obj:`str`
-                BED file to filter.
-
-            filter_bed : :obj:`str`
-                BED file with entries to filter from input_bed.
-
-            output_bed : :obj:`str`
-                Output BED file.
-            """
-            (
-                pybedtools.BedTool(input_bed)
-                .intersect(pybedtools.BedTool(filter_bed), v=True)
-                .saveas(output_bed)
-            )
+        from ngs_toolkit.utils import homer_peaks_to_bed, filter_bed_file
 
         if comparison_table is None:
             comparison_table = self.comparison_table
@@ -335,19 +362,21 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
         if not os.path.exists(peaks_dir):
             os.makedirs(peaks_dir)
 
-        for comparison in comparison_table["comparison_name"].unique():
+        for name, comp in self.comparisons.items():
             # MACS2
-            prefix = os.path.join(peaks_dir, comparison, comparison + "_peaks")
-            _filter(prefix + ".narrowPeak", filter_bed, prefix + ".filtered.bed")
+            filter_bed_file(comp['peak_calls']['original']['macs'], filter_bed, comp['peak_calls']['filtered']['macs'])
             # HOMER
-            prefix = os.path.join(peaks_dir, comparison, comparison + "_homer_peaks")
-            homer_peaks_to_bed(prefix + ".factor.narrowPeak", prefix + ".factor.bed")
-            _filter(prefix + ".factor.bed", filter_bed, prefix + ".factor.filtered.bed")
-            homer_peaks_to_bed(prefix + ".histone.narrowPeak", prefix + ".histone.bed")
-            _filter(
-                prefix + ".histone.bed", filter_bed, prefix + ".histone.filtered.bed"
-            )
+            tmp_bed = comp['peak_calls']['original']['homer_factor'].replace(".narrowPeak", ".bed")
+            homer_peaks_to_bed(comp['peak_calls']['original']['homer_factor'], tmp_bed)
+            filter_bed_file(tmp_bed, filter_bed, comp['peak_calls']['filtered']['homer_factor'])
+            os.remove(tmp_bed)
 
+            tmp_bed = comp['peak_calls']['original']['homer_histone'].replace(".narrowPeak", ".bed")
+            homer_peaks_to_bed(comp['peak_calls']['original']['homer_histone'], tmp_bed)
+            filter_bed_file(tmp_bed, filter_bed, comp['peak_calls']['filtered']['homer_histone'])
+            os.remove(tmp_bed)
+
+    @check_has_attributes(["comparisons"], [dict])
     def summarize_peaks_from_comparisons(
         self,
         comparison_table=None,
@@ -401,80 +430,40 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
             )
 
         # For each comparison, count called peaks
-        peak_counts = pd.DataFrame()
-        for comparison in (
-            comparison_table["comparison_name"].drop_duplicates().sort_values()
-        ):
-            _LOGGER.info(comparison)
-            ending = ".filtered.bed" if filtered else ".narrowPeak"
-            for peak_type, file in [
-                (
-                    "macs",
-                    os.path.join(
-                        output_dir, comparison, comparison + "_peaks" + ending
-                    ),
-                ),
-                (
-                    "homer_factor",
-                    os.path.join(
-                        output_dir,
-                        comparison,
-                        comparison + "_homer_peaks.factor" + ending,
-                    ),
-                ),
-                (
-                    "homer_histone",
-                    os.path.join(
-                        output_dir,
-                        comparison,
-                        comparison + "_homer_peaks.histone" + ending,
-                    ),
-                ),
-            ]:
-                error = "Peak files for comparison '{}' with '{}' parameters don't exist.".format(
-                    comparison, peak_type
-                )
+        peak_type = "filtered" if filtered else "original"
+        peak_counts = list()
+        for name, comp in self.comparisons.items():
+            _LOGGER.info(name)
 
-                if "homer" in peak_type and not filtered:
+            for peak_caller, file in comp['peak_calls'][peak_type].items():
+                error = "Peak files for comparison '%s' with '%s' parameters don't exist."
+
+                if "homer" in peak_caller and not filtered:
                     try:
                         homer_peaks_to_bed(file, file.replace("narrowPeak", "bed"))
                     except IOError:
                         if permissive:
-                            _LOGGER.warning(error)
-                            peak_counts = peak_counts.append(
-                                pd.Series([comparison, peak_type, np.nan]),
-                                ignore_index=True,
-                            )
+                            _LOGGER.warning(error, (name, peak_caller))
+                            peak_counts.append([name, peak_caller, np.nan])
                             continue
                         else:
                             raise
                     except pd.errors.EmptyDataError:
-                        peak_counts = peak_counts.append(
-                            pd.Series([comparison, peak_type, 0.0]), ignore_index=True
-                        )
-
+                        peak_counts.append([name, peak_caller, 0.0])
                     file = file.replace("narrowPeak", "bed")
                 try:
                     df = pd.read_csv(file, sep="\t")
                 except IOError:
                     if permissive:
-                        _LOGGER.warning(error)
-                        peak_counts = peak_counts.append(
-                            pd.Series([comparison, peak_type, np.nan]),
-                            ignore_index=True,
-                        )
+                        _LOGGER.warning(error, (name, peak_caller))
+                        peak_counts.append([name, peak_caller, np.nan])
                         continue
                     else:
                         raise
                 except pd.errors.EmptyDataError:
-                    peak_counts = peak_counts.append(
-                        pd.Series([comparison, peak_type, 0.0]), ignore_index=True
-                    )
-
-                peak_counts = peak_counts.append(
-                    pd.Series([comparison, peak_type, df.shape[0]]), ignore_index=True
-                )
-        peak_counts.columns = ["comparison_name", "peak_type", "peak_counts"]
+                    peak_counts.append([name, peak_caller, 0.0])
+                peak_counts.append([name, peak_caller, df.shape[0]])
+        peak_counts = pd.DataFrame(peak_counts, columns=["comparison_name", "peak_caller", "peak_counts"])
 
         return peak_counts  # .fillna(0)
 
@@ -482,6 +471,7 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
             self,
             samples=None,
             region_type="summits",
+            peak_type="filtered",
             extension=250,
             blacklist_bed=None,
             filter_chroms=True,
@@ -559,12 +549,8 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
         import tempfile
 
         if "comparison_table" not in kwargs:
-            comparison_table = self.comparison_table
-        else:
-            comparison_table = kwargs["comparison_table"]
-
-        if "peak_dir" not in kwargs:
-            peak_dir = os.path.join(self.results_dir, "chipseq_peaks")
+            # TODO: allow not requiring peak_dir to be passed if specifying a new table
+            self.set_comparisons(kwargs["comparison_table"], peak_dir=kwargs["peak_dir"])
 
         if region_type not in ["summits", "peaks"]:
             msg = "`region_type` attribute must be one of 'summits' or 'peaks'!"
@@ -581,49 +567,20 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
                 _LOGGER.error(msg)
                 raise AttributeError(msg)
 
-        comps = comparison_table["comparison_name"].drop_duplicates()
-
+        # Simply concatenate all peaks in one file
         f = tempfile.NamedTemporaryFile()
         with open(f.name, "a") as handle:
-            for comparison in tqdm(comps, total=len(comps), desc="Comparison"):
-                peak_files = [
-                    os.path.join(peak_dir, comparison, comparison + "_peaks.narrowPeak"),
-                    os.path.join(
-                        peak_dir, comparison, comparison + "_homer_peaks.factor.bed"
-                    ),
-                    os.path.join(
-                        peak_dir, comparison, comparison + "_homer_peaks.histone.bed"
-                    ),
-                ]
-                for peak_file in peak_files:
-                    genome = (
-                        comparison_table.loc[
-                            comparison_table["comparison_name"] == comparison,
-                            "comparison_genome",
-                        ]
-                        .drop_duplicates()
-                        .squeeze()
-                    )
-
-                    msg = "Could not determine genome of comparison '{}'.".format(
-                        comparison
-                    )
-                    if not isinstance(genome, str):
-                        _LOGGER.error(msg)
-                        raise AssertionError(msg)
-
-                    # Get peak file
+            for name, comp in tqdm(self.comparisons.items(), total=len(self.comparisons), desc="Comparison"):
+                for peak_caller, peak_file in comp['peak_calls'][peak_type].items():
                     try:
-                        f = re.sub("_peaks.narrowPeak", "_summits.bed", peak_file)
+                        # TODO: check if homer has summits and they match this pattern
+                        summit = re.sub("_peaks.narrowPeak", "_summits.bed", peak_file)
                         file = (
-                            pybedtools.BedTool(f)
-                            .slop(b=extension, genome=genome).fn
+                            pybedtools.BedTool(summit).slop(b=extension, genome=comp['genome']).fn
                             if region_type == "summits"
                             else peak_file)
                     except (ValueError, FileNotFoundError):
-                        _LOGGER.warning(
-                            "Input file for comparison {} ({}) not found!"
-                            .format(comparison, f))
+                        _LOGGER.warning("Input file for comparison {} ({}) not found!", (name, f))
                         if not permissive:
                             raise
 
@@ -658,7 +615,7 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
         return sites
 
     def calculate_peak_support(
-            self, samples=None, region_type="summits", permissive=False,
+            self, samples=None, region_type="summits", peak_type="filtered", permissive=True,
             comparison_table=None, peak_dir="{results_dir}/chipseq_peaks"):
         """
         Calculate a measure of support for each region in peak set
@@ -698,51 +655,28 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
         index = bed_to_index(self.sites.to_dataframe())
 
         # calculate support (number of samples overlaping each merged peak)
-        comps = comparison_table["comparison_name"].drop_duplicates()
         support = pd.DataFrame(index=index)
-        for comparison in tqdm(comps, total=comps.shape[0], desc="Comparison"):
-            peak_files = [
-                (
-                    "MACS",
-                    os.path.join(
-                        peak_dir, comparison, comparison + "_peaks.narrowPeak"
-                    ),
-                ),
-                (
-                    "HOMER_factor",
-                    os.path.join(
-                        peak_dir, comparison, comparison + "_homer_peaks.factor.bed"
-                    ),
-                ),
-                (
-                    "HOMER_histone",
-                    os.path.join(
-                        peak_dir, comparison, comparison + "_homer_peaks.histone.bed"
-                    ),
-                ),
-            ]
-            for peak_type, peak_file in peak_files:
+        for name, comp in tqdm(self.comparisons.items(), total=len(self.comparisons), desc="Comparison"):
+            for peak_caller, peak_file in comp['peak_calls'][peak_type].items():
                 try:
-                    sample_support = self.sites.intersect(
-                        peak_file, wa=True, c=True
-                    ).to_dataframe()
+                    sample_support = self.sites.intersect(peak_file, wa=True, c=True).to_dataframe()
                 except (
                     ValueError,
                     pybedtools.MalformedBedLineError,
                     pybedtools.helpers.BEDToolsError,
                 ):
                     _LOGGER.warning(
-                        "Peaks for comparison {} ({}) not found!".format(
-                            comparison, peak_file
-                        )
-                    )
-                    continue
+                        "Peaks for comparison %s (%s) not found!", (name, peak_file))
+                    if permissive:
+                        continue
+                    else:
+                        raise
                 sample_support.index = index
-                support[(comparison, peak_type)] = sample_support.iloc[:, 3]
+                support[(name, peak_caller)] = sample_support.iloc[:, 3]
 
         # Make multiindex labeling comparisons and peak type
         support.columns = pd.MultiIndex.from_tuples(
-            support.columns, names=["comparison", "peak_type"]
+            support.columns, names=["comparison", "peak_caller"]
         )
         support.to_csv(
             os.path.join(
@@ -752,9 +686,7 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
         )
 
         # divide sum (of unique overlaps) by total to get support value between 0 and 1
-        support["support"] = support.astype(bool).astype(int).sum(axis=1) / float(
-            support.shape[1]
-        )
+        support["support"] = support.astype(bool).sum(axis=1) / float(support.shape[1])
 
         # save
         support.to_csv(
@@ -841,35 +773,26 @@ class ChIPSeqAnalysis(ATACSeqAnalysis):
             samples = self.samples
         matrix = self.get_matrix(matrix, samples=samples)
 
-        comparisons = set(comparison_table['comparison_name'])
-        s_names = [s.name for s in samples]
+        # TODO: I believe the indexing of a dataframe with the sample objects themselves will not work
+        # one would need to get their names
         if not by_group:
             res = pd.DataFrame(index=matrix.index)
-            for comparison in comparisons:
-                comp = comparison_table.query("comparison_name == '{}'".format(comparison))
-                signal_samples = [s for s in comp.query("comparison_side == 1")['sample_name'] if s in s_names]
-                background_samples = [s for s in comp.query("comparison_side == 0")['sample_name'] if s in s_names]
-
-                for s in signal_samples:
+            for name, comp in self.comparisons.items():
+                for s in comp['signal_samples']:
                     res.loc[:, s] = comparison_func(
                         matrix.loc[:, s],
-                        matrix.loc[:, background_samples].apply(reduction_func, axis=1)
+                        matrix.loc[:, comp['background_samples']].apply(reduction_func, axis=1)
                         if reduction_func != np.mean
-                        else matrix.loc[:, background_samples].mean(axis=1))
+                        else matrix.loc[:, comp['background_samples']].mean(axis=1))
         if by_group:
             comparisons = set(comparison_table['comparison_name'])
-            s_names = [s.name for s in samples]
             res = pd.DataFrame(index=matrix.index, columns=comparisons)
-            for comparison in comparisons:
-                comp = comparison_table.query("comparison_name == '{}'".format(comparison))
-                signal_samples = [s for s in comp.query("comparison_side == 1")['sample_name'] if s in s_names]
-                background_samples = [s for s in comp.query("comparison_side == 0")['sample_name'] if s in s_names]
-
-                res.loc[:, comparison] = comparison_func(
-                    matrix.loc[:, signal_samples].apply(reduction_func, axis=1)
+            for name, comp in self.comparisons.items():
+                res.loc[:, name] = comparison_func(
+                    matrix.loc[:, comp['signal_samples']].apply(reduction_func, axis=1)
                     if reduction_func != np.mean
-                    else matrix.loc[:, signal_samples].mean(axis=1),
-                    matrix.loc[:, background_samples].apply(reduction_func, axis=1)
+                    else matrix.loc[:, comp['signal_samples']].mean(axis=1),
+                    matrix.loc[:, comp['background_samples']].apply(reduction_func, axis=1)
                     if reduction_func != np.mean
-                    else matrix.loc[:, background_samples].mean(axis=1))
+                    else matrix.loc[:, comp['background_samples']].mean(axis=1))
         return res

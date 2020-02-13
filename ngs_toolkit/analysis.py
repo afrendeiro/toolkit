@@ -24,6 +24,7 @@ from ngs_toolkit.decorators import check_has_attributes
 # TODO: Add function to create comparison_table from samples' group_attributes
 # TODO: Make recipe to get all (or subset through CLI) resources
 # TODO: add matrix_features to RNASeqAnalysis class
+# TODO: make pandas dataframes indexable by Sample objects
 
 # Testing:
 # TODO: test having no config set

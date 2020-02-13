@@ -10,7 +10,6 @@ import pytest
 
 from ngs_toolkit import _CONFIG
 from ngs_toolkit.atacseq import ATACSeqAnalysis
-from ngs_toolkit.utils import get_this_file_or_timestamped
 from .conftest import file_exists, file_exists_and_not_empty, CI, RPY2
 
 

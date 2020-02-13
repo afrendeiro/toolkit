@@ -6,7 +6,7 @@ from functools import partialmethod
 
 import pytest
 
-from ngs_toolkit import MEMORY, _LOGGER, Analysis, ATACSeqAnalysis
+from ngs_toolkit import MEMORY, _CONFIG, _LOGGER, Analysis, ATACSeqAnalysis
 from ngs_toolkit.demo import generate_project
 
 
@@ -56,6 +56,28 @@ except KeyError:
 # # I'm manually setting fitType="mean" for testing only.
 Analysis.differential_analysis = partialmethod(
     Analysis.differential_analysis, deseq_kwargs={"fitType": "mean"})
+
+
+# This a part of the "example" config that is required for some analysis
+# that require existing input files (BAM, peaks, etc)
+NEW_CONFIG = {
+    "sample_input_files": {
+        "ATAC-seq": {
+            "aligned_filtered_bam":
+                "{data_dir}/{sample_name}/mapped/{sample_name}.trimmed.bowtie2.filtered.bam",
+            "peaks": "{data_dir}/{sample_name}/peaks/{sample_name}_peaks.narrowPeak",
+            "summits": "{data_dir}/{sample_name}/peaks/{sample_name}_summits.bed"},
+        "ChIP-seq": {
+            "aligned_filtered_bam":
+                "{data_dir}/{sample_name}/mapped/{sample_name}.trimmed.bowtie2.filtered.bam"},
+        "CNV": {
+            "aligned_filtered_bam":
+                "{data_dir}/{sample_name}/mapped/{sample_name}.trimmed.bowtie2.filtered.bam"},
+        "RNA-seq": {
+            "aligned_filtered_bam":
+                "{data_dir}/{sample_name}/mapped/{sample_name}.trimmed.bowtie2.filtered.bam",
+            "bitseq_counts":
+                "{data_dir}/{sample_name}/bowtie1_{genome}/bitSeq/{sample_name}.counts"}}}
 
 
 def is_internet_connected(hostname="www.google.com"):
@@ -157,28 +179,9 @@ def atac_analysis(tmp_path):
 
 @pytest.fixture
 def atac_analysis_with_input_files(tmp_path):
-    from ngs_toolkit import _CONFIG
     from ngs_toolkit.demo.data_generator import generate_sample_input_files
 
-    new_config = {
-        "sample_input_files": {
-            "ATAC-seq": {
-                "aligned_filtered_bam":
-                    "{data_dir}/{sample_name}/mapped/{sample_name}.trimmed.bowtie2.filtered.bam",
-                "peaks": "{data_dir}/{sample_name}/peaks/{sample_name}_peaks.narrowPeak",
-                "summits": "{data_dir}/{sample_name}/peaks/{sample_name}_summits.bed"},
-            "ChIP-seq": {
-                "aligned_filtered_bam":
-                    "{data_dir}/{sample_name}/mapped/{sample_name}.trimmed.bowtie2.filtered.bam"},
-            "CNV": {
-                "aligned_filtered_bam":
-                    "{data_dir}/{sample_name}/mapped/{sample_name}.trimmed.bowtie2.filtered.bam"},
-            "RNA-seq": {
-                "aligned_filtered_bam":
-                    "{data_dir}/{sample_name}/mapped/{sample_name}.trimmed.bowtie2.filtered.bam",
-                "bitseq_counts":
-                    "{data_dir}/{sample_name}/bowtie1_{genome}/bitSeq/{sample_name}.counts"}}}
-    _CONFIG.update(new_config)
+    _CONFIG.update(NEW_CONFIG)
 
     tmp_path = str(tmp_path)
     kwargs = {
@@ -293,6 +296,63 @@ def rnaseq_analysis(tmp_path):
         "output_dir": tmp_path})
 
     return generate_project(**kwargs)
+
+
+@pytest.fixture
+def chipseq_analysis(tmp_path):
+    tmp_path = str(tmp_path)
+
+    _CONFIG.update(NEW_CONFIG)
+
+    kwargs = {
+        'data_type': "ChIP-seq",
+        'organism': "human",
+        'genome_assembly': "hg38",
+        'n_factors': 2,
+        'n_features': 100,
+        'n_replicates': 2}
+    kwargs.update({
+        "project_name": "test-project_" + "_".join(
+            str(x) for x in kwargs.values()),
+        "output_dir": tmp_path})
+
+    an = generate_project(**kwargs, sample_input_files=True)
+    # an = generate_project(**kwargs, sample_input_files=True)
+    an.comparison_table['comparison_type'] = 'peaks'
+    an.set_comparisons()
+
+    return an
+
+
+@pytest.fixture
+def chipseq_analysis_with_peaks(chipseq_analysis):
+    import numpy as np
+    from ngs_toolkit.utils import bed_to_index
+    df = chipseq_analysis.sites.to_dataframe()
+
+    # for homer peaks add p-value column
+    df['name'] = bed_to_index(df)  # dummy column
+    df['score'] = np.random.random(df.shape[0])  # p-value
+    df['strand'] = "."  # dummy column
+
+    for name, comp in chipseq_analysis.comparisons.items():
+
+        os.makedirs(comp['output_dir'])
+
+        for peak_type in ['original', 'filtered']:
+            for peak_caller, file in comp['peak_calls'][peak_type].items():
+                # select 30% of all peaks to be present in each sample
+                df2 = df.sample(frac=0.3)
+
+                # for homer the column order is different
+                if "homer" in peak_caller:
+                    df2 = df2[['name', 'chrom', 'start', 'end', 'score', 'strand']]
+
+                with open(file, 'w') as handle:
+                    for _, entry in df2.iterrows():
+                        handle.write("\t".join(entry.astype(str)) + "\n")
+
+    return chipseq_analysis
 
 
 @pytest.fixture()

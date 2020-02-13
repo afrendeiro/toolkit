@@ -32,7 +32,8 @@ before_script:
   - R -q -e "suppressMessages(library("DESeq2")); suppressMessages(library("preprocessCore")); sessionInfo()"
 
 script:
-  - pytest -n 2 --disable-warnings --show-capture=no --cov ./ --cov-report term --cov-report xml --pyargs ngs_toolkit
+  # - pytest -n 2 --disable-warnings --show-capture=no --cov ./ --cov-report term --cov-report xml --pyargs ngs_toolkit
+  - pytest -n 2 --disable-warnings --cov ./ --cov-report term --cov-report xml --pyargs ngs_toolkit
 
 after_success:
   - coverage xml

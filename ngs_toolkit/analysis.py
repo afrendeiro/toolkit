@@ -11,14 +11,19 @@ from ngs_toolkit.decorators import check_has_attributes
 # Bugs:
 # TODO: unsupervised_analysis plotting fails if only one sample in one group
 # TODO: plot_differential_enrichment fails if only one comparison
+# TODO: make plotting functions that take analysis as arguments track too
 
 # Improvements:
+# TODO: move plot_features to be under Analysis, abstract. Call in plot_differential
+# TODO: Make from_pep intialization a static method returning an instance
+# TODO: Actually use ngs_toolkit.constants
 # TODO: Add PAGE as enrichment method
 # TODO: Analysis.annotate_samples: reimplement to support CNV dict of resolutions
 # TODO: Analysis.annotate_samples: implement connection to analysis' numeric_attributes or another way of preserving dtypes
 # TODO: Add function to complete comparison_table information such as "comparison_genome" and "data_type" and call it when setting automatically
 # TODO: Add function to create comparison_table from samples' group_attributes
 # TODO: Make recipe to get all (or subset through CLI) resources
+# TODO: add matrix_features to RNASeqAnalysis class
 
 # Testing:
 # TODO: test having no config set
@@ -118,6 +123,7 @@ class Analysis(object):
         _LOGGER.debug("Adding given arguments to analysis object.")
         self.name = name
         self.root_dir = root_dir
+        self.pep = None if not from_pep else from_pep
         self.prj = prj
         self.samples = samples
 
@@ -188,21 +194,18 @@ class Analysis(object):
         self.results_dir = os.path.join(self.root_dir, results_dir)
 
         # # if given absolute paths, keep them, otherwise append to root directory
-        for dir_, attr in [(data_dir, "data_dir"), (results_dir, "results_dir")]:
-            if not os.path.isabs(dir_):
-                setattr(self, attr, os.path.join(self.root_dir, dir_))
-            else:
-                setattr(self, attr, dir_)
+        for _dir, attr in [(data_dir, "data_dir"), (results_dir, "results_dir")]:
+            if not os.path.isabs(_dir):
+                _dir = os.path.join(self.root_dir, _dir)
+            setattr(self, attr, _dir)
 
         # Try to make directories
-        for directory in [self.data_dir, self.results_dir]:
-            if not os.path.exists(directory):
+        for _dir in [self.data_dir, self.results_dir]:
+            if not os.path.exists(_dir):
                 try:
-                    os.makedirs(directory)
+                    os.makedirs(_dir)
                 except OSError:
-                    _LOGGER.debug(
-                        "Could not make directory for Analysis: '{}'".format(directory)
-                    )
+                    _LOGGER.debug("Could not make directory for Analysis: '%s'", _dir)
 
         # Add sample input file locations
         _LOGGER.debug("Trying to set sample input file attributes.")

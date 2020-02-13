@@ -1,10 +1,25 @@
-# ignore test results
-tests/test/*
+# ignore test files
+.tox
+_version.py
+pytest.log
+.coverage*
+
+# Build-related stuff
+build/
+dist/
+*.egg-info
+
 
 # toy/experimental files
+*.txt
 *.csv
 *.tsv
 *.pkl
+*.pickle
+*.svg
+*.png
+*.jpg
+*.jpeg
 
 # ignore eggs
 .eggs/
@@ -59,10 +74,6 @@ Thumbs.db
 # libreoffice lock files:
 .~lock*
 
-# Default-named test output
-microtest/
-open_pipelines/
-
 # IDE-specific items
 .idea/
 
@@ -73,8 +84,3 @@ coverage.xml
 
 # Reserved files for comparison
 *RESERVE*
-
-# Build-related stuff
-build/
-dist/
-*.egg-info

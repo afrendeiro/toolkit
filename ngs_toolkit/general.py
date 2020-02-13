@@ -1712,8 +1712,9 @@ def enrichr(gene_set, gene_set_libraries=None, kind="genes", max_attempts=5):
     If input contains <NaN> values, they will be ignored.
 
     The output of this function is cached to disk using joblib.
-    To please either call :func:`ngs_toolkit.MEMORY.clear()` or
-    remove the contents of `~/.ngs_toolkit/joblib/general/enrichr`.
+    To clear the cache of this function please remove the contents of
+    `~/.ngs_toolkit/joblib/general/enrichr` or call
+    :func:`ngs_toolkit.MEMORY.clear()` to remove all ngs_toolkit cached values.
 
     Parameters
     ----------
@@ -2317,18 +2318,19 @@ def query_biomart(
     Available attributes can be see at Biomart. Each should be snakecase
     (lowecase with only underscore separators) as defined in the Biomart API.
 
-    Common examples:
+    Example attributes:
 
         * "ensembl_gene_id"
         * "external_gene_name"
         * "hgnc_symbol"
 
-    If a certain field multiple values separated by commas,
+    If a certain field contains multiple values separated by commas,
     it will attemp to return dataframe but it might fail.
 
     The output of this function is cached to disk using joblib.
-    To please either call :func:`ngs_toolkit.MEMORY.clear()` or
-    remove the contents of `~/.ngs_toolkit/joblib/general/query_biomart`.
+    To clear the cache of this function please remove the contents of
+    `~/.ngs_toolkit/joblib/general/query_biomart` or call
+    :func:`ngs_toolkit.MEMORY.clear()` to remove all ngs_toolkit cached values.
 
     Parameters
     ----------

@@ -13,8 +13,19 @@ test:
 		--disable-warnings \
 		--show-capture=no \
 		--cov=ngs_toolkit \
-		--cov-report xml ngs_toolkit/tests/test_*.py \
-		--lf
+		--lf \
+		--cov-report xml \
+		ngs_toolkit/tests/test_*.py
+
+
+test_cov:
+	python -m \
+		pytest \
+		--testmon \
+		--disable-warnings \
+		--show-capture=no \
+		ngs_toolkit/tests/test_*.py
+
 
 coverage: test
 	python -m codecov \

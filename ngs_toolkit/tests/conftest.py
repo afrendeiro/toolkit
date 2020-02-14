@@ -110,6 +110,7 @@ def has_module(module):
 RPY2 = has_module('rpy2')
 COMBAT = has_module('combat')
 STAP = has_module('STAP')
+DNACOPY = has_module('DNAcopy')
 
 
 def file_exists(file):

@@ -5,7 +5,7 @@ import os
 import pytest
 import pandas as pd
 
-from .conftest import file_exists_and_not_empty, STAP  # , CI, RPY2
+from .conftest import file_exists_and_not_empty, STAP, DNACOPY  # , CI, RPY2
 
 
 @pytest.mark.xfail
@@ -71,7 +71,8 @@ def test_plot_stats_per_chromosome(cnv_analysis):
                     assert file_exists_and_not_empty(f)
 
 
-@pytest.mark.skipif(not STAP, "STAP R library is required to perform segmentation.")
+# @pytest.mark.skipif(not STAP or not DNACOPY, reason="STAP and DNACopy R libraries are required to perform segmentation.")
+@pytest.mark.xfail
 def test_segment_genome(cnv_analysis):
     cnv_analysis.segment_genome()
     assert False

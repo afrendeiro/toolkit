@@ -16,16 +16,6 @@ import pandas as pd
 import pybedtools
 import yaml
 
-# To be refractored
-import subprocess
-from ngs_toolkit import _LOGGER
-DEV = False
-try:
-    o = subprocess.check_output("git status".split(" "))
-    DEV = "dev" in o.decode().split("\n")[0]
-except subprocess.CalledProcessError:
-    msg = "Could not detect whether on a development branch."
-    _LOGGER.warning(msg)
 
 REGION_BASED_DATA_TYPES = ['ATAC-seq', 'ChIP-seq']  # CNV technically is too but it does not need a `sites` attr
 DEFAULT_CNV_RESOLUTIONS = ["1000kb", "100kb", "10kb"]
@@ -340,21 +330,21 @@ def generate_project(
                     )
                 )
 
-    if not DEV:
-        # Here we are raising the logger level to omit messages during
-        # sample file creation which would have been too much clutter,
-        # especially since I make use of `load_data` with permissive=True.
-        # In dev, I still want to see them.
-        _LOGGER.debug("Shutting logger for now")
-        prev_level = _LOGGER.getEffectiveLevel()
-        _LOGGER.setLevel("ERROR")
+    # Here we are raising the logger level to omit messages during
+    # sample file creation which would have been too much clutter,
+    # especially since I make use of `load_data` with permissive=True.
+    # In dev, I still want to see them.
+    # if DEV:
+    # _LOGGER.debug("Shutting logger for now")
+    prev_level = _LOGGER.getEffectiveLevel()
+    _LOGGER.setLevel("ERROR")
     an = initialize_analysis_of_data_type(data_type, config_file)
     an.load_data(permissive=True)
     if sample_input_files:
         generate_sample_input_files(an, dnum)
-    if not DEV:
-        _LOGGER.setLevel(prev_level)
-        _LOGGER.debug("Reactivated logger")
+    # if DEV:
+    _LOGGER.setLevel(prev_level)
+    # _LOGGER.debug("Reactivated logger")
     if not initialize:
         return config_file
     return an

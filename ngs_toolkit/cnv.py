@@ -9,6 +9,9 @@ import pandas as pd
 from ngs_toolkit import _LOGGER
 from ngs_toolkit.analysis import Analysis
 from ngs_toolkit.decorators import check_has_attributes
+from ngs_toolkit.utils import warn_or_raise
+
+from ngs_toolkit.demo.data_generator import DEFAULT_CNV_RESOLUTIONS
 
 
 class CNVAnalysis(Analysis):
@@ -117,7 +120,7 @@ class CNVAnalysis(Analysis):
         )
 
         if not hasattr(self, "resolutions"):
-            self.resolutions = (["1000kb", "100kb", "20kb", "10kb"],)
+            self.resolutions = DEFAULT_CNV_RESOLUTIONS
 
     def load_data(
         self,
@@ -177,41 +180,30 @@ class CNVAnalysis(Analysis):
 
         prefix = self._format_string_with_attributes(prefix)
 
+        if resolutions is None:
+            resolutions = self.resolutions
+
         if output_map is None:
             kwargs = {"index_col": 0}
             output_map = {
-                "matrix_raw": (
-                    os.path.join(self.results_dir, self.name + ".{}.matrix_raw.csv"),
-                    kwargs,
-                ),
-                "matrix_norm": (
-                    os.path.join(self.results_dir, self.name + ".{}.matrix_norm.csv"),
-                    kwargs,
-                ),
-                "segmentation": (
-                    os.path.join(self.results_dir, self.name + ".{}.segmentation.csv"),
-                    {},
-                ),
-                "segmentation_annot": (
-                    os.path.join(
-                        self.results_dir, self.name + ".{}.segmentation.annotated.csv"
-                    ),
-                    {},
-                ),
+                "matrix_raw": {r: (prefix + ".{}.matrix_raw.csv".format(r), kwargs) for r in resolutions},
+                "matrix_norm": {r: (prefix + ".{}.matrix_norm.csv".format(r), kwargs) for r in resolutions},
+                "segmentation": {r: (prefix + ".{}.segmentation.csv".format(r), {}) for r in resolutions},
+                "segmentation_annot": {r: (prefix + ".{}.segmentation.annotated.csv".format(r), {}) for r in resolutions}
             }
         if only_these_keys is None:
             only_these_keys = list(output_map.keys())
 
         output_map = {k: v for k, v in output_map.items() if k in only_these_keys}
 
-        if resolutions is None:
-            resolutions = self.resolutions
-        for resolution in resolutions:
-            for name, (file, kwargs) in output_map.items():
+        for name, f in output_map.items():
+            for resolution, (file, kwargs) in f.items():
                 file = file.format(resolution)
-                _LOGGER.info("Loading '{}' analysis attribute.".format(name))
+                _LOGGER.info(
+                    "Loading '{}' analysis attribute for resolution '{}'."
+                    .format(name, resolution))
                 if not hasattr(self, name):
-                    setattr(self, name, {})
+                    setattr(self, name, {resolution: None})
                 try:
                     getattr(self, name)[resolution] = pd.read_csv(file, **kwargs)
                     # Fix possible multiindex for matrix_norm
@@ -228,32 +220,34 @@ class CNVAnalysis(Analysis):
     def _copy_cnv_profile_plots(
             self, output_dir="{results_dir}/cnv_profiles",
             output_prefix="log2_profile",
-            resolutions=None, samples=None, permissive=False
+            resolutions=None, samples=None, permissive=True
     ):
         """
-        Load CNV data from ATAC-seq CNV pipeline and create CNV matrix at various resolutions.
+        Convenience to copy output plots from runnning several samples independently
+        to a given directory.
 
         Parameters
         ----------
+        output_dir : :obj:`str`, optional
+            Directory to copy to.
+
+            Defaults to "{results_dir}/cnv_profiles".
+        output_prefix : :obj:`str`, optional
+            Prefix for copied files.
+
+            Defaults to "log2_profile".
         resolutions : :obj:`list`, optional
             Resolutions of analysis.
-            Defaults to resolutions in Analysis object.
 
+            Defaults to resolutions in Analysis object.
         samples : :obj:`list`, optional
             Samples to restrict analysis to.
+
             Defaults to samples in Analysis object.
-
-        save: :obj:`bool`, optional
-            Whether results should be saved to disc.
-            Defaults to True
-
-        assign: :obj:`bool`, optional
-            Whether results should be assigned to an attribute in the Analsyis object.
-            Defaults to True
-
         permissive: :obj:`bool`, optional
-            Whether missing files should be allowed.
-            Defaults to False
+            Whether missing files should raise an error.
+
+            Defaults to :obj:`True.`
         """
         from tqdm import tqdm
         from glob import glob
@@ -312,23 +306,24 @@ class CNVAnalysis(Analysis):
         ----------
         resolutions : :obj:`list`, optional
             Resolutions of analysis.
-            Defaults to resolutions in Analysis object.
 
+            Defaults to resolutions in Analysis object.
         samples : :obj:`list`, optional
             Samples to restrict analysis to.
-            Defaults to samples in Analysis object.
 
+            Defaults to samples in Analysis object.
         save: :obj:`bool`, optional
             Whether results should be saved to disc.
-            Defaults to True
 
+            Defaults to :obj:`True`
         assign: :obj:`bool`, optional
             Whether results should be assigned to an attribute in the Analsyis object.
-            Defaults to True
 
+            Defaults to :obj:`True`
         permissive: :obj:`bool`, optional
             Whether missing files should be allowed.
-            Defaults to False
+
+            Defaults to :obj:`False`
 
         Returns
         -------
@@ -347,6 +342,7 @@ class CNVAnalysis(Analysis):
         """
         # TODO: figure out a way of having the input file specified before hand
         from tqdm import tqdm
+        from ngs_toolkit.utils import bed_to_index
 
         if resolutions is None:
             resolutions = self.resolutions
@@ -362,27 +358,22 @@ class CNVAnalysis(Analysis):
             for sample in tqdm(samples, total=len(samples), desc="Sample"):
                 # Read log2 file
                 if not hasattr(sample, "log2_read_counts"):
-                    sample.log2_read_counts = os.path.join(
-                        self.data_dir,
-                        sample.paths.sample_root, sample.name + "_{resolution}",
-                        "CNAprofiles",
-                        "log2_read_counts.igv")
-                if "{resolution}" in sample.log2_read_counts:
-                    input_file = sample.log2_read_counts.format(resolution=resolution)
+                    msg = "Sample does not have a 'log2_read_counts' attribute."
+                    warn_or_raise(AttributeError(msg), permissive)
+
+                input_file = sample.log2_read_counts[resolution].format(resolution=resolution)
                 try:
                     cov = pd.read_csv(
                         input_file, sep="\t", comment="#"
                     ).set_index("Feature")
                 except IOError as e:
-                    e = "Sample {} does not have a 'log2_read_counts' file: '{}'.".format(
-                        sample.name, input_file
-                    )
-                    if permissive:
-                        print(e)
-                        continue
-                    else:
-                        raise IOError(e)
+                    e = IOError(
+                        "Sample %s does not have a 'log2_read_counts' file: '%s'." %
+                        (sample.name, input_file))
+                    warn_or_raise(e, permissive)
 
+                # TODO: this is specific to CopyWriter, should be removed later
+                # and probably replaced with the column position
                 cov.columns = (
                     cov.columns.str.replace("log2.", "")
                     .str.replace(".trimmed.bowtie2.filtered.bam", "")
@@ -390,25 +381,24 @@ class CNVAnalysis(Analysis):
                 )
 
                 # normalize signal to control
-                matrix_raw[resolution][sample.name] = np.log2(
-                    (
-                        (0.1 + (2 ** cov.loc[:, sample.name]))
-                        / (0.1 + (2 ** cov.iloc[:, -1]))
-                    )
-                )
+                # # TODO: check whether there was a reason I was previously
+                # # undoing and redoing the log
+                # matrix_raw[resolution][sample.name] = np.log2(
+                #     (
+                #         (0.1 + (2 ** cov.loc[:, sample.name]))
+                #         / (0.1 + (2 ** cov.iloc[:, -1]))
+                #     )
+                # )
+                matrix_raw[resolution][sample.name] = cov.loc[:, sample.name] - cov.iloc[:, -1]
             if "cov" not in locals():
                 msg = "None of the samples had a valid 'log2_read_counts' file."
                 _LOGGER.error(msg)
                 raise ValueError(msg)
 
-            matrix_raw[resolution].index = (
-                cov["Chromosome"]
-                + ":"
-                + cov["Start"].astype(int).astype(str)
-                + "-"
-                + cov["End"].astype(int).astype(str)
-            )
-            matrix_raw[resolution].index.name = "index"
+            c = cov.columns.tolist()
+            c[:3] = ["chrom", "start", "end"]
+            cov.columns = c
+            matrix_raw[resolution].index = bed_to_index(cov)
 
             if save:
                 matrix_raw[resolution].to_csv(
@@ -440,28 +430,28 @@ class CNVAnalysis(Analysis):
         ----------
         resolutions : :obj:`list`, optional
             Resolutions of analysis.
-            Defaults to resolutions in Analysis object.
 
+            Defaults to resolutions in Analysis object.
         method : :obj:`str`
             Normalization method to apply.
 
             Defaults to "median".
         matrix : :obj:`str`, optional
             Attribute name of dictionary of matrices to normalize.
-            Defaults to `matrix_raw`.
 
+            Defaults to `matrix_raw`.
         samples : :obj:`list`
             Iterable of peppy.Sample objects to restrict matrix to.
-            Default is all in analysis.
 
+            Defaults to all in analysis.
         save: :obj:`bool`, optional
             Whether results should be saved to disc.
-            Defaults to True
 
+            Defaults to :obj:`True`
         assign: :obj:`bool`, optional
             Whether results should be assigned to an attribute in the Analsyis object.
-            Defaults to True
 
+            Defaults to :obj:`True`
         kwargs : :obj:`dict`, optional
             Additional kwargs are passed to the respective normalization method.
 
@@ -523,13 +513,9 @@ class CNVAnalysis(Analysis):
         resolutions=None,
         samples=None,
         output_dir=None,
-        output_prefix="{analysis_name}.all_data",
-        robust=True,
-        vmin=None,
-        vmax=None,
-        rasterized=True,
-        dpi=300,
+        output_prefix="all_data",
         sample_labels=True,
+        **kwargs
     ):
         """
         Visualize CNV data genome-wide using heatmaps.
@@ -539,46 +525,30 @@ class CNVAnalysis(Analysis):
         ----------
         matrix : :obj:`str`, optional
             Attribute name of dictionary of matrices to normalize.
-            Defaults to `matrix_norm`.
 
+            Defaults to `matrix_norm`.
         resolutions : :obj:`list`, optional
             Resolutions of analysis.
-            Defaults to resolutions in Analysis object.
 
+            Defaults to resolutions in Analysis object.
         samples : :obj:`list`, optional
             Samples to restrict analysis to.
-            Defaults to samples in Analysis object.
 
+            Defaults to samples in Analysis object.
         output_dir : :obj:`str`, optional
             Output directory.
-            Defaults to Analysis results directory.
 
+            Defaults to Analysis results directory.
         output_prefix : :obj:`str`, optional
             Prefix to add to plots.
+
             Defaults to "{analysis_name}.all_data"
-
-        robust: :obj:`bool`, optional
-            Whether to scale the color scale robustly (to quantiles rather than extremes).
-            Defaults to True
-
-        vmin : float, optional
-            Minimum value of color scale.
-
-        vmax : float, optional
-            Maximum value of color scale.
-            Defaults to None
-
-        rasterized: :obj:`bool`, optional
-            Whether to rasterize main heatmap.
-            Defaults to True
-
-        dpi : :obj:`int`, optional
-            DPI resolution of rasterized image.
-            Defaults to 300
-
-        sample_labels: :obj:`bool`, optional
+        sample_labels : :obj:`bool`, optional
             Whether to label samples with their name.
-            Defaults to True
+
+            Defaults to :obj:`True`
+        **kwargs : :obj:`dict`
+            Additional kwargs will be passed to `seaborn.clustermap`.
         """
         # TODO: add support for group colours
         from tqdm import tqdm
@@ -593,63 +563,40 @@ class CNVAnalysis(Analysis):
             samples = self.samples
         if output_dir is None:
             output_dir = self.results_dir
-        if "{analysis_name}" in output_prefix:
-            output_prefix = output_prefix.format(analysis_name=self.name)
         names = [s.name for s in samples]
 
         # Plot mean and variationper chromosome
         for resolution in tqdm(resolutions, desc="Resolution"):
             r_names = [n for n in names if n in matrix[resolution].columns]
+            p = os.path.join(
+                self.results_dir, self.name
+                + ".{}.{}.full_data.".format(resolution, output_prefix))
             # Plot all data
+            kws = dict(
+                cmap="RdBu_r", robust=True,
+                rasterized=True,
+                xticklabels=False,
+                yticklabels=r_names if sample_labels else False,
+                cbar_kws={"label": "log2(change)"})
+            kws.update(kwargs)
+
             fig, axis = plt.subplots(1, 1, figsize=(4 * 2, 4 * 1))
             sns.heatmap(
                 matrix[resolution].T,
-                cmap="RdBu_r",
-                center=0,
-                robust=robust,
-                ax=axis,
-                vmin=vmin,
-                vmax=vmax,
-                rasterized=rasterized,
-                xticklabels=False,
-                yticklabels=r_names if sample_labels else False,
-                cbar_kws={"label": "log2(change)"},
+                center=0, ax=axis, **kws
             )
             axis.set_xlabel("Chromosome position")
             axis.set_ylabel("Sample")
-            savefig(
-                fig,
-                os.path.join(
-                    self.results_dir,
-                    self.name
-                    + ".{}.{}.full_data.heatmap.svg".format(resolution, output_prefix)))
+            savefig(fig, p + "heatmap.svg")
 
             grid = sns.clustermap(
                 matrix[resolution].fillna(0).T,
-                metric="correlation",
-                cmap="RdBu_r",
-                center=0,
-                col_cluster=False,
-                robust=robust,
-                vmin=vmin,
-                vmax=vmax,
-                rasterized=rasterized,
-                xticklabels=False,
-                yticklabels=r_names if sample_labels else False,
-                cbar_kws={"label": "log2(change)"},
-                figsize=(4 * 2, 4 * 1),
+                metric="correlation", center=0,
+                col_cluster=False, figsize=(4 * 2, 4 * 1), **kws
             )
             grid.ax_heatmap.set_xlabel("Chromosome position")
             grid.ax_heatmap.set_ylabel("Sample")
-            savefig(
-                grid.fig,
-                os.path.join(
-                    self.results_dir,
-                    self.name
-                    + ".{}.{}.full_data.fillna.clustermap.svg".format(
-                        resolution, output_prefix
-                    ),
-                ))
+            savefig(grid, p + "fillna.clustermap.svg")
 
     def plot_stats_per_chromosome(
         self,
@@ -657,11 +604,9 @@ class CNVAnalysis(Analysis):
         resolutions=None,
         samples=None,
         output_dir="{results_dir}",
-        output_prefix="{analysis_name}.all_data",
-        robust=True,
-        rasterized=True,
-        dpi=300,
+        output_prefix="all_data",
         sample_labels=True,
+        **kwargs
     ):
         """
         Visualize mean and variation of CNV data for each chromosome using heatmaps.
@@ -672,39 +617,30 @@ class CNVAnalysis(Analysis):
         ----------
         matrix : :obj:`str`, optional
             Attribute name of dictionary of matrices to normalize.
-            Defaults to `matrix_norm`.
 
+            Defaults to `matrix_norm`.
         resolutions : :obj:`list`, optional
             Resolutions of analysis.
-            Defaults to resolutions in Analysis object.
 
+            Defaults to resolutions in Analysis object.
         samples : :obj:`list`, optional
             Samples to restrict analysis to.
-            Defaults to samples in Analysis object.
 
+            Defaults to samples in Analysis object.
         output_dir : :obj:`str`, optional
             Output directory.
-            Defaults to Analysis results directory.
 
+            Defaults to Analysis results directory.
         output_prefix : :obj:`str`, optional
             Prefix to add to plots.
+
             Defaults to "{analysis_name}.all_data"
-
-        robust: :obj:`bool`, optional
-            Whether to scale the color scale robustly (to quantiles rather than extremes).
-            Defaults to True
-
-        rasterized: :obj:`bool`, optional
-            Whether to rasterize main heatmap.
-            Defaults to True
-
-        dpi : :obj:`int`, optional
-            DPI resolution of rasterized image.
-            Defaults to 300
-
         sample_labels: :obj:`bool`, optional
             Whether to label samples with their name.
-            Defaults to True
+
+            Defaults to :obj:`True`
+        **kwargs : :obj:`dict`
+            Additional kwargs will be passed to `seaborn.clustermap`.
         """
         import seaborn as sns
         from tqdm import tqdm
@@ -720,72 +656,49 @@ class CNVAnalysis(Analysis):
         if "{analysis_name}" in output_prefix:
             output_prefix = output_prefix.format(analysis_name=self.name)
 
-        # Plot mean and variationper chromosome
+        # Plot mean and variation per chromosome
         for resolution in tqdm(resolutions, desc="Resolution"):
+            names = [s.name for s in samples if s.name in matrix[resolution].columns]
+            to_plot = matrix[resolution].loc[:, names]
+
+            to_plot["chr"] = list(map(lambda x: x[0], to_plot.index.str.split(":")))
+
             for label, function in tqdm(
                 [("variation", np.std), ("mean", np.mean)], desc="metric"
             ):
-                to_plot = matrix[resolution].copy()
-                names = [s.name for s in samples if s.name in to_plot.columns]
-                to_plot = to_plot.loc[:, names]
-                to_plot["chr"] = map(lambda x: x[0], to_plot.index.str.split(":"))
+                prefix = os.path.join(
+                    output_dir, self.name
+                    + ".{}.".format(resolution) + output_prefix + ".{}".format(label))
+                kws = {"yticklabels": False, "xticklabels": sample_labels}
+                kws.update(kwargs)
 
                 p = to_plot[names + ["chr"]].groupby("chr").apply(function)
                 grid = sns.clustermap(
                     p + p.min().min(),
                     cbar_kws={"label": label},
-                    cmap="Greens",
-                    xticklabels=sample_labels,
-                    yticklabels=True,
-                    rasterized=rasterized)
+                    cmap="Greens", **kws)
                 clustermap_fix_label_orientation(grid)
-                savefig(
-                    grid.fig,
-                    os.path.join(
-                        output_dir,
-                        self.name
-                        + ".{}.".format(resolution)
-                        + output_prefix
-                        + ".{}_per_chrom.svg".format(label)))
+                savefig(grid.fig, prefix + "_per_chrom.svg")
 
                 p = (
                     to_plot.loc[~to_plot["chr"].str.contains("X|Y"), names + ["chr"]]
                     .groupby("chr")
                     .apply(function))
-                kwargs = {
-                    "xticklabels": sample_labels,
-                    "yticklabels": True,
-                    "rasterized": rasterized,
-                    "robust": robust}
                 grid = sns.clustermap(
                     p + abs(p.min().min()),
                     cbar_kws={"label": label},
-                    cmap="Greens", **kwargs)
+                    cmap="Greens", **kws)
                 clustermap_fix_label_orientation(grid)
-                savefig(
-                    grid.fig,
-                    os.path.join(
-                        output_dir,
-                        self.name
-                        + ".{}.".format(resolution)
-                        + output_prefix
-                        + ".{}_per_chrom.no_sex_chroms.svg".format(label)))
+                savefig(grid.fig, prefix + "_per_chrom.no_sex_chroms.svg")
 
                 grid = sns.clustermap(
                     p,
                     cbar_kws={"label": label + " (Z-score)"},
                     cmap="RdBu_r",
                     center=0,
-                    z_score=1, **kwargs)
+                    z_score=1, **kws)
                 clustermap_fix_label_orientation(grid)
-                savefig(
-                    grid.fig,
-                    os.path.join(
-                        output_dir,
-                        self.name
-                        + ".{}.".format(resolution)
-                        + output_prefix
-                        + ".{}_per_chrom.no_sex_chroms.zscore.svg".format(label)))
+                savefig(grid.fig, prefix + "_per_chrom.no_sex_chroms.zscore.svg")
 
     def segment_genome(
         self,
@@ -807,23 +720,24 @@ class CNVAnalysis(Analysis):
         ----------
         matrix : :obj:`str`, optional
             Attribute name of dictionary of matrices to segment.
-            Defaults to `matrix_norm`.
 
+            Defaults to `matrix_norm`.
         resolutions : :obj:`list`, optional
             Resolutions of analysis.
-            Defaults to resolutions in Analysis object.
 
+            Defaults to resolutions in Analysis object.
         samples : :obj:`list`, optional
             Samples to restrict analysis to.
-            Defaults to samples in Analysis object.
 
+            Defaults to samples in Analysis object.
         save: :obj:`bool`, optional
             Whether results should be saved to disc.
-            Defaults to True
 
+            Defaults to :obj:`True`
         assign: :obj:`bool`, optional
             Whether results should be assigned to an attribute in the Analsyis object.
-            Defaults to True
+
+            Defaults to :obj:`True`
 
         Returns
         -------
@@ -929,23 +843,24 @@ class CNVAnalysis(Analysis):
         ----------
         segmentation : :obj:`str`, optional
             Attribute name of dictionary of segmentation results.
-            Defaults to `segmentation`.
 
+            Defaults to `segmentation`.
         resolutions : :obj:`list`, optional
             Resolutions of analysis.
-            Defaults to resolutions in Analysis object.
 
+            Defaults to resolutions in Analysis object.
         samples : :obj:`list`, optional
             Samples to restrict analysis to.
-            Defaults to samples in Analysis object.
 
+            Defaults to samples in Analysis object.
         save: :obj:`bool`, optional
             Whether results should be saved to disc.
-            Defaults to True
 
+            Defaults to :obj:`True`
         assign: :obj:`bool`, optional
             Whether results should be assigned to an attribute in the Analsyis object.
-            Defaults to True
+
+            Defaults to :obj:`True`
 
         Returns
         -------
@@ -1036,20 +951,22 @@ class CNVAnalysis(Analysis):
         ----------
         segmentation : :obj:`str`, optional
             Dictionary of segmentation results.
-            Defaults to `segmentation`.
 
+            Defaults to "segmentation".
         resolutions : :obj:`list`, optional
-            Resolutions of analysis. Defaults to resolutions in Analysis object.
+            Resolutions of analysis.
 
+            Defaults to resolutions in Analysis object.
         per_sample: :obj:`bool`, optional
             Whether plots should be made for each sample too.
-            Defaults to False
 
+            Defaults to :obj:`False`
         output_dir : :obj:`str`, optional
             Output directory.
 
         output_prefix : :obj:`str`, optional
             Prefix to add to plots.
+
             Defaults to "{resolution}.segmentation_metrics"
         """
         # TODO: plot stats per sample too

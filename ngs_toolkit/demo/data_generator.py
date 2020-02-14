@@ -10,14 +10,25 @@ import tempfile
 
 from ngs_toolkit.general import query_biomart
 from ngs_toolkit.utils import location_index_to_bed
-from ngs_toolkit.project_manager import create_project
+from ngs_toolkit.project_manager import create_project as init_proj
 import numpy as np
 import pandas as pd
 import pybedtools
 import yaml
 
+# To be refractored
+import subprocess
+from ngs_toolkit import _LOGGER
+DEV = False
+try:
+    o = subprocess.check_output("git status".split(" "))
+    DEV = "dev" in o.decode().split("\n")[0]
+except subprocess.CalledProcessError:
+    msg = "Could not detect whether on a development branch."
+    _LOGGER.warning(msg)
 
-REGION_BASED_DATA_TYPES = ['ATAC-seq', 'ChIP-seq', 'CNV']
+REGION_BASED_DATA_TYPES = ['ATAC-seq', 'ChIP-seq']  # CNV technically is too but it does not need a `sites` attr
+DEFAULT_CNV_RESOLUTIONS = ["1000kb", "100kb", "10kb"]
 
 
 def generate_count_matrix(
@@ -146,13 +157,32 @@ def generate_data(
             n_features, genome_assembly=genome_assembly
         )
     elif data_type in ["CNV"]:
-        from ngs_toolkit.utils import z_score
+        # choose last value of last factor as "background"
+        factor = dcat.columns[-1]
+        value = dcat[factor].unique()[-1]
+        background_samples = dcat[factor] == value
+        # get log2 ratios
+        dnum += 1
+        background = dnum.loc[:, background_samples].median(1)
+        signal = dnum.loc[:, ~background_samples].median(1)
+        dnum = np.log2(dnum.T / background).T
 
-        dnum.index = get_genomic_bins(
+        # now sort feature by group difference
+        dnum = dnum.reindex((signal - background).sort_values().index)
+
+        # and assign contiguous locations in the genome
+        dnum_res = dict()
+        for resolution in DEFAULT_CNV_RESOLUTIONS:
+            x = dnum.copy()
+            x.index = get_genomic_bins(
+                n_features, genome_assembly=genome_assembly, resolution=resolution
+            )
+            dnum_res[resolution] = x
+        dnum = dnum_res
+    elif data_type in ["CRISPR"]:
+        dnum.index = get_random_grnas(
             n_features, genome_assembly=genome_assembly
         )
-        dnum = z_score(dnum)
-
     return dnum, dcat
 
 
@@ -225,7 +255,7 @@ def generate_project(
         output_dir = tempfile.mkdtemp()
 
     # Create project with projectmanager
-    create_project(
+    init_proj(
         project_name,
         genome_assemblies={organism: genome_assembly},
         overwrite=True,
@@ -294,19 +324,37 @@ def generate_project(
                 sep="\t",
                 header=False,
             )
-        dnum.to_csv(
-            os.path.join(
-                output_dir, project_name, "results",
-                project_name + ".matrix_raw.csv"
+        if isinstance(dnum, pd.DataFrame):
+            dnum.to_csv(
+                os.path.join(
+                    output_dir, project_name, "results",
+                    project_name + ".matrix_raw.csv"
+                )
             )
-        )
-    prev_level = _LOGGER.getEffectiveLevel()
-    _LOGGER.setLevel("ERROR")
+        elif isinstance(dnum, dict):
+            for res, d in dnum.items():
+                d.to_csv(
+                    os.path.join(
+                        output_dir, project_name, "results",
+                        project_name + "." + res + ".matrix_raw.csv"
+                    )
+                )
+
+    if not DEV:
+        # Here we are raising the logger level to omit messages during
+        # sample file creation which would have been too much clutter,
+        # especially since I make use of `load_data` with permissive=True.
+        # In dev, I still want to see them.
+        _LOGGER.debug("Shutting logger for now")
+        prev_level = _LOGGER.getEffectiveLevel()
+        _LOGGER.setLevel("ERROR")
     an = initialize_analysis_of_data_type(data_type, config_file)
     an.load_data(permissive=True)
     if sample_input_files:
         generate_sample_input_files(an, dnum)
-    _LOGGER.setLevel(prev_level)
+    if not DEV:
+        _LOGGER.setLevel(prev_level)
+        _LOGGER.debug("Reactivated logger")
     if not initialize:
         return config_file
     return an
@@ -315,7 +363,7 @@ def generate_project(
 def generate_projects(
         output_path=None,
         project_prefix_name="demo-project",
-        data_types=["ATAC-seq", "RNA-seq"],
+        data_types=["ATAC-seq", "ChIP-seq", "CNV", "RNA-seq"],
         organisms=["human", "mouse"],
         genome_assemblies=["hg38", "mm10"],
         n_factors=[1, 2, 5],
@@ -413,6 +461,20 @@ def generate_peak_file(peak_set, output_peak, genome_assembly="hg38", summits=Fa
     s.saveas(output_peak)
 
 
+def generate_log2_profiles(sample_vector, background_vector, output_file):
+    """Generate a file with read count profile of CNVs for the sample and background"""
+    # raise NotImplementedError
+
+    s = location_index_to_bed(sample_vector.index)
+    s["log2." + sample_vector.name + ".trimmed.bowtie2.filtered.bam"] = sample_vector
+    s["log2.background.trimmed.bowtie2.filtered.bam"] = background_vector
+    s.index.name = "Feature"
+    with open(output_file, 'w') as handle:
+        handle.write("# This is a comment made by the CNV caller program\n")
+        handle.write("# This is a another\n")
+        s.to_csv(handle, sep="\t")
+
+
 def generate_sample_input_files(analysis, matrix):
     """Generate input files (BAM, peaks) for a sample depending on its data type."""
     if analysis.data_type in REGION_BASED_DATA_TYPES:
@@ -428,8 +490,7 @@ def generate_sample_input_files(analysis, matrix):
         if hasattr(sample, "aligned_filtered_bam"):
             if sample.aligned_filtered_bam is not None:
                 d = os.path.dirname(sample.aligned_filtered_bam)
-                if not os.path.exists(d):
-                    os.makedirs(d)
+                os.makedirs(d, exist_ok=True)
                 generate_bam_file(
                     matrix.loc[:, sample.name],
                     sample.aligned_filtered_bam,
@@ -438,19 +499,26 @@ def generate_sample_input_files(analysis, matrix):
         if hasattr(sample, "peaks"):
             if sample.peaks is not None:
                 d = os.path.dirname(sample.peaks)
-                if not os.path.exists(d):
-                    os.makedirs(d)
+                os.makedirs(d, exist_ok=True)
                 generate_peak_file(
                     analysis.sites, sample.peaks, summits=False,
                     genome_assembly=analysis.genome)
         if hasattr(sample, "summits"):
             if sample.summits is not None:
                 d = os.path.dirname(sample.summits)
-                if not os.path.exists(d):
-                    os.makedirs(d)
+                os.makedirs(d, exist_ok=True)
                 generate_peak_file(
                     analysis.sites, sample.summits, summits=True,
                     genome_assembly=analysis.genome)
+
+        if hasattr(sample, "log2_read_counts"):
+            if sample.log2_read_counts is not None:
+                for res, file in sample.log2_read_counts.items():
+                    os.makedirs(os.path.dirname(file), exist_ok=True)
+                    generate_log2_profiles(
+                        (2 ** matrix[res].loc[:, sample.name]).astype(int),
+                        (2 ** matrix[res].loc[:, sample.name]).astype(int),  # this should be the background vector
+                        file)
 
 
 def initialize_analysis_of_data_type(data_type, pep_config, *args, **kwargs):
@@ -501,10 +569,23 @@ def get_random_genes(n_genes, genome_assembly="hg38"):
         .squeeze()
         .drop_duplicates()
     )
-    return pd.Series(np.random.choice(g, n_genes, replace=False)).sort_values()
+    return g.sample(n=n_genes, replace=False).sort_values()
 
 
-def get_genomic_bins(n_bins, distribution="normal", genome_assembly="hg38"):
+def get_random_grnas(n_genes, genome_assembly="hg38", n_grnas_per_gene=4):
+    """Get ``n_genes`` number of random genes from the set of genes of the ``genome_assembly``"""
+    import itertools
+    gs = int(n_genes / n_grnas_per_gene)
+    genes = get_random_genes(gs, genome_assembly=genome_assembly)
+    grna_ns = itertools.chain(*[range(n_grnas_per_gene) for _ in range(gs)])
+
+    return [
+        a + "__" + str(b)
+        for a, b in
+        zip(genes.repeat(n_grnas_per_gene), list(grna_ns))]
+
+
+def get_genomic_bins(n_bins, genome_assembly="hg38", resolution=None):
     """Get a ``size`` number of random genomic bins respecting the boundaries of the ``genome_assembly``"""
     from ngs_toolkit.utils import bed_to_index
 
@@ -514,6 +595,10 @@ def get_genomic_bins(n_bins, distribution="normal", genome_assembly="hg38"):
     w = bed.makewindows(
         genome=genome_assembly, w=sum([i.length for i in bed]) / n_bins
     ).to_dataframe()
+    if resolution is not None:
+        if isinstance(resolution, str):
+            resolution = int(resolution.replace("kb", "000"))
+        w["end"] = w["start"] + resolution
     return bed_to_index(w.head(n_bins))
 
 

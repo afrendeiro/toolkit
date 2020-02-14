@@ -7,7 +7,7 @@ from functools import partialmethod
 import pytest
 
 from ngs_toolkit import MEMORY, _CONFIG, _LOGGER, Analysis, ATACSeqAnalysis
-from ngs_toolkit.demo import generate_project
+from ngs_toolkit.demo.data_generator import generate_project
 
 
 # Environment-specific
@@ -109,6 +109,7 @@ def has_module(module):
 
 RPY2 = has_module('rpy2')
 COMBAT = has_module('combat')
+STAP = has_module('STAP')
 
 
 def file_exists(file):
@@ -355,6 +356,50 @@ def chipseq_analysis_with_peaks(chipseq_analysis):
                         handle.write("\t".join(entry.astype(str)) + "\n")
 
     return chipseq_analysis
+
+
+@pytest.fixture
+def cnv_analysis(tmp_path):
+    tmp_path = str(tmp_path)
+
+    _CONFIG.update(NEW_CONFIG)
+
+    kwargs = {
+        'data_type': "CNV",
+        'organism': "human",
+        'genome_assembly': "hg38",
+        'n_factors': 2,
+        'n_features': 100,
+        'n_replicates': 2}
+    kwargs.update({
+        "project_name": "test-project_" + "_".join(
+            str(x) for x in kwargs.values()),
+        "output_dir": tmp_path})
+
+    an = generate_project(**kwargs, sample_input_files=False)
+    return an
+
+
+@pytest.fixture
+def cnv_analysis_with_inputs(tmp_path):
+    tmp_path = str(tmp_path)
+
+    _CONFIG.update(NEW_CONFIG)
+
+    kwargs = {
+        'data_type': "CNV",
+        'organism': "human",
+        'genome_assembly': "hg38",
+        'n_factors': 2,
+        'n_features': 100,
+        'n_replicates': 2}
+    kwargs.update({
+        "project_name": "test-project_" + "_".join(
+            str(x) for x in kwargs.values()),
+        "output_dir": tmp_path})
+
+    an = generate_project(**kwargs, sample_input_files=True)
+    return an
 
 
 @pytest.fixture()

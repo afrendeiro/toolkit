@@ -745,6 +745,37 @@ class Analysis(object):
             else:
                 return string.format(**sample_dict)
 
+        def _set(attr, value, obj, sample):
+            # This first bit here is to handle recursively
+            # cases where value is a dict or (PathExAttMap in fact)
+            if isinstance(value, dict):
+                setattr(obj, attr, value)
+                for k, v in getattr(obj, attr).items():
+                    _set(k, v, getattr(obj, attr), sample)
+                return
+            try:
+                value = _format_string_with_sample_attributes(sample, value)
+            except KeyError:
+                _LOGGER.error("Failed formatting for sample '{}', value '{}'."
+                              .format(sample.name, value))
+            if overwrite:
+                _LOGGER.debug(msg.format(attr, sample.name, value))
+                setattr(obj, attr, value)
+            else:
+                if not hasattr(sample, attr):
+                    _LOGGER.debug(msg.format(attr, sample.name, value))
+                    setattr(obj, attr, value)
+                else:
+                    if getattr(sample, attr) is None:
+                        _LOGGER.debug(msg.format(attr, sample.name, value))
+                        setattr(obj, attr, value)
+                    else:
+                        _LOGGER.debug(
+                            "{} already exists in sample, not overwriting.".format(
+                                attr.replace("_", " ").capitalize()
+                            )
+                        )
+
         if self.samples is None:
             _LOGGER.warning(
                 "Analysis object does not have attached Samples. "
@@ -759,31 +790,7 @@ class Analysis(object):
                 if ("name" in sample) and ("sample_name" not in sample):
                     sample.sample_name = sample.name
                 for attr, value in _CONFIG["sample_input_files"][data_type].items():
-                    try:
-                        value = _format_string_with_sample_attributes(sample, value)
-                    except KeyError:
-                        if (attr != "log2_read_counts"):
-                            _LOGGER.error("Failed formatting for sample '{}', value '{}'."
-                                          .format(sample.name, value))
-                        continue
-
-                    if overwrite:
-                        _LOGGER.debug(msg.format(attr, sample.name, value))
-                        setattr(sample, attr, value)
-                    else:
-                        if not hasattr(sample, attr):
-                            _LOGGER.debug(msg.format(attr, sample.name, value))
-                            setattr(sample, attr, value)
-                        else:
-                            if getattr(sample, attr) is None:
-                                _LOGGER.debug(msg.format(attr, sample.name, value))
-                                setattr(sample, attr, value)
-                            else:
-                                _LOGGER.debug(
-                                    "{} already exists in sample, not overwriting.".format(
-                                        attr.replace("_", " ").capitalize()
-                                    )
-                                )
+                    _set(attr, value, sample, sample)
 
     def to_pickle(self, timestamp=False):
         """

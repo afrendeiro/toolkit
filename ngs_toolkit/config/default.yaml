@@ -56,13 +56,15 @@ sample_input_files:
     aligned_filtered_bam:
     peaks:
     summits:
-    log2_read_counts:
   ChIP-seq:
     aligned_filtered_bam:
   ChIPmentation:
     aligned_filtered_bam:
   CNV:
     log2_read_counts:
+      1000kb:
+      100kb:
+      10kb:
   RNA-seq:
     aligned_filtered_bam:
     counts:

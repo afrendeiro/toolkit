@@ -71,8 +71,10 @@ NEW_CONFIG = {
             "aligned_filtered_bam":
                 "{data_dir}/{sample_name}/mapped/{sample_name}.trimmed.bowtie2.filtered.bam"},
         "CNV": {
-            "aligned_filtered_bam":
-                "{data_dir}/{sample_name}/mapped/{sample_name}.trimmed.bowtie2.filtered.bam"},
+            "log2_read_counts":
+                {"10kb": "{data_dir}/{sample_name}/{sample_name}_10kb/CNAprofiles/log2_read_counts.igv",
+                 "100kb": "{data_dir}/{sample_name}/{sample_name}_100kb/CNAprofiles/log2_read_counts.igv",
+                 "1000kb": "{data_dir}/{sample_name}/{sample_name}_1000kb/CNAprofiles/log2_read_counts.igv"}},
         "RNA-seq": {
             "aligned_filtered_bam":
                 "{data_dir}/{sample_name}/mapped/{sample_name}.trimmed.bowtie2.filtered.bam",

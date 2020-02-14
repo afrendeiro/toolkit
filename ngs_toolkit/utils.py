@@ -7,6 +7,16 @@ import numpy as np
 import pandas as pd
 
 
+def warn_or_raise(exception, permissive=False):
+    from ngs_toolkit import _LOGGER
+    msg = exception.args[0]
+    if permissive:
+        _LOGGER.warning(msg)
+    else:
+        _LOGGER.error(msg)
+        raise exception
+
+
 def have_unbuffered_output():
     """Set unbuffered output for current session."""
     import sys

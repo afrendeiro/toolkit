@@ -2,9 +2,10 @@
 
 from functools import wraps
 from ngs_toolkit import _LOGGER
+from ngs_toolkit.utils import warn_or_raise
 
 
-def check_has_attributes(attributes=None, object_types=None):
+def check_has_attributes(attributes=None, object_types=None, permissive=False):
     attributes = [] or attributes
     object_types = [None] * len(attributes) or object_types
     if len(attributes) != len(object_types):
@@ -23,9 +24,7 @@ def check_has_attributes(attributes=None, object_types=None):
                 [hasattr(args[0], attr) for attr in attributes],
                 index=attributes)
             if not has.all():
-                msg = msg.format(",".join(has[~has].index))
-                _LOGGER.error(msg)
-                raise AttributeError(msg)
+                warn_or_raise(AttributeError(msg.format(",".join(has[~has].index))), permissive)
 
             # check attributes are not None
             msg = "Analysis '{}' attribute(s) are None."
@@ -33,9 +32,7 @@ def check_has_attributes(attributes=None, object_types=None):
                 [getattr(args[0], attr) is not None for attr in attributes],
                 index=attributes)
             if not not_none.all():
-                msg = msg.format(",".join(not_none[~not_none].index))
-                _LOGGER.error(msg)
-                raise AttributeError(msg)
+                warn_or_raise(AttributeError(msg.format(",".join(not_none[~not_none].index))), permissive)
 
             # check the type of attribute values matches requested
             msg = "Analysis '{}' attribute(s) are not of requested types '{}'."
@@ -46,11 +43,11 @@ def check_has_attributes(attributes=None, object_types=None):
                  for attr, t in zip(t_attributes, t_object_types)],
                 index=t_attributes, dtype=object)
             if not not_type.all():
-                msg = msg.format(
-                    ",".join(not_type[~not_type].index),
-                    ",".join([str(t) for t in t_object_types]))
-                _LOGGER.error(msg)
-                raise AttributeError(msg)
+                warn_or_raise(
+                    AttributeError(msg.format(
+                        ",".join(not_type[~not_type].index),
+                        ",".join([str(t) for t in t_object_types]))),
+                    permissive)
 
             # for iterable types, check length > 0
             msg = "Analysis '{}' attribute(s) have 0 elements."
@@ -60,11 +57,11 @@ def check_has_attributes(attributes=None, object_types=None):
                 [len(getattr(args[0], attr)) > 0 for attr in i_attributes],
                 index=i_attributes)
             if not not_empty.all():
-                msg = msg.format(
-                    ",".join(not_empty[~not_empty].index),
-                    ",".join([str(t) for t in i_object_types]))
-                _LOGGER.error(msg)
-                raise AttributeError(msg)
+                warn_or_raise(
+                    AttributeError(msg.format(
+                        ",".join(not_empty[~not_empty].index),
+                        ",".join([str(t) for t in i_object_types]))),
+                    permissive)
             return f(*args, **kwargs)
         return wrapper
     return decorator

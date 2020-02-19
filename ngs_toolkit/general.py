@@ -1165,46 +1165,25 @@ def differential_from_bivariate_fit(
     import seaborn as sns
     from statsmodels.sandbox.stats.multicomp import multipletests
 
+    os.makedirs(output_dir, exist_ok=True)
+
     comparisons = comparison_table["comparison_name"].drop_duplicates().sort_values()
-    if plot:
-        fig, axis = plt.subplots(
-            2,
-            len(comparisons),
-            figsize=(4 * len(comparisons), 4 * 2),
-            sharex=True,
-            sharey="row",
-        )
 
     if make_values_positive:
         matrix = matrix + abs(matrix.min().min())
 
-    results = pd.DataFrame()
+    results = list()
     for i, comparison in enumerate(comparisons):
         _LOGGER.info("Doing comparison '{}'".format(comparison))
         out_file = os.path.join(
             output_dir, output_prefix + ".fit_result.{}.csv".format(comparison)
         )
 
-        sa = comparison_table.loc[
-            (comparison_table["comparison_name"] == comparison)
-            & (comparison_table["comparison_side"] == 1),
-            "sample_name",
-        ]
-        ga = comparison_table.loc[
-            (comparison_table["comparison_name"] == comparison)
-            & (comparison_table["comparison_side"] == 1),
-            "sample_group",
-        ].squeeze()
-        sb = comparison_table.loc[
-            (comparison_table["comparison_name"] == comparison)
-            & (comparison_table["comparison_side"] == 0),
-            "sample_name",
-        ]
-        gb = comparison_table.loc[
-            (comparison_table["comparison_name"] == comparison)
-            & (comparison_table["comparison_side"] == 0),
-            "sample_group",
-        ].squeeze()
+        comp = comparison_table.query("comparison_name == '{}'".format(comparison))
+        sa = comp.query("comparison_side == 1")['sample_name']
+        ga = comp.query("comparison_side == 1")['sample_group'].unique()[0]
+        sb = comp.query("comparison_side == 0")['sample_name']
+        gb = comp.query("comparison_side == 0")['sample_group'].unique()[0]
         a = matrix.loc[:, sa].mean(axis=1)
         a.name = ga
         b = matrix.loc[:, sb].mean(axis=1)
@@ -1266,52 +1245,69 @@ def differential_from_bivariate_fit(
 
         res["direction"] = (res["norm_log2FoldChange"] >= 0).astype(int).replace(0, -1)
         res.to_csv(out_file)
+        results.append(res)
 
-        if plot:
-            axis[0, i].scatter(
-                res["comparison_mean"],
-                res["log2FoldChange"],
-                alpha=0.2,
-                s=5,
-                color=sns.color_palette(palette)[0],
-                rasterized=True,
-            )
-            axis[0, i].axhline(0, color="black", linestyle="--")
-            axis[1, i].scatter(
-                res["comparison_mean"],
-                res["norm_log2FoldChange"],
-                alpha=0.2,
-                s=5,
-                color=sns.color_palette(palette)[0],
-                rasterized=True,
-            )
-            diff = res.loc[
-                (res["pvalue"] < 0.05) & (res["norm_log2FoldChange"].abs() >= 2), :
-            ].index
-            axis[0, i].scatter(
-                res.loc[diff, "comparison_mean"],
-                res.loc[diff, "log2FoldChange"],
-                alpha=0.2,
-                s=5,
-                color=sns.color_palette(palette)[1],
-                rasterized=True,
-            )
-            axis[1, i].scatter(
-                res.loc[diff, "comparison_mean"],
-                res.loc[diff, "norm_log2FoldChange"],
-                alpha=0.2,
-                s=5,
-                color=sns.color_palette(palette)[1],
-                rasterized=True,
-            )
-            axis[1, i].axhline(0, color="black", linestyle="--")
-            axis[0, i].set_title(comparison + "\n" + ga + " vs " + gb)
-            axis[1, i].set_xlabel("Comparison mean")
-            if i == 0:
-                axis[0, i].set_ylabel("log2 fold-change")
-                axis[1, i].set_ylabel("Norm(log2 fold-change)")
+    # save all
+    results = pd.concat(results)
+    results.to_csv(
+        os.path.join(output_dir, output_prefix + ".deseq_result.all_comparisons.csv"),
+        index=True,
+    )
 
-        results = results.append(res.reset_index(), ignore_index=True)
+    if not plot:
+        return
+    fig, axis = plt.subplots(
+        2,
+        len(comparisons),
+        figsize=(4 * len(comparisons), 4 * 2),
+        sharex=True,
+        sharey="row",
+        squeeze=False
+    )
+
+    for i, comparison in enumerate(comparisons):
+        axis[0, i].scatter(
+            res["comparison_mean"],
+            res["log2FoldChange"],
+            alpha=0.2,
+            s=5,
+            color=sns.color_palette(palette)[0],
+            rasterized=True,
+        )
+        axis[0, i].axhline(0, color="black", linestyle="--")
+        axis[1, i].scatter(
+            res["comparison_mean"],
+            res["norm_log2FoldChange"],
+            alpha=0.2,
+            s=5,
+            color=sns.color_palette(palette)[0],
+            rasterized=True,
+        )
+        diff = res.loc[
+            (res["pvalue"] < 0.05) & (res["norm_log2FoldChange"].abs() >= 2), :
+        ].index
+        axis[0, i].scatter(
+            res.loc[diff, "comparison_mean"],
+            res.loc[diff, "log2FoldChange"],
+            alpha=0.2,
+            s=5,
+            color=sns.color_palette(palette)[1],
+            rasterized=True,
+        )
+        axis[1, i].scatter(
+            res.loc[diff, "comparison_mean"],
+            res.loc[diff, "norm_log2FoldChange"],
+            alpha=0.2,
+            s=5,
+            color=sns.color_palette(palette)[1],
+            rasterized=True,
+        )
+        axis[1, i].axhline(0, color="black", linestyle="--")
+        axis[0, i].set_title(comparison + "\n" + ga + " vs " + gb)
+        axis[1, i].set_xlabel("Comparison mean")
+        if i == 0:
+            axis[0, i].set_ylabel("log2 fold-change")
+            axis[1, i].set_ylabel("Norm(log2 fold-change)")
 
     # save figure
     savefig(
@@ -1320,14 +1316,6 @@ def differential_from_bivariate_fit(
             output_dir, output_prefix + ".deseq_result.all_comparisons.scatter.svg"
         ),
     )
-
-    # save all
-    results = results.set_index("index")
-    results.to_csv(
-        os.path.join(output_dir, output_prefix + ".deseq_result.all_comparisons.csv"),
-        index=True,
-    )
-
     return results
 
 
@@ -2041,6 +2029,7 @@ def run_enrichment_jobs(
 def project_to_geo(
     project,
     output_dir="geo_submission",
+    steps=['bam', 'bigwig', 'peaks'],
     samples=None,
     distributed=False,
     dry_run=False,
@@ -2104,82 +2093,78 @@ def project_to_geo(
     output_dir = os.path.abspath(output_dir)
     if samples is None:
         samples = project.samples
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
+    os.makedirs(output_dir, exist_ok=True)
 
     annot = pd.DataFrame(index=pd.Index([], name="sample_name"))
     for sample in samples:
         various = len(sample.data_path.split(" ")) > 1
         cmd = ""
-        for i, file in enumerate(sample.data_path.split(" ")):
-            suffix = ".file{}".format(i) if various else ""
-            # Copy raw file
-            bam_file = os.path.join(output_dir, sample.name + "{}.bam".format(suffix))
-            cmd += "cp {} {};\n".format(file, bam_file)
-            cmd += "chmod 644 {};\n".format(bam_file)
-            annot.loc[sample.name, "bam_file{}".format(i)] = bam_file
+        if 'bam' in steps:
+            for i, file in enumerate(sample.data_path.split(" ")):
+                suffix = ".file{}".format(i) if various else ""
+                # Copy raw file
+                bam_file = os.path.join(output_dir, sample.name + "{}.bam".format(suffix))
+                cmd += "cp {} {};\n".format(file, bam_file)
+                cmd += "chmod 644 {};\n".format(bam_file)
+                annot.loc[sample.name, "bam_file{}".format(i)] = bam_file
 
-            # Copy or generate md5sum
-            md5_file = bam_file + ".md5"
-            if os.path.exists(file + ".md5"):
-                cmd += "cp {} {};\n".format(file + ".md5", md5_file)
-            else:
-                b = os.path.basename(file)
-                cmd += "md5sum {} > {};\n".format(os.path.join(output_dir, b), md5_file)
-            cmd += "chmod 644 {};\n".format(md5_file)
-            annot.loc[sample.name, "bam_file{}_md5sum".format(i)] = md5_file
+                # Copy or generate md5sum
+                md5_file = bam_file + ".md5"
+                if os.path.exists(file + ".md5"):
+                    cmd += "cp {} {};\n".format(file + ".md5", md5_file)
+                else:
+                    cmd += "md5sum {} > {};\n".format(bam_file, md5_file)
+                cmd += "chmod 644 {};\n".format(md5_file)
+                annot.loc[sample.name, "bam_file{}_md5sum".format(i)] = md5_file
 
         # Copy bigWig files
         if sample.library in ["ATAC-seq", "ChIP-seq"]:
-            if hasattr(sample, "bigwig"):
-                bigwig_file = os.path.join(output_dir, sample.name + ".bigWig")
-                cmd += "cp {} {};\n".format(sample.bigwig, bigwig_file)
-                cmd += "chmod 644 {};\n".format(bigwig_file)
-                annot.loc[sample.name, "bigwig_file"] = bigwig_file
+            if 'bigwig' in steps:
+                if hasattr(sample, "bigwig"):
+                    bigwig_file = os.path.join(output_dir, sample.name + ".bigWig")
+                    cmd += "cp {} {};\n".format(sample.bigwig, bigwig_file)
+                    cmd += "chmod 644 {};\n".format(bigwig_file)
+                    annot.loc[sample.name, "bigwig_file"] = bigwig_file
 
-                # Copy or generate md5sum
-                md5_file = bigwig_file + ".md5"
-                if os.path.exists(sample.bigwig + ".md5"):
-                    cmd += "cp {} {};\n".format(sample.bigwig + ".md5", md5_file)
+                    # Copy or generate md5sum
+                    md5_file = bigwig_file + ".md5"
+                    if os.path.exists(sample.bigwig + ".md5"):
+                        cmd += "cp {} {};\n".format(sample.bigwig + ".md5", md5_file)
+                    else:
+                        cmd += "md5sum {} > {};\n".format(bigwig_file, md5_file)
+                    cmd += "chmod 644 {};\n".format(md5_file)
+                    annot.loc[sample.name, "bigwig_file_md5sum"] = md5_file
                 else:
-                    b = os.path.basename(sample.bigwig)
-                    cmd += "md5sum {} > {};\n".format(
-                        os.path.join(output_dir, b), md5_file
+                    _LOGGER.warning(
+                        "'{}' sample '{}' does not have a 'bigwig'".format(
+                            sample.library, sample.name
+                        )
+                        + " attribute set. Skipping bigWig file."
                     )
-                cmd += "chmod 644 {};\n".format(md5_file)
-                annot.loc[sample.name, "bigwig_file_md5sum"] = md5_file
-            else:
-                _LOGGER.warning(
-                    "'{}' sample '{}' does not have a 'bigwig'".format(
-                        sample.library, sample.name
-                    )
-                    + " attribute set. Skipping bigWig file."
-                )
         # Copy peaks
         if sample.library == "ATAC-seq":
-            if hasattr(sample, "peaks"):
-                peaks_file = os.path.join(output_dir, sample.name + ".peaks.narrowPeak")
-                cmd += "cp {} {};\n".format(sample.peaks, peaks_file)
-                cmd += "chmod 644 {};\n".format(peaks_file)
-                annot.loc[sample.name, "peaks_file"] = peaks_file
+            if 'peaks' in steps:
+                if hasattr(sample, "peaks"):
+                    peaks_file = os.path.join(output_dir, sample.name + ".peaks.narrowPeak")
+                    cmd += "cp {} {};\n".format(sample.peaks, peaks_file)
+                    cmd += "chmod 644 {};\n".format(peaks_file)
+                    annot.loc[sample.name, "peaks_file"] = peaks_file
 
-                # Copy or generate md5sum
-                md5_file = peaks_file + ".md5"
-                if os.path.exists(sample.peaks + ".md5"):
-                    cmd += "cp {} {};\n".format(sample.peaks + ".md5", md5_file)
+                    # Copy or generate md5sum
+                    md5_file = peaks_file + ".md5"
+                    if os.path.exists(sample.peaks + ".md5"):
+                        cmd += "cp {} {};\n".format(sample.peaks + ".md5", md5_file)
+                    else:
+                        cmd += "md5sum {} > {};\n".format(peaks_file, md5_file)
+                    cmd += "chmod 644 {};\n".format(md5_file)
+                    annot.loc[sample.name, "peaks_file_md5sum"] = md5_file
                 else:
-                    b = os.path.basename(sample.peaks)
-                    cmd += "md5sum {} > {};\n".format(peaks_file, md5_file)
-                cmd += "chmod 644 {};\n".format(md5_file)
-                annot.loc[sample.name, "peaks_file_md5sum"] = md5_file
-            else:
-                _LOGGER.warning(
-                    "'{}' sample '{}' does not have a 'peaks' attribute set.".format(
-                        sample.library, sample.name
+                    _LOGGER.warning(
+                        "'{}' sample '{}' does not have a 'peaks' attribute set.".format(
+                            sample.library, sample.name
+                        )
+                        + " Skipping peaks file."
                     )
-                    + " Skipping peaks file."
-                )
-        cmd += "\ndate\n"
 
         # Assemble job
         job_name = "project_to_geo.{}".format(sample.name)
@@ -2238,8 +2223,7 @@ def rename_sample_files(
 
         Defaults to :obj:`False`.
     """
-    import subprocess
-    # TODO: test
+    # import subprocess
     cmds = list()
     # 1) move to tmp name
     for i, series in annotation_mapping.iterrows():
@@ -2253,18 +2237,15 @@ def rename_sample_files(
                 os.path.join(results_dir, o), os.path.join(results_dir, t)
             )
         )
-        # further directories
-        cmds.append(
-            "find {} -type d -exec rename {} {} {{}} \\;".format(
-                os.path.join(results_dir, t), o, t
+        # further directories and files
+        for file_type in ['d', 'f']:
+            cmds.append(
+                "find {} -type {} -exec rename 's/{}/{}/g' {{}} \\;".format(
+                    os.path.join(results_dir, t), file_type, o, t
+                )
             )
-        )
-        # files
-        cmds.append(
-            "find {} -type f -exec rename {} {} {{}} \\;".format(
-                os.path.join(results_dir, t), o, t
-            )
-        )
+            # note on GNU's 'find -exec \;' execution through subprocess
+            # the usuall '\;' from bash does not need to be escaped
 
     # 2) move to new name
     for i, series in annotation_mapping.iterrows():
@@ -2278,18 +2259,13 @@ def rename_sample_files(
                 os.path.join(results_dir, t), os.path.join(results_dir, n)
             )
         )
-        # further directories
-        cmds.append(
-            "find {} -type d -exec rename {} {} {{}} \\;".format(
-                os.path.join(results_dir, n), t, n
+        # further directories and files
+        for file_type in ['d', 'f']:
+            cmds.append(
+                "find {} -type {} -exec rename 's/{}/{}/g' {{}} \\;".format(
+                    os.path.join(results_dir, n), file_type, t, n
+                )
             )
-        )
-        # files
-        cmds.append(
-            "find {} -type f -exec rename {} {} {{}} \\;".format(
-                os.path.join(results_dir, n), t, n
-            )
-        )
 
     if dry_run:
         _LOGGER.info("\n".join(cmds))
@@ -2298,12 +2274,15 @@ def rename_sample_files(
             _LOGGER.info(i, cmd)
             if cmd.startswith("#"):
                 continue
-            try:
-                r = subprocess.call(cmd.split(" "))
-            except OSError as e:
-                raise e
-            if r != 0:
-                raise OSError("Command '{}' failed.".format(cmd))
+
+            # TODO: replace os.system with subprocess.call
+            os.system(cmd)
+            # try:
+            #     r = subprocess.call(cmd.split(" "))
+            # except OSError as e:
+            #     raise e
+            # if r != 0:
+            #     raise OSError("Command '{}' failed.".format(cmd))
 
 
 @MEMORY.cache

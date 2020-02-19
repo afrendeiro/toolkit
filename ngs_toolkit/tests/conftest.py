@@ -207,6 +207,28 @@ def atac_analysis_with_input_files(tmp_path):
 
 
 @pytest.fixture
+def atac_analysis_with_unmapped_input_files(atac_analysis_with_input_files):
+    import pandas as pd
+    import yaml
+
+    with atac_analysis_with_input_files as an:
+        # We will update the annotation to add a 'data_source' column
+        csv = an.pep.replace("project_config.yaml", "annotation.csv")
+        df = pd.read_csv(csv)
+        df['data_source'] = 'mapped'
+        df.to_csv(csv, index=False)
+        # We will update the config to add a line pointing to the aligned bams
+        conf = yaml.safe_load(open(an.pep))
+        mapped_path = os.path.join(an.root_dir, 'data/{sample_name}/mapped/{sample_name}.trimmed.bowtie2.filtered.bam')
+        conf['data_sources']['mapped'] = mapped_path
+        yaml.safe_dump(conf, open(an.pep, 'w'))
+        a = ATACSeqAnalysis(from_pep=an.pep)
+        a.load_data()
+
+        return a
+
+
+@pytest.fixture
 def subproject_config(atac_analysis):
     import yaml
 

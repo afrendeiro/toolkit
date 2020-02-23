@@ -193,7 +193,7 @@ def create_project(
     #     submission_template: slurm_template.sub
     #     submission_command: sbatch
     trackhubs:
-        trackhub_dir: /data/groups/lab_bock/public_html/{username}/{project_name}/
+        trackhub_dir: {project_dir}/trackhubs
         url: {url}""".format(
         project_name=project_name,
         username=username,

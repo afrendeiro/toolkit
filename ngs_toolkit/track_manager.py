@@ -17,9 +17,6 @@ import pandas as pd
 import peppy
 
 
-peppy.project.logging.disable()
-
-
 def parse_arguments():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(dest="project_config_file")
@@ -68,6 +65,7 @@ def get_colors(level, pallete="gist_rainbow", nan_color=[0.5, 0.5, 0.5]):
     Given a level (list or iterable) with length n,
     return a same-sized list of RGB colors  for each unique value in the level.
     """
+    import numpy as np
 
     pallete = plt.get_cmap(pallete)
     level_unique = list(set(level))
@@ -79,7 +77,7 @@ def get_colors(level, pallete="gist_rainbow", nan_color=[0.5, 0.5, 0.5]):
 
     color_dict = dict(zip(list(set(level)), p))
     # color for nan cases
-    color_dict[pd.np.nan] = nan_color
+    color_dict[np.nan] = nan_color
     return [color_dict[x] for x in level]
 
 
@@ -151,7 +149,7 @@ maxHeightPixels 32:32:8
 
     # Make dataframe for groupby
     df = (
-        pd.DataFrame([s.as_series() for s in prj.samples])
+        pd.DataFrame([s.to_dict() for s in prj.samples])
         .fillna("none")
         .drop_duplicates(subset="sample_name")
     )
@@ -177,7 +175,7 @@ maxHeightPixels 32:32:8
             os.makedirs(os.path.join(bigwig_dir, genome))
         os.chmod(os.path.join(bigwig_dir, genome), 0o755)
 
-        df_g = df[(df["genome"] == genome)]
+        df_g = df.loc[(df["genome"] == genome), :]
 
         # Genomes
         text = """genome {g}
@@ -241,7 +239,7 @@ trackDb {g}/trackDb.txt
             )
 
             if len(indices) == 1:
-                sample_attrs = df_g.ix[indices].squeeze()
+                sample_attrs = df_g.loc[indices].squeeze()
 
                 track += textwrap.dedent(
                     track_final.format(
@@ -280,7 +278,7 @@ trackDb {g}/trackDb.txt
                 )
 
                 for index in indices:
-                    sample_attrs = df_g.ix[index].squeeze()
+                    sample_attrs = df_g.loc[index].squeeze()
                     track += track_final.format(
                         name=sample_attrs["sample_name"],
                         color=sample_attrs["track_color"],
@@ -350,7 +348,7 @@ def make_igv_tracklink(prj, track_file, track_url):
     link_header = "http://localhost:60151/load"
 
     # Make dataframe
-    df = pd.DataFrame([s.as_series() for s in prj.samples]).fillna("none")
+    df = pd.DataFrame([s.to_dict() for s in prj.samples]).fillna("none")
 
     # Keep only samples that have appropriate types to be displayed
     if "library" in df.columns:
@@ -435,6 +433,7 @@ def main():
 
     # Setup paths and hub files
     bigwig_dir = os.path.join(prj.trackhubs.trackhub_dir)
+    os.makedirs(bigwig_dir, exist_ok=True)
     track_hub = os.path.join(bigwig_dir, "hub.txt")
     genomes_hub = os.path.join(bigwig_dir, "genomes.txt")
     open(genomes_hub, "w").write("")

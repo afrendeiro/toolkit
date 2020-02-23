@@ -2193,9 +2193,6 @@ def rename_sample_files(
     Old and new sample names can overlap - this procedure will handle these cases correctly
     by a 2-step process with temporary sample names with prefix ``tmp_prefix``.
 
-    .. caution:: NEEDS TESTING!
-        This function has not been used in a while and needs more testing.
-
     Attributes
     ----------
     annotation_mapping : :obj:`pandas.DataFrame`
@@ -2216,6 +2213,7 @@ def rename_sample_files(
         Defaults to "rename_sample_files".
     results_dir : :obj:`str`, optional
         Pipeline output directory containing sample output directories.
+        This is usually the `data_dir` attribute of Analysis objects.
 
         Defaults to "results_pipeline".
     dry_run: :obj:`bool`, optional
@@ -2223,66 +2221,36 @@ def rename_sample_files(
 
         Defaults to :obj:`False`.
     """
-    # import subprocess
-    cmds = list()
+    def find_replace(from_pattern, to_pattern, root_dir=None, dry_run=False):
+        import shutil
+        root_dir = os.path.abspath(os.path.curdir if root_dir is None else root_dir)
+        os.chdir(root_dir)
+        for file in os.listdir(root_dir):  # parse through file list in the current directory
+            if from_pattern in file:  # if pattern is found
+                new_file = file.replace(from_pattern, to_pattern)
+                if not dry_run:
+                    shutil.move(file, new_file)  # rename
+                else:
+                    print(file, new_file)
+                file = new_file
+            if os.path.isdir(file):
+                os.chdir(file)
+                find_replace(from_pattern, to_pattern, ".")
+                os.chdir("..")
+
     # 1) move to tmp name
     for i, series in annotation_mapping.iterrows():
         o = series[old_sample_name_column]
         t = "{}-{}".format(tmp_prefix, i)
-        cmds.append("# Moving old sample '{}' to '{}'.".format(o, t))
-
-        # directory
-        cmds.append(
-            "mv {} {}".format(
-                os.path.join(results_dir, o), os.path.join(results_dir, t)
-            )
-        )
-        # further directories and files
-        for file_type in ['d', 'f']:
-            cmds.append(
-                "find {} -type {} -exec rename 's/{}/{}/g' {{}} \\;".format(
-                    os.path.join(results_dir, t), file_type, o, t
-                )
-            )
-            # note on GNU's 'find -exec \;' execution through subprocess
-            # the usuall '\;' from bash does not need to be escaped
+        _LOGGER.debug("# Moving old sample '%s' to temporary name '%s'." % (o, t))
+        find_replace(o, t, root_dir=results_dir, dry_run=dry_run)
 
     # 2) move to new name
     for i, series in annotation_mapping.iterrows():
         t = "{}-{}".format(tmp_prefix, i)
         n = series[new_sample_name_column]
-        cmds.append("# Moving old sample '{}' to '{}'.".format(t, n))
-
-        # directory
-        cmds.append(
-            "mv {} {}".format(
-                os.path.join(results_dir, t), os.path.join(results_dir, n)
-            )
-        )
-        # further directories and files
-        for file_type in ['d', 'f']:
-            cmds.append(
-                "find {} -type {} -exec rename 's/{}/{}/g' {{}} \\;".format(
-                    os.path.join(results_dir, n), file_type, t, n
-                )
-            )
-
-    if dry_run:
-        _LOGGER.info("\n".join(cmds))
-    else:
-        for i, cmd in enumerate(cmds):
-            _LOGGER.info(i, cmd)
-            if cmd.startswith("#"):
-                continue
-
-            # TODO: replace os.system with subprocess.call
-            os.system(cmd)
-            # try:
-            #     r = subprocess.call(cmd.split(" "))
-            # except OSError as e:
-            #     raise e
-            # if r != 0:
-            #     raise OSError("Command '{}' failed.".format(cmd))
+        _LOGGER.debug("# Moving temporary named sample '%s' to '%s'." % (t, n))
+        find_replace(t, n, root_dir=results_dir, dry_run=dry_run)
 
 
 @MEMORY.cache
@@ -2440,7 +2408,7 @@ def query_biomart(
 def subtract_principal_component(
     x,
     pc=1,
-    norm=False,
+    standardize=False,
     plot=True,
     plot_name="PCA_based_batch_correction.svg",
     max_pcs_to_plot=6,
@@ -2456,7 +2424,7 @@ def subtract_principal_component(
     pc -= 1
 
     # All regions
-    if norm:
+    if standardize:
         x = StandardScaler().fit_transform(x)
 
     # PCA
@@ -2472,6 +2440,8 @@ def subtract_principal_component(
     if plot:
         x2_hat = pca.fit_transform(x2)
         fig, axis = plt.subplots(max_pcs_to_plot, 2, figsize=(4 * 2, 4 * max_pcs_to_plot))
+        axis[0, 0].set_title("Original")
+        axis[0, 1].set_title("PC {} removed".format(pc + 1))
         for pc in range(max_pcs_to_plot):
             # before
             for j, _ in enumerate(x.index):
@@ -2489,32 +2459,6 @@ def subtract_principal_component(
             axis[pc, 1].set_ylabel("PC{}".format(pc + 2))
         savefig(fig, plot_name)
 
-    return x2
-
-
-def subtract_principal_component_by_attribute(df, attributes, pc=1):
-    """
-    Given a matrix (n_samples, n_variables), remove `pc` (1-based) from matrix.
-    """
-    from sklearn.decomposition import PCA
-
-    pc -= 1
-
-    x2 = pd.DataFrame(index=df.index, columns=df.columns)
-    for attr in attributes:
-        _LOGGER.info(attr)
-        sel = df.index[df.index.str.contains(attr)]
-        x = df.loc[sel, :]
-
-        # PCA
-        pca = PCA()
-        x_hat = pca.fit_transform(x)
-
-        # Remove PC
-        x2.loc[sel, :] = x - np.outer(x_hat[:, pc], pca.components_[pc, :])
-    for sample in df.index:
-        if x2.loc[sample, :].isnull().all():
-            x2.loc[sample, :] = df.loc[sample, :]
     return x2
 
 

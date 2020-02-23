@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import os
 
 from .conftest import file_exists_and_not_empty  # , CI, RPY2
 
@@ -50,7 +51,6 @@ def test_get_matrix(atac_analysis):
 
 
 def test_differential_from_bivariate_fit(analysis_normalized):
-    import os
     from ngs_toolkit.general import differential_from_bivariate_fit
 
     with analysis_normalized as an:
@@ -77,7 +77,6 @@ def test_differential_from_bivariate_fit(analysis_normalized):
 
 
 def test_project_to_geo(atac_analysis_with_unmapped_input_files):
-    import os
     from ngs_toolkit.general import project_to_geo
 
     with atac_analysis_with_unmapped_input_files as an:
@@ -108,7 +107,6 @@ def test_project_to_geo(atac_analysis_with_unmapped_input_files):
 
 
 def test_rename_sample_files(atac_analysis_with_input_files):
-    import os
     import pandas as pd
     from ngs_toolkit.general import rename_sample_files
 
@@ -129,7 +127,21 @@ def test_rename_sample_files(atac_analysis_with_input_files):
             for f in outs:
                 assert file_exists_and_not_empty(os.path.join(an.data_dir, sample, f))
 
+
 # +++ query_biomart
-# subtract_principal_component
-# subtract_principal_component_by_attribute
+
+
+def test_subtract_principal_component(analysis_normalized):
+    from ngs_toolkit.general import subtract_principal_component
+
+    with analysis_normalized as an:
+
+        plot = os.path.join(an.root_dir, "subtract_plot.svg")
+        df = subtract_principal_component(
+            an.matrix_norm.T, plot_name=plot).T
+
+        assert df.shape == an.matrix_norm.shape
+        assert file_exists_and_not_empty(plot)
+
+
 # fix_batch_effect_limma

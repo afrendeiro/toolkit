@@ -710,7 +710,7 @@ def assess_cell_cycle(
     g2m_genes = cc_prots[43:].tolist()
     cc_prots = [x for x in cc_prots if x in matrix.index.tolist()]
 
-    plot_expression(
+    plot_features(
         knockout_genes=cc_prots,
         output_prefix=output_prefix + ".gene_expression.zscore0",
         matrix=exp_z,

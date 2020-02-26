@@ -14,13 +14,41 @@ and this project adheres to `Semantic Versioning <https://semver.org/spec/v2.0.0
 Added
 -----------------------------
   - New CRISPR module for the analysis of pooled CRISPR screens
-  - Generation of input files for RNA-seq and CNV data types
-  - Testing of RNA-seq and CNV modules specific functionality
-  - Testing of recipes
 
 Changed
 -----------------------------
   - More simplicity and abstraction for functions in main :class:`ngs_toolkit.analysis.Analysis` class.
+
+
+[0.23.0] - 2020-02-26
+*****************************
+
+Added
+-----------------------------
+
+  - Add ``joblib`` as requirement.
+  - Add caching to :func:`ngs_toolkit.general.enrichr` and :func:`ngs_toolkit.general.query_biomart` in order to spead up and save queries.
+  - Generation of demo data of type CNV and RNASeq
+  - Testing of CNVAnalysis, RNASeqAnalysis, most recipes, track_manager and project_manager
+  - Add :func:`ngs_toolkit.graphics.clustermap_varieties` function to plot various clustered heatmaps and reduce code duplication.
+  - Add :func:`ngs_toolkit.utils.filter_bed_file`
+  - Add :func:`ngs_toolkit.utils.warn_or_raise`
+
+Changed
+-----------------------------
+
+  - Minor changes to allow pandas==1.0.0
+  - Increased test coverage of :module:`ngs_toolkit.general`
+  - Revamped and simplified :module:`ngs_toolkit.cnv` and :module:`ngs_toolkit.chipseq`.
+  - Changed config to support various resolutions of ``log2_read_counts`` for CNV samples.
+  - :func:`ngs_toolkit.general.enrichr` can now accept :obj:`list` of genes, :obj:`pandas.Series` or :obj:`pandas.DataFrame` as input. This function is now cached.
+  - :func:`ngs_toolkit.general.project_to_geo` now has a ``steps`` option to control which parts should be done.
+  - Simplify :func:`ngs_toolkit.general.rename_sample_files` to a pure Python implementation.
+  - :func:`ngs_toolkit.general.query_biomart` is now a cached function.
+  - Rename the keyword argument ``norm`` to ``standardize`` in :func:`ngs_toolkit.general.subtract_principal_component`.
+  - Removed :func:`ngs_toolkit.general.subtract_principal_component_by_attribute`.
+  - :func:`ngs_toolkit.graphics.clustermap_fix_label_orientation` now returns the input grid.
+  - Renamed :func:`ngs_toolkit.rnaseq.knockout_plot` to :func:`ngs_toolkit.rnaseq.plot_features` - this will be a general function probably moved to :module:`ngs_toolkit.graphics` later.
 
 
 [0.22.0] - 2020-02-07

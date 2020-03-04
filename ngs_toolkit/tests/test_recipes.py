@@ -149,11 +149,14 @@ def test_ngs_analysis(pep):
 @pytest.mark.skipif(
     CI or DEV, reason="Test too long to be performed on CI.")
 def test_merge_signal(pep):
+    import pkgutil
     from .conftest import file_exists_and_not_empty
+
     dir_ = os.path.dirname(os.path.dirname(pep))
     output_dir = os.path.join(dir_, "data_merged")
     cmd = (
         "{exe} -m ngs_toolkit.recipes.merge_signal "
+        "-d "
         "--attributes A "
         "--output-dir {output_dir} "
         "{pep}"
@@ -162,21 +165,31 @@ def test_merge_signal(pep):
         output_dir=output_dir,
         pep=pep)
 
+    # this requires a config with sample input files
+    file_config = os.path.join(os.path.expanduser("~"), ".ngs_toolkit.config.yaml")
+    content = (
+        pkgutil.get_data("ngs_toolkit", "config/default.yaml").decode().strip()
+    )
+    with open(file_config, 'w') as handle:
+        handle.write(content)
+
     p = subprocess.Popen(cmd.split(" "))
     o = p.communicate()
     assert o == (None, None)
 
     files = [
-        "A_1.bigWig",
-        "A_1.merged.bam",
-        "A_1.merged.sorted.bam",
-        "A_1.merged.sorted.bam.bai",
+        # "A_1.bigWig",
+        # "A_1.merged.bam",
+        # "A_1.merged.sorted.bam",
+        # "A_1.merged.sorted.bam.bai",
         "A_1.merge_signal.sh",
-        "A_2.bigWig",
-        "A_2.merged.bam",
-        "A_2.merged.sorted.bam",
-        "A_2.merged.sorted.bam.bai",
+        # "A_2.bigWig",
+        # "A_2.merged.bam",
+        # "A_2.merged.sorted.bam",
+        # "A_2.merged.sorted.bam.bai",
         "A_2.merge_signal.sh"]
 
     for f in files:
         assert file_exists_and_not_empty(os.path.join(output_dir, f))
+
+    os.remove(file_config)

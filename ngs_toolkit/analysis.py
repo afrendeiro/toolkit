@@ -5594,7 +5594,7 @@ class Analysis(object):
 
     def collect_differential_enrichment(
         self,
-        steps=["region", "lola", "motif", "homer", "homer_consensus", "enrichr"],
+        steps=["region", "lola", "meme", "homer", "homer_consensus", "enrichr"],
         directional=True,
         permissive=True,
         output_dir="{results_dir}/differential_analysis_{data_type}/enrichments",
@@ -5654,7 +5654,7 @@ class Analysis(object):
             "ATAC-seq": [
                 "region",
                 "lola",
-                "motif",
+                "meme",
                 "homer",
                 "homer_consensus",
                 "enrichr",
@@ -5662,7 +5662,7 @@ class Analysis(object):
             "ChIP-seq": [
                 "region",
                 "lola",
-                "motif",
+                "meme",
                 "homer",
                 "homer_consensus",
                 "enrichr",
@@ -5809,7 +5809,7 @@ class Analysis(object):
 
     def plot_differential_enrichment(
         self,
-        steps=["region", "lola", "motif", "great", "enrichr"],
+        steps=["region", "lola", "meme", "great", "enrichr"],
         plot_types=["barplots", "scatter", "correlation", "heatmap"],
         enrichment_type=None,
         enrichment_table=None,
@@ -5834,7 +5834,7 @@ class Analysis(object):
         ----------
         steps : :obj:`list`, optional
             Types of the enrichment analysis to plot.
-            Options are ["region", "lola", "motif", "great", "enrichr"].
+            Options are ["region", "lola", "meme", "great", "enrichr"].
 
             Defaults to all keys present in analysis.enrichment_results.
         plot_types : :obj:`list`, optional
@@ -5845,7 +5845,7 @@ class Analysis(object):
         enrichment_type : :obj:`str`, optional
             Type of enrichment if run for a single type of enrichment.
             In this case `enrichment_table` must be given.
-            One of {"region", "lola", "motif", "great", "enrichr"}.
+            One of {"region", "lola", "meme", "great", "enrichr"}.
 
             Default (``None``) is to run all keys present in analysis.enrichment_results.
         enrichment_table : :obj:`pandas.DataFrame`, optional
@@ -6015,7 +6015,7 @@ class Analysis(object):
                 _LOGGER.warning(msg)
 
         if steps is None:
-            steps = ["region", "lola", "motif", "great", "enrichr"]
+            steps = ["region", "lola", "meme", "great", "enrichr"]
 
         if (enrichment_table is None) and (enrichment_type is None):
             if not hasattr(self, "enrichment_results"):
@@ -6044,7 +6044,7 @@ class Analysis(object):
                         output_prefix=output_prefix,
                         rasterized=rasterized,
                         clustermap_metric=clustermap_metric,
-                        top_n=top_n if step != "motif" else 300,
+                        top_n=top_n if step != "meme" else 300,
                         z_score=z_score,
                         cmap=cmap,
                     )
@@ -6054,12 +6054,12 @@ class Analysis(object):
             "region",
             "lola",
             "enrichr",
-            "motif",
+            "meme",
             "homer_consensus",
             "great",
         ]:
             raise AssertionError(
-                "`enrichment_type` must be one of 'lola', 'enrichr', 'motif', 'homer_consensus', 'great'."
+                "`enrichment_type` must be one of 'lola', 'enrichr', 'meme', 'homer_consensus', 'great'."
             )
 
         output_dir = self._format_string_with_attributes(output_dir)
@@ -6292,8 +6292,8 @@ class Analysis(object):
                         z_score=z_score,
                     )
 
-        if enrichment_type == "motif":
-            _LOGGER.info("Plotting enrichments for 'motif'")
+        if enrichment_type == "meme":
+            _LOGGER.info("Plotting enrichments for 'meme'")
             enrichment_table.loc[:, "log_p_value"] = log_pvalues(
                 enrichment_table["p_value"]
             )

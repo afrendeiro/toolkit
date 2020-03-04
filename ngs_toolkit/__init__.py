@@ -18,7 +18,7 @@ JOBLIB_CACHE_DIR = os.path.join(os.path.expanduser("~"), ".ngs_toolkit")
 MEMORY = Memory(location=JOBLIB_CACHE_DIR, verbose=0)
 
 
-def setup_logger(level="INFO", logfile=None):
+def setup_logger(name="ngs_toolkit", level="INFO", logfile=None):
     """
     Set up a logger for the library.
 
@@ -45,11 +45,11 @@ def setup_logger(level="INFO", logfile=None):
     import logging
     import os
 
-    _LOGGER = logging.getLogger("ngs_toolkit")
+    _LOGGER = logging.getLogger(name)
     _LOGGER.setLevel(logging.DEBUG)
     # create file handler which logs even debug messages
     if logfile is None:
-        logfile = os.path.join(os.path.expanduser("~"), ".ngs_toolkit.log.txt")
+        logfile = os.path.join(os.path.expanduser("~"), "." + name + ".log.txt")
     fh = logging.FileHandler(logfile)
     fh.setLevel(logging.DEBUG)
     # create console handler with a higher log level

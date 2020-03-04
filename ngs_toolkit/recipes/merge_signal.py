@@ -175,7 +175,7 @@ def main(cli=None):
             args.attributes = [args.attributes]
 
     _LOGGER.info(
-        "Using the following attributes to merge samples: '%s',"
+        "Using the following attributes to merge samples: '%s', "
         "resulting in a total of %i groups.",
         "', '".join(args.attributes),
         len(sheet.groupby(args.attributes).groups.items())

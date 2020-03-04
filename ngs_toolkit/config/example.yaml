@@ -74,21 +74,21 @@ resources:
     region_databases:
       # under each section, there should be a list of items
       hg19:
-        - /data/groups/lab_bock/shared/resources/regions/LOLACore/hg19/
-        - /data/groups/lab_bock/shared/resources/regions/customRegionDB/hg19/
+        - /home/${USER}/resources/regions/LOLACore/hg19/
+        - /home/${USER}/resources/regions/customRegionDB/hg19/
       hg38:
-        - /data/groups/lab_bock/shared/resources/regions/LOLACore/hg38/
-        - /data/groups/lab_bock/shared/resources/regions/customRegionDB/hg38/
+        - /home/${USER}/resources/regions/LOLACore/hg38/
+        - /home/${USER}/resources/regions/customRegionDB/hg38/
       mm10:
-        - /data/groups/lab_bock/shared/resources/regions/LOLACore/mm10/
-        - /data/groups/lab_bock/shared/resources/regions/customRegionDB/mm10/
+        - /home/${USER}/resources/regions/LOLACore/mm10/
+        - /home/${USER}/resources/regions/customRegionDB/mm10/
   meme:
     motif_databases:
-      human: /data/groups/lab_bock/shared/resources/motifs/motif_databases/HUMAN/HOCOMOCOv10.meme
-      mouse: /data/groups/lab_bock/shared/resources/motifs/motif_databases/MOUSE/uniprobe_mouse.meme
+      human: /home/${USER}/resources/motifs/motif_databases/HUMAN/HOCOMOCOv10.meme
+      mouse: /home/${USER}/resources/motifs/motif_databases/MOUSE/uniprobe_mouse.meme
       vertebrate: /home/arendeiro/workspace/homer_4.8/data/knownTFs/vertebrates/known.motifs
     motif_id_mapping:
-      mouse: /data/groups/lab_bock/shared/resources/motifs/motif_databases/MOUSE/uniprobe_mouse.id_mapping.tsv
+      mouse: /home/${USER}/resources/motifs/motif_databases/MOUSE/uniprobe_mouse.id_mapping.tsv
   enrichr:
     gene_set_libraries:
       # this should be a list of items

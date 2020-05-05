@@ -1,10 +1,10 @@
 language: python
 os: linux
-dist: bionic
+dist: focal
 
 python:
-  - "3.6"
   - "3.7"
+  - "3.8"
 
 cache:
   directories:
@@ -16,7 +16,7 @@ services:
 before_install:
   # Install bedtools
   - sudo apt-get -y install bedtools samtools gawk
-  # Install R
+  # Install R >= 3.6
   - sudo apt-get -y install r-base
   # Add bioconductor libraries
   - sudo apt-get -y install r-bioc-deseq2 r-bioc-preprocesscore
@@ -29,7 +29,7 @@ install:
 before_script:
   - export DISPLAY=:99.0
   - pip freeze
-  - R -q -e "suppressMessages(library("DESeq2")); suppressMessages(library("preprocessCore")); sessionInfo()"
+  - R -q -e "suppressMessages(library('DESeq2')); suppressMessages(library('preprocessCore')); sessionInfo()"
 
 script:
   # - pytest -n 2 --disable-warnings --show-capture=no --cov ./ --cov-report term --cov-report xml --pyargs ngs_toolkit

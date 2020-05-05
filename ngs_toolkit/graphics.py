@@ -227,7 +227,6 @@ def radar_plot(
         scale_to_max=True,
 ):
     """
-
     Heavy inspiration from here: https://matplotlib.org/examples/api/radar_chart.html
 
     Parameters

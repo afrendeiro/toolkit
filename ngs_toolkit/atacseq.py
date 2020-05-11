@@ -2596,8 +2596,10 @@ class ATACSeqAnalysis(Analysis):
             Default is all: ['region', 'lola', 'meme', 'homer', 'enrichr'].
         """
         from ngs_toolkit.general import meme_ame, homer_motifs, lola, enrichr
-        from ngs_toolkit.utils import bed_to_fasta, standard_score
-        from ngs_toolkit.utils import location_index_to_bed
+        from ngs_toolkit.utils import (
+            bed_to_fasta, standard_score,
+            location_index_to_bed,
+            get_this_file_or_timestamped)
 
         # use all sites as universe
         if universe_file is None:
@@ -2722,7 +2724,11 @@ class ATACSeqAnalysis(Analysis):
         if "lola" in steps:
             _LOGGER.info("Running LOLA for '{}'".format(prefix))
             try:
-                lola(bed_file, universe_file, output_dir, genome=genome)
+                lola(
+                    get_this_file_or_timestamped(bed_file),
+                    get_this_file_or_timestamped(universe_file),
+                    output_dir,
+                    genome=genome)
             except:
                 _LOGGER.error("LOLA analysis for '{}' failed!".format(prefix))
 

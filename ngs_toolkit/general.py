@@ -8,6 +8,7 @@ import pandas as pd
 
 from ngs_toolkit import _CONFIG, _LOGGER, MEMORY
 from ngs_toolkit.utils import get_this_file_or_timestamped
+from ngs_toolkit.exceptions import NetworkError
 
 
 def get_genome_reference(
@@ -2302,6 +2303,12 @@ def query_biomart(
     -------
     :obj:`pandas.DataFrame`
         Dataframe with required attributes for each entry.
+
+
+    Raises
+    ------
+    :obj:`ngs_toolkit.exceptions.NetworkError:
+        If API call to Enrichr is unsusscessfull for `max_api_retries`.
     """
     import requests
     import time
@@ -2355,7 +2362,7 @@ def query_biomart(
                 n_fails += 1
                 if n_fails == max_api_retries:
                     _LOGGER.error(msg)
-                    raise ValueError(msg)
+                    raise NetworkError(msg)
                 else:
                     _LOGGER.warning(msg + " Retrying.")
                     time.sleep(1)

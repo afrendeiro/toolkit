@@ -20,6 +20,23 @@ Changed
   - More simplicity and abstraction for functions in main :class:`ngs_toolkit.analysis.Analysis` class.
 
 
+[0.24.1] - 2020-05-11
+*****************************
+
+Added
+-----------------------------
+
+  - Add support for matplotlib~=3.2
+  - Add support for rpy2~=3.3.2
+
+Changed
+-----------------------------
+
+  - Fix wrong call of ``homer_motifs`` https://github.com/afrendeiro/toolkit/issues/64.
+  - Fix passsing timestamped BED files to ``lola`` https://github.com/afrendeiro/toolkit/issues/65. 
+  - Now only testing Python 3.7 & 3.8.
+
+
 [0.23.0] - 2020-02-26
 *****************************
 

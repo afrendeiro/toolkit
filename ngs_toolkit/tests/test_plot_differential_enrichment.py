@@ -3,7 +3,7 @@
 import os
 
 import pytest
-from .conftest import file_exists_and_not_empty, RPY2
+from .conftest import file_exists_and_not_empty, R, R_REASON
 
 
 @pytest.fixture
@@ -29,8 +29,8 @@ def outputs(analysis_with_differential_enrichment):
 
 
 @pytest.mark.skipif(
-    not RPY2,
-    reason="rpy2 not installed")
+    not R,
+    reason=R_REASON)
 class Test_plot_differential_enrichment:
     def test_no_arguments(self, analysis_with_differential_enrichment, outputs):
         analysis_with_differential_enrichment.plot_differential_enrichment()

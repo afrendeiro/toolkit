@@ -10,7 +10,7 @@ import pytest
 
 from ngs_toolkit import _CONFIG
 from ngs_toolkit.atacseq import ATACSeqAnalysis
-from .conftest import file_exists, file_exists_and_not_empty, CI, RPY2
+from .conftest import file_exists, file_exists_and_not_empty, CI, R, R_REASON
 
 
 def test_get_consensus_sites(various_analysis):
@@ -92,8 +92,8 @@ def test_python_quantile_normalization(various_analysis):
 
 
 @pytest.mark.skipif(
-    not RPY2,
-    reason="rpy2 not installed")
+    not R,
+    reason=R_REASON)
 def test_r_quantile_normalization(various_analysis):
     for analysis in various_analysis:
         f = os.path.join(

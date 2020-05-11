@@ -16,6 +16,9 @@ CI_NAME = None
 BUILD_DIR: str = os.path.abspath(os.path.curdir)
 DEV: bool = False
 RPY2: bool
+DESEQ2: bool
+PREPROCESSCORE: bool
+R: bool
 COMBAT: bool
 
 
@@ -107,10 +110,26 @@ def has_module(module):
         return False
 
 
+def has_R_library(library):
+    if not has_module("rpy2"):
+        return False
+    from rpy2.robjects.packages import importr
+    from rpy2.robjects.packages import PackageNotInstalledError
+    try:
+        importr(library)
+        return True
+    except PackageNotInstalledError:
+        return False
+
+
 RPY2 = has_module('rpy2')
 COMBAT = has_module('combat')
 STAP = has_module('STAP')
 DNACOPY = has_module('DNAcopy')
+PREPROCESSCORE = has_R_library("preprocessCore")
+DESEQ2 = has_R_library("DESeq2")
+R = RPY2 and PREPROCESSCORE and DESEQ2
+R_REASON = "R, rpy2 or R libraries not available."
 
 
 def file_exists(file):

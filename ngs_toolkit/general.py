@@ -2348,10 +2348,10 @@ def query_biomart(
             msg = "Request to Biomart API was not successful."
             if n_fails == max_api_retries:
                 _LOGGER.error(msg)
-                raise ValueError(msg)
+                raise NetworkError(msg)
             else:
                 _LOGGER.warning(msg + " Retrying.")
-                time.sleep(1)
+                time.sleep(10)
         else:
             try:
                 content = list(req.iter_lines())
@@ -2366,7 +2366,7 @@ def query_biomart(
                     raise NetworkError(msg)
                 else:
                     _LOGGER.warning(msg + " Retrying.")
-                    time.sleep(1)
+                    time.sleep(10)
 
     if isinstance(content[0], bytes):
         content = [x.decode("utf-8") for x in content]

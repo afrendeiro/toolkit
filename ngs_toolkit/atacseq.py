@@ -2716,7 +2716,7 @@ class ATACSeqAnalysis(Analysis):
         # HOMER
         if "homer" in steps:
             _LOGGER.info("Running HOMER for '{}'".format(prefix))
-            homer_motifs(bed_file, output_dir, genome=genome)
+            homer_motifs(bed_file, output_dir, genome_assembly=genome)
 
         # LOLA
         if "lola" in steps:

@@ -5418,7 +5418,7 @@ class Analysis(object):
                 "lola",
                 lola_enr,
                 pd.read_csv,
-                {"sep", "\t"},
+                {"sep": "\t"},
                 "allEnrichments.tsv",
                 ".lola.csv",
             ),

@@ -2,7 +2,11 @@
 
 import os
 
-from .conftest import file_exists_and_not_empty  # , CI, RPY2
+import pybedtools
+from ngs_toolkit.general import lola
+
+import pytest
+from .conftest import file_exists_and_not_empty, CI  # , RPY2
 
 
 class Test_annotate_samples:
@@ -68,7 +72,80 @@ def test_differential_from_bivariate_fit(analysis_normalized):
             assert file_exists_and_not_empty(out_prefix + f)
 
 
-# lola
+@pytest.mark.skipif(
+    CI,
+    reason="LOLA testing is not performed on CI")
+class Test_LOLA():
+    def test_lola_function(self, tmp_path):
+        bed = pybedtools.example_bedtool('hg38-base.bed')
+        univ = bed.slop(l=0, r=10, genome='hg38')
+        bed_file = bed.fn
+        universe_file = univ.fn
+        output_folder = os.path.dirname(tmp_path)
+        genome = "hg38"
+
+        lola(bed_file, universe_file, output_folder, genome)
+
+        output_files = [
+            "allEnrichments.tsv",
+            "col_codex.tsv"]
+        for file in output_files:
+            assert file_exists_and_not_empty(os.path.join(output_folder, file))
+
+    def test_lola_function_multiple_inputs(self, tmp_path):
+        import shutil
+        bed = pybedtools.example_bedtool('hg38-base.bed')
+        univ = bed.slop(l=0, r=10, genome='hg38')
+        bed_file = bed.fn
+        shutil.copy(bed_file, "A.bed")
+        shutil.copy(bed_file, "B.bed")
+        universe_file = univ.fn
+        output_folder = os.path.dirname(tmp_path)
+        genome = "hg38"
+
+        lola(["A.bed", "B.bed"], universe_file, output_folder, genome)
+
+        output_files = [
+            "allEnrichments",
+            "col_codex"]
+        for file in output_files:
+            for i in ['A', 'B']:
+                assert file_exists_and_not_empty(
+                    os.path.join(output_folder, file + i + ".tsv"))
+
+
+    def test_lola_through_differential_enrichment(
+            self, analysis_with_differential):
+        with analysis_with_differential as an:
+            an.differential_enrichment(steps=['lola'])
+
+        output_files = [
+            "allEnrichments.tsv",
+            "col_codex.tsv"]
+
+        for file in output_files:
+            for direction in ['up', 'down']:
+                assert file_exists_and_not_empty(os.path.join(
+                    an.results_dir,
+                    "differential_analysis_ATAC-seq/enrichments/Factor_A_2vs1."
+                    + direction, file))
+
+    def test_lola_through_differential_enrichment_distributed(
+            self, analysis_with_differential):
+        with analysis_with_differential as an:
+            an.differential_enrichment(steps=['lola'], distributed=True)
+
+        output_files = [
+            "allEnrichments.tsv",
+            "col_codex.tsv"]
+
+        for file in output_files:
+            for direction in ['up', 'down']:
+                assert file_exists_and_not_empty(os.path.join(
+                    an.results_dir,
+                    "differential_analysis_ATAC-seq/enrichments/Factor_A_2vs1."
+                    + direction, file))
+
 # meme_ame
 # homer_motifs
 # homer_combine_motifs

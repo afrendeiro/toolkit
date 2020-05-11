@@ -247,7 +247,12 @@ def submit_job(
         """
         return subprocess.check_output(check_cmd).split(sep).__len__()
 
-    def submit_job_if_possible(cmd, check_cmd="squeue", total_job_lim=800, refresh_time=10, in_between_time=5):
+    def submit_job_if_possible(
+            cmd,
+            check_cmd="squeue",
+            total_job_lim=800,
+            refresh_time=10,
+            in_between_time=5):
         submit = count_jobs_running(check_cmd) < total_job_lim
         while not submit:
             time.sleep(refresh_time)
@@ -693,6 +698,11 @@ def fix_dataframe_header(df, force_dtypes=float):
 
 def r2pandas_df(r_df):
     """Make :class:`pandas.DataFrame` from a ``R`` dataframe given by :class:`rpy`."""
+    from rpy2.robjects import pandas2ri
+    if isinstance(r_df, pd.DataFrame):
+        return r_df
+    if isinstance(r_df, np.recarray):
+        return pd.DataFrame.from_records(r_df)
     df = pd.DataFrame(np.asarray(r_df)).T
     df.columns = [str(x) for x in r_df.colnames]
     df.index = [str(x) for x in r_df.rownames]

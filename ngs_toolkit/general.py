@@ -1914,11 +1914,11 @@ def run_enrichment_jobs(
 
     # REGION
     if "region" in steps:
-        files = glob(results_dir + "/*/*_regions.bed")
+        files = glob(results_dir + "/*/*_regions*bed")
         for file in files:
             dir_ = os.path.dirname(file)
             name = os.path.basename(dir_)
-            output_ = os.path.join(dir_, "region_type_enrichment.csv")
+            output_ = os.path.join(dir_, "region_type_enrichment*csv")
             if os.path.exists(output_) and (not overwrite):
                 continue
             jobs.append(
@@ -1935,11 +1935,12 @@ def run_enrichment_jobs(
 
     # LOLA
     if "lola" in steps:
-        files = glob(results_dir + "/*/*_regions.bed")
+        # the star here is to support timestamped files
+        files = glob(results_dir + "/*/*_regions*bed")
         for file in files:
             dir_ = os.path.dirname(file)
             name = os.path.basename(dir_)
-            output_ = os.path.join(dir_, "allEnrichments.tsv")
+            output_ = os.path.join(dir_, "allEnrichments*tsv")
             if os.path.exists(output_) and (not overwrite):
                 continue
             jobs.append(
@@ -1981,7 +1982,7 @@ def run_enrichment_jobs(
 
     # HOMER
     if "homer" in steps:
-        files = glob(results_dir + "/*/*_regions.bed")
+        files = glob(results_dir + "/*/*_regions*bed")
         for file in files:
             dir_ = os.path.dirname(file)
             name = os.path.basename(dir_)

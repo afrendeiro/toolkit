@@ -2834,18 +2834,22 @@ class Analysis(object):
 
             # plot pca
             pcs = min(x_new.shape[1] - 1, plot_max_pcs)
-            _LOGGER.info("Plotting PCA up to ({} + 1) dimensions.".format(pcs))
-            plot_projection(
-                df=x_new,
-                color_dataframe=color_dataframe,
-                dims=pcs,
-                output_file=os.path.join(
-                    output_dir, "{}.{}.pca.svg".format(self.name, output_prefix)
-                ),
-                attributes_to_plot=attributes_to_plot,
-                axis_ticklabels_name="PCA",
-                **projection_kwargs
-            )
+
+            if pcs > 0:
+                _LOGGER.info("Plotting PCA up to ({} + 1) dimensions.".format(pcs))
+                plot_projection(
+                    df=x_new,
+                    color_dataframe=color_dataframe,
+                    dims=pcs,
+                    output_file=os.path.join(
+                        output_dir, "{}.{}.pca.svg".format(self.name, output_prefix)
+                    ),
+                    attributes_to_plot=attributes_to_plot,
+                    axis_ticklabels_name="PCA",
+                    **projection_kwargs
+                )
+            else:
+                _LOGGER.warning("Only one PC selected, cannot plot projection.")
 
         if "pca_association" in steps:
             # Test association of PCs with attributes

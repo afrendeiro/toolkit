@@ -153,7 +153,7 @@ def barmap(x, figsize=None, square=False, row_colors=None, z_score=None, ylims=N
         x = zscore(x, axis=z_score)
         x = pd.DataFrame(x, index=rows, columns=cols)
 
-    # Get figure dimentions if not given
+    # Get figure dimensions if not given
     if figsize is None:
         square_size = 0.2  # in inches
         figsize = (x_size * square_size, y_size * square_size)
@@ -434,7 +434,7 @@ def plot_projection(
         Dataframe of RGB tuples for sample i in attribute j.
 
     dims : :obj:`int`
-        Number of dimentions to plot
+        Number of dimensions to plot
 
     output_file : :obj:`str`
         Path to figure output file
@@ -443,7 +443,7 @@ def plot_projection(
         List of levels in df.index to plot
 
     plot_max_dims : number, optional
-        Maximum number of dimentions to plot.
+        Maximum number of dimensions to plot.
         Defaults to 8.
 
     plot_group_centroids: :obj:`bool`, optional

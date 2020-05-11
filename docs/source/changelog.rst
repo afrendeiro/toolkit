@@ -20,6 +20,22 @@ Changed
   - More simplicity and abstraction for functions in main :class:`ngs_toolkit.analysis.Analysis` class.
 
 
+[0.24.2] - 2020-05-11
+*****************************
+
+Added
+-----------------------------
+
+  - Add testing for LOLA and HOMER enrichment (only locally)
+
+Changed
+-----------------------------
+
+  - Fix formatting of Homer call
+  - Fix typo making calling LOLA with a set instead of a dict.
+
+
+
 [0.24.1] - 2020-05-11
 *****************************
 
@@ -33,7 +49,7 @@ Changed
 -----------------------------
 
   - Fix wrong call of ``homer_motifs`` https://github.com/afrendeiro/toolkit/issues/64.
-  - Fix passsing timestamped BED files to ``lola`` https://github.com/afrendeiro/toolkit/issues/65. 
+  - Fix passsing timestamped BED files to ``lola`` https://github.com/afrendeiro/toolkit/issues/65.
   - Now only testing Python 3.7 & 3.8.
 
 
@@ -128,7 +144,7 @@ Changed
 
 Added
 -----------------------------
-  
+
   - New module :class:`ngs_toolkit.demo` which generates random data as PEP-formatted projects
   - New :class:`ngs_toolkit.recipes.generate_project` recipe to generate a new project using CLI
   - New normalization method: variance stabilizing transformation (VST) available
@@ -415,7 +431,7 @@ Changed
     - add support for plotting 1 attribute in unsupervised_analysis
     - add support for limma regression without covariates; more help messages
     - fix bug in plot_differential when plotting scatter with colours per p-value
-    - improved general.query_biomart to handle fields with multiple values  
+    - improved general.query_biomart to handle fields with multiple values
     - update requirements
 
   - minor:

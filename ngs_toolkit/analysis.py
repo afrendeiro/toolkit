@@ -487,17 +487,8 @@ class Analysis(object):
         :obj:`ValueError`
             If not all patterns are set environment variables.
         """
-        if string is None:
-            return string
-        to_format = pd.Series(string).str.extractall(r"\${(.*?)}")[0].values
-        attrs = os.environ
-        if not all([x in attrs for x in to_format]):
-            msg = "Not all required patterns were found in the environment variables."
-            _LOGGER.error(msg)
-            raise ValueError(msg)
-        for attr in to_format:
-            string = string.replace("${" + attr + "}", "{" + attr + "}")
-        return string.format(**attrs)
+        from ngs_toolkit.utils import _format_string_with_environment_variables
+        return _format_string_with_environment_variables(string)
 
     def _format_string_with_attributes(self, string):
         """

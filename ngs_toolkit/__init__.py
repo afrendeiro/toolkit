@@ -104,6 +104,7 @@ def setup_config(custom_yaml_config=None):
     import pkg_resources
     import os
     import yaml
+    from ngs_toolkit.utils import _format_string_with_environment_variables
 
     default_config_path = "config/default.yaml"
     default_config_path = pkg_resources.resource_filename(
@@ -127,10 +128,15 @@ def setup_config(custom_yaml_config=None):
     user_config_path = os.path.join(
         os.path.expanduser("~"), ".ngs_toolkit.config.yaml")
     if os.path.exists(user_config_path):
-        # Read up
+        # Read up and format user variables
         _LOGGER.debug("Found custom user config: {}".format(user_config_path))
         try:
-            custom_config = yaml.safe_load(open(user_config_path, "r"))
+            string = open(user_config_path, "r").read()
+            # filter out comments (to prevent formating stuff there)
+            string = "\n".join(filter(lambda x: not x.strip().startswith("#"), string.split("\n")))
+            string = _format_string_with_environment_variables(string)
+
+            custom_config = yaml.safe_load(string)
             _LOGGER.debug("Custom user config: {}".format(custom_config))
             # Update config
             _LOGGER.debug(

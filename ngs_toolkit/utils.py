@@ -7,6 +7,53 @@ import numpy as np
 import pandas as pd
 
 
+def _format_string_with_environment_variables(string):
+    """
+    Given a string, containing curly braces with dollar sign,
+    format it with the environment variables.
+
+    Parameters
+    ----------
+    string : :obj:`str`
+        String to format.
+
+    Returns
+    ----------
+    :obj:`str`
+        Formated string.
+
+    Raises
+    -------
+    :obj:`ValueError`
+        If not all patterns are set environment variables.
+    """
+    if string is None:
+        return string
+
+    not_to_format = pd.Series(string).str.extractall(r"[^$]{(.*?)}")[0].values
+    to_format = pd.Series(string).str.extractall(r"\${(.*?)}")[0].values
+    attrs = os.environ
+    if not all([x in attrs for x in to_format]):
+        msg = "Not all required patterns were found in the environment variables."
+        _LOGGER.error(msg)
+        raise ValueError(msg)
+    # first, make sure there are no unintended strings being formatted
+    for attr in set(not_to_format):
+        string = string.replace("{" + attr + "}", "<>" + attr + "<>")
+
+    # now format the intended ones
+    for attr in set(to_format):
+        string = string.replace("${" + attr + "}", r"{" + attr + r"}")
+
+    # now format
+    string = string.format(**attrs)
+
+    # now return the not ones to original
+    for attr in set(not_to_format):
+        string = string.replace("<>" + attr + "<>", "{" + attr + "}")
+    return string
+
+
 def warn_or_raise(exception, permissive=False):
     from ngs_toolkit import _LOGGER
     msg = exception.args[0]

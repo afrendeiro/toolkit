@@ -87,6 +87,7 @@ class TestUnsupervisedAnalysis:
             )
 
     def test_low_samples_no_manifolds(self, atac_analysis_many_factors):
+        import pandas as pd
         prefix = os.path.join(
             atac_analysis_many_factors.results_dir,
             "unsupervised_analysis_ATAC-seq",
@@ -114,8 +115,13 @@ class TestUnsupervisedAnalysis:
         ]
         # here I'm picking the first and last samples just to make sure
         # they are from different values of attributes `a` and `b`
+        samples = atac_analysis_many_factors.samples
+        idx = pd.Series([(s.A, s.B) for s in samples]).drop_duplicates().index.tolist()
+        samples = [samples[idx[0]]] + [samples[idx[-1]]]
+        assert samples[0].A != samples[1].A
+        assert samples[0].B != samples[1].B
         atac_analysis_many_factors.unsupervised_analysis(
-            samples=[atac_analysis_many_factors.samples[0]] + [atac_analysis_many_factors.samples[-1]])
+            samples=samples)
         for output in outputs2:
             assert file_exists_and_not_empty(output)
         for output in not_outputs:

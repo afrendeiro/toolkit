@@ -74,7 +74,7 @@ def test_differential_from_bivariate_fit(analysis_normalized):
 
 @pytest.mark.skipif(
     CI,
-    reason="LOLA testing is not performed on CI")
+    reason="LOLA testing is not performed on CI.")
 class Test_LOLA():
     def test_lola_function(self, tmp_path):
         bed = pybedtools.example_bedtool('hg38-base.bed')
@@ -148,6 +148,9 @@ class Test_LOLA():
 
 # meme_ame
 
+@pytest.mark.skipif(
+    CI,
+    reason="HOMER testing is not performed on CI.")
 class TestHomer():
     def test_homer_function(self, tmp_path):
         from ngs_toolkit.general import homer_motifs

@@ -147,7 +147,22 @@ class Test_LOLA():
                     + direction, file))
 
 # meme_ame
-# homer_motifs
+
+class TestHomer():
+    def test_homer_function(self, tmp_path):
+        from ngs_toolkit.general import homer_motifs
+
+        bed = pybedtools.example_bedtool('hg38-base.bed')
+        univ = bed.slop(l=0, r=10, genome='hg38')
+        bed_file = bed.fn
+        universe_file = univ.fn
+        output_dir = os.path.dirname(tmp_path)
+        genome_assembly = "hg38"
+
+        homer_motifs(bed_file, output_dir, genome_assembly)
+        assert os.path.exists(os.path.join(output_dir, "homerMotifs.all.motifs"))
+
+
 # homer_combine_motifs
 # +++ enrichr
 # run_enrichment_jobs

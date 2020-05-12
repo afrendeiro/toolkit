@@ -146,6 +146,9 @@ class Test_LOLA():
                     "differential_analysis_ATAC-seq/enrichments/Factor_A_2vs1."
                     + direction, file))
 
+    # def test_lola__plot_differential_enrichment(self):
+    #     pass
+
 # meme_ame
 
 @pytest.mark.skipif(

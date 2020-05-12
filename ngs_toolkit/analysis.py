@@ -6138,7 +6138,7 @@ class Analysis(object):
             if not cols:
                 raise ValueError("None of the columns present in were found in {} the LOLA results."
                     .format("CONFIG:resources:lola:region_set_labeling_columns"))
-            enrichment_table.loc[:, "label"] = enrichment_table[cols].apply(", ".join, axis=1)
+            enrichment_table.loc[:, "label"] = enrichment_table[cols].astype(str).apply(", ".join, axis=1)
             enrichment_table.loc[:, "label"] = (
                 enrichment_table["label"]
                 .str.replace("nan", "")

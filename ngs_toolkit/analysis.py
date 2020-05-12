@@ -3315,7 +3315,7 @@ class Analysis(object):
                 cmd = (
                     (
                         "{executable} -m ngs_toolkit.recipes.deseq2 "
-                        "--no-save-inputs --output_prefix {output_prefix} "
+                        "--no-save-inputs --output-prefix {output_prefix} "
                         "--formula '{formula}' "
                         "{overwrite} {out}")
                     .format(

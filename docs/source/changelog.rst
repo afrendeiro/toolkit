@@ -33,6 +33,7 @@ Changed
 
   - Fix formatting of Homer call
   - Fix typo making calling LOLA with a set instead of a dict.
+  - Increased wait time between failed API calls in :func:`ngs_toolkit.general.query_biomart`.
 
 
 

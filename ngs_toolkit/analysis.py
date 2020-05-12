@@ -3332,14 +3332,12 @@ class Analysis(object):
                     log_file=log_file,
                     jobname=job_name,
                     **kwargs)
-            try:
-                if kwargs["computing_configuration"] in ["localhost", "default"]:
-                    _LOGGER.info("Collecting differential results.")
-                    return self.collect_differential_analysis(
-                        comparison_table=comparison_table,
-                        overwrite=overwrite)
-            except KeyError:
-                pass
+            if "computing_configuration" in kwargs:
+                if kwargs["computing_configuration"] not in ["localhost", "default"]:
+                    return
+            return self.collect_differential_analysis(
+                comparison_table=comparison_table,
+                overwrite=overwrite)
 
     def collect_differential_analysis(
             self,
@@ -6132,23 +6130,15 @@ class Analysis(object):
 
         if enrichment_type == "lola":
             _LOGGER.info("Plotting enrichments for 'lola'")
+            cols = _CONFIG['resources']['lola']['region_set_labeling_columns']
+            odds_col = _CONFIG['resources']['lola']['output_column_names']['odds_ratio']
+            pval_col = _CONFIG['resources']['lola']['output_column_names']['log_p_value']
             # get a unique label for each lola region set
-            enrichment_table.loc[:, "label"] = (
-                # TODO: re-write
-                enrichment_table["collection"].astype(str)
-                + ", "
-                + enrichment_table["description"].astype(str)
-                + ", "
-                + enrichment_table["filename"].astype(str)
-                + ", "
-                + enrichment_table["cellType"].astype(str)
-                + ", "
-                + enrichment_table["tissue"].astype(str)
-                + ", "
-                + enrichment_table["antibody"].astype(str)
-                + ", "
-                + enrichment_table["treatment"].astype(str)
-            )
+            cols = [col for col in cols if col in enrichment_table.columns]
+            if not cols:
+                raise ValueError("None of the columns present in were found in {} the LOLA results."
+                    .format("CONFIG:resources:lola:region_set_labeling_columns"))
+            enrichment_table.loc[:, "label"] = enrichment_table[cols].apply(", ".join, axis=1)
             enrichment_table.loc[:, "label"] = (
                 enrichment_table["label"]
                 .str.replace("nan", "")
@@ -6160,11 +6150,11 @@ class Analysis(object):
 
             # Replace inf values with maximum non-inf p-value observed
             r = enrichment_table.loc[
-                enrichment_table["pValueLog"] != np.inf, "pValueLog"
+                enrichment_table[pval_col] != np.inf, pval_col
             ].max()
             r += r * 0.1
-            enrichment_table.loc[:, "pValueLog"] = enrichment_table[
-                "pValueLog"
+            enrichment_table.loc[:, pval_col] = enrichment_table[
+                pval_col
             ].replace(np.inf, r)
 
             # Plot top_n terms of each comparison in barplots
@@ -6172,7 +6162,7 @@ class Analysis(object):
                 enrichment_barplot(
                     enrichment_table,
                     x="label",
-                    y="pValueLog",
+                    y=pval_col,
                     group_variable=comp_variable,
                     top_n=top_n,
                     output_file=os.path.join(
@@ -6191,28 +6181,29 @@ class Analysis(object):
                     figsize=(3 * n_side, 3 * n_side),
                     sharex=False,
                     sharey=False,
+                    squeeze=False,
                 )
                 axis = axis.flatten()
                 for i, comp in enumerate(
                     enrichment_table[comp_variable].drop_duplicates().sort_values()
                 ):
-                    enr = enrichment_table[enrichment_table[comp_variable] == comp]
+                    enr = enrichment_table[enrichment_table[comp_variable] == comp].reset_index(drop=True)
                     enr.loc[:, "combined"] = (
-                        enr[["logOddsRatio", "pValueLog"]].apply(zscore).mean(axis=1)
+                        enr[[odds_col, pval_col]].apply(zscore).mean(axis=1)
                     )
                     axis[i].scatter(
-                        enr["logOddsRatio"],
-                        enr["pValueLog"],
+                        enr[odds_col],
+                        enr[pval_col],
                         c=enr["combined"],
                         s=8,
                         alpha=0.75,
                     )
 
                     # label top points
-                    for j in enr["pValueLog"].sort_values().tail(5).index:
+                    for j in enr[pval_col].sort_values().tail(5).index:
                         axis[i].text(
-                            enr.loc[j, "logOddsRatio"],
-                            enr.loc[j, "pValueLog"],
+                            enr.loc[j, odds_col],
+                            enr.loc[j, pval_col],
                             s=enr.loc[j, "label"],
                             ha="right",
                             fontsize=5,
@@ -6238,7 +6229,7 @@ class Analysis(object):
                 return
             lola_pivot = pd.pivot_table(
                 enrichment_table,
-                values="pValueLog",
+                values=pval_col,
                 columns=comp_variable,
                 index="label",
             ).fillna(0)
@@ -6260,7 +6251,7 @@ class Analysis(object):
             if "heatmap" in plot_types:
                 top = (
                     enrichment_table.set_index("label")
-                    .groupby(comp_variable)["pValueLog"]
+                    .groupby(comp_variable)[pval_col]
                     .nlargest(top_n)
                 )
                 top_terms = top.index.get_level_values("label").unique()

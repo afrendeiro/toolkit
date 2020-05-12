@@ -82,6 +82,17 @@ resources:
       mm10:
         - /home/${USER}/resources/regions/LOLACore/mm10/
         - /home/${USER}/resources/regions/customRegionDB/mm10/
+    region_set_labeling_columns:
+      - "collection"
+      - "description"
+      - "filename"
+      - "cellType"
+      - "tissue"
+      - "antibody"
+      - "treatment"
+    output_column_names:
+      odds_ratio: "oddsRatio"
+      log_p_value: "pValueLog"
   meme:
     motif_databases:
       human: /home/${USER}/resources/motifs/motif_databases/HUMAN/HOCOMOCOv10.meme

@@ -1550,7 +1550,8 @@ def homer_motifs(bed_file, output_dir, genome_assembly):
 
     default_opts = "-size 1000 -h -p 2 -len 8,10,12,14 -noknown"
     cmd = "findMotifsGenome.pl {bed} {genome}r {out_dir} {opts}".format(
-        bed=bed_file, genome=genome_assembly, out_dir=output_dir, opts=default_opts
+        bed=get_this_file_or_timestamped(bed_file), genome=genome_assembly,
+        out_dir=output_dir, opts=default_opts
     )
     subprocess.call(cmd.split(" "))
 

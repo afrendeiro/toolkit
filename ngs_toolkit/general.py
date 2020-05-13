@@ -1647,10 +1647,8 @@ def homer_combine_motifs(
             p_value_threshold,
             info_value,
             fold_enrichment,
-            cpus,
-        ).split(
-            " "
-        )
+            cpus)
+        .split(" ")
     )
 
     # concatenate consensus motif files
@@ -1676,13 +1674,14 @@ def homer_combine_motifs(
                 os.remove(results)
             # prepare enrichment command with consensus set
             cmd = "findMotifsGenome.pl {bed} {genome}r {dir} -p {cpus} -nomotif -mknown {motif_file}".format(
-                bed=os.path.join(dir_, region_prefix + "_regions.bed"),
+                bed=get_this_file_or_timestamped(os.path.join(dir_, region_prefix + "_regions.bed")),
                 genome=genome,
                 cpus=cpus,
                 dir=dir_,
                 motif_file=combined_motifs,
             )
             # run
+            # TODO: send this as a job through submit_job
             if distributed:
                 subprocess.call(
                     "sbatch -J homer.{d} -o {dir}.homer.log -p shortq -c 8 --mem 20000".format(

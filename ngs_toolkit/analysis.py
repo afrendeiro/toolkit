@@ -5802,7 +5802,7 @@ class Analysis(object):
 
     def plot_differential_enrichment(
         self,
-        steps=["region", "lola", "meme", "great", "enrichr"],
+        steps=["region", "lola", "meme", "homer_consensus", "great", "enrichr"],
         plot_types=["barplots", "scatter", "correlation", "heatmap"],
         enrichment_type=None,
         enrichment_table=None,
@@ -5827,7 +5827,7 @@ class Analysis(object):
         ----------
         steps : :obj:`list`, optional
             Types of the enrichment analysis to plot.
-            Options are ["region", "lola", "meme", "great", "enrichr"].
+            Options are ["region", "lola", "meme", "homer_consensus", great", "enrichr"].
 
             Defaults to all keys present in analysis.enrichment_results.
         plot_types : :obj:`list`, optional
@@ -5969,10 +5969,12 @@ class Analysis(object):
             shape = input_df.shape
 
             # # fix some labels
-            input_df.index = input_df.index.str.replace(r"_Homo.*", "")
-            input_df.index = input_df.index.str.replace(r"_Mus.*", "")
-            input_df.index = input_df.index.str.replace(r" \(GO:.*", "")
-            input_df.index = input_df.index.str.replace("_", " ")
+            input_df.index = (
+                input_df.index
+                .str.replace(r"_Homo.*", "")
+                .str.replace(r"_Mus.*", "")
+                .str.replace(r" \(GO:.*", "")
+                .str.replace("_", " "))
             if z_score is not None:
                 params.update({"cmap": "RdBu_r", "center": 0, "z_score": z_score})
             try:
@@ -6008,7 +6010,7 @@ class Analysis(object):
                 _LOGGER.warning(msg)
 
         if steps is None:
-            steps = ["region", "lola", "meme", "great", "enrichr"]
+            steps = ["region", "lola", "meme", "homer_consensus", "great", "enrichr"]
 
         if (enrichment_table is None) and (enrichment_type is None):
             if not hasattr(self, "enrichment_results"):

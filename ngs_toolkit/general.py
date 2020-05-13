@@ -1619,6 +1619,7 @@ def homer_combine_motifs(
 
     # concatenate files
     out_file = os.path.join(output_dir, "homerMotifs.combined.motifs")
+    open(out_file, "w")  # make sure file is empty in the beginning
     with open(out_file, "a") as outfile:
         for dir_ in comparison_dirs:
             with open(os.path.join(dir_, "homerMotifs.all.motifs"), "r") as infile:

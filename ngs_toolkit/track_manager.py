@@ -51,9 +51,7 @@ def parse_arguments():
         action="store_true",
         help="Whether bigWig files should be soft-linked to the track database directory. Default=False.",
     )
-    parser.add_argument(
-        "-V", "--version", action="version", version=ngs_toolkit.__version__
-    )
+    parser.add_argument("-V", "--version", action="version", version=ngs_toolkit.__version__)
 
     args = parser.parse_args()
 
@@ -160,9 +158,7 @@ maxHeightPixels 32:32:8
     elif "protocol" in df.columns:
         var_ = "protocol"
     else:
-        raise ValueError(
-            "Samples must contain either a 'library' or 'protocol' attribute."
-        )
+        raise ValueError("Samples must contain either a 'library' or 'protocol' attribute.")
     df = df[df[var_].isin(["ATAC-seq", "ChIP-seq", "ChIPmentation"])]
 
     # Keep only attributes that have at least one value
@@ -197,16 +193,12 @@ trackDb {g}/trackDb.txt
                 """subGroup{0} {1} {1} \\\n    {2}""".format(
                     i + 1,
                     attr,
-                    " \\\n    ".join(
-                        [x + "=" + x for x in sorted(df_g[attr].unique())]
-                    ),
+                    " \\\n    ".join([x + "=" + x for x in sorted(df_g[attr].unique())]),
                 )
                 for i, attr in enumerate(attributes)
             ]
         )
-        subgroups = subgroups.replace(
-            "    = \\\n", ""
-        )  # remove values of subgroups with no value
+        subgroups = subgroups.replace("    = \\\n", "")  # remove values of subgroups with no value
         sort_order = "\n" + "sortOrder " + " ".join([x + "=+" for x in attributes])
         dimensions = (
             "\n"
@@ -215,10 +207,7 @@ trackDb {g}/trackDb.txt
                 [
                     "".join(x)
                     for x in zip(
-                        [
-                            "dim{}=".format(x)
-                            for x in ["X", "Y"] + [string.ascii_uppercase[:-3]]
-                        ],
+                        ["dim{}=".format(x) for x in ["X", "Y"] + [string.ascii_uppercase[:-3]]],
                         attributes,
                     )
                 ]
@@ -253,9 +242,7 @@ trackDb {g}/trackDb.txt
 
                 # Make symbolic link to bigWig
                 dest = os.path.join(
-                    os.path.join(
-                        bigwig_dir, genome, os.path.basename(sample_attrs["bigwig"])
-                    )
+                    os.path.join(bigwig_dir, genome, os.path.basename(sample_attrs["bigwig"]))
                 )
                 if not os.path.exists(dest) and args.link:
                     try:
@@ -289,9 +276,7 @@ trackDb {g}/trackDb.txt
 
                 # Make symbolic link to bigWig
                 dest = os.path.join(
-                    os.path.join(
-                        bigwig_dir, genome, os.path.basename(sample_attrs["bigwig"])
-                    )
+                    os.path.join(bigwig_dir, genome, os.path.basename(sample_attrs["bigwig"]))
                 )
                 if not os.path.exists(dest) and args.link:
                     try:
@@ -356,9 +341,7 @@ def make_igv_tracklink(prj, track_file, track_url):
     elif "protocol" in df.columns:
         var_ = "protocol"
     else:
-        raise ValueError(
-            "Samples must contain either a 'library' or 'protocol' attribute."
-        )
+        raise ValueError("Samples must contain either a 'library' or 'protocol' attribute.")
     df = df[df[var_].isin(["ATAC-seq", "ChIP-seq", "ChIPmentation"])]
 
     text = "<html><head></head><body>"
@@ -370,10 +353,7 @@ def make_igv_tracklink(prj, track_file, track_url):
         text += "<a href="
         text += link_header
         text += "?file=" + ",".join(
-            prj["trackhubs"]["url"]
-            + "/{}/".format(genome)
-            + df_g["sample_name"]
-            + ".bigWig"
+            prj["trackhubs"]["url"] + "/{}/".format(genome) + df_g["sample_name"] + ".bigWig"
         )
         text += "?names=" + ",".join(df_g["sample_name"])
         text += "?genome={}".format(genome)
@@ -406,12 +386,10 @@ def main():
     # Start project object
     prj = peppy.Project(args.project_config_file)
 
-    if "trackhubs" not in prj:
+    if "trackhubs" not in prj._config:
         raise ValueError("Project configuration does not have a trackhub section.")
-    if "trackhub_dir" not in prj.trackhubs:
-        raise ValueError(
-            "Project trackhub configuration does not have a trackhub_dir attribute."
-        )
+    if "trackhub_dir" not in prj._config.trackhubs:
+        raise ValueError("Project trackhub configuration does not have a trackhub_dir attribute.")
 
     if args.attributes is None:
         # If no attributes are set try to use group attributes specified in the project config
@@ -432,7 +410,7 @@ def main():
         args.color_attribute = args.attributes[0]
 
     # Setup paths and hub files
-    bigwig_dir = os.path.join(prj.trackhubs.trackhub_dir)
+    bigwig_dir = os.path.join(prj._config.trackhubs.trackhub_dir)
     os.makedirs(bigwig_dir, exist_ok=True)
     track_hub = os.path.join(bigwig_dir, "hub.txt")
     genomes_hub = os.path.join(bigwig_dir, "genomes.txt")
@@ -442,11 +420,11 @@ def main():
     proj_name = (
         prj["project_name"]
         if "project_name" in prj
-        else os.path.basename(prj["paths"]["output_dir"])
+        else os.path.basename(prj.root_dir)
+        if "root_dir" in prj
+        else os.path.join("..", "..", os.path.basename(prj._config.sample_table))
     )
-    proj_desc = (
-        prj["project_description"] if "project_description" in prj else proj_name
-    )
+    proj_desc = prj["description"] if "description" in prj else proj_name
     user_email = prj["email"] if "email" in prj else ""
 
     # In the future there will be more actions than this

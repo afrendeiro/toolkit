@@ -16,35 +16,25 @@ def a(atac_analysis_with_input_files):
 
 
 def test_has_bam_files(a):
-    v = [
-        file_exists_and_not_empty(s.aligned_filtered_bam)
-        for s in a.samples]
+    v = [file_exists_and_not_empty(s.aligned_filtered_bam) for s in a.samples]
     assert all(v)
-    v = [
-        file_exists_and_not_empty(s.aligned_filtered_bam + ".bai")
-        for s in a.samples]
+    v = [file_exists_and_not_empty(s.aligned_filtered_bam + ".bai") for s in a.samples]
     assert all(v)
 
 
 def test_has_peak_files(a):
-    v = [
-        file_exists_and_not_empty(s.peaks)
-        for s in a.samples]
+    v = [file_exists_and_not_empty(s.peaks) for s in a.samples]
     assert all(v)
 
 
 def test_has_summit_files(a):
-    v = [
-        file_exists_and_not_empty(s.summits)
-        for s in a.samples]
+    v = [file_exists_and_not_empty(s.summits) for s in a.samples]
     assert all(v)
 
 
 class Test_measure_coverage:
-
     def test_no_arguments(self, a):
-        mn = get_this_file_or_timestamped(
-            os.path.join(a.results_dir, a.name + ".matrix_raw.csv"))
+        mn = get_this_file_or_timestamped(os.path.join(a.results_dir, a.name + ".matrix_raw.csv"))
 
         os.remove(mn)
 
@@ -53,8 +43,7 @@ class Test_measure_coverage:
         assert file_exists_and_not_empty(mn)
 
     def test_distributed(self, a):
-        mn = get_this_file_or_timestamped(
-            os.path.join(a.results_dir, a.name + ".matrix_raw.csv"))
+        mn = get_this_file_or_timestamped(os.path.join(a.results_dir, a.name + ".matrix_raw.csv"))
 
         os.remove(mn)
 
@@ -63,8 +52,8 @@ class Test_measure_coverage:
         # Check job files for each sample exist
         fs = list()
         for s in a.samples:
-            f = os.path.join(s.paths['sample_root'], "coverage", s.name + ".peak_set_coverage.")
-            for end in ['sh', 'bed']:
+            f = os.path.join(s.sample_root, "coverage", s.name + ".peak_set_coverage.")
+            for end in ["sh", "bed"]:
                 fs.append(f + end)
         assert all([file_exists_and_not_empty(f) for f in fs])
 
@@ -72,14 +61,13 @@ class Test_measure_coverage:
         # # just check for existence
         fs = list()
         for s in a.samples:
-            f = os.path.join(s.paths['sample_root'], "coverage", s.name + ".peak_set_coverage.")
-            for end in ['log']:
+            f = os.path.join(s.sample_root, "coverage", s.name + ".peak_set_coverage.")
+            for end in ["log"]:
                 fs.append(f + end)
         assert all([os.path.exists(f) for f in fs])
 
     def test_few_samples(self, a):
-        mn = get_this_file_or_timestamped(
-            os.path.join(a.results_dir, a.name + ".matrix_raw.csv"))
+        mn = get_this_file_or_timestamped(os.path.join(a.results_dir, a.name + ".matrix_raw.csv"))
 
         os.remove(mn)
 
@@ -90,8 +78,7 @@ class Test_measure_coverage:
         assert pd.read_csv(mn, index_col=0).shape[1] == 2
 
     def test_one_sample(self, a):
-        mn = get_this_file_or_timestamped(
-            os.path.join(a.results_dir, a.name + ".matrix_raw.csv"))
+        mn = get_this_file_or_timestamped(os.path.join(a.results_dir, a.name + ".matrix_raw.csv"))
 
         os.remove(mn)
 
@@ -102,8 +89,7 @@ class Test_measure_coverage:
         assert pd.read_csv(mn, index_col=0).shape[1] == 1
 
     def test_missing_input_no_permissive(self, a):
-        mn = get_this_file_or_timestamped(
-            os.path.join(a.results_dir, a.name + ".matrix_raw.csv"))
+        mn = get_this_file_or_timestamped(os.path.join(a.results_dir, a.name + ".matrix_raw.csv"))
 
         os.remove(mn)
         os.remove(a.samples[0].aligned_filtered_bam)
@@ -112,8 +98,7 @@ class Test_measure_coverage:
             a.measure_coverage(samples=a.samples[:1])
 
     def test_missing_input_all_samples(self, a):
-        mn = get_this_file_or_timestamped(
-            os.path.join(a.results_dir, a.name + ".matrix_raw.csv"))
+        mn = get_this_file_or_timestamped(os.path.join(a.results_dir, a.name + ".matrix_raw.csv"))
 
         os.remove(mn)
         for s in a.samples:
@@ -123,8 +108,7 @@ class Test_measure_coverage:
             a.measure_coverage()
 
     def test_missing_input_with_permissive(self, a):
-        mn = get_this_file_or_timestamped(
-            os.path.join(a.results_dir, a.name + ".matrix_raw.csv"))
+        mn = get_this_file_or_timestamped(os.path.join(a.results_dir, a.name + ".matrix_raw.csv"))
 
         os.remove(mn)
         os.remove(a.samples[0].aligned_filtered_bam)

@@ -56,6 +56,7 @@ def _format_string_with_environment_variables(string):
 
 def warn_or_raise(exception, permissive=False):
     from ngs_toolkit import _LOGGER
+
     msg = exception.args[0]
     if permissive:
         _LOGGER.warning(msg)
@@ -90,7 +91,7 @@ def is_running_inside_ipython():
     """Check whether code is running inside an IPython session."""
     try:
         cfg = get_ipython().config
-        if cfg['IPKernelApp']['parent_appname'] == 'ipython-notebook':
+        if cfg["IPKernelApp"]["parent_appname"] == "ipython-notebook":
             return True
         else:
             return False
@@ -102,14 +103,10 @@ def filter_kwargs_by_callable(kwargs, callabl, exclude=None):
     from inspect import signature
 
     args = signature(callabl).parameters.keys()
-    return {
-        k: v
-        for k, v in kwargs.items()
-        if (k in args)
-        and k not in (exclude or [])}
+    return {k: v for k, v in kwargs.items() if (k in args) and k not in (exclude or [])}
 
 
-def get_timestamp(fmt='%Y-%m-%d-%H:%M:%S'):
+def get_timestamp(fmt="%Y-%m-%d-%H:%M:%S"):
     """Get current timestamp in ``fmt`` format."""
     from datetime import datetime
 
@@ -119,6 +116,7 @@ def get_timestamp(fmt='%Y-%m-%d-%H:%M:%S'):
 def remove_timestamp_if_existing(file):
     """Remove timestamp from path if matching timestamp pattern exists."""
     import re
+
     return re.sub(r"\d{4}-\d{2}-\d{2}-\d{2}:\d{2}:\d{2}\.", "", file)
 
 
@@ -150,12 +148,12 @@ def get_this_file_or_timestamped(file, permissive=True):
     end = split[-1]
 
     res = sorted_nicely(glob(body + "*" + end))
-    res = [x for x in res
-           if re.search(body + r"\.\d{4}-\d{2}-\d{2}-\d{2}:\d{2}:\d{2}\.", x)]
+    res = [x for x in res if re.search(body + r"\.\d{4}-\d{2}-\d{2}-\d{2}:\d{2}:\d{2}\.", x)]
     if len(res) > 1:
         _LOGGER.warning(
             "Could not get unequivocal timestamped file for '{}'.".format(file)
-            + " Returning latest: '{}'.".format(res[-1]))
+            + " Returning latest: '{}'.".format(res[-1])
+        )
     try:
         # get newest file
         return res[-1]
@@ -202,11 +200,11 @@ def is_analysis_descendent(exclude_functions=None):
             return False
         # # Function does not have "self" in locals and therefore
         # # unlikely part of Analysis
-        if 'self' not in s.frame.f_locals:
+        if "self" not in s.frame.f_locals:
             continue
         # # Get Analysis object
-        if isinstance(s.frame.f_locals['self'], Analysis):
-            return (s.frame.f_locals['self'], s.function)
+        if isinstance(s.frame.f_locals["self"], Analysis):
+            return (s.frame.f_locals["self"], s.function)
     return False
 
 
@@ -229,11 +227,17 @@ def record_analysis_output(file_name, **kwargs):
 
 
 def submit_job(
-        code, job_file, log_file=None,
-        computing_configuration=None,
-        dry_run=False,
-        limited_number=False, total_job_lim=500, refresh_time=10, in_between_time=5,
-        **kwargs):
+    code,
+    job_file,
+    log_file=None,
+    computing_configuration=None,
+    dry_run=False,
+    limited_number=False,
+    total_job_lim=500,
+    refresh_time=10,
+    in_between_time=5,
+    **kwargs
+):
     """
     Submit a job to be run.
     Uses divvy to allow running on a local computer or distributed computing resources.
@@ -295,11 +299,8 @@ def submit_job(
         return subprocess.check_output(check_cmd).split(sep).__len__()
 
     def submit_job_if_possible(
-            cmd,
-            check_cmd="squeue",
-            total_job_lim=800,
-            refresh_time=10,
-            in_between_time=5):
+        cmd, check_cmd="squeue", total_job_lim=800, refresh_time=10, in_between_time=5
+    ):
         submit = count_jobs_running(check_cmd) < total_job_lim
         while not submit:
             time.sleep(refresh_time)
@@ -313,8 +314,7 @@ def submit_job(
     # Get computing configuration from config
     if computing_configuration is None:
         try:
-            computing_configuration = \
-                _CONFIG['preferences']['computing_configuration']
+            computing_configuration = _CONFIG["preferences"]["computing_configuration"]
         except KeyError:
             msg = "'computing_configuration' was not given"
             msg += " and default could not be get from config."
@@ -335,7 +335,7 @@ def submit_job(
 
     # Submit job
     if not dry_run:
-        scmd = dcc['compute']['submission_command']
+        scmd = dcc["compute"]["submission_command"]
         cmd = scmd.split(" ") + [job_file]
 
         # simply submit if not limiting submission to the number of already running jobs
@@ -362,7 +362,7 @@ def chunks(l, n):
         Size of chunks to generate.
     """
     n = max(1, n)
-    return list(l[i: i + n] for i in range(0, len(l), n))
+    return list(l[i : i + n] for i in range(0, len(l), n))
 
 
 def sorted_nicely(l):
@@ -506,15 +506,14 @@ def bed_to_index(df):
         Pandas index.
     """
     import pybedtools
+
     if isinstance(df, pybedtools.BedTool):
         df = df.to_dataframe()
     elif isinstance(df, str):
         df = pybedtools.BedTool(df).to_dataframe()
     cols = ["chrom", "start", "end"]
     if not all([x in df.columns for x in cols]):
-        raise AttributeError(
-            "DataFrame does not have '{}' columns.".format("', '".join(cols))
-        )
+        raise AttributeError("DataFrame does not have '{}' columns.".format("', '".join(cols)))
     index = (
         df["chrom"].astype(str)
         + ":"
@@ -528,6 +527,7 @@ def bed_to_index(df):
 def bedtool_to_index(bedtool):
     """Convert bedtool or path to a bed file to list of region identifiers"""
     import pybedtools
+
     if isinstance(bedtool, str):
         bedtool = pybedtools.BedTool(bedtool)
     elif isinstance(bedtool, pybedtools.BedTool):
@@ -535,14 +535,13 @@ def bedtool_to_index(bedtool):
     else:
         msg = "Input not pybedtools.BedTool or string to BED file."
         raise ValueError(msg)
-    return [
-        str(i.chrom) + ":" + str(i.start) + "-" + str(i.stop)
-        for i in bedtool]
+    return [str(i.chrom) + ":" + str(i.start) + "-" + str(i.stop) for i in bedtool]
 
 
 def to_bed_index(sites):
     """Convert bedtool, BED file or dataframe to list of region identifiers"""
     import pybedtools
+
     msg = "Input not pybedtools.BedTool, pandas.DataFrame or path to BED file."
     if isinstance(sites, str):
         return bedtool_to_index(pybedtools.BedTool(sites))
@@ -568,7 +567,7 @@ def sort_bed_nicely(bed_file):
         pass
     chrom_names = tempfile.NamedTemporaryFile()
     with open(chrom_names.name, "w") as handle:
-        for chrom in sorted_nicely(sites.to_dataframe()['chrom'].unique()):
+        for chrom in sorted_nicely(sites.to_dataframe()["chrom"].unique()):
             handle.write(chrom + "\n")
     return sites.sort(g=chrom_names.name)
 
@@ -589,6 +588,7 @@ def filter_bed_file(input_bed, filter_bed, output_bed):
         Output BED file.
     """
     import pybedtools
+
     input_bed = get_this_file_or_timestamped(input_bed)
 
     (
@@ -746,6 +746,7 @@ def fix_dataframe_header(df, force_dtypes=float):
 def r2pandas_df(r_df):
     """Make :class:`pandas.DataFrame` from a ``R`` dataframe given by :class:`rpy`."""
     from rpy2.robjects import pandas2ri
+
     if isinstance(r_df, pd.DataFrame):
         return r_df
     if isinstance(r_df, np.recarray):
@@ -758,8 +759,7 @@ def r2pandas_df(r_df):
 
 def recarray2pandas_df(recarray):
     """Make :class:`pandas.DataFrame` from :class:`numpy.recarray`."""
-    df = pd.DataFrame.from_records(
-        recarray, index=list(range(recarray.shape[0])))
+    df = pd.DataFrame.from_records(recarray, index=list(range(recarray.shape[0])))
     return df
 
 
@@ -978,11 +978,13 @@ def download_file(url, output_file, chunk_size=1024):
         import shutil
         import urllib.request as request
         from contextlib import closing
+
         with closing(request.urlopen(url)) as r:
-            with open(output_file, 'wb') as f:
+            with open(output_file, "wb") as f:
                 shutil.copyfileobj(r, f)
     else:
         import requests
+
         response = requests.get(url, stream=True)
         with open(output_file, "wb") as outfile:
             outfile.writelines(response.iter_content(chunk_size=chunk_size))
@@ -1037,9 +1039,7 @@ def deseq_results_to_bed_file(
         df = df.sort_values("log2FoldChange", ascending=ascending)
 
     if significant_only is True:
-        df = df.loc[
-            (df["padj"] < alpha) & (df["log2FoldChange"].abs() > abs_fold_change), :
-        ]
+        df = df.loc[(df["padj"] < alpha) & (df["log2FoldChange"].abs() > abs_fold_change), :]
 
     # decompose index string (chrom:start-end) into columns
     df["chrom"] = map(lambda x: x[0], df.index.str.split(":"))
@@ -1079,9 +1079,7 @@ def homer_peaks_to_bed(homer_peaks, output_bed):
     )
 
 
-def macs2_call_chipseq_peak(
-    signal_samples, control_samples, output_dir, name, distributed=True
-):
+def macs2_call_chipseq_peak(signal_samples, control_samples, output_dir, name, distributed=True):
     """
     Call ChIP-seq peaks with MACS2 in a slurm job.
 
@@ -1147,28 +1145,18 @@ def homer_call_chipseq_peak_job(
     signal_tag_directory = os.path.join(output_dir, "homer_tag_dir_" + name + "_signal")
     fs = " ".join([s.aligned_filtered_bam for s in signal_samples])
     runnable = """makeTagDirectory {0} {1}\n""".format(signal_tag_directory, fs)
-    background_tag_directory = os.path.join(
-        output_dir, "homer_tag_dir_" + name + "_background"
-    )
+    background_tag_directory = os.path.join(output_dir, "homer_tag_dir_" + name + "_background")
     fs = " ".join([s.aligned_filtered_bam for s in control_samples])
     runnable += """makeTagDirectory {0} {1}\n""".format(background_tag_directory, fs)
 
     # call peaks
-    output_file = os.path.join(
-        output_dir, name, name + "_homer_peaks.factor.narrowPeak"
-    )
+    output_file = os.path.join(output_dir, name, name + "_homer_peaks.factor.narrowPeak")
     runnable += """findPeaks {signal} -style factor -o {output_file} -i {background}\n""".format(
-        output_file=output_file,
-        background=background_tag_directory,
-        signal=signal_tag_directory,
+        output_file=output_file, background=background_tag_directory, signal=signal_tag_directory,
     )
-    output_file = os.path.join(
-        output_dir, name, name + "_homer_peaks.histone.narrowPeak"
-    )
+    output_file = os.path.join(output_dir, name, name + "_homer_peaks.histone.narrowPeak")
     runnable += """findPeaks {signal} -style histone -o {output_file} -i {background}""".format(
-        output_file=output_file,
-        background=background_tag_directory,
-        signal=signal_tag_directory,
+        output_file=output_file, background=background_tag_directory, signal=signal_tag_directory,
     )
 
     if distributed:
@@ -1215,9 +1203,8 @@ def bed_to_fasta(input_bed, output_fasta, genome_file):
 def read_bed_file_three_columns(input_bed: str) -> pd.DataFrame:
     """Read BED file into dataframe, make 'name' field from location."""
     bed = pd.read_csv(
-        input_bed,
-        sep="\t", header=None,
-        usecols=[0, 1, 2], names=['chrom', 'start', 'end'])
+        input_bed, sep="\t", header=None, usecols=[0, 1, 2], names=["chrom", "start", "end"]
+    )
     bed["name"] = bed_to_index(bed)
     return bed
 
@@ -1245,8 +1232,7 @@ def bed_to_fasta_through_2bit(input_bed, output_fasta, genome_2bit):
     bed = read_bed_file_three_columns(input_bed)
     bed.to_csv(tmp_bed, sep="\t", header=None, index=False)
 
-    cmd = "twoBitToFa {0} -bed={1} {2}".format(
-        genome_2bit, tmp_bed, output_fasta)
+    cmd = "twoBitToFa {0} -bed={1} {2}".format(genome_2bit, tmp_bed, output_fasta)
     subprocess.call(cmd.split(" "))
     os.remove(tmp_bed)
 
@@ -1352,6 +1338,7 @@ def normalize_quantiles_r(array):
     """
     from rpy2.robjects import numpy2ri, pandas2ri, r
     from rpy2.robjects.packages import importr
+
     numpy2ri.activate()
     pandas2ri.activate()
 
@@ -1419,6 +1406,7 @@ def cqn(matrix, gc_content, lengths):
     """
     from rpy2.robjects import numpy2ri, pandas2ri, r
     from rpy2.robjects.packages import importr
+
     numpy2ri.activate()
     pandas2ri.activate()
 
@@ -1429,9 +1417,7 @@ def cqn(matrix, gc_content, lengths):
     y_r = cqn_out[list(cqn_out.names).index("y")]
     y = pd.DataFrame(np.array(y_r), index=matrix.index, columns=matrix.columns)
     offset_r = cqn_out[list(cqn_out.names).index("offset")]
-    offset = pd.DataFrame(
-        np.array(offset_r), index=matrix.index, columns=matrix.columns
-    )
+    offset = pd.DataFrame(np.array(offset_r), index=matrix.index, columns=matrix.columns)
 
     return y + offset
 
@@ -1439,13 +1425,14 @@ def cqn(matrix, gc_content, lengths):
 def count_bam_file_length(bam_file: str) -> int:
     """Get length of BAM indexed file"""
     import pysam
+
     return pysam.AlignmentFile(bam_file).count()
 
 
 def count_lines(file: str) -> int:
     """Count lines of plain text file"""
     i = -1
-    with open(file, 'r') as f:
+    with open(file, "r") as f:
         for i, _ in enumerate(f):
             pass
     return i + 1

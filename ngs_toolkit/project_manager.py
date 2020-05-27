@@ -15,10 +15,10 @@ from ngs_toolkit import _CONFIG, _LOGGER
 
 
 def parse_arguments(cli_string=None):
-    parser = argparse.ArgumentParser(
-        description=__doc__
-    )
-    subparsers = parser.add_subparsers(dest="command")  # , required=True <- not supported in Python < 3.7
+    parser = argparse.ArgumentParser(description=__doc__)
+    subparsers = parser.add_subparsers(
+        dest="command"
+    )  # , required=True <- not supported in Python < 3.7
 
     # Create command
     create_subparser = subparsers.add_parser(
@@ -62,13 +62,11 @@ def parse_arguments(cli_string=None):
 
     # Recipe command
     recipe_subparser = subparsers.add_parser(
-        "recipe",
-        description="Run recipe.",
-        help="Run ngs_toolkit recipe for a given project.",
+        "recipe", description="Run recipe.", help="Run ngs_toolkit recipe for a given project.",
     )
-    recipe_subparser.add_argument(dest="recipe_name", help="Recipe name.", nargs='?')
+    recipe_subparser.add_argument(dest="recipe_name", help="Recipe name.", nargs="?")
     recipe_subparser.add_argument(
-        dest="project_config", help="Project configuration file.", nargs='?'
+        dest="project_config", help="Project configuration file.", nargs="?"
     )
     recipe_subparser.add_argument(
         "-l",
@@ -80,9 +78,7 @@ def parse_arguments(cli_string=None):
     )
 
     for p in [create_subparser, recipe_subparser]:
-        p.add_argument(
-            "-V", "--version", action="version", version=ngs_toolkit.__version__
-        )
+        p.add_argument("-V", "--version", action="version", version=ngs_toolkit.__version__)
 
     if cli_string is None:
         args = parser.parse_args()
@@ -95,8 +91,7 @@ def parse_arguments(cli_string=None):
     elif args.command == "create":
         args.root_dir = os.path.abspath(args.root_dir)
     elif args.command == "recipe":
-        if not args.list_only and (
-                (args.recipe_name is None) or (args.project_config is None)):
+        if not args.list_only and ((args.recipe_name is None) or (args.project_config is None)):
             parser.print_help(sys.stderr)
             sys.exit(1)
 
@@ -124,9 +119,7 @@ def create_project(
     if root_projects_dir is None:
         root_projects_dir = _CONFIG["preferences"]["root_projects_dir"]
 
-    root_projects_dir = Analysis._format_string_with_environment_variables(
-        root_projects_dir
-    )
+    root_projects_dir = Analysis._format_string_with_environment_variables(root_projects_dir)
     project_dir = os.path.join(root_projects_dir, project_name)
 
     if os.path.exists(project_dir):
@@ -156,7 +149,9 @@ def create_project(
 
     genome_assemblies = "\n            ".join(
         [
-            "'{}':\n                genome: '{}'".format(s, g)
+            "- if:{n12}    organism: '{org}'{n12}  then:{n12}    genome: '{gen}'".format(
+                org=s, gen=g, n12="\n" + "".join([" "] * 12)
+            )
             for s, g in genome_assemblies.items()
         ]
     )
@@ -166,32 +161,30 @@ def create_project(
         if not os.path.exists(d):
             os.makedirs(d)
 
-    project_config_template = """    project_name: {project_name}
-    project_description: {project_name}
+    project_config_template = """    pep_version: "2.0.0"
+    project_name: {project_name}
+    description: {project_name}
     username: {username}
     email: {email}
-    metadata:
-        output_dir: {project_dir}
-        results_subdir: data
-        submission_subdir: submission
-        pipeline_interfaces: /home/{username}/workspace/open_pipelines/pipeline_interface.yaml
-        sample_annotation: {annotation_table}
-        sample_subannotation: {sample_subannotation}
-        comparison_table: {comparison_table}
+    root_dir: {project_dir}
+    results_subdir: data
+    submission_subdir: submission
+    pipeline_interfaces: /home/{username}/workspace/open_pipelines/pipeline_interface.yaml
+    sample_table: {annotation_table}
+    subsample_table: {sample_subannotation}
+    comparison_table: {comparison_table}
     sample_attributes:
         - sample_name
     group_attributes:
         - sample_name
-    data_sources:
-        local: "{project_dir}/data/{{sample_name}}.bam"
-        bsf: /scratch/lab_bsf/samples/{{flowcell}}/{{flowcell}}_{{lane}}_samples/{{flowcell}}_{{lane}}#{{BSF_name}}.bam
-    implied_attributes:
-        organism:
+    sample_modifiers:
+        imply:
             {genome_assemblies}
-    compute_packages: null
-    # compute_packages:
-    #     submission_template: slurm_template.sub
-    #     submission_command: sbatch
+        derive:
+            attributes: [data_source]
+            sources:
+                bsf: /scratch/lab_bsf/samples/{{flowcell}}/{{flowcell}}_{{lane}}_samples/{{flowcell}}_{{lane}}#{{BSF_name}}.bam
+                local: /tmp/tmptd4zmpiw/test_project/data/{{sample_name}}.bam
     trackhubs:
         trackhub_dir: {project_dir}/trackhubs
         url: {url}""".format(
@@ -206,9 +199,7 @@ def create_project(
         url=url,
     )
 
-    merge_table_template = ",".join(
-        ["sample_name", "flowcell", "lane", "BSF_name", "data_source"]
-    )
+    merge_table_template = ",".join(["sample_name", "flowcell", "lane", "BSF_name", "data_source"])
     annotation_table_template = ",".join(
         [
             "sample_name",
@@ -243,13 +234,13 @@ def create_project(
     )
 
     # write config and tables
-    with open(project_config, "w") as handle:
+    with open(project_config, "w", 1) as handle:
         handle.write(textwrap.dedent(project_config_template + "\n"))
-    with open(sample_subannotation, "w") as handle:
+    with open(sample_subannotation, "w", 1) as handle:
         handle.write(merge_table_template)
-    with open(annotation_table, "w") as handle:
+    with open(annotation_table, "w", 1) as handle:
         handle.write(annotation_table_template)
-    with open(comparison_table, "w") as handle:
+    with open(comparison_table, "w", 1) as handle:
         handle.write(comparison_table_template)
 
     # Initialize git repository)
@@ -257,15 +248,14 @@ def create_project(
         p = subprocess.Popen(
             "git init {}".format(project_dir).split(" "),
             stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT)
+            stderr=subprocess.STDOUT,
+        )
         p.communicate()
         return p.returncode
     return 0
 
 
-def create_requirements_file(
-    project_name, project_dir, requirements=None, overwrite=False
-):
+def create_requirements_file(project_name, project_dir, requirements=None, overwrite=False):
     """
     Create a requirements.txt file with pip requirements.
     """
@@ -297,7 +287,7 @@ def create_requirements_file(
     requirements_filecontent = "\n".join(requirements)
 
     # write requirements file
-    with open(requirements_file, "w") as handle:
+    with open(requirements_file, "w", 1) as handle:
         handle.write(textwrap.dedent(requirements_filecontent) + "\n")
 
 
@@ -348,7 +338,7 @@ def create_makefile(project_name, project_dir, overwrite=False):
     )
 
     # write Makefile
-    with open(makefile, "w") as handle:
+    with open(makefile, "w", 1) as handle:
         handle.write(textwrap.dedent(makefile_content) + "\n")
 
 
@@ -371,9 +361,7 @@ def main():
     args = parse_arguments()
 
     if args.command == "create":
-        _LOGGER.info(
-            "Creating project '{}' in '{}'.".format(args.project_name, args.root_dir)
-        )
+        _LOGGER.info("Creating project '{}' in '{}'.".format(args.project_name, args.root_dir))
 
         genome_assemblies = {
             x.split(":")[0]: x.split(":")[1] for x in args.genome_assemblies.split(",")
@@ -390,9 +378,7 @@ def main():
             return git_ok
 
         # Create requirements file.
-        _LOGGER.info(
-            "Creating requirements file for project '{}'.".format(args.project_name)
-        )
+        _LOGGER.info("Creating requirements file for project '{}'.".format(args.project_name))
         create_requirements_file(
             project_name=args.project_name,
             project_dir=os.path.join(args.root_dir, args.project_name),
@@ -400,9 +386,7 @@ def main():
         )
 
         # Create Makefile.
-        _LOGGER.info(
-            "Creating Makefile file for project '{}'.".format(args.project_name)
-        )
+        _LOGGER.info("Creating Makefile file for project '{}'.".format(args.project_name))
         create_makefile(
             project_name=args.project_name,
             project_dir=os.path.join(args.root_dir, args.project_name),
@@ -416,11 +400,7 @@ def main():
             import ngs_toolkit.recipes
 
             n = pkgutil.iter_modules(ngs_toolkit.recipes.__path__)
-            print(
-                "Available ngs_toolkit recipes: '{}'.".format(
-                    "', '".join([x[1] for x in n])
-                )
-            )
+            print("Available ngs_toolkit recipes: '{}'.".format("', '".join([x[1] for x in n])))
         else:
             _LOGGER.info("Running recipe '{}'.".format(args.recipe_name))
             run_recipe(recipe_name=args.recipe_name, project_config=args.project_config)

@@ -20,6 +20,17 @@ Changed
   - More simplicity and abstraction for functions in main :class:`ngs_toolkit.analysis.Analysis` class.
 
 
+
+[0.25.0] - 2020-05-26
+*****************************
+
+Changed
+-----------------------------
+
+  - Compatibility with PEP format 2.0.0. Previously created PEP projects should be updated to work with the PEP stack.
+  - Increased ``peppy`` requirement to ``0.30.1``.
+
+
 [0.24.2] - 2020-05-11
 *****************************
 

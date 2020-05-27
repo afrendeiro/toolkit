@@ -41,9 +41,9 @@ extensions = [
     "sphinx.ext.coverage",
     "sphinx.ext.viewcode",
     # "numpydoc",
-    'sphinx.ext.napoleon',
+    "sphinx.ext.napoleon",
     "sphinx_issues",
-    'sphinxarg.ext',  # for CLI parsing of arguments
+    "sphinxarg.ext",  # for CLI parsing of arguments
     # 'sphinx_autodoc_typehints' <- this would be handy when whole codebase has typehinting
     # "sphinxcontrib.jupyter", <- this could be useful to make jupyter NBs
 ]
@@ -75,9 +75,9 @@ copyright = u"2019, Andre Rendeiro"
 # |version| and |release|, also used in various other places throughout the
 # built documents.
 #
-release = get_distribution('ngs_toolkit').version
+release = get_distribution("ngs_toolkit").version
 # for example take major/minor
-version = '.'.join(release.split('.')[:3])
+version = ".".join(release.split(".")[:3])
 
 # The full version, including alpha/beta/rc tags.
 release = version
@@ -131,6 +131,7 @@ autodoc_member_order = "bysource"
 # a list of builtin themes.
 
 html_theme = "sphinx_rtd_theme"
+# html_theme = "pydata_sphinx_theme"
 html_theme_path = [sphinx_rtd_theme.get_html_theme_path()]
 # html_theme = 'bootstrap'
 # html_theme_path = sphinx_bootstrap_theme.get_html_theme_path()
@@ -230,13 +231,7 @@ latex_elements = {
 # (source start file, target name, title,
 #  author, documentclass [howto, manual, or own class]).
 latex_documents = [
-    (
-        "index",
-        "ngs_toolkit.tex",
-        u"ngs_toolkit Documentation",
-        u"Andre Rendeiro",
-        "manual",
-    )
+    ("index", "ngs_toolkit.tex", u"ngs_toolkit Documentation", u"Andre Rendeiro", "manual",)
 ]
 
 # The name of an image file (relative to this directory) to place at the top of
@@ -264,9 +259,7 @@ latex_documents = [
 
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
-man_pages = [
-    ("index", "ngs_toolkit", u"ngs_toolkit Documentation", [u"Andre Rendeiro"], 1)
-]
+man_pages = [("index", "ngs_toolkit", u"ngs_toolkit Documentation", [u"Andre Rendeiro"], 1)]
 
 # If true, show URL addresses after external links.
 # man_show_urls = False
@@ -374,11 +367,11 @@ epub_exclude_files = ["search.html"]
 
 # Example configuration for intersphinx: refer to the Python standard library.
 intersphinx_mapping = {
-    'python': ('http://docs.python.org/3', None),
-    'urllib3': ('http://urllib3.readthedocs.org/en/latest', None),
-    'numpy': ('http://docs.scipy.org/doc/numpy/', None),
-    'scipy': ('https://docs.scipy.org/doc/scipy-1.3.0/reference/', None),
-    'pandas': ('http://pandas.pydata.org/pandas-docs/stable/', None),
-    'pybedtools': ('https://daler.github.io/pybedtools/', None),
-    'peppy': ('http://peppy.databio.org/en/latest/', None)
+    "python": ("http://docs.python.org/3", None),
+    "urllib3": ("http://urllib3.readthedocs.org/en/latest", None),
+    "numpy": ("http://docs.scipy.org/doc/numpy/", None),
+    "scipy": ("https://docs.scipy.org/doc/scipy-1.3.0/reference/", None),
+    "pandas": ("http://pandas.pydata.org/pandas-docs/stable/", None),
+    "pybedtools": ("https://daler.github.io/pybedtools/", None),
+    "peppy": ("http://peppy.databio.org/en/latest/", None),
 }

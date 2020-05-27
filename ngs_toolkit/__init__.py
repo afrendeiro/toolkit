@@ -10,7 +10,8 @@ try:
     from ngs_toolkit._version import __version__
 except ImportError:
     from setuptools_scm import get_version as _get_version
-    __version__ = _get_version(root='..', relative_to=__file__)
+
+    __version__ = _get_version(root="..", relative_to=__file__)
 
 
 # Setup joblib memory
@@ -70,8 +71,7 @@ def setup_logger(name="ngs_toolkit", level="INFO", logfile=None):
     _LOGGER.addHandler(ch)
 
     _LOGGER.debug(
-        "This is ngs_toolkit (http://ngs-toolkit.rtfd.io), version: {}"
-        .format(__version__)
+        "This is ngs_toolkit (http://ngs-toolkit.rtfd.io), version: {}".format(__version__)
     )
     return _LOGGER
 
@@ -107,26 +107,19 @@ def setup_config(custom_yaml_config=None):
     from ngs_toolkit.utils import _format_string_with_environment_variables
 
     default_config_path = "config/default.yaml"
-    default_config_path = pkg_resources.resource_filename(
-        __name__, default_config_path)
+    default_config_path = pkg_resources.resource_filename(__name__, default_config_path)
     _LOGGER.debug(
         "Reading default configuration file distributed"
-        " with package from '{}'.".format(
-            default_config_path
-        )
+        " with package from '{}'.".format(default_config_path)
     )
     try:
         _CONFIG = yaml.safe_load(open(default_config_path, "r"))
         _LOGGER.debug("Default config: {}".format(_CONFIG))
     except IOError:
-        _LOGGER.error(
-            "Couldn't read configuration file from '{}'."
-            .format(default_config_path)
-        )
+        _LOGGER.error("Couldn't read configuration file from '{}'.".format(default_config_path))
         _CONFIG = dict()
 
-    user_config_path = os.path.join(
-        os.path.expanduser("~"), ".ngs_toolkit.config.yaml")
+    user_config_path = os.path.join(os.path.expanduser("~"), ".ngs_toolkit.config.yaml")
     if os.path.exists(user_config_path):
         # Read up and format user variables
         _LOGGER.debug("Found custom user config: {}".format(user_config_path))
@@ -140,16 +133,14 @@ def setup_config(custom_yaml_config=None):
             _LOGGER.debug("Custom user config: {}".format(custom_config))
             # Update config
             _LOGGER.debug(
-                "Updating configuration with custom file from '{}'."
-                .format(user_config_path)
+                "Updating configuration with custom file from '{}'.".format(user_config_path)
             )
             _CONFIG.update(custom_config)
             _LOGGER.debug("Current config: {}".format(custom_config))
         except IOError:
             _LOGGER.error(
                 "Configuration file from '{}' exists but is not readable."
-                " Ignoring."
-                .format(user_config_path)
+                " Ignoring.".format(user_config_path)
             )
     else:
         _LOGGER.debug(
@@ -164,16 +155,15 @@ def setup_config(custom_yaml_config=None):
             _LOGGER.debug("Custom passed config: {}".format(custom_config))
             # Update config
             _LOGGER.debug(
-                "Updating configuration with custom file from '{}'.".format(
-                    custom_yaml_config
-                )
+                "Updating configuration with custom file from '{}'.".format(custom_yaml_config)
             )
             _CONFIG.update(custom_config)
             _LOGGER.debug("Current config: {}".format(custom_config))
         except IOError as e:
             _LOGGER.error(
-                "Passed configuration from '{}' exists but is not readable."
-                .format(custom_yaml_config)
+                "Passed configuration from '{}' exists but is not readable.".format(
+                    custom_yaml_config
+                )
             )
             raise e
 
@@ -215,14 +205,14 @@ def setup_timestamping():
         from ngs_toolkit.decorators import (
             read_csv_timestamped,
             to_csv_timestamped,
-            timestamped_input)
+            timestamped_input,
+        )
         import pandas as pd
 
-        pd.io.parsers.TextFileReader = read_csv_timestamped(
-            pd.io.parsers.TextFileReader)
+        pd.io.parsers.TextFileReader = read_csv_timestamped(pd.io.parsers.TextFileReader)
         pd.DataFrame.to_csv = to_csv_timestamped(
-            pd.DataFrame.to_csv,
-            exclude_functions=["from_dataframe"])
+            pd.DataFrame.to_csv, exclude_functions=["from_dataframe"]
+        )
 
         os.remove = timestamped_input(os.remove)
 
@@ -232,10 +222,9 @@ def check_bedtools_version():
 
     version = pybedtools.helpers.settings.bedtools_version
     # not existing
-    v = ".".join(
-        [str(x) for x in version])
+    v = ".".join([str(x) for x in version])
     msg = "Bedtools does not seem to be installed or is not in $PATH."
-    if v == '':
+    if v == "":
         _LOGGER.warning(msg)
         return None
 

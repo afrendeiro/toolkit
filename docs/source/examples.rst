@@ -22,8 +22,8 @@ We have the following `PEP project <https://peppy.readthedocs.io>`_ config YAML 
       results_subdir: data
       submission_subdir: submission
       pipeline_interfaces: /home/user/workspace/open_pipelines/pipeline_interface.yaml
-      sample_annotation: /scratch/lab_bock/shared/projects/example_project/metadata/annotation.csv
-      sample_subannotation: /scratch/lab_bock/shared/projects/example_project/metadata/sample_subannotation.csv
+      sample_table: /scratch/lab_bock/shared/projects/example_project/metadata/annotation.csv
+      subsample_table: /scratch/lab_bock/shared/projects/example_project/metadata/sample_subannotation.csv
       comparison_table: /scratch/lab_bock/shared/projects/example_project/metadata/comparison_table.csv
     sample_attributes:
       - sample_name
@@ -32,10 +32,17 @@ We have the following `PEP project <https://peppy.readthedocs.io>`_ config YAML 
     group_attributes:
       - genotype
       - replicate
-    data_sources:
-      bsf: /path/to/samples/{flowcell}/{flowcell}_{lane}#{sample_name}.bam
-    genomes:
-      human: hg19
+    sample_modifiers:
+        imply:
+            - if:
+                organism: 'human'
+              then:
+                genome: 'hg38'
+        derive:
+            attributes: [data_source]
+            sources:
+                bsf: /scratch/lab_bsf/samples/{flowcell}/{flowcell}_{lane}_samples/{flowcell}_{lane}#{BSF_name}.bam
+                local: /tmp/tmptd4zmpiw/test_project/data/{sample_name}.bam
     trackhubs:
       trackhub_dir: /path/to/public_html/user/example_project/
       url: http://root-url.com/example_project
@@ -115,7 +122,7 @@ ATAC-seq analysis example
 
 
     # UNSUPERVISED ANALYSIS
-    # # plot pairwise sample correlations, 
+    # # plot pairwise sample correlations,
     # # perform dimensionality reduction (MDS, PCA)
     # # and plot samples in this spaces, annotated with their attributes
     analysis.unsupervised_analysis()

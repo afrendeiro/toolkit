@@ -31,10 +31,9 @@ def parse_arguments():
     Global options for analysis.
     """
     parser = ArgumentParser(
-        prog="python -m ngs_toolkit.recipes.region_set_frip", description=__doc__)
-    parser.add_argument(
-        dest="config_file", help="YAML project configuration file.", type=str
+        prog="python -m ngs_toolkit.recipes.region_set_frip", description=__doc__
     )
+    parser.add_argument(dest="config_file", help="YAML project configuration file.", type=str)
     parser.add_argument(
         "-r",
         "--region-set",
@@ -73,8 +72,8 @@ def main(cli=None):
     args = parse_arguments().parse_args(cli)
 
     for data_type, clax in [
-            ("ATAC-seq", ATACSeqAnalysis),
-            ("ChIP-seq", ChIPSeqAnalysis),
+        ("ATAC-seq", ATACSeqAnalysis),
+        ("ChIP-seq", ChIPSeqAnalysis),
     ]:
         an = clax(from_pep=args.config_file)
 
@@ -82,10 +81,7 @@ def main(cli=None):
             continue
 
         if args.pass_qc:
-            an.samples = [
-                s for s in an.samples
-                if getattr(s, "pass_qc", None) in ['1', '1.0', 1]
-            ]
+            an.samples = [s for s in an.samples if getattr(s, "pass_qc", None) in ["1", "1.0", 1]]
 
         if data_type == "ChIP-seq" and not hasattr(an, "comparison_table"):
             msg = (
@@ -112,49 +108,48 @@ def main(cli=None):
         calculate_region_set_frip(
             region_set=an.sites.fn,
             samples=an.samples,
-            computing_configuration=args.computing_configuration
+            computing_configuration=args.computing_configuration,
         )
 
 
-def calculate_region_set_frip(
-        region_set, samples, computing_configuration=None
-):
+def calculate_region_set_frip(region_set, samples, computing_configuration=None):
     """
     """
     from ngs_toolkit.utils import submit_job
 
     for sample in samples:
-        inside_reads = os.path.join(
-            sample.paths.sample_root, "region_set_frip.inside_reads.txt"
+        sample.sample_root = os.path.join(
+            sample.project.root_dir, sample.project._config.results_subdir, sample.name
         )
-        all_reads = os.path.join(
-            sample.paths.sample_root, "region_set_frip.all_reads.txt"
-        )
+        inside_reads = os.path.join(sample.sample_root, "region_set_frip.inside_reads.txt")
+        all_reads = os.path.join(sample.sample_root, "region_set_frip.all_reads.txt")
 
         job_name = sample.name + ".region_set_frip"
-        log_file = os.path.join(sample.paths.sample_root, job_name + ".log")
-        job_file = os.path.join(sample.paths.sample_root, job_name + ".sh")
-        sample_stats = os.path.join(sample.paths.sample_root, "stats.tsv")
+        log_file = os.path.join(sample.sample_root, job_name + ".log")
+        job_file = os.path.join(sample.sample_root, job_name + ".sh")
+        sample_stats = os.path.join(sample.sample_root, "stats.tsv")
 
         cmd = "\n".join(
             [
                 """samtools view -c -L {} {} > {}""".format(
                     region_set, sample.aligned_filtered_bam, inside_reads
                 ),
-                """samtools view -c {} > {}""".format(
-                    sample.aligned_filtered_bam, all_reads
-                ),
+                """samtools view -c {} > {}""".format(sample.aligned_filtered_bam, all_reads),
                 'calc(){ awk "BEGIN { print "$*" }"; }',
                 "IN=`cat {}`".format(inside_reads),
                 "ALL=`cat {}`".format(all_reads),
                 "FRIP=`calc $IN/$ALL`",
                 'echo "region_set_frip\\t$FRIP\\t." >> {}'.format(sample_stats),
-                "date"
+                "date",
             ]
         )
         submit_job(
-            cmd, job_file, log_file, jobname=job_name,
-            computing_configuration=computing_configuration)
+            cmd,
+            job_file,
+            log_file,
+            jobname=job_name,
+            computing_configuration=computing_configuration,
+        )
 
 
 if __name__ == "__main__":

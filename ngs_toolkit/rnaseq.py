@@ -57,6 +57,7 @@ class RNASeqAnalysis(Analysis):
         Additional keyword arguments will be passed to parent class
         :class:`~ngs_toolkit.analysis.Analysis`.
     """
+
     _data_type = "RNA-seq"
 
     def __init__(
@@ -77,7 +78,8 @@ class RNASeqAnalysis(Analysis):
             "__data_type__": "RNA-seq",
             "var_unit_name": "gene",
             "quantity": "expression",
-            "norm_units": "RPM"}
+            "norm_units": "RPM",
+        }
         for k, v in default_args.items():
             if not hasattr(self, k):
                 setattr(self, k, v)
@@ -94,9 +96,7 @@ class RNASeqAnalysis(Analysis):
             **kwargs
         )
 
-    def collect_bitseq_output(
-        self, samples=None, permissive=True, expression_type="counts"
-    ):
+    def collect_bitseq_output(self, samples=None, permissive=True, expression_type="counts"):
         """
         Collect gene expression (read counts, transcript-level) output from Bitseq
         into expression matrix for `samples`.
@@ -113,17 +113,15 @@ class RNASeqAnalysis(Analysis):
 
         expr = list()
         for i, sample in enumerate(samples):
-            _LOGGER.debug(
-                "Reading transcriptome files for sample '{}'.".format(sample.name)
-            )
+            _LOGGER.debug("Reading transcriptome files for sample '{}'.".format(sample.name))
             tr_file = os.path.join(
-                sample.paths.sample_root,
+                sample.sample_root,
                 "bowtie1_{}".format(sample.transcriptome),
                 "bitSeq",
                 sample.name + ".tr",
             )
             counts_file = os.path.join(
-                sample.paths.sample_root,
+                sample.sample_root,
                 "bowtie1_{}".format(sample.transcriptome),
                 "bitSeq",
                 sample.name + ".counts",
@@ -197,7 +195,7 @@ class RNASeqAnalysis(Analysis):
             try:
                 c = pd.read_csv(
                     os.path.join(
-                        sample.paths.sample_root,
+                        sample.sample_root,
                         "ESAT_{}".format(sample.genome),
                         sample.name + ".gene.txt",
                     ),
@@ -205,17 +203,15 @@ class RNASeqAnalysis(Analysis):
                 )
             except IOError:
                 if permissive:
-                    _LOGGER.warning(
-                        "Sample '%s' is missing file: %s",
-                        sample.name, sample.counts)
+                    _LOGGER.warning("Sample '%s' is missing file: %s", sample.name, sample.counts)
                     continue
                 else:
                     raise
             # extract only gene ID and counts
             c = c[["Symbol", "Exp1"]]
-            c = c.rename(
-                columns={"Symbol": "gene_symbol", "Exp1": sample.name}
-            ).set_index("gene_symbol")
+            c = c.rename(columns={"Symbol": "gene_symbol", "Exp1": sample.name}).set_index(
+                "gene_symbol"
+            )
 
             # Append
             if first:
@@ -241,7 +237,7 @@ class RNASeqAnalysis(Analysis):
     #             # read the "tr" file of one sample to get indexes
     #             c = pd.read_csv(
     #                 os.path.join(
-    #                     sample.paths.sample_root,
+    #                     sample.sample_root,
     #                     "tophat_{}".format(sample.genome),
     #                     sample.name + ".aln_sorted.htseq-count.tsv"), sep="\t")
     #             c.columns = ['ensembl_gene_id', 'ensembl_transcript_id', 'counts']
@@ -346,9 +342,7 @@ class RNASeqAnalysis(Analysis):
             raise NotImplementedError(msg)
 
         if expression_level not in ["gene", "transcript"]:
-            raise NotImplementedError(
-                "`expression_level` must be one of 'gene' or 'transcript'!"
-            )
+            raise NotImplementedError("`expression_level` must be one of 'gene' or 'transcript'!")
 
         if samples is None:
             samples = self.samples
@@ -371,14 +365,12 @@ class RNASeqAnalysis(Analysis):
         mapping = query_biomart(
             attributes=["ensembl_transcript_id", "external_gene_name"],
             species=species or constants.organism_to_species_mapping[self.organism],
-            ensembl_version=ensembl_version or constants.genome_to_ensembl_mapping[self.genome]
+            ensembl_version=ensembl_version or constants.genome_to_ensembl_mapping[self.genome],
         )
         mapping.columns = ["ensembl_transcript_id", "gene_name"]
 
         # Join gene names to existing Ensembl
-        transcript_counts = transcript_counts.reset_index(
-            drop=True, level="ensembl_gene_id"
-        )
+        transcript_counts = transcript_counts.reset_index(drop=True, level="ensembl_gene_id")
         transcript_counts = (
             transcript_counts.join(mapping.set_index("ensembl_transcript_id"))
             .set_index(["gene_name"], append=True)
@@ -397,8 +389,7 @@ class RNASeqAnalysis(Analysis):
                 matrix_raw.to_csv(output_file)
             else:
                 matrix_raw.to_csv(
-                    os.path.join(self.results_dir, self.name + ".matrix_raw.csv"),
-                    index=True,
+                    os.path.join(self.results_dir, self.name + ".matrix_raw.csv"), index=True,
                 )
         if assign:
             self.matrix_raw = matrix_raw
@@ -410,7 +401,7 @@ class RNASeqAnalysis(Analysis):
         matrix_norm=None,
         samples=None,
         output_dir="{results_dir}/quality_control",
-        output_prefix="quality_control"
+        output_prefix="quality_control",
     ):
         """
         Plot general characteristics of the gene expression
@@ -459,14 +450,9 @@ class RNASeqAnalysis(Analysis):
             if samples is not None:
                 matrix_norm = matrix_norm.loc[:, [s.name for s in samples]]
 
-        fig, axis = plt.subplots(
-            figsize=(4, 4 * np.log10(len(matrix_raw.columns)))
-        )
+        fig, axis = plt.subplots(figsize=(4, 4 * np.log10(len(matrix_raw.columns))))
         sns.barplot(
-            data=matrix_raw
-            .sum()
-            .sort_values()
-            .reset_index(),
+            data=matrix_raw.sum().sort_values().reset_index(),
             y="index",
             x=0,
             orient="horiz",
@@ -478,8 +464,7 @@ class RNASeqAnalysis(Analysis):
         sns.despine(fig)
         fig.savefig(
             os.path.join(
-                output_dir,
-                self.name + "{}.expression.reads_per_sample.svg".format(output_prefix),
+                output_dir, self.name + "{}.expression.reads_per_sample.svg".format(output_prefix),
             ),
             bbox_inches="tight",
         )
@@ -490,10 +475,7 @@ class RNASeqAnalysis(Analysis):
 
         fig, axis = plt.subplots(1, 2, figsize=(6 * 2, 6))
         sns.heatmap(
-            cov.drop([1, 2], axis=1),
-            ax=axis[0],
-            cmap="GnBu",
-            cbar_kws={"label": "Genes covered"},
+            cov.drop([1, 2], axis=1), ax=axis[0], cmap="GnBu", cbar_kws={"label": "Genes covered"},
         )
         sns.heatmap(
             cov.drop([1, 2], axis=1).apply(lambda x: (x - x.mean()) / x.std(), axis=0),
@@ -509,8 +491,7 @@ class RNASeqAnalysis(Analysis):
         sns.despine(fig)
         fig.savefig(
             os.path.join(
-                output_dir,
-                self.name + "{}.expression.genes_with_reads.svg".format(output_prefix),
+                output_dir, self.name + "{}.expression.genes_with_reads.svg".format(output_prefix),
             ),
             bbox_inches="tight",
         )
@@ -533,22 +514,21 @@ class RNASeqAnalysis(Analysis):
                 os.path.join(
                     output_dir,
                     self.name
-                    + "{}.expression.boxplot_per_sample.{}.svg".format(
-                        output_prefix, name
-                    ),
+                    + "{}.expression.boxplot_per_sample.{}.svg".format(output_prefix, name),
                 ),
                 bbox_inches="tight",
             )
 
 
 def plot_features(
-        analysis=None,
-        knockout_genes=None,
-        matrix="matrix_norm",
-        samples=None,
-        differential_results=None,
-        output_dir=None,
-        output_prefix="knockout_expression",):
+    analysis=None,
+    knockout_genes=None,
+    matrix="matrix_norm",
+    samples=None,
+    differential_results=None,
+    output_dir=None,
+    output_prefix="knockout_expression",
+):
     """
     Plot expression of genes in samples or sample groups.
 
@@ -588,9 +568,7 @@ def plot_features(
     from ngs_toolkit.graphics import clustermap_varieties
 
     if (analysis is None) and (matrix is None):
-        raise AssertionError(
-            "One of `analysis` or `matrix` must be provided."
-        )
+        raise AssertionError("One of `analysis` or `matrix` must be provided.")
 
     msg = "If an `analysis` object is not provided, you must provide a list of `knockout_genes`."
     if (analysis is None) and (knockout_genes is None):
@@ -633,7 +611,7 @@ def plot_features(
     if differential_results is None:
         return
 
-    if len(differential_results['comparison_name'].unique()) <= 1:
+    if len(differential_results["comparison_name"].unique()) <= 1:
         msg = "Could not plot values per comparison as only one found!"
         _LOGGER.warning(msg)
         return
@@ -652,12 +630,19 @@ def plot_features(
     p_table = p_table.replace(-np.inf, 0)
 
     clustermap_varieties(
-        p_table, output_dir=output_dir,
-        output_prefix=output_prefix + ".p_value", quantity="-log10(FDR p-value)")
+        p_table,
+        output_dir=output_dir,
+        output_prefix=output_prefix + ".p_value",
+        quantity="-log10(FDR p-value)",
+    )
     clustermap_varieties(
-        p_table, output_dir=output_dir,
+        p_table,
+        output_dir=output_dir,
         output_prefix=output_prefix + ".p_value.thresholded",
-        steps=['base', 'sorted'], quantity="-log10(FDR p-value)", vmax=1.3 * 5)
+        steps=["base", "sorted"],
+        quantity="-log10(FDR p-value)",
+        vmax=1.3 * 5,
+    )
 
     # logfoldchanges
     fc_table = pd.pivot_table(
@@ -671,13 +656,21 @@ def plot_features(
     fc_table = fc_table.loc[:, knockout_genes].dropna()
 
     clustermap_varieties(
-        fc_table, output_dir=output_dir,
+        fc_table,
+        output_dir=output_dir,
         output_prefix=output_prefix + "log_fc",
-        steps=['base', 'sorted'], quantity="log2(fold-change)")
+        steps=["base", "sorted"],
+        quantity="log2(fold-change)",
+    )
     clustermap_varieties(
-        fc_table, output_dir=output_dir,
+        fc_table,
+        output_dir=output_dir,
         output_prefix=output_prefix + "log_fc.thresholded",
-        steps=['base', 'sorted'], quantity="log2(fold-change)", vmin=-2, vmax=2)
+        steps=["base", "sorted"],
+        quantity="log2(fold-change)",
+        vmin=-2,
+        vmax=2,
+    )
 
 
 def assess_cell_cycle(
@@ -698,9 +691,7 @@ def assess_cell_cycle(
     #         "results",
     #         "arid1a_rnaseq.expression_counts.gene_level.quantile_normalized.log2_tpm.csv"),
     #     index_col=0)
-    exp_z = pd.DataFrame(
-        zscore(matrix, axis=0), index=matrix.index, columns=matrix.columns
-    )
+    exp_z = pd.DataFrame(zscore(matrix, axis=0), index=matrix.index, columns=matrix.columns)
 
     # Score samples for cell cycle
     cl = "https://raw.githubusercontent.com/theislab/scanpy_usage/master/"
@@ -737,26 +728,16 @@ def assess_cell_cycle(
             s=5,
         )
         axis[1].scatter(
-            preds.loc[
-                (preds["phase"] == phase) & (preds.index.str.contains("HAP1")),
-                "S_score",
-            ],
-            preds.loc[
-                (preds["phase"] == phase) & (preds.index.str.contains("HAP1")),
-                "G2M_score",
-            ],
+            preds.loc[(preds["phase"] == phase) & (preds.index.str.contains("HAP1")), "S_score",],
+            preds.loc[(preds["phase"] == phase) & (preds.index.str.contains("HAP1")), "G2M_score",],
             label=phase,
             alpha=0.5,
             s=5,
         )
     for s in preds.index:
-        axis[0].text(
-            preds.loc[s, "S_score"], preds.loc[s, "G2M_score"], s=s, fontsize=6
-        )
+        axis[0].text(preds.loc[s, "S_score"], preds.loc[s, "G2M_score"], s=s, fontsize=6)
     for s in preds.index[preds.index.str.contains("HAP1")]:
-        axis[1].text(
-            preds.loc[s, "S_score"], preds.loc[s, "G2M_score"], s=s, fontsize=6
-        )
+        axis[1].text(preds.loc[s, "S_score"], preds.loc[s, "G2M_score"], s=s, fontsize=6)
     axis[0].set_title("All samples")
     axis[1].set_title("HAP1 samples")
     fig.savefig(

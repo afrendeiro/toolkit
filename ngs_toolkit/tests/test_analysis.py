@@ -46,19 +46,19 @@ class TestAnalysis:
                 "n_factors": [1, 2, 3],
                 "n_features": [100, 1000, 10000],
                 "n_replicates": [1, 2, 5],
-                "analysis": "ATACSeqAnalysis"
+                "analysis": "ATACSeqAnalysis",
             },
             "ChIP-seq": {
                 "n_factors": [1, 2, 3],
                 "n_features": [100, 1000, 10000],
                 "n_replicates": [1, 2, 5],
-                "analysis": "ChIPSeqAnalysis"
+                "analysis": "ChIPSeqAnalysis",
             },
             "RNA-seq": {
                 "n_factors": [1, 2, 3],
                 "n_features": [100, 1000, 25000],
                 "n_replicates": [1, 2, 5],
-                "analysis": "RNASeqAnalysis"
+                "analysis": "RNASeqAnalysis",
             },
         }
 
@@ -205,7 +205,9 @@ class TestAnalysis:
         with pytest.raises(IOError):
             atac_analysis._get_samples_with_input_file("aligned_filtered_bam")
 
-        assert not atac_analysis._get_samples_with_input_file("aligned_filtered_bam", permissive=True)
+        assert not atac_analysis._get_samples_with_input_file(
+            "aligned_filtered_bam", permissive=True
+        )
         assert not atac_analysis._get_samples_with_input_file("peaks", permissive=True)
         assert not atac_analysis._get_samples_with_input_file("summits", permissive=True)
 
@@ -214,7 +216,8 @@ class TestAnalysis:
         [
             ("_${USER}_", "_{}_".format(os.environ.get("USER"))),
             # ("_$PATH_", "_{}_".format(os.environ.get("PATH"))),
-        ])
+        ],
+    )
     def test__format_string_with_environment_variables(self, env_var, string):
         assert string == Analysis._format_string_with_environment_variables(env_var)
 
@@ -226,10 +229,8 @@ class TestAnalysis:
 
     @pytest.mark.parametrize(
         "env_var,string",
-        [
-            ("{data_type}", "ATAC-seq"),
-            ("{name}", "test-project_ATAC-seq_human_hg38_1_250_2"),
-        ])
+        [("{data_type}", "ATAC-seq"), ("{name}", "test-project_ATAC-seq_human_hg38_1_250_2"),],
+    )
     def test__format_string_with_attributes(self, atac_analysis, env_var, string):
         assert string == atac_analysis._format_string_with_attributes(env_var)
 
@@ -249,57 +250,46 @@ def test_project_with_subprojects(subproject_config):
     a = Analysis(from_pep=subproject_config)
     assert len(a.samples) == 0
 
-    a = Analysis(from_pep=subproject_config, subproject="test_subproject")
+    a = Analysis(from_pep=subproject_config, amendments=["test_subproject"])
     assert len(a.samples) > 0
 
 
-@pytest.mark.skipif(
-    not COMBAT,
-    reason="Combat not installed")
+@pytest.mark.skipif(not COMBAT, reason="Combat not installed")
 def test_remove_factor(atac_analysis_many_factors):
     import pandas as pd
 
     a = atac_analysis_many_factors
     a.matrix_norm = a.matrix_norm.dropna()
 
-    prefix = os.path.join(
-        a.results_dir,
-        "unsupervised_analysis_{}".format(a.data_type),
-        a.name
-    )
+    prefix = os.path.join(a.results_dir, "unsupervised_analysis_{}".format(a.data_type), a.name)
     # inspect
-    a.unsupervised_analysis(output_prefix="before", steps=['pca_association'])
+    a.unsupervised_analysis(output_prefix="before", steps=["pca_association"])
 
     f = prefix + ".before.pca.variable_principle_components_association.csv"
     p = pd.read_csv(get_this_file_or_timestamped(f))
 
     # extract the name of the factor with highest contribution
-    factor = p.iloc[p.query("pc == 1")['p_value'].idxmin()]['attribute']
+    factor = p.iloc[p.query("pc == 1")["p_value"].idxmin()]["attribute"]
     # check if it's significant
-    assert p.query("attribute == '{}' and pc < 15".format(factor))['p_value'].min() < 0.05
+    assert p.query("attribute == '{}' and pc < 15".format(factor))["p_value"].min() < 0.05
 
     # remove factor without regard for the other factors
-    m = a.remove_factor_from_matrix(
-        factor=factor,
-        assign=False, save=False)
-    a.unsupervised_analysis(
-        matrix=m,
-        output_prefix="after_simple",
-        steps=['pca_association'])
+    m = a.remove_factor_from_matrix(factor=factor, assign=False, save=False)
+    a.unsupervised_analysis(matrix=m, output_prefix="after_simple", steps=["pca_association"])
 
     f = prefix + ".after_simple.pca.variable_principle_components_association.csv"
     p2 = pd.read_csv(get_this_file_or_timestamped(f))
-    assert p2.query("attribute == '{}' and pc < 15".format(factor))['p_value'].min() > 0.05
+    assert p2.query("attribute == '{}' and pc < 15".format(factor))["p_value"].min() > 0.05
 
     # remove factor accounting for the other factors
     m = a.remove_factor_from_matrix(
-        factor=factor, covariates=[x for x in a.group_attributes if x != factor],
-        assign=False, save=False)
-    a.unsupervised_analysis(
-        matrix=m,
-        output_prefix="after_covariates",
-        steps=['pca_association'])
+        factor=factor,
+        covariates=[x for x in a.group_attributes if x != factor],
+        assign=False,
+        save=False,
+    )
+    a.unsupervised_analysis(matrix=m, output_prefix="after_covariates", steps=["pca_association"])
 
     f = prefix + ".after_covariates.pca.variable_principle_components_association.csv"
     p3 = pd.read_csv(get_this_file_or_timestamped(f))
-    assert p3.query("attribute == '{}' and pc < 15".format(factor))['p_value'].min() > 0.05
+    assert p3.query("attribute == '{}' and pc < 15".format(factor))["p_value"].min() > 0.05

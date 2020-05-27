@@ -81,6 +81,7 @@ class ATACSeqAnalysis(Analysis):
     >>> # Save object
     >>> a.to_pickle()
     """
+
     _data_type = "ATAC-seq"
 
     def __init__(
@@ -93,7 +94,7 @@ class ATACSeqAnalysis(Analysis):
         results_dir="results",
         prj=None,
         samples=None,
-        **kwargs
+        **kwargs,
     ):
         # The check for existance is to make sure other classes can inherit from this
         default_args = {
@@ -101,7 +102,8 @@ class ATACSeqAnalysis(Analysis):
             "__data_type__": "ATAC-seq",
             "var_unit_name": "region",
             "quantity": "accessibility",
-            "norm_units": "RPM"}
+            "norm_units": "RPM",
+        }
         for k, v in default_args.items():
             if not hasattr(self, k):
                 setattr(self, k, v)
@@ -115,15 +117,11 @@ class ATACSeqAnalysis(Analysis):
             results_dir=results_dir,
             prj=prj,
             samples=samples,
-            **kwargs
+            **kwargs,
         )
 
     def load_data(
-        self,
-        output_map=None,
-        only_these_keys=None,
-        prefix="{results_dir}/{name}",
-        permissive=True,
+        self, output_map=None, only_these_keys=None, prefix="{results_dir}/{name}", permissive=True,
     ):
         """
         Load the output files of the major functions of the Analysis.
@@ -191,27 +189,15 @@ class ATACSeqAnalysis(Analysis):
                 "support": (prefix + ".support.csv", kwargs),
                 "nuc": (prefix + ".gccontent_length.csv", kwargs),
                 "gene_annotation": (prefix + ".gene_annotation.csv", kwargs),
-                "closest_tss_distances": (
-                    prefix + ".closest_tss_distances.csv",
-                    kwargs,
-                ),
+                "closest_tss_distances": (prefix + ".closest_tss_distances.csv", kwargs,),
                 "region_annotation": (prefix + ".region_annotation.csv", kwargs),
-                "region_annotation_b": (
-                    prefix + ".region_annotation_background.csv",
-                    kwargs,
-                ),
-                "region_annotation_mapping": (
-                    prefix + ".region_annotation_mapping.csv",
-                    kwargs,
-                ),
+                "region_annotation_b": (prefix + ".region_annotation_background.csv", kwargs,),
+                "region_annotation_mapping": (prefix + ".region_annotation_mapping.csv", kwargs,),
                 "region_annotation_b_mapping": (
                     prefix + ".region_annotation_background_mapping.csv",
                     kwargs,
                 ),
-                "chrom_state_annotation": (
-                    prefix + ".chrom_state_annotation.csv",
-                    kwargs,
-                ),
+                "chrom_state_annotation": (prefix + ".chrom_state_annotation.csv", kwargs,),
                 "chrom_state_annotation_b": (
                     prefix + ".chrom_state_annotation_background.csv",
                     kwargs,
@@ -261,10 +247,7 @@ class ATACSeqAnalysis(Analysis):
 
     @staticmethod
     def check_region_index(matrix):
-        return (
-            matrix.index.str.contains(":").all()
-            and matrix.index.str.contains("-").all()
-        )
+        return matrix.index.str.contains(":").all() and matrix.index.str.contains("-").all()
 
     @staticmethod
     def set_region_index(matrix, force=False):
@@ -278,7 +261,9 @@ class ATACSeqAnalysis(Analysis):
             if all([x in matrix.columns for x in req]):
                 matrix.index = bed_to_index(matrix)
             else:
-                raise ValueError("Could not format matrix index. Missing '{}' columns.".format(",".join(req)))
+                raise ValueError(
+                    "Could not format matrix index. Missing '{}' columns.".format(",".join(req))
+                )
 
     def get_consensus_sites(
         self,
@@ -290,7 +275,7 @@ class ATACSeqAnalysis(Analysis):
         permissive=False,
         save=True,
         assign=True,
-        **kwargs
+        **kwargs,
     ):
         """
         Get consensus (union) of enriched sites (peaks) across samples.
@@ -376,12 +361,10 @@ class ATACSeqAnalysis(Analysis):
             region_type, permissive=permissive, samples=samples
         )
 
-        if (blacklist_bed is not False and blacklist_bed is None):
+        if blacklist_bed is not False and blacklist_bed is None:
             _LOGGER.info("Blacklist file not provided. Downloading...")
             try:
-                blacklist_bed = self.get_resources(steps=["blacklist"])[
-                    "blacklist_file"
-                ]
+                blacklist_bed = self.get_resources(steps=["blacklist"])["blacklist_file"]
             except AttributeError:
                 msg = "Blacklist file was not provided and cannot be"
                 msg += " get one without `organism` and `genome` set."
@@ -392,18 +375,22 @@ class ATACSeqAnalysis(Analysis):
         with open(f.name, "a") as handle:
             for sample in tqdm(samples, total=len(samples), desc="Sample"):
                 try:
-                    file = pybedtools.BedTool(sample.summits) \
-                        .slop(b=extension, genome=sample.genome).fn \
-                        if region_type == "summits" else sample.peaks
+                    file = (
+                        pybedtools.BedTool(sample.summits)
+                        .slop(b=extension, genome=sample.genome)
+                        .fn
+                        if region_type == "summits"
+                        else sample.peaks
+                    )
                 except (ValueError, FileNotFoundError):
                     if not permissive:
                         raise
                     else:
                         _LOGGER.warning(
-                            "Peaks for sample {} ({}) not found!"
-                            .format(sample, sample.peaks))
+                            "Peaks for sample {} ({}) not found!".format(sample, sample.peaks)
+                        )
                         continue
-                for line in open(file, 'r'):
+                for line in open(file, "r"):
                     handle.write(line)
 
         # NCBI genome FASTA files are sorted naturally while Ensembl are not
@@ -425,7 +412,9 @@ class ATACSeqAnalysis(Analysis):
                 sites = sites.filter(lambda x: x.chrom not in filter_chroms).saveas()
             elif isinstance(filter_chroms, str):
                 s = sites.to_dataframe()
-                sites = pybedtools.BedTool.from_dataframe(s.loc[~s['chrom'].str.match(filter_chroms)])
+                sites = pybedtools.BedTool.from_dataframe(
+                    s.loc[~s["chrom"].str.match(filter_chroms)]
+                )
 
         # Save and assign
         if save:
@@ -468,10 +457,14 @@ class ATACSeqAnalysis(Analysis):
                 self.sites.saveas(default_sites)
         # TODO: warn if not overwrite and file exists already
 
-    @check_has_attributes(['sites'])
+    @check_has_attributes(["sites"])
     def calculate_peak_support(
-        self, samples=None, region_type="summits", permissive=False,
-        comparison_table=None, peak_dir=None
+        self,
+        samples=None,
+        region_type="summits",
+        permissive=False,
+        comparison_table=None,
+        peak_dir=None,
     ):
         """
         Count number of called peaks per sample in the consensus region set.
@@ -523,7 +516,8 @@ class ATACSeqAnalysis(Analysis):
 
         # Check which samples to run (dependent on permissive)
         samples = self._get_samples_with_input_file(
-            region_type, permissive=permissive, samples=samples)
+            region_type, permissive=permissive, samples=samples
+        )
 
         # calculate support (number of samples overlaping each merged peak)
         for i, sample in tqdm(enumerate(samples), total=len(samples), desc="Sample"):
@@ -553,13 +547,10 @@ class ATACSeqAnalysis(Analysis):
             support.saveas(t.name)
             support = pd.read_csv(t.name, sep="\t", header=None)
 
-        support.columns = ["chrom", "start", "end"] + [
-            sample.name for sample in samples
-        ]
+        support.columns = ["chrom", "start", "end"] + [sample.name for sample in samples]
         support.index = bed_to_index(support)
         support.to_csv(
-            os.path.join(self.results_dir, self.name + ".binary_overlap_support.csv"),
-            index=True,
+            os.path.join(self.results_dir, self.name + ".binary_overlap_support.csv"), index=True,
         )
 
         # divide sum (of unique overlaps) by total to get support value between 0 and 1
@@ -567,9 +558,7 @@ class ATACSeqAnalysis(Analysis):
             lambda x: sum([i if i <= 1 else 1 for i in x]) / float(len(samples)), axis=1
         )
         # save
-        support.to_csv(
-            os.path.join(self.results_dir, self.name + ".support.csv"), index=True
-        )
+        support.to_csv(os.path.join(self.results_dir, self.name + ".support.csv"), index=True)
 
         setattr(self, "support", support)
         return self.support
@@ -607,7 +596,7 @@ class ATACSeqAnalysis(Analysis):
         permissive=False,
         distributed=False,
         overwrite=True,
-        **kwargs
+        **kwargs,
     ):
         """
         Measure read coverage (counts) of each sample in each region
@@ -731,13 +720,12 @@ class ATACSeqAnalysis(Analysis):
 
         else:
             for s in samples:
-                output_dir = os.path.join(s.paths.sample_root, "coverage")
+                output_dir = os.path.join(s.sample_root, "coverage")
                 if not os.path.exists(output_dir):
                     os.makedirs(output_dir)
 
                 job_name = "{}.{}_coverage".format(peak_set_name, s.name)
-                prefix = os.path.join(output_dir, s.name + ".{}_coverage"
-                                      .format(peak_set_name))
+                prefix = os.path.join(output_dir, s.name + ".{}_coverage".format(peak_set_name))
                 output_file = prefix + ".bed"
                 log_file = prefix + ".log"
                 job_file = prefix + ".sh"
@@ -745,32 +733,32 @@ class ATACSeqAnalysis(Analysis):
                     if os.path.exists(output_file):
                         continue
 
-                cmd = (
-                    "\\\n".join([
+                cmd = "\\\n".join(
+                    [
                         "{executable} -m ngs_toolkit.recipes.coverage ",
                         "--no-overwrite" if not overwrite else "",
-                        "{input_bed} {input_bam} {output_bed}"])
-                    .format(
-                        executable=sys.executable,
-                        input_bed=sites.fn,
-                        input_bam=s.aligned_filtered_bam,
-                        output_bed=output_file
-                    )
+                        "{input_bed} {input_bam} {output_bed}",
+                    ]
+                ).format(
+                    executable=sys.executable,
+                    input_bed=sites.fn,
+                    input_bam=s.aligned_filtered_bam,
+                    output_bed=output_file,
                 )
                 for k, v in [("cores", 1), ("mem", 8000), ("time", "04:00:00")]:
                     if k not in kwargs:
                         kwargs[k] = v
 
-                submit_job(
-                    cmd, job_file,
-                    jobname=job_name,
-                    logfile=log_file,
-                    **kwargs)
+                submit_job(cmd, job_file, jobname=job_name, logfile=log_file, **kwargs)
             if getattr(kwargs, "computing_configuration", None) in ["localhost", "default"]:
                 _LOGGER.info("Collecting job results.")
                 return self.collect_coverage(
-                    samples=samples, save=save, assign=assign,
-                    output_file=output_file, permissive=permissive)
+                    samples=samples,
+                    save=save,
+                    assign=assign,
+                    output_file=output_file,
+                    permissive=permissive,
+                )
 
     def collect_coverage(
         self,
@@ -780,7 +768,7 @@ class ATACSeqAnalysis(Analysis):
         output_file=None,
         permissive=False,
         peak_set_name="peak_set",
-        fast_and_unsafe=False
+        fast_and_unsafe=False,
     ):
         """
         Collect read coverage (counts) of each sample in each region in consensus sites from existing files.
@@ -845,7 +833,7 @@ class ATACSeqAnalysis(Analysis):
                 sample,
                 "_coverage",
                 os.path.join(
-                    sample.paths.sample_root,
+                    sample.sample_root,
                     "coverage",
                     sample.name + ".{}_coverage.bed".format(peak_set_name),
                 ),
@@ -888,14 +876,20 @@ class ATACSeqAnalysis(Analysis):
         if fast_and_unsafe:
             _LOGGER.warning("Using a concatenation method that is not 100% safe.")
             matrix_raw = pd.concat(matrix_raw, axis=1, sort=False).dropna().sort_index()
-            matrix_raw = matrix_raw.loc[:, ~matrix_raw.columns.duplicated()].set_index(["chrom", "start", "end"]).astype(int)
+            matrix_raw = (
+                matrix_raw.loc[:, ~matrix_raw.columns.duplicated()]
+                .set_index(["chrom", "start", "end"])
+                .astype(int)
+            )
         else:
             matrix_raw = (
                 pd.concat(matrix_raw, axis=0, sort=False)
                 .melt(id_vars=["chrom", "start", "end"])
                 .pivot_table(
-                    index=["chrom", "start", "end"], columns="variable",
-                    values="value", fill_value=0
+                    index=["chrom", "start", "end"],
+                    columns="variable",
+                    values="value",
+                    fill_value=0,
                 )
                 .astype(int)
             )
@@ -908,12 +902,11 @@ class ATACSeqAnalysis(Analysis):
                 matrix_raw.to_csv(output_file, index=True)
             else:
                 self.matrix_raw.to_csv(
-                    os.path.join(self.results_dir, self.name + ".matrix_raw.csv"),
-                    index=True,
+                    os.path.join(self.results_dir, self.name + ".matrix_raw.csv"), index=True,
                 )
         return matrix_raw
 
-    @check_has_attributes(['organism', 'genome'])
+    @check_has_attributes(["organism", "genome"])
     def get_peak_gccontent_length(self, bed_file=None, fasta_file=None):
         """
         Get length and GC content of features in region set.
@@ -950,9 +943,7 @@ class ATACSeqAnalysis(Analysis):
             sites = pybedtools.BedTool(bed_file)
 
         if fasta_file is None:
-            _LOGGER.info(
-                "Reference genome FASTA file was not given, will try to get it."
-            )
+            _LOGGER.info("Reference genome FASTA file was not given, will try to get it.")
             _LOGGER.info(
                 "Getting genome FASTA file for organism '{}', genome '{}'. ".format(
                     self.organism, self.genome
@@ -970,16 +961,12 @@ class ATACSeqAnalysis(Analysis):
         self.nuc = nuc.loc[self.matrix_raw.index]
 
         self.nuc.to_csv(
-            os.path.join(self.results_dir, self.name + ".gccontent_length.csv"),
-            index=True,
+            os.path.join(self.results_dir, self.name + ".gccontent_length.csv"), index=True,
         )
 
         return self.nuc
 
-    def normalize_cqn(
-            self,
-            matrix="matrix_raw", samples=None,
-            save=True, assign=True):
+    def normalize_cqn(self, matrix="matrix_raw", samples=None, save=True, assign=True):
         """
         Conditional quantile normalization (CQN) of a matrix.
         It uses GC content and length of regulatory elements as covariates.
@@ -1037,8 +1024,7 @@ class ATACSeqAnalysis(Analysis):
 
         if save:
             matrix_norm.to_csv(
-                os.path.join(self.results_dir, self.name + ".matrix_norm.csv"),
-                index=True,
+                os.path.join(self.results_dir, self.name + ".matrix_norm.csv"), index=True,
             )
         if assign:
             self.matrix_norm = matrix_norm
@@ -1046,14 +1032,10 @@ class ATACSeqAnalysis(Analysis):
 
         return matrix_norm
 
-    @check_has_attributes(['sites'])
+    @check_has_attributes(["sites"])
     def get_peak_gene_annotation(
-            self,
-            tss_file=None,
-            max_dist=100000,
-            save=True,
-            output_prefix="",
-            assign=True):
+        self, tss_file=None, max_dist=100000, save=True, output_prefix="", assign=True
+    ):
         """
         Annotates peaks with closest gene.
         The annotation reference can either be given in the `tss_file` parameter
@@ -1107,9 +1089,7 @@ class ATACSeqAnalysis(Analysis):
         cols = [6, 8, -1]  # gene_name, strand, distance
 
         if tss_file is None:
-            _LOGGER.info(
-                "Reference TSS file was not given, will try to get TSS annotations."
-            )
+            _LOGGER.info("Reference TSS file was not given, will try to get TSS annotations.")
             _LOGGER.info(
                 "Getting TSS annotations for organism '{}', genome '{}'.".format(
                     self.organism, self.genome
@@ -1124,25 +1104,18 @@ class ATACSeqAnalysis(Analysis):
 
         # get closest TSS of each region
         tss = pybedtools.BedTool(tss_file)
-        columns = [
-            "chrom", "start", "end",
-            "gene_name", "strand", "distance"]
-        closest_tss_distances = (
-            self.sites.closest(tss, D="b")
-            .to_dataframe())
+        columns = ["chrom", "start", "end", "gene_name", "strand", "distance"]
+        closest_tss_distances = self.sites.closest(tss, D="b").to_dataframe()
 
         closest_tss_distances = closest_tss_distances.iloc[:, [0, 1, 2] + cols]
         closest_tss_distances.columns = columns
 
         # set NaN to distance without assignment (rather than the default '-1' from bedtools)
-        closest_tss_distances.loc[
-            closest_tss_distances["gene_name"] == ".", "distance"
-        ] = np.nan
+        closest_tss_distances.loc[closest_tss_distances["gene_name"] == ".", "distance"] = np.nan
 
         # set NaN to assignments out of range
         closest_tss_distances.loc[
-            closest_tss_distances["distance"].abs() > max_dist,
-            ["gene_name", "strand", "distance"],
+            closest_tss_distances["distance"].abs() > max_dist, ["gene_name", "strand", "distance"],
         ] = np.nan
 
         # aggregate annotation per peak, concatenate various genes (comma-separated)
@@ -1159,11 +1132,16 @@ class ATACSeqAnalysis(Analysis):
             if output_prefix != "":
                 output_prefix += "."
             closest_tss_distances.to_csv(
-                os.path.join(self.results_dir, self.name + ".closest_tss_distances.{}csv".format(output_prefix)),
+                os.path.join(
+                    self.results_dir,
+                    self.name + ".closest_tss_distances.{}csv".format(output_prefix),
+                ),
                 index=True,
             )
             gene_annotation.to_csv(
-                os.path.join(self.results_dir, self.name + ".gene_annotation.{}csv".format(output_prefix)),
+                os.path.join(
+                    self.results_dir, self.name + ".gene_annotation.{}csv".format(output_prefix)
+                ),
                 index=True,
             )
         if assign:
@@ -1171,13 +1149,10 @@ class ATACSeqAnalysis(Analysis):
             self.gene_annotation = gene_annotation
         return gene_annotation
 
-    @check_has_attributes(['organism', 'genome', 'sites'])
+    @check_has_attributes(["organism", "genome", "sites"])
     def get_peak_genomic_location(
-            self,
-            genomic_context_file=None,
-            save=True,
-            output_prefix="",
-            assign=True):
+        self, genomic_context_file=None, save=True, output_prefix="", assign=True
+    ):
         """
         Annotates a consensus peak set (``sites`` attribute of analysis) with their genomic context.
         The genomic context is mostly gene-centric, which includes overlap with
@@ -1224,9 +1199,7 @@ class ATACSeqAnalysis(Analysis):
         from ngs_toolkit.utils import bed_to_index, get_this_file_or_timestamped
 
         if genomic_context_file is None:
-            _LOGGER.info(
-                "Reference genomic context file was not given, will try to get it."
-            )
+            _LOGGER.info("Reference genomic context file was not given, will try to get it.")
             _LOGGER.info(
                 "Getting genomic context annotations for organism '{}', genome '{}'. ".format(
                     self.organism, self.genome
@@ -1251,10 +1224,7 @@ class ATACSeqAnalysis(Analysis):
             ("real", "region_annotation", self.sites),
         ]:
             annot = (
-                bed.intersect(context, wa=True, wb=True, f=0.2)
-                .sort()
-                .to_dataframe()
-                .iloc[:, cols]
+                bed.intersect(context, wa=True, wb=True, f=0.2).sort().to_dataframe().iloc[:, cols]
             )
             annot.index = bed_to_index(annot)
             annot.columns = ["chrom", "start", "end", "genomic_region"]
@@ -1283,7 +1253,8 @@ class ATACSeqAnalysis(Analysis):
                 )
                 annot_comp.to_csv(
                     os.path.join(
-                        self.results_dir, self.name + ".region_annotation{}.{}csv".format(a, output_prefix)
+                        self.results_dir,
+                        self.name + ".region_annotation{}.{}csv".format(a, output_prefix),
                     ),
                     index=True,
                 )
@@ -1293,14 +1264,10 @@ class ATACSeqAnalysis(Analysis):
                 setattr(self, attr + "_mapping", annot)
         return self.region_annotation
 
-    @check_has_attributes(['organism', 'genome', 'sites'])
+    @check_has_attributes(["organism", "genome", "sites"])
     def get_peak_chromatin_state(
-            self,
-            chrom_state_file,
-            frac=0.2,
-            save=True,
-            output_prefix="",
-            assign=True):
+        self, chrom_state_file, frac=0.2, save=True, output_prefix="", assign=True
+    ):
         """
         Annotates a consensus peak set (``sites`` attribute of analysis)
         with their chromatin state context.
@@ -1363,14 +1330,10 @@ class ATACSeqAnalysis(Analysis):
 
         for label, attr, bed in [
             ("real", "chrom_state_annotation", self.sites),
-            ("background", "chrom_state_annotation_b", background)
+            ("background", "chrom_state_annotation_b", background),
         ]:
-            _LOGGER.debug(
-                "Overlapping chromatin state annotation with {} regions.".format(label)
-            )
-            annot = bed.intersect(
-                states, wa=True, wb=True, f=frac, loj=True
-            )
+            _LOGGER.debug("Overlapping chromatin state annotation with {} regions.".format(label))
+            annot = bed.intersect(states, wa=True, wb=True, f=frac, loj=True)
             try:
                 annot = annot.to_dataframe(usecols=[0, 1, 2, 6])
             except pd.errors.EmptyDataError:
@@ -1399,7 +1362,8 @@ class ATACSeqAnalysis(Analysis):
                 annot.to_csv(
                     os.path.join(
                         self.results_dir,
-                        self.name + ".chrom_state_annotation{}_mapping.{}csv".format(a, output_prefix),
+                        self.name
+                        + ".chrom_state_annotation{}_mapping.{}csv".format(a, output_prefix),
                     ),
                     index=True,
                 )
@@ -1479,7 +1443,9 @@ class ATACSeqAnalysis(Analysis):
         # calculate ratio
         ratio = m.loc[sex_chroms[1]] - m.loc[sex_chroms[0]]
         ratio.name = "{}_to_{}_ratio".format(sex_chroms[1], sex_chroms[0])
-        ratio.to_csv(os.path.join(output_dir, self.name + "." + output_prefix + ".csv"), header=True)
+        ratio.to_csv(
+            os.path.join(output_dir, self.name + "." + output_prefix + ".csv"), header=True
+        )
 
         if plot:
             ratio.sort_values(inplace=True)
@@ -1503,7 +1469,9 @@ class ATACSeqAnalysis(Analysis):
             )
             grid.ax_heatmap.set_xlabel("Chromosomes")
             grid.ax_heatmap.set_ylabel("Samples")
-            savefig(grid, os.path.join(output_dir, self.name + "." + output_prefix + ".clustermap.svg"))
+            savefig(
+                grid, os.path.join(output_dir, self.name + "." + output_prefix + ".clustermap.svg")
+            )
 
             # Value vs Rank
             fig, axis = plt.subplots(1, figsize=(3, ratio.shape[0] * 0.3))
@@ -1520,17 +1488,21 @@ class ATACSeqAnalysis(Analysis):
             v += v * 0.1
             axis.set_xlim((-v, v))
             sns.despine(fig)
-            savefig(fig, os.path.join(output_dir, self.name + "." + output_prefix + ".rank_vs_ratio.svg"))
+            savefig(
+                fig,
+                os.path.join(output_dir, self.name + "." + output_prefix + ".rank_vs_ratio.svg"),
+            )
 
         return ratio.sort_index()
 
     def get_gene_level_matrix(
-            self,
-            matrix="matrix_norm",
-            reduce_func=np.mean,
-            assign=True,
-            save=True,
-            output_file="{results_dir}/{name}.gene_coverage.csv"):
+        self,
+        matrix="matrix_norm",
+        reduce_func=np.mean,
+        assign=True,
+        save=True,
+        output_file="{results_dir}/{name}.gene_coverage.csv",
+    ):
         """
         Get gene-level measurements of coverage.
 
@@ -1580,16 +1552,14 @@ class ATACSeqAnalysis(Analysis):
         matrix = self.get_matrix(matrix).copy()
 
         if hasattr(self, "closest_tss_distances"):
-            matrix2 = matrix.join(self.closest_tss_distances[['gene_name']])
-            matrix2 = matrix2.set_index('gene_name', append=True)
+            matrix2 = matrix.join(self.closest_tss_distances[["gene_name"]])
+            matrix2 = matrix2.set_index("gene_name", append=True)
         else:
             g = self.gene_annotation["gene_name"].str.split(",").apply(pd.Series).stack()
             g.index = g.index.droplevel(1)
             g.name = "gene_name"
             matrix2 = matrix.join(g).drop("gene_name", axis=1)
-            matrix2.index = (
-                matrix.join(g).reset_index().set_index(["index", "gene_name"]).index
-            )
+            matrix2.index = matrix.join(g).reset_index().set_index(["index", "gene_name"]).index
 
         matrix2.columns = matrix.columns
         matrix3 = matrix2.groupby(level="gene_name").apply(reduce_func)
@@ -1600,9 +1570,7 @@ class ATACSeqAnalysis(Analysis):
             matrix3.to_csv(self._format_string_with_attributes(output_file))
         return matrix3
 
-    def get_gene_level_changes(
-            self,
-            differential_results=None, reduce_func=np.mean):
+    def get_gene_level_changes(self, differential_results=None, reduce_func=np.mean):
         """
         Redcuce changes in regulatory elements to gene-level by
         aggregating across regulatory elements.
@@ -1635,7 +1603,7 @@ class ATACSeqAnalysis(Analysis):
             differential_results = self.differential_results
 
         if hasattr(self, "closest_tss_distances"):
-            dr2 = differential_results.join(self.closest_tss_distances[['gene_name']])
+            dr2 = differential_results.join(self.closest_tss_distances[["gene_name"]])
             dr2 = dr2.set_index("gene_name", append=True)
         else:
             g = self.gene_annotation["gene_name"].str.split(",").apply(pd.Series).stack()
@@ -1644,18 +1612,11 @@ class ATACSeqAnalysis(Analysis):
 
             dr2 = differential_results.join(g).drop("gene_name", axis=1)
             dr2.index = (
-                differential_results.join(g)
-                .reset_index()
-                .set_index(["index", "gene_name"])
-                .index
+                differential_results.join(g).reset_index().set_index(["index", "gene_name"]).index
             )
 
         dr2.columns = differential_results.columns
-        dr3 = (
-            dr2.reset_index()
-            .groupby(["gene_name", "comparison_name"])
-            .apply(reduce_func)
-        )
+        dr3 = dr2.reset_index().groupby(["gene_name", "comparison_name"]).apply(reduce_func)
 
         return dr3.loc[:, ~dr3.isnull().all()]
 
@@ -1665,7 +1626,7 @@ class ATACSeqAnalysis(Analysis):
         by_attribute=None,
         genome_space=3e9,
         output_dir="{results_dir}/peak_characteristics",
-        output_prefix="{name}"
+        output_prefix="{name}",
     ):
         """
         Several diagnostic plots on the analysis' consensus peak set
@@ -1719,9 +1680,7 @@ class ATACSeqAnalysis(Analysis):
             os.makedirs(output_dir)
         output_prefix = self._format_string_with_attributes(output_prefix)
 
-        reads = parmap.map(
-            count_bam_file_length, [s.aligned_filtered_bam for s in samples]
-        )
+        reads = parmap.map(count_bam_file_length, [s.aligned_filtered_bam for s in samples])
         peaks = list(map(count_lines, [s.peaks for s in samples]))
         open_chrom = list(map(get_total_region_area, [s.peaks for s in samples]))
 
@@ -1734,9 +1693,7 @@ class ATACSeqAnalysis(Analysis):
         stats["peaks_norm"] = (stats["peak_number"] / stats["reads_used"]) * 1e3
         stats["open_chromatin_norm"] = stats["open_chromatin"] / stats["reads_used"]
         stats.to_csv(
-            os.path.join(
-                output_dir, "{}.open_chromatin_space.csv".format(output_prefix)
-            ),
+            os.path.join(output_dir, "{}.open_chromatin_space.csv".format(output_prefix)),
             index=True,
         )
         # stats = pd.read_csv(os.path.join(
@@ -1766,14 +1723,9 @@ class ATACSeqAnalysis(Analysis):
         # plot
         stats = stats.sort_values("open_chromatin_norm")
         fig, axis = plt.subplots(2, 1, figsize=(1 * 3, 2 * 3))
-        for ax, var in zip(axis, ['open_chromatin', 'open_chromatin_norm']):
+        for ax, var in zip(axis, ["open_chromatin", "open_chromatin_norm"]):
             sns.barplot(
-                y="index",
-                x=var,
-                orient="horiz",
-                data=stats.reset_index(),
-                palette="summer",
-                ax=ax,
+                y="index", x=var, orient="horiz", data=stats.reset_index(), palette="summer", ax=ax,
             )
             ax.set_ylabel("Sample name")
         axis[0].set_xlabel("Total open chromatin space (bp)")
@@ -1782,8 +1734,7 @@ class ATACSeqAnalysis(Analysis):
         savefig(
             fig,
             os.path.join(
-                output_dir,
-                "{}.total_open_chromatin_space.per_sample.svg".format(output_prefix),
+                output_dir, "{}.total_open_chromatin_space.per_sample.svg".format(output_prefix),
             ),
         )
 
@@ -1830,9 +1781,7 @@ class ATACSeqAnalysis(Analysis):
                 fig,
                 os.path.join(
                     output_dir,
-                    "{}.total_open_chromatin_space.per_{}.svg".format(
-                        self.name, by_attribute
-                    ),
+                    "{}.total_open_chromatin_space.per_{}.svg".format(self.name, by_attribute),
                 ),
             )
 
@@ -1870,10 +1819,7 @@ class ATACSeqAnalysis(Analysis):
         axis[1].set_xscale("log")
         sns.despine(fig)
         savefig(
-            fig,
-            os.path.join(
-                output_dir, "{}.peak_lengths.per_sample.svg".format(output_prefix)
-            ),
+            fig, os.path.join(output_dir, "{}.peak_lengths.per_sample.svg".format(output_prefix)),
         )
 
         if by_attribute is not None:
@@ -1904,8 +1850,7 @@ class ATACSeqAnalysis(Analysis):
             savefig(
                 fig,
                 os.path.join(
-                    output_dir,
-                    "{}.peak_lengths.per_{}.svg".format(output_prefix, by_attribute),
+                    output_dir, "{}.peak_lengths.per_{}.svg".format(output_prefix, by_attribute),
                 ),
             )
 
@@ -1939,9 +1884,7 @@ class ATACSeqAnalysis(Analysis):
             axis.set_yticklabels(axis.get_yticklabels(), rotation=0, ha="right")
             savefig(
                 fig,
-                os.path.join(
-                    output_dir, "{}.peak_location.per_sample.svg".format(output_prefix)
-                ),
+                os.path.join(output_dir, "{}.peak_location.per_sample.svg".format(output_prefix)),
             )
 
         # Peak set across samples:
@@ -1964,15 +1907,11 @@ class ATACSeqAnalysis(Analysis):
             sns.distplot(self.support["support"], bins=40, ax=axis)
             axis.set_ylabel("frequency")
             sns.despine(fig)
-            savefig(
-                fig, os.path.join(output_dir, "{}.support.svg".format(output_prefix))
-            )
+            savefig(fig, os.path.join(output_dir, "{}.support.svg".format(output_prefix)))
 
         # Plot distance to nearest TSS
         if hasattr(self, "closest_tss_distances"):
-            fig, axis = plt.subplots(
-                2, 1, figsize=(3 * 1, 3 * 2), sharex=False, sharey=False
-            )
+            fig, axis = plt.subplots(2, 1, figsize=(3 * 1, 3 * 2), sharex=False, sharey=False)
             for i, ax in enumerate(axis):
                 sns.distplot(
                     self.closest_tss_distances["distance"],
@@ -1986,18 +1925,13 @@ class ATACSeqAnalysis(Analysis):
             axis[1].set_yscale("log")
             sns.despine(fig)
             savefig(
-                fig,
-                os.path.join(output_dir, "{}.tss_distance.svg".format(output_prefix)),
+                fig, os.path.join(output_dir, "{}.tss_distance.svg".format(output_prefix)),
             )
 
         # Plot genomic regions
         datas = list()
         for name, attr, attr_b in [
-            (
-                "genomic_region",
-                "region_annotation_mapping",
-                "region_annotation_b_mapping",
-            ),
+            ("genomic_region", "region_annotation_mapping", "region_annotation_b_mapping",),
             (
                 "chromatin_state",
                 "chrom_state_annotation_mapping",
@@ -2010,9 +1944,7 @@ class ATACSeqAnalysis(Analysis):
                 # count region frequency
                 data = f[name].value_counts().sort_values(ascending=False)
                 background = b[name].value_counts().sort_values(ascending=False)
-                data = data.to_frame(name="foreground").join(
-                    background.to_frame(name="background")
-                )
+                data = data.to_frame(name="foreground").join(background.to_frame(name="background"))
                 data["fold_change"] = np.log2(data["foreground"] / data["background"])
                 data.index.name = "region"
 
@@ -2037,10 +1969,7 @@ class ATACSeqAnalysis(Analysis):
                 g.map(sns.barplot, "value", "region", orient="horiz")
                 sns.despine(fig)
                 savefig(
-                    g,
-                    os.path.join(
-                        output_dir, "{}.{}s.svg".format(output_prefix, name)
-                    ),
+                    g, os.path.join(output_dir, "{}.{}s.svg".format(output_prefix, name)),
                 )
 
         # plot together
@@ -2060,8 +1989,7 @@ class ATACSeqAnalysis(Analysis):
             savefig(
                 g,
                 os.path.join(
-                    output_dir,
-                    "{}.genomic_region_and_chromatin_states.svg".format(output_prefix),
+                    output_dir, "{}.genomic_region_and_chromatin_states.svg".format(output_prefix),
                 ),
             )
 
@@ -2072,10 +2000,7 @@ class ATACSeqAnalysis(Analysis):
                 sns.distplot(self.stats.loc[:, attr], hist=False, kde=True, ax=axis)
                 sns.despine(fig)
                 savefig(
-                    fig,
-                    os.path.join(
-                        output_dir, "{}.{}.distplot.svg".format(output_prefix, attr)
-                    ),
+                    fig, os.path.join(output_dir, "{}.{}.distplot.svg".format(output_prefix, attr)),
                 )
         if hasattr(self, "support"):
             attr = "support"
@@ -2083,10 +2008,7 @@ class ATACSeqAnalysis(Analysis):
             sns.distplot(self.support.loc[:, attr], hist=False, kde=True, ax=axis)
             sns.despine(fig)
             savefig(
-                fig,
-                os.path.join(
-                    output_dir, "{}.{}.distplot.svg".format(output_prefix, attr)
-                ),
+                fig, os.path.join(output_dir, "{}.{}.distplot.svg".format(output_prefix, attr)),
             )
 
         # Pairwise against mean
@@ -2097,18 +2019,11 @@ class ATACSeqAnalysis(Analysis):
             for attr in stats.columns:
                 if attr == "mean":
                     continue
-                p = stats[
-                    (stats["mean"] > 0)
-                    & (stats[attr] < np.percentile(stats[attr], 99) * 3)
-                ]
-                g = sns.jointplot(
-                    p["mean"], p[attr], s=1, alpha=0.1, rasterized=True, height=3
-                )
+                p = stats[(stats["mean"] > 0) & (stats[attr] < np.percentile(stats[attr], 99) * 3)]
+                g = sns.jointplot(p["mean"], p[attr], s=1, alpha=0.1, rasterized=True, height=3)
                 savefig(
                     g.fig,
-                    os.path.join(
-                        output_dir, "{}.mean_vs_{}.svg".format(output_prefix, attr)
-                    ),
+                    os.path.join(output_dir, "{}.mean_vs_{}.svg".format(output_prefix, attr)),
                 )
 
     def plot_raw_coverage(self, samples=None, by_attribute=None):
@@ -2149,10 +2064,7 @@ class ATACSeqAnalysis(Analysis):
                 ax=axis,
             )
             sns.despine(fig)
-            savefig(
-                fig,
-                os.path.join(
-                    self.results_dir, self.name + ".raw_counts.violinplot.svg"))
+            savefig(fig, os.path.join(self.results_dir, self.name + ".raw_counts.violinplot.svg"))
         else:
             attrs = set([getattr(s, by_attribute) for s in samples])
             fig, axis = plt.subplots(len(attrs), 1, figsize=(8, len(attrs) * 6))
@@ -2162,11 +2074,7 @@ class ATACSeqAnalysis(Analysis):
                     np.log2(
                         1
                         + self.matrix_raw[
-                            [
-                                s.name
-                                for s in samples
-                                if getattr(s, by_attribute) == attr
-                            ]
+                            [s.name for s in samples if getattr(s, by_attribute) == attr]
                         ]
                     ),
                     var_name="Sample name",
@@ -2187,7 +2095,9 @@ class ATACSeqAnalysis(Analysis):
                 fig,
                 os.path.join(
                     self.results_dir,
-                    self.name + ".raw_counts.violinplot.by_{}.svg".format(by_attribute)))
+                    self.name + ".raw_counts.violinplot.by_{}.svg".format(by_attribute),
+                ),
+            )
 
     def plot_coverage(self):
         import matplotlib.pyplot as plt
@@ -2207,9 +2117,7 @@ class ATACSeqAnalysis(Analysis):
             d.index = d.index.droplevel(
                 1
             )  # returned a multiindex Series, so get rid of second index level (first is from original row)
-            data = data.drop(
-                [variable], axis=1
-            )  # drop original column so there are no conflicts
+            data = data.drop([variable], axis=1)  # drop original column so there are no conflicts
             d.name = variable
             data = data.join(d)  # joins on index
 
@@ -2232,9 +2140,7 @@ class ATACSeqAnalysis(Analysis):
             "chromatin_state",
         ]
         # Plot
-        data_melted = pd.melt(
-            data, id_vars=variables, var_name="sample", value_name="norm_counts"
-        )
+        data_melted = pd.melt(data, id_vars=variables, var_name="sample", value_name="norm_counts")
 
         # transform dispersion
         data_melted["dispersion"] = np.log2(1 + data_melted["dispersion"])
@@ -2244,8 +2150,7 @@ class ATACSeqAnalysis(Analysis):
         sns.violinplot("genomic_region", "norm_counts", data=data_melted, ax=axis)
         fig.savefig(
             os.path.join(
-                self.results_dir,
-                self.name + ".norm_counts.per_genomic_region.violinplot.svg",
+                self.results_dir, self.name + ".norm_counts.per_genomic_region.violinplot.svg",
             ),
             bbox_inches="tight",
         )
@@ -2266,8 +2171,7 @@ class ATACSeqAnalysis(Analysis):
         sns.violinplot("genomic_region", "qv2", data=data_melted, ax=axis)
         fig.savefig(
             os.path.join(
-                self.results_dir,
-                self.name + ".norm_counts.qv2.per_genomic_region.violinplot.svg",
+                self.results_dir, self.name + ".norm_counts.qv2.per_genomic_region.violinplot.svg",
             ),
             bbox_inches="tight",
         )
@@ -2276,8 +2180,7 @@ class ATACSeqAnalysis(Analysis):
         sns.violinplot("chromatin_state", "norm_counts", data=data_melted, ax=axis)
         fig.savefig(
             os.path.join(
-                self.results_dir,
-                self.name + ".norm_counts.chromatin_state.violinplot.svg",
+                self.results_dir, self.name + ".norm_counts.chromatin_state.violinplot.svg",
             ),
             bbox_inches="tight",
         )
@@ -2296,8 +2199,7 @@ class ATACSeqAnalysis(Analysis):
         sns.violinplot("chromatin_state", "qv2", data=data_melted, ax=axis)
         fig.savefig(
             os.path.join(
-                self.results_dir,
-                self.name + ".norm_counts.qv2.chromatin_state.violinplot.svg",
+                self.results_dir, self.name + ".norm_counts.qv2.chromatin_state.violinplot.svg",
             ),
             bbox_inches="tight",
         )
@@ -2307,8 +2209,7 @@ class ATACSeqAnalysis(Analysis):
         g.map(sns.distplot, "mean", hist=False, rug=False)
         g.fig.savefig(
             os.path.join(
-                self.results_dir,
-                self.name + ".norm_counts.mean.per_genomic_region.distplot.svg",
+                self.results_dir, self.name + ".norm_counts.mean.per_genomic_region.distplot.svg",
             ),
             bbox_inches="tight",
         )
@@ -2327,8 +2228,7 @@ class ATACSeqAnalysis(Analysis):
         g.map(sns.distplot, "qv2", hist=False, rug=False)
         g.fig.savefig(
             os.path.join(
-                self.results_dir,
-                self.name + ".norm_counts.qv2.per_genomic_region.distplot.svg",
+                self.results_dir, self.name + ".norm_counts.qv2.per_genomic_region.distplot.svg",
             ),
             bbox_inches="tight",
         )
@@ -2347,8 +2247,7 @@ class ATACSeqAnalysis(Analysis):
         g.map(sns.distplot, "mean", hist=False, rug=False)
         g.fig.savefig(
             os.path.join(
-                self.results_dir,
-                self.name + ".norm_counts.mean.chromatin_state.distplot.svg",
+                self.results_dir, self.name + ".norm_counts.mean.chromatin_state.distplot.svg",
             ),
             bbox_inches="tight",
         )
@@ -2367,8 +2266,7 @@ class ATACSeqAnalysis(Analysis):
         g.map(sns.distplot, "qv2", hist=False, rug=False)
         g.fig.savefig(
             os.path.join(
-                self.results_dir,
-                self.name + ".norm_counts.qv2.chromatin_state.distplot.svg",
+                self.results_dir, self.name + ".norm_counts.qv2.chromatin_state.distplot.svg",
             ),
             bbox_inches="tight",
         )
@@ -2377,8 +2275,7 @@ class ATACSeqAnalysis(Analysis):
         g.map(sns.distplot, "support", hist=False, rug=False)
         g.fig.savefig(
             os.path.join(
-                self.results_dir,
-                self.name + ".norm_counts.support.chromatin_state.distplot.svg",
+                self.results_dir, self.name + ".norm_counts.support.chromatin_state.distplot.svg",
             ),
             bbox_inches="tight",
         )
@@ -2448,9 +2345,7 @@ class ATACSeqAnalysis(Analysis):
 
         options = ["region_set", "genome"]
         if background not in options:
-            msg = "Option `background` must be one of '{}'.".format(
-                "', '".join(options)
-            )
+            msg = "Option `background` must be one of '{}'.".format("', '".join(options))
             raise ValueError(msg)
 
         # compare genomic regions and chromatin_states
@@ -2458,11 +2353,7 @@ class ATACSeqAnalysis(Analysis):
         msg = "'{}' step selected, but analysis does not have '{}'."
         msg2 = "'genome' selected, but analysis does not have '{}'."
         for step, matrix, matrix_b in [
-            (
-                "genomic_region",
-                "region_annotation_mapping",
-                "region_annotation_b_mapping",
-            ),
+            ("genomic_region", "region_annotation_mapping", "region_annotation_b_mapping",),
             (
                 "chromatin_state",
                 "chrom_state_annotation_mapping",
@@ -2505,9 +2396,7 @@ class ATACSeqAnalysis(Analysis):
 
             # Calculate log fold enrichment:
             # # normalize to total:
-            res.loc[:, "foreground_fraction"] = (
-                res["foreground"] / res["foreground"].sum()
-            )
+            res.loc[:, "foreground_fraction"] = res["foreground"] / res["foreground"].sum()
             res.loc[:, "universe_fraction"] = res["universe"] / res["universe"].sum()
             res.loc[:, "log2_fold_change"] = np.log2(
                 res["foreground_fraction"] / res["universe_fraction"]
@@ -2516,18 +2405,11 @@ class ATACSeqAnalysis(Analysis):
             for feature in res["foreground"].index:
                 a = res.loc[feature, "foreground"]
                 b = res.loc[:, "foreground"].drop(feature).sum()
-                c = annot.loc[(~annot.index.isin(regions)), step].value_counts()[
-                    feature
-                ]
-                d = (
-                    annot.loc[(~annot.index.isin(regions)), step]
-                    .value_counts()
-                    .drop(feature)
-                    .sum()
+                c = annot.loc[(~annot.index.isin(regions)), step].value_counts()[feature]
+                d = annot.loc[(~annot.index.isin(regions)), step].value_counts().drop(feature).sum()
+                res.loc[feature, "odds_ratio"], res.loc[feature, "p_value"] = fisher_exact(
+                    [[a, c], [b, d]], alternative="two-sided"
                 )
-                res.loc[feature, "odds_ratio"], res.loc[
-                    feature, "p_value"
-                ] = fisher_exact([[a, c], [b, d]], alternative="two-sided")
             res.loc[:, "log2_odds_ratio"] = np.log2(res["odds_ratio"])
             res.loc[:, "-log10(p-value)"] = log_pvalues(res["p_value"])
             res.loc[:, "region_type"] = step
@@ -2597,9 +2479,11 @@ class ATACSeqAnalysis(Analysis):
         """
         from ngs_toolkit.general import meme_ame, homer_motifs, lola, enrichr
         from ngs_toolkit.utils import (
-            bed_to_fasta, standard_score,
+            bed_to_fasta,
+            standard_score,
             location_index_to_bed,
-            get_this_file_or_timestamped)
+            get_this_file_or_timestamped,
+        )
 
         # use all sites as universe
         if universe_file is None:
@@ -2611,9 +2495,7 @@ class ATACSeqAnalysis(Analysis):
                     )
                 )
             except AttributeError as e:
-                _LOGGER.error(
-                    "Background region set 'analysis.sites' is not set! Cannot run LOLA!"
-                )
+                _LOGGER.error("Background region set 'analysis.sites' is not set! Cannot run LOLA!")
                 raise e
 
         if genome is None:
@@ -2633,11 +2515,7 @@ class ATACSeqAnalysis(Analysis):
 
         # export gene names
         clean_gene = (
-            differential["gene_name"]
-            .str.split(",")
-            .apply(pd.Series, 1)
-            .stack()
-            .drop_duplicates()
+            differential["gene_name"].str.split(",").apply(pd.Series, 1).stack().drop_duplicates()
         )
         clean_gene = clean_gene[~clean_gene.isin([".", "nan", ""])]
         clean_gene.to_csv(
@@ -2665,9 +2543,7 @@ class ATACSeqAnalysis(Analysis):
             differential["score"] = standard_score(abs(differential["log2FoldChange"]))
             differential["abs_fc"] = abs(differential["log2FoldChange"])
 
-            d = differential[["gene_name", "score"]].sort_values(
-                "score", ascending=False
-            )
+            d = differential[["gene_name", "score"]].sort_values("score", ascending=False)
 
             # split gene names from score if a reg.element was assigned to more than one gene
             a = d["gene_name"].str.split(",").apply(pd.Series, 1).stack()
@@ -2677,8 +2553,7 @@ class ATACSeqAnalysis(Analysis):
             # reduce various ranks to mean per gene
             d = d.groupby("gene_name").mean().reset_index()
             d.to_csv(
-                os.path.join(output_dir, "{}.gene_symbols.score.csv".format(prefix)),
-                index=False,
+                os.path.join(output_dir, "{}.gene_symbols.score.csv".format(prefix)), index=False,
             )
 
         # get fasta file with sequence underlying region
@@ -2688,16 +2563,12 @@ class ATACSeqAnalysis(Analysis):
 
             resources = self.get_resources(steps=["genome"])["genome_file"]
             if "fasta" not in resources:
-                reason = (
-                    "Could not get genome sequence file in either FASTA or 2bit format."
-                )
+                reason = "Could not get genome sequence file in either FASTA or 2bit format."
                 _LOGGER.warning(reason + hint)
             else:
                 try:
                     bed_to_fasta(
-                        input_bed=bed_file,
-                        output_fasta=fasta_file,
-                        genome_file=resources["fasta"],
+                        input_bed=bed_file, output_fasta=fasta_file, genome_file=resources["fasta"],
                     )
                 except EnvironmentError:
                     reason = "Could not get FASTA sequence for regions."
@@ -2728,7 +2599,8 @@ class ATACSeqAnalysis(Analysis):
                     get_this_file_or_timestamped(bed_file),
                     get_this_file_or_timestamped(universe_file),
                     output_dir,
-                    genome=genome)
+                    genome=genome,
+                )
             except:
                 _LOGGER.error("LOLA analysis for '{}' failed!".format(prefix))
 

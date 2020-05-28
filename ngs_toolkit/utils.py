@@ -990,7 +990,7 @@ def download_file(url, output_file, chunk_size=1024):
             outfile.writelines(response.iter_content(chunk_size=chunk_size))
 
 
-def download_gzip_file(url, output_file, **kwargs):
+def download_gzip_file(url, output_file, decompress=True, **kwargs):
     """
     Download a gzip compressed file and write uncompressed
     file to disk in chunks (not in memory).
@@ -1007,6 +1007,8 @@ def download_gzip_file(url, output_file, **kwargs):
     if not output_file.endswith(".gz"):
         output_file += ".gz"
     download_file(url, output_file, **kwargs)
+    if not decompress:
+        return
     decompress_file(output_file)
     if os.path.exists(output_file) and os.path.exists(output_file.replace(".gz", "")):
         os.remove(output_file)

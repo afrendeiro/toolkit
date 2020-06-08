@@ -34,7 +34,7 @@ preferences:
       # key:values under parameters are passed to seaborn.set
       parameters:
         context: "paper"
-        style: "white"
+        style: "ticks"
         palette: "colorblind"
         color_codes: True
     figure_saving:

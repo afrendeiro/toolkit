@@ -83,7 +83,10 @@ def get_genome_reference(
 
     def twobit_to_fasta(genome_file):
         if distutils.spawn.find_executable("twoBitToFa") is not None:
-            args = ["twoBitToFa"] + [genome_file, genome_file.replace(".2bit", ".fa")]
+            args = ["twoBitToFa"] + [
+                genome_file,
+                genome_file.replace(".2bit", ".fa"),
+            ]
             subprocess.check_output(args, shell=False)
             index_fasta(genome_file.replace(".2bit", ".fa"))
 
@@ -94,13 +97,17 @@ def get_genome_reference(
 
     opts = ["UCSC", "Ensembl"]
     if genome_provider not in opts:
-        msg = "`genome_provider` attribute must be one of '{}'.".format(", ".join(opts))
+        msg = "`genome_provider` attribute must be one of '{}'.".format(
+            ", ".join(opts)
+        )
         _LOGGER.error(msg)
         raise ValueError(msg)
 
     opts = ["fasta", "2bit"]
     if file_format not in opts:
-        msg = "`file_format` attribute must be one of '{}'.".format(", ".join(opts))
+        msg = "`file_format` attribute must be one of '{}'.".format(
+            ", ".join(opts)
+        )
         _LOGGER.error(msg)
         raise ValueError(msg)
 
@@ -130,12 +137,36 @@ def get_genome_reference(
 
     elif genome_provider == "Ensembl":
         default_organisms = {
-            "human": {"long_species": "homo_sapiens", "version": "grch38", "release": "75",},
-            "hsapiens": {"long_species": "homo_sapiens", "version": "grch38", "release": "75",},
-            "homo_sapiens": {"long_species": "homo_sapiens", "version": "grch38", "release": "75",},
-            "mouse": {"long_species": "mus_musculus", "version": "grcm38", "release": "94",},
-            "mmusculus": {"long_species": "mus_musculus", "version": "grcm38", "release": "94",},
-            "mus_musculus": {"long_species": "mus_musculus", "version": "grcm38", "release": "94",},
+            "human": {
+                "long_species": "homo_sapiens",
+                "version": "grch38",
+                "release": "75",
+            },
+            "hsapiens": {
+                "long_species": "homo_sapiens",
+                "version": "grch38",
+                "release": "75",
+            },
+            "homo_sapiens": {
+                "long_species": "homo_sapiens",
+                "version": "grch38",
+                "release": "75",
+            },
+            "mouse": {
+                "long_species": "mus_musculus",
+                "version": "grcm38",
+                "release": "94",
+            },
+            "mmusculus": {
+                "long_species": "mus_musculus",
+                "version": "grcm38",
+                "release": "94",
+            },
+            "mus_musculus": {
+                "long_species": "mus_musculus",
+                "version": "grcm38",
+                "release": "94",
+            },
             "yeast": {
                 "long_species": "saccharomyces_cerevisiae",
                 "version": "R64",
@@ -153,7 +184,9 @@ def get_genome_reference(
             },
         }
         if genome_assembly is None:
-            genome_assembly = default_organisms[organism]["version"].replace("grc", "GRC")
+            genome_assembly = default_organisms[organism]["version"].replace(
+                "grc", "GRC"
+            )
         base_link = "ftp://ftp.ensembl.org/pub/release-{release}/fasta/{long_organism}/dna/"
         base_link += "{Clong_organism}.{assembly}."
         base_link += (
@@ -167,19 +200,33 @@ def get_genome_reference(
         url = base_link.format(
             release=default_organisms[organism]["release"],
             long_organism=default_organisms[organism]["long_species"],
-            Clong_organism=default_organisms[organism]["long_species"].capitalize(),
+            Clong_organism=default_organisms[organism][
+                "long_species"
+            ].capitalize(),
             assembly=genome_assembly,
         )
 
-    if (genome_provider == "UCSC") and (file_format == "fasta") and (genome_assembly != "hg38"):
-        msg = "UCSC does not provide FASTA files for the {} assembly.".format(genome_assembly)
-        hint = " Download a 2bit file and use for example 'TwoBitToFa' to convert."
+    if (
+        (genome_provider == "UCSC")
+        and (file_format == "fasta")
+        and (genome_assembly != "hg38")
+    ):
+        msg = "UCSC does not provide FASTA files for the {} assembly.".format(
+            genome_assembly
+        )
+        hint = (
+            " Download a 2bit file and use for example 'TwoBitToFa' to convert."
+        )
         _LOGGER.error(msg + hint)
         raise ValueError(msg)
 
     genome_file = os.path.join(
         output_dir,
-        "{}.{}.{}".format(organism, genome_assembly, "fa.gz" if file_format == "fasta" else "2bit"),
+        "{}.{}.{}".format(
+            organism,
+            genome_assembly,
+            "fa.gz" if file_format == "fasta" else "2bit",
+        ),
     )
 
     if os.path.exists(genome_file) and (not overwrite):
@@ -207,7 +254,9 @@ def get_genome_reference(
     return (url, genome_file)
 
 
-def get_blacklist_annotations(organism, genome_assembly=None, output_dir=None, overwrite=True):
+def get_blacklist_annotations(
+    organism, genome_assembly=None, output_dir=None, overwrite=True
+):
     """
     Get annotations of blacklisted genomic regions for a given organism/genome assembly.
     Saves results to disk and returns a path to a BED file.
@@ -250,7 +299,9 @@ def get_blacklist_annotations(organism, genome_assembly=None, output_dir=None, o
             )
         )
 
-    output_file = os.path.join(output_dir, "{}.{}.blacklist.bed".format(organism, genome_assembly))
+    output_file = os.path.join(
+        output_dir, "{}.{}.blacklist.bed".format(organism, genome_assembly)
+    )
     if os.path.exists(output_file) and (not overwrite):
         msg = "Annotation file already exists and 'overwrite' is set to False."
         hint = " Returning existing annotation file: {}".format(output_file)
@@ -261,7 +312,9 @@ def get_blacklist_annotations(organism, genome_assembly=None, output_dir=None, o
     if genome_assembly not in ["hg19"]:
         url += "{0}-{1}/{0}.blacklist.bed.gz".format(genome_assembly, organism)
     else:
-        url += "{0}-human/wgEncodeHg19ConsensusSignalArtifactRegions.bed.gz".format(genome_assembly)
+        url += "{0}-human/wgEncodeHg19ConsensusSignalArtifactRegions.bed.gz".format(
+            genome_assembly
+        )
 
     try:
         download_gzip_file(url, output_file)
@@ -278,7 +331,12 @@ def get_tss_annotations(
     save=True,
     output_dir=None,
     chr_prefix=True,
-    gene_types=["protein_coding", "processed_transcript", "lincRNA", "antisense"],
+    gene_types=[
+        "protein_coding",
+        "processed_transcript",
+        "lincRNA",
+        "antisense",
+    ],
     overwrite=True,
 ):
     """
@@ -341,7 +399,8 @@ def get_tss_annotations(
         genome_assembly = "R64"
 
     output_file = os.path.join(
-        output_dir, "{}.{}.gene_annotation.tss.bed".format(organism, genome_assembly)
+        output_dir,
+        "{}.{}.gene_annotation.tss.bed".format(organism, genome_assembly),
     )
     o = get_this_file_or_timestamped(output_file)
     if os.path.exists(o) and (not overwrite):
@@ -353,7 +412,9 @@ def get_tss_annotations(
 
     if save:
         if output_dir is None:
-            output_dir = os.path.join(os.path.abspath(os.path.curdir), "reference")
+            output_dir = os.path.join(
+                os.path.abspath(os.path.curdir), "reference"
+            )
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
 
@@ -380,10 +441,16 @@ def get_tss_annotations(
     res.loc[:, "start_position"] = res["start_position"].astype(int)
     res.loc[:, "strand"] = res["strand"].replace("1", "+").replace("-1", "-")
     res.loc[:, "end"] = res.apply(
-        lambda x: x["start_position"] + 1 if x["strand"] == "+" else x["start_position"], axis=1,
+        lambda x: x["start_position"] + 1
+        if x["strand"] == "+"
+        else x["start_position"],
+        axis=1,
     )
     res.loc[:, "start_position"] = res.apply(
-        lambda x: x["start_position"] - 1 if x["strand"] == "-" else x["start_position"], axis=1,
+        lambda x: x["start_position"] - 1
+        if x["strand"] == "-"
+        else x["start_position"],
+        axis=1,
     )
 
     # drop same gene duplicates if starting in same position but just annotated with
@@ -424,11 +491,13 @@ def get_tss_annotations(
 
         output_file = os.path.join(
             output_dir,
-            "{}.{}.gene_annotation.protein_coding.tss.bed".format(organism, genome_assembly),
+            "{}.{}.gene_annotation.protein_coding.tss.bed".format(
+                organism, genome_assembly
+            ),
         )
-        res[res["transcript_biotype"] == "protein_coding"].drop(attributes[-1], axis=1).to_csv(
-            output_file, index=False, header=False, sep="\t"
-        )
+        res[res["transcript_biotype"] == "protein_coding"].drop(
+            attributes[-1], axis=1
+        ).to_csv(output_file, index=False, header=False, sep="\t")
 
     return res
 
@@ -439,8 +508,21 @@ def get_genomic_context(
     save=True,
     output_dir=None,
     chr_prefix=True,
-    region_subset=["promoter", "exon", "5utr", "3utr", "intron", "genebody", "intergenic",],
-    gene_types=["protein_coding", "processed_transcript", "lincRNA", "antisense"],
+    region_subset=[
+        "promoter",
+        "exon",
+        "5utr",
+        "3utr",
+        "intron",
+        "genebody",
+        "intergenic",
+    ],
+    gene_types=[
+        "protein_coding",
+        "processed_transcript",
+        "lincRNA",
+        "antisense",
+    ],
     promoter_width=3000,
     overwrite=True,
 ):
@@ -490,8 +572,16 @@ def get_genomic_context(
     import pybedtools
 
     default_organisms = {
-        "human": {"species": "hsapiens", "ensembl_version": "grch38", "ucsc_version": "hg38",},
-        "mouse": {"species": "mmusculus", "ensembl_version": "grcm38", "ucsc_version": "mm10",},
+        "human": {
+            "species": "hsapiens",
+            "ensembl_version": "grch38",
+            "ucsc_version": "hg38",
+        },
+        "mouse": {
+            "species": "mmusculus",
+            "ensembl_version": "grcm38",
+            "ucsc_version": "mm10",
+        },
         "yeast": {"species": "scerevisiae", "ensembl_version": "R64"},
     }
 
@@ -511,19 +601,24 @@ def get_genomic_context(
         ensembl_genome_assembly = genome_assembly
 
     output_file = os.path.join(
-        output_dir, "{}.{}.genomic_context.bed".format(organism, ensembl_genome_assembly)
+        output_dir,
+        "{}.{}.genomic_context.bed".format(organism, ensembl_genome_assembly),
     )
     o = get_this_file_or_timestamped(output_file)
     if os.path.exists(o) and (not overwrite):
         msg = "Annotation file already exists and 'overwrite' is set to False."
-        hint = " Returning existing annotation from file: {}".format(output_file)
+        hint = " Returning existing annotation from file: {}".format(
+            output_file
+        )
         _LOGGER.warning(msg + hint)
         annot = pd.read_csv(output_file, header=None, sep="\t")
         return annot
 
     if save:
         if output_dir is None:
-            output_dir = os.path.join(os.path.abspath(os.path.curdir), "reference")
+            output_dir = os.path.join(
+                os.path.abspath(os.path.curdir), "reference"
+            )
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
 
@@ -572,16 +667,18 @@ def get_genomic_context(
     ] - (
         promoter_width / 2
     )  # + 1
-    promoter.loc[promoter["strand"] == "+", "end_position"] = promoter.loc[:, "start_position"] + (
-        promoter_width / 2
-    )
+    promoter.loc[promoter["strand"] == "+", "end_position"] = promoter.loc[
+        :, "start_position"
+    ] + (promoter_width / 2)
     for col in bed_cols[1:3]:
         promoter.loc[:, col] = promoter.loc[:, col].astype(int)
 
     # # # fix where promoter start < 0
     promoter.loc[promoter["start_position"] < 0, "start_position"] = 0
     # # # remove end < start
-    promoter = promoter.loc[~(promoter["start_position"] > promoter["end_position"])]
+    promoter = promoter.loc[
+        ~(promoter["start_position"] > promoter["end_position"])
+    ]
 
     # # genebody = start->end + promoter
     gb = res[bed_cols].drop_duplicates()
@@ -597,11 +694,23 @@ def get_genomic_context(
     genebody = genebody_bed.to_dataframe()
 
     # # Exon
-    exon = res[["chromosome_name", "exon_chrom_start", "exon_chrom_end"]].drop_duplicates().dropna()
+    exon = (
+        res[["chromosome_name", "exon_chrom_start", "exon_chrom_end"]]
+        .drop_duplicates()
+        .dropna()
+    )
     # # 5utr
-    utr5 = res[["chromosome_name", "5_utr_start", "5_utr_end"]].drop_duplicates().dropna()
+    utr5 = (
+        res[["chromosome_name", "5_utr_start", "5_utr_end"]]
+        .drop_duplicates()
+        .dropna()
+    )
     # # 3utr
-    utr3 = res[["chromosome_name", "3_utr_start", "3_utr_end"]].drop_duplicates().dropna()
+    utr3 = (
+        res[["chromosome_name", "3_utr_start", "3_utr_end"]]
+        .drop_duplicates()
+        .dropna()
+    )
     for d in [exon, utr5, utr3]:
         for col in d.columns:
             if ("start" in col) or ("end" in col):
@@ -626,7 +735,15 @@ def get_genomic_context(
     intergenic = intergenic.to_dataframe()
 
     # join all
-    features = ["promoter", "genebody", "exon", "intron", "utr5", "utr3", "intergenic"]
+    features = [
+        "promoter",
+        "genebody",
+        "exon",
+        "intron",
+        "utr5",
+        "utr3",
+        "intergenic",
+    ]
     annot = list()
     for name in features:
         cur = locals()[name]
@@ -634,10 +751,14 @@ def get_genomic_context(
         cur.columns = bed_cols[:3]
         cur.loc[:, "region_type"] = name
         if save:
-            cur.sort_values(cur.columns.tolist()).drop("region_type", axis=1).to_csv(
+            cur.sort_values(cur.columns.tolist()).drop(
+                "region_type", axis=1
+            ).to_csv(
                 os.path.join(
                     output_dir,
-                    "{}.{}.genomic_context.{}.bed".format(organism, ensembl_genome_assembly, name),
+                    "{}.{}.genomic_context.{}.bed".format(
+                        organism, ensembl_genome_assembly, name
+                    ),
                 ),
                 index=False,
                 header=False,
@@ -654,7 +775,9 @@ def get_genomic_context(
     return annot
 
 
-def get_chromosome_sizes(organism, genome_assembly=None, output_dir=None, overwrite=True):
+def get_chromosome_sizes(
+    organism, genome_assembly=None, output_dir=None, overwrite=True
+):
     """
     Get a file with the sizes of chromosomes in a given organism/genome assembly.
     Saves results to disk and returns a path to a text file.
@@ -700,7 +823,8 @@ def get_chromosome_sizes(organism, genome_assembly=None, output_dir=None, overwr
         )
 
     output_file = os.path.join(
-        output_dir, "{}.{}.chromosome_sizes.txt".format(organism, genome_assembly)
+        output_dir,
+        "{}.{}.chromosome_sizes.txt".format(organism, genome_assembly),
     )
     if os.path.exists(output_file) and (not overwrite):
         msg = "Annotation file already exists and 'overwrite' is set to False."
@@ -791,21 +915,32 @@ def deseq_analysis(
     importr("DESeq2")
 
     # order experiment and count matrices in same way
-    experiment_matrix = experiment_matrix.set_index("sample_name").loc[count_matrix.columns, :]
+    experiment_matrix = experiment_matrix.set_index("sample_name").loc[
+        count_matrix.columns, :
+    ]
 
     # save the matrices just in case
     if save_inputs:
-        count_matrix.to_csv(os.path.join(output_dir, output_prefix + ".count_matrix.tsv"), sep="\t")
+        count_matrix.to_csv(
+            os.path.join(output_dir, output_prefix + ".count_matrix.tsv"),
+            sep="\t",
+        )
         experiment_matrix.to_csv(
-            os.path.join(output_dir, output_prefix + ".experiment_matrix.tsv"), sep="\t"
+            os.path.join(output_dir, output_prefix + ".experiment_matrix.tsv"),
+            sep="\t",
         )
         comparison_table.to_csv(
-            os.path.join(output_dir, output_prefix + ".comparison_table.tsv"), sep="\t"
+            os.path.join(output_dir, output_prefix + ".comparison_table.tsv"),
+            sep="\t",
         )
 
     # Rename samples to avoid R errors with sample names containing symbols
-    count_matrix.columns = ["S{}".format(i) for i in range(len(count_matrix.columns))]
-    experiment_matrix.index = ["S{}".format(i) for i in range(len(experiment_matrix.index))]
+    count_matrix.columns = [
+        "S{}".format(i) for i in range(len(count_matrix.columns))
+    ]
+    experiment_matrix.index = [
+        "S{}".format(i) for i in range(len(experiment_matrix.index))
+    ]
     # Replace hyphens with underscores
     experiment_matrix = experiment_matrix.replace("-", "_")
     comparison_table = comparison_table.replace("-", "_")
@@ -826,12 +961,18 @@ def deseq_analysis(
             if not os.path.exists(os.path.join(output_dir, comp)):
                 os.makedirs(os.path.join(output_dir, comp))
             out_file = os.path.join(
-                output_dir, comp, output_prefix + ".deseq_result.{}.csv".format(comp)
+                output_dir,
+                comp,
+                output_prefix + ".deseq_result.{}.csv".format(comp),
             )
         else:
-            out_file = os.path.join(output_dir, output_prefix + ".deseq_result.{}.csv".format(comp))
+            out_file = os.path.join(
+                output_dir, output_prefix + ".deseq_result.{}.csv".format(comp)
+            )
 
-        if not overwrite and os.path.exists(get_this_file_or_timestamped(out_file)):
+        if not overwrite and os.path.exists(
+            get_this_file_or_timestamped(out_file)
+        ):
             continue
         _LOGGER.info("Doing comparison '{}'".format(comp))
         a = (
@@ -865,7 +1006,9 @@ def deseq_analysis(
                 )
             )
         except Exception as e:
-            _LOGGER.warning("DESeq2 group contrast '{}' didn't work!".format(contrast))
+            _LOGGER.warning(
+                "DESeq2 group contrast '{}' didn't work!".format(contrast)
+            )
             _LOGGER.error(e)
             contrast = ["sample_group" + a, "sample_group" + b]
             try:
@@ -879,11 +1022,15 @@ def deseq_analysis(
                     )
                 )
                 _LOGGER.warning(
-                    "DESeq2 group contrast '{}' did work now!".format(", ".join(contrast))
+                    "DESeq2 group contrast '{}' did work now!".format(
+                        ", ".join(contrast)
+                    )
                 )
             except Exception as e2:
                 _LOGGER.warning(
-                    "DESeq2 group contrast '{}' didn't work either!".format(", ".join(contrast))
+                    "DESeq2 group contrast '{}' didn't work either!".format(
+                        ", ".join(contrast)
+                    )
                 )
                 _LOGGER.error(e2)
                 raise e2
@@ -908,7 +1055,10 @@ def deseq_analysis(
     results = pd.concat(results)
     results.index.name = "index"
     results.to_csv(
-        os.path.join(output_dir, output_prefix + ".deseq_result.all_comparisons.csv"), index=True,
+        os.path.join(
+            output_dir, output_prefix + ".deseq_result.all_comparisons.csv"
+        ),
+        index=True,
     )
 
     # return
@@ -976,7 +1126,9 @@ def least_squares_fit(
     if standardize_data:
         norm = StandardScaler()
         matrix = pd.DataFrame(
-            norm.fit_transform(matrix), index=matrix.index, columns=matrix.columns
+            norm.fit_transform(matrix),
+            index=matrix.index,
+            columns=matrix.columns,
         )
 
     a1 = patsy.dmatrix(test_model, design_matrix)
@@ -985,17 +1137,23 @@ def least_squares_fit(
     a0 = patsy.dmatrix(null_model, design_matrix)
     betas0, residuals0, _, _ = lstsq(a0, matrix)
 
-    results = pd.DataFrame(betas1.T, columns=a1.design_info.column_names, index=matrix.columns)
+    results = pd.DataFrame(
+        betas1.T, columns=a1.design_info.column_names, index=matrix.columns
+    )
 
     # Calculate the log-likelihood ratios
     n = float(matrix.shape[0])
     results["model_residuals"] = residuals1
     results["null_residuals"] = residuals0
     results["model_log_likelihood"] = (
-        (-n / 2.0) * np.log(2 * np.pi) - n / 2.0 * np.log(results["model_residuals"] / n) - n / 2.0
+        (-n / 2.0) * np.log(2 * np.pi)
+        - n / 2.0 * np.log(results["model_residuals"] / n)
+        - n / 2.0
     )
     results["null_log_likelihood"] = (
-        (-n / 2.0) * np.log(2 * np.pi) - n / 2.0 * np.log(results["null_residuals"] / n) - n / 2.0
+        (-n / 2.0) * np.log(2 * np.pi)
+        - n / 2.0 * np.log(results["null_residuals"] / n)
+        - n / 2.0
     )
 
     results["log_likelihood_ratio"] = (
@@ -1005,7 +1163,9 @@ def least_squares_fit(
     results["p_value"] = stats.chi2.sf(
         results["log_likelihood_ratio"], df=betas1.shape[0] - betas0.shape[0]
     )
-    results["q_value"] = multipletests(results["p_value"], method=multiple_correction_method)[1]
+    results["q_value"] = multipletests(
+        results["p_value"], method=multiple_correction_method
+    )[1]
 
     if not standardize_data:
         results["mean"] = matrix.mean(axis=0)
@@ -1070,7 +1230,9 @@ def differential_from_bivariate_fit(
 
     os.makedirs(output_dir, exist_ok=True)
 
-    comparisons = comparison_table["comparison_name"].drop_duplicates().sort_values()
+    comparisons = (
+        comparison_table["comparison_name"].drop_duplicates().sort_values()
+    )
 
     if make_values_positive:
         matrix = matrix + abs(matrix.min().min())
@@ -1078,9 +1240,13 @@ def differential_from_bivariate_fit(
     results = list()
     for i, comparison in enumerate(comparisons):
         _LOGGER.info("Doing comparison '{}'".format(comparison))
-        out_file = os.path.join(output_dir, output_prefix + ".fit_result.{}.csv".format(comparison))
+        out_file = os.path.join(
+            output_dir, output_prefix + ".fit_result.{}.csv".format(comparison)
+        )
 
-        comp = comparison_table.query("comparison_name == '{}'".format(comparison))
+        comp = comparison_table.query(
+            "comparison_name == '{}'".format(comparison)
+        )
         sa = comp.query("comparison_side == 1")["sample_name"]
         ga = comp.query("comparison_side == 1")["sample_group"].unique()[0]
         sb = comp.query("comparison_side == 0")["sample_name"]
@@ -1103,30 +1269,39 @@ def differential_from_bivariate_fit(
         # standardize fold change
         bounds = np.linspace(0, res["comparison_mean"].max(), n_bins)
         for (start, end) in zip(bounds[:-2], bounds[1:-1]):
-            r = res.loc[(res["comparison_mean"] > start) & (res["comparison_mean"] < end)].index
+            r = res.loc[
+                (res["comparison_mean"] > start)
+                & (res["comparison_mean"] < end)
+            ].index
             v = res.loc[r, "log2FoldChange"]
-            res.loc[r, "norm_log2FoldChange"] = (v - np.nanmean(v)) / np.nanstd(v)
+            res.loc[r, "norm_log2FoldChange"] = (v - np.nanmean(v)) / np.nanstd(
+                v
+            )
 
         # let's try a bivariate gaussian kernel
         # separately for positive and negative to avoid biases in center of mass
         kernel = gaussian_kde(
             res.loc[
-                res["norm_log2FoldChange"] > 0, ["comparison_mean", "norm_log2FoldChange"],
+                res["norm_log2FoldChange"] > 0,
+                ["comparison_mean", "norm_log2FoldChange"],
             ].T.values
         )
         res.loc[res["norm_log2FoldChange"] > 0, "density"] = kernel(
             res.loc[
-                res["norm_log2FoldChange"] > 0, ["comparison_mean", "norm_log2FoldChange"],
+                res["norm_log2FoldChange"] > 0,
+                ["comparison_mean", "norm_log2FoldChange"],
             ].T.values
         )
         kernel = gaussian_kde(
             res.loc[
-                res["norm_log2FoldChange"] <= 0, ["comparison_mean", "norm_log2FoldChange"],
+                res["norm_log2FoldChange"] <= 0,
+                ["comparison_mean", "norm_log2FoldChange"],
             ].T.values
         )
         res.loc[res["norm_log2FoldChange"] <= 0, "density"] = kernel(
             res.loc[
-                res["norm_log2FoldChange"] <= 0, ["comparison_mean", "norm_log2FoldChange"],
+                res["norm_log2FoldChange"] <= 0,
+                ["comparison_mean", "norm_log2FoldChange"],
             ].T.values
         )
 
@@ -1134,16 +1309,23 @@ def differential_from_bivariate_fit(
         res["pvalue"] = (res["density"] - res["density"].min()) / (
             res["density"].max() - res["density"].min()
         )
-        res["padj"] = multipletests(res["pvalue"].fillna(1), method=multiple_correction_method)[1]
+        res["padj"] = multipletests(
+            res["pvalue"].fillna(1), method=multiple_correction_method
+        )[1]
 
-        res["direction"] = (res["norm_log2FoldChange"] >= 0).astype(int).replace(0, -1)
+        res["direction"] = (
+            (res["norm_log2FoldChange"] >= 0).astype(int).replace(0, -1)
+        )
         res.to_csv(out_file)
         results.append(res)
 
     # save all
     results = pd.concat(results)
     results.to_csv(
-        os.path.join(output_dir, output_prefix + ".deseq_result.all_comparisons.csv"), index=True,
+        os.path.join(
+            output_dir, output_prefix + ".deseq_result.all_comparisons.csv"
+        ),
+        index=True,
     )
 
     if not plot:
@@ -1175,7 +1357,9 @@ def differential_from_bivariate_fit(
             color=sns.color_palette(palette)[0],
             rasterized=True,
         )
-        diff = res.loc[(res["pvalue"] < 0.05) & (res["norm_log2FoldChange"].abs() >= 2), :].index
+        diff = res.loc[
+            (res["pvalue"] < 0.05) & (res["norm_log2FoldChange"].abs() >= 2), :
+        ].index
         axis[0, i].scatter(
             res.loc[diff, "comparison_mean"],
             res.loc[diff, "log2FoldChange"],
@@ -1201,7 +1385,11 @@ def differential_from_bivariate_fit(
 
     # save figure
     savefig(
-        fig, os.path.join(output_dir, output_prefix + ".deseq_result.all_comparisons.scatter.svg"),
+        fig,
+        os.path.join(
+            output_dir,
+            output_prefix + ".deseq_result.all_comparisons.scatter.svg",
+        ),
     )
     return results
 
@@ -1246,7 +1434,14 @@ def differential_from_bivariate_fit(
 #     plt.show()
 
 
-def lola(bed_files, universe_file, output_folder, genome, output_prefixes=None, cpus=8):
+def lola(
+    bed_files,
+    universe_file,
+    output_folder,
+    genome,
+    output_prefixes=None,
+    cpus=8,
+):
     """
     Perform location overlap analysis (LOLA).
 
@@ -1301,7 +1496,9 @@ def lola(bed_files, universe_file, output_folder, genome, output_prefixes=None, 
     importr("LOLA")
 
     # Get region databases from config
-    _LOGGER.info("Getting LOLA databases for genome '%s' from configuration.", genome)
+    _LOGGER.info(
+        "Getting LOLA databases for genome '%s' from configuration.", genome
+    )
 
     msg = (
         "LOLA database values in configuration could not be found or understood. "
@@ -1341,7 +1538,8 @@ def lola(bed_files, universe_file, output_folder, genome, output_prefixes=None, 
             )
             _LOGGER.warning(msg)
             output_prefixes = [
-                rr.replace(os.path.sep, "__").replace(".bed", ".") for rr in bed_files
+                rr.replace(os.path.sep, "__").replace(".bed", ".")
+                for rr in bed_files
             ]
         else:
             output_prefixes = ["."]
@@ -1354,30 +1552,43 @@ def lola(bed_files, universe_file, output_folder, genome, output_prefixes=None, 
         _LOGGER.info("Reading up BED file '{}'.".format(bed_file))
         user_set = r("LOLA::readBed")(bed_file)
         _LOGGER.info("Running LOLA testing for file '{}'.".format(bed_file))
-        _lola_results = r("LOLA::runLOLA")(user_set, universe, _regionDB, cores=cpus)
+        _lola_results = r("LOLA::runLOLA")(
+            user_set, universe, _regionDB, cores=cpus
+        )
         _LOGGER.info("Converting results from R to Python")
         lola_results = r2pandas_df(_lola_results)
         _LOGGER.info("Saving all results for file '{}'.".format(bed_file))
         lola_results.to_csv(
-            os.path.join(output_folder, "allEnrichments" + suffix + "tsv"), index=False, sep="\t",
+            os.path.join(output_folder, "allEnrichments" + suffix + "tsv"),
+            index=False,
+            sep="\t",
         )
         for region_set in lola_results["collection"].drop_duplicates():
             _LOGGER.info("Saving results for collection '%s' only.", region_set)
             lola_results[lola_results["collection"] == region_set].to_csv(
-                os.path.join(output_folder, "col_" + region_set + suffix + "tsv"),
+                os.path.join(
+                    output_folder, "col_" + region_set + suffix + "tsv"
+                ),
                 index=False,
                 sep="\t",
             )
 
 
 def meme_ame(
-    input_fasta, output_dir, background_fasta=None, organism="human", motif_database_file=None,
+    input_fasta,
+    output_dir,
+    background_fasta=None,
+    organism="human",
+    motif_database_file=None,
 ):
     import subprocess
 
     if motif_database_file is None:
         # Get region databases from config
-        _LOGGER.info("Getting 2bit reference genome for genome '%s' from configuration.", organism)
+        _LOGGER.info(
+            "Getting 2bit reference genome for genome '%s' from configuration.",
+            organism,
+        )
 
         msg = (
             "Reference genome in 2bit format value in configuration could not"
@@ -1388,7 +1599,9 @@ def meme_ame(
             "https://github.com/afrendeiro/toolkit/tree/master/ngs_toolkit/config/example.yaml"
         )
         try:
-            motif_database_file = _CONFIG["resources"]["meme"]["motif_databases"][organism]
+            motif_database_file = _CONFIG["resources"]["meme"][
+                "motif_databases"
+            ][organism]
         except KeyError:
             _LOGGER.error(msg, organism)
             return
@@ -1499,7 +1712,9 @@ def homer_combine_motifs(
     open(out_file, "w")  # make sure file is empty in the beginning
     with open(out_file, "a") as outfile:
         for dir_ in comparison_dirs:
-            with open(os.path.join(dir_, "homerMotifs.all.motifs"), "r") as infile:
+            with open(
+                os.path.join(dir_, "homerMotifs.all.motifs"), "r"
+            ) as infile:
                 for line in infile:
                     outfile.write(line)
 
@@ -1544,7 +1759,11 @@ def homer_combine_motifs(
             # delete previous results if existing
             results = os.path.join(dir_, "knownResults.txt")
             if os.path.exists(results):
-                _LOGGER.warning("Deleting previously existing results file: '{}'".format(results))
+                _LOGGER.warning(
+                    "Deleting previously existing results file: '{}'".format(
+                        results
+                    )
+                )
                 os.remove(results)
             # prepare enrichment command with consensus set
             cmd = "findMotifsGenome.pl {bed} {genome}r {dir} -p {cpus} -nomotif -mknown {motif_file}".format(
@@ -1562,7 +1781,9 @@ def homer_combine_motifs(
                 subprocess.call(
                     "sbatch -J homer.{d} -o {dir}.homer.log -p shortq -c 8 --mem 20000".format(
                         d=os.path.basename(dir_), dir=dir_
-                    ).split(" ")
+                    ).split(
+                        " "
+                    )
                     + ["--wrap", cmd]
                 )
             else:
@@ -1627,7 +1848,9 @@ def enrichr(gene_set, gene_set_libraries=None, kind="genes", max_attempts=5):
         msg += "Please add a list of value(s) to this section 'resources:mem:motif_databases'. "
         msg += "For an example, see https://github.com/afrendeiro/toolkit/tree/master/ngs_toolkit/config/example.yaml"
         try:
-            gene_set_libraries = _CONFIG["resources"]["enrichr"]["gene_set_libraries"]
+            gene_set_libraries = _CONFIG["resources"]["enrichr"][
+                "gene_set_libraries"
+            ]
         except KeyError:
             _LOGGER.error(msg)
             return
@@ -1655,7 +1878,9 @@ def enrichr(gene_set, gene_set_libraries=None, kind="genes", max_attempts=5):
             try:
                 genes = gene_set["gene_name"].dropna().tolist()
             except KeyError:
-                msg = "Provided input dataframe does not have a gene_name column!"
+                msg = (
+                    "Provided input dataframe does not have a gene_name column!"
+                )
                 _LOGGER.error(msg)
                 raise ValueError(msg)
 
@@ -1682,19 +1907,30 @@ def enrichr(gene_set, gene_set_libraries=None, kind="genes", max_attempts=5):
 
     results = pd.DataFrame()
     for gene_set_library in tqdm(
-        gene_set_libraries, total=len(gene_set_libraries), desc="Gene set library"
+        gene_set_libraries,
+        total=len(gene_set_libraries),
+        desc="Gene set library",
     ):
-        _LOGGER.debug("Using Enricher on {} gene set library.".format(gene_set_library))
+        _LOGGER.debug(
+            "Using Enricher on {} gene set library.".format(gene_set_library)
+        )
 
         # Request enriched sets in gene set
         i = 0
         okay = False
         while not okay:
             if i == max_attempts:
-                _LOGGER.error("API request failed {} times, exceeding `max_attempts`.".format(i))
-                raise Exception("Fetching enrichment results maxed `max_attempts`.")
+                _LOGGER.error(
+                    "API request failed {} times, exceeding `max_attempts`.".format(
+                        i
+                    )
+                )
+                raise Exception(
+                    "Fetching enrichment results maxed `max_attempts`."
+                )
             response = requests.get(
-                ENRICHR_RETRIEVE + query_string.format(user_list_id, gene_set_library)
+                ENRICHR_RETRIEVE
+                + query_string.format(user_list_id, gene_set_library)
             )
             okay = response.ok
             if not okay:
@@ -1843,7 +2079,9 @@ def run_enrichment_jobs(
                     os.path.join(dir_, name + ".meme_ame.log"),
                     os.path.join(dir_, name + ".meme_ame.sh"),
                     ("shortq", 1, 4000, "08:00:00"),
-                    "fasta-dinucleotide-shuffle -c 1 -f {f} > {f}.shuffled.fa\n".format(f=file)
+                    "fasta-dinucleotide-shuffle -c 1 -f {f} > {f}.shuffled.fa\n".format(
+                        f=file
+                    )
                     + " ame --bgformat 1 --scoring avg --method ranksum --pvalue-report-threshold 0.05"
                     + " --control {f}.shuffled.fa -o {d} {f} {motifs}".format(
                         f=file, d=dir_, motifs=dbs[omap[genome]]
@@ -1879,7 +2117,9 @@ def run_enrichment_jobs(
             dir_ = os.path.dirname(file)
             name = os.path.basename(dir_)
             output_ = file.replace(".gene_symbols.txt", ".enrichr.csv")
-            if os.path.exists(get_this_file_or_timestamped(output_)) and (not overwrite):
+            if os.path.exists(get_this_file_or_timestamped(output_)) and (
+                not overwrite
+            ):
                 continue
             jobs.append(
                 [
@@ -1893,7 +2133,13 @@ def run_enrichment_jobs(
                 ]
             )
 
-    for jobname, log_file, job_file, (partition, cores, mem, time), task in jobs:
+    for (
+        jobname,
+        log_file,
+        job_file,
+        (partition, cores, mem, time),
+        task,
+    ) in jobs:
         submit_job(
             task,
             job_file,
@@ -1983,7 +2229,9 @@ def project_to_geo(
             for i, file in enumerate(sample.data_source.split(" ")):
                 suffix = ".file{}".format(i) if various else ""
                 # Copy raw file
-                bam_file = os.path.join(output_dir, sample.name + "{}.bam".format(suffix))
+                bam_file = os.path.join(
+                    output_dir, sample.name + "{}.bam".format(suffix)
+                )
                 cmd += "cp {} {};\n".format(file, bam_file)
                 cmd += "chmod 644 {};\n".format(bam_file)
                 annot.loc[sample.name, "bam_file{}".format(i)] = bam_file
@@ -2001,7 +2249,9 @@ def project_to_geo(
         if sample.protocol in ["ATAC-seq", "ChIP-seq"]:
             if "bigwig" in steps:
                 if hasattr(sample, "bigwig"):
-                    bigwig_file = os.path.join(output_dir, sample.name + ".bigWig")
+                    bigwig_file = os.path.join(
+                        output_dir, sample.name + ".bigWig"
+                    )
                     cmd += "cp {} {};\n".format(sample.bigwig, bigwig_file)
                     cmd += "chmod 644 {};\n".format(bigwig_file)
                     annot.loc[sample.name, "bigwig_file"] = bigwig_file
@@ -2009,7 +2259,9 @@ def project_to_geo(
                     # Copy or generate md5sum
                     md5_file = bigwig_file + ".md5"
                     if os.path.exists(sample.bigwig + ".md5"):
-                        cmd += "cp {} {};\n".format(sample.bigwig + ".md5", md5_file)
+                        cmd += "cp {} {};\n".format(
+                            sample.bigwig + ".md5", md5_file
+                        )
                     else:
                         cmd += "md5sum {} > {};\n".format(bigwig_file, md5_file)
                     cmd += "chmod 644 {};\n".format(md5_file)
@@ -2025,7 +2277,9 @@ def project_to_geo(
         if sample.protocol == "ATAC-seq":
             if "peaks" in steps:
                 if hasattr(sample, "peaks"):
-                    peaks_file = os.path.join(output_dir, sample.name + ".peaks.narrowPeak")
+                    peaks_file = os.path.join(
+                        output_dir, sample.name + ".peaks.narrowPeak"
+                    )
                     cmd += "cp {} {};\n".format(sample.peaks, peaks_file)
                     cmd += "chmod 644 {};\n".format(peaks_file)
                     annot.loc[sample.name, "peaks_file"] = peaks_file
@@ -2033,7 +2287,9 @@ def project_to_geo(
                     # Copy or generate md5sum
                     md5_file = peaks_file + ".md5"
                     if os.path.exists(sample.peaks + ".md5"):
-                        cmd += "cp {} {};\n".format(sample.peaks + ".md5", md5_file)
+                        cmd += "cp {} {};\n".format(
+                            sample.peaks + ".md5", md5_file
+                        )
                     else:
                         cmd += "md5sum {} > {};\n".format(peaks_file, md5_file)
                     cmd += "chmod 644 {};\n".format(md5_file)
@@ -2112,9 +2368,13 @@ def rename_sample_files(
     def find_replace(from_pattern, to_pattern, root_dir=None, dry_run=False):
         import shutil
 
-        root_dir = os.path.abspath(os.path.curdir if root_dir is None else root_dir)
+        root_dir = os.path.abspath(
+            os.path.curdir if root_dir is None else root_dir
+        )
         os.chdir(root_dir)
-        for file in os.listdir(root_dir):  # parse through file list in the current directory
+        for file in os.listdir(
+            root_dir
+        ):  # parse through file list in the current directory
             if from_pattern in file:  # if pattern is found
                 new_file = file.replace(from_pattern, to_pattern)
                 if not dry_run:
@@ -2131,7 +2391,9 @@ def rename_sample_files(
     for i, series in annotation_mapping.iterrows():
         o = series[old_sample_name_column]
         t = "{}-{}".format(tmp_prefix, i)
-        _LOGGER.debug("# Moving old sample '%s' to temporary name '%s'." % (o, t))
+        _LOGGER.debug(
+            "# Moving old sample '%s' to temporary name '%s'." % (o, t)
+        )
         find_replace(o, t, root_dir=results_dir, dry_run=dry_run)
 
     # 2) move to new name
@@ -2143,7 +2405,12 @@ def rename_sample_files(
 
 
 @MEMORY.cache
-def query_biomart(attributes=None, species="hsapiens", ensembl_version="grch38", max_api_retries=5):
+def query_biomart(
+    attributes=None,
+    species="hsapiens",
+    ensembl_version="grch38",
+    max_api_retries=5,
+):
     """
     Query Biomart for gene attributes (https://www.ensembl.org/biomart/martview/).
 
@@ -2205,7 +2472,12 @@ def query_biomart(attributes=None, species="hsapiens", ensembl_version="grch38",
         _LOGGER.warning(msg)
 
     if attributes is None:
-        attributes = ["ensembl_gene_id", "external_gene_name", "hgnc_id", "hgnc_symbol"]
+        attributes = [
+            "ensembl_gene_id",
+            "external_gene_name",
+            "hgnc_id",
+            "hgnc_symbol",
+        ]
 
     # Build request XML
     ens_ver = (
@@ -2213,12 +2485,16 @@ def query_biomart(attributes=None, species="hsapiens", ensembl_version="grch38",
     )
     url_query = "".join(
         [
-            """http://{}ensembl.org/biomart/martservice?query=""".format(ens_ver),
+            """http://{}ensembl.org/biomart/martservice?query=""".format(
+                ens_ver
+            ),
             """<?xml version="1.0" encoding="UTF-8"?>""",
             """<!DOCTYPE Query>""",
             """<Query  virtualSchemaName="default" formatter="CSV" header="0" """
             """uniqueRows="0" count="" datasetConfigVersion="0.6" >""",
-            """<Dataset name="{}_gene_ensembl" interface="default" >""".format(species),
+            """<Dataset name="{}_gene_ensembl" interface="default" >""".format(
+                species
+            ),
         ]
         + ["""<Attribute name="{}" />""".format(attr) for attr in attributes]
         + ["""</Dataset>""", """</Query>"""]
@@ -2259,18 +2535,19 @@ def query_biomart(attributes=None, species="hsapiens", ensembl_version="grch38",
 
     if (len(content) == 1) and (content[0].startswith("Query ERROR")):
         msg = (
-            "Request to Biomart API was not successful. " "Please check your input: \n\t{}"
+            "Request to Biomart API was not successful. "
+            "Please check your input: \n\t{}"
         ).format(content[0])
         # _LOGGER.error(msg)
         raise ValueError(msg)
 
     try:
-        mapping = pd.DataFrame([x.strip().split(",") for x in content], columns=attributes)
+        mapping = pd.DataFrame(
+            [x.strip().split(",") for x in content], columns=attributes
+        )
     except AssertionError as e:
         msg = "Could not simply return dataframe with results."
-        msg += (
-            " It is likely this is because one of the requested attributes has commas as is quoted."
-        )
+        msg += " It is likely this is because one of the requested attributes has commas as is quoted."
         msg += " Or because querying an organism not present in vertebrate database."
         msg += " Will try to replace these fields and parse."
         _LOGGER.warning(msg)
@@ -2288,7 +2565,9 @@ def query_biomart(attributes=None, species="hsapiens", ensembl_version="grch38",
         # now get back together with instances that didn't have quotes
         c.update(f)
         try:
-            mapping = pd.DataFrame([x.strip().split(",") for x in c], columns=attributes)
+            mapping = pd.DataFrame(
+                [x.strip().split(",") for x in c], columns=attributes
+            )
         except AssertionError:
             _LOGGER.error("Attempt to fix failed.")
             raise e
@@ -2331,19 +2610,27 @@ def subtract_principal_component(
     # plot
     if plot:
         x2_hat = pca.fit_transform(x2)
-        fig, axis = plt.subplots(max_pcs_to_plot, 2, figsize=(4 * 2, 4 * max_pcs_to_plot))
+        fig, axis = plt.subplots(
+            max_pcs_to_plot, 2, figsize=(4 * 2, 4 * max_pcs_to_plot)
+        )
         axis[0, 0].set_title("Original")
         axis[0, 1].set_title("PC {} removed".format(pc + 1))
         for pc in range(max_pcs_to_plot):
             # before
             for j, _ in enumerate(x.index):
-                axis[pc, 0].scatter(x_hat[j, pc], x_hat[j, pc + 1], s=50, rasterized=True)
+                axis[pc, 0].scatter(
+                    x_hat[j, pc], x_hat[j, pc + 1], s=50, rasterized=True
+                )
             axis[pc, 0].set_xlabel("PC{}".format(pc + 1))
             axis[pc, 0].set_ylabel("PC{}".format(pc + 2))
             # after
             for j, _ in enumerate(x2.index):
                 axis[pc, 1].scatter(
-                    x2_hat[j, pc], x2_hat[j, pc + 1], s=35, alpha=0.8, rasterized=True
+                    x2_hat[j, pc],
+                    x2_hat[j, pc + 1],
+                    s=35,
+                    alpha=0.8,
+                    rasterized=True,
                 )
             axis[pc, 1].set_xlabel("PC{}".format(pc + 1))
             axis[pc, 1].set_ylabel("PC{}".format(pc + 2))
@@ -2392,14 +2679,21 @@ def fix_batch_effect_limma(matrix, batch_variable="batch", covariates=None):
         covariates = []
 
     if len(covariates) > 0:
-        cov = patsy.dmatrix("~{} - 1".format(" + ".join(covariates)), matrix.columns.to_frame())
+        cov = patsy.dmatrix(
+            "~{} - 1".format(" + ".join(covariates)), matrix.columns.to_frame()
+        )
         fixed = r("removeBatchEffect")(
-            x=matrix.values, batch=matrix.columns.get_level_values(batch_variable), design=cov,
+            x=matrix.values,
+            batch=matrix.columns.get_level_values(batch_variable),
+            design=cov,
         )
     else:
         fixed = r("removeBatchEffect")(
-            x=matrix.values, batch=matrix.columns.get_level_values(batch_variable)
+            x=matrix.values,
+            batch=matrix.columns.get_level_values(batch_variable),
         )
-    fixed = pd.DataFrame(np.asarray(fixed), index=matrix.index, columns=matrix.columns)
+    fixed = pd.DataFrame(
+        np.asarray(fixed), index=matrix.index, columns=matrix.columns
+    )
     return fixed
     # fixed.to_csv(os.path.join(analysis.results_dir, analysis.name + "_peaks.limma_fixed.csv"))

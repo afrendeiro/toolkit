@@ -2208,7 +2208,9 @@ def query_biomart(attributes=None, species="hsapiens", ensembl_version="grch38",
         attributes = ["ensembl_gene_id", "external_gene_name", "hgnc_id", "hgnc_symbol"]
 
     # Build request XML
-    ens_ver = "" if ensembl_version.endswith("38") else ensembl_version + "."
+    ens_ver = (
+        "www." if ensembl_version.endswith("38") else ensembl_version + "."
+    )
     url_query = "".join(
         [
             """http://{}ensembl.org/biomart/martservice?query=""".format(ens_ver),

@@ -32,8 +32,8 @@ jobs:
         sudo dpkg -i bedtools_2.27.1+dfsg-4_amd64.deb
     - name: Install R 3.6
       run: |
-        sudo apt remove -y r-base
-        sudo apt autoremove
+        sudo apt-get remove -y r-base
+        sudo apt-get autoremove
         sudo apt-get update
         sudo apt-get -y install r-base
     - name: Install bioconductor libraries
@@ -42,12 +42,12 @@ jobs:
         sudo apt-get -y install r-bioc-deseq2 r-bioc-preprocesscore
     - name: Install Combat
       run: |
-        python3 -m pip install --user git+https://github.com/afrendeiro/combat.git
+        python3 -m pip install git+https://github.com/afrendeiro/combat.git
     - name: Install ngs-toolkit
-      run: python3 -m pip install --user .[testing]
+      run: python3 -m pip install .[testing]
     - name: Lint with flake8
       run: |
-        python3 -m pip install --user flake8
+        python3 -m pip install flake8
         # stop the build if there are Python syntax errors or undefined names
         python3 -m flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
         # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide

@@ -6,6 +6,8 @@ import os
 import numpy as np
 import pandas as pd
 
+from ngs_toolkit import _LOGGER
+
 
 def _format_string_with_environment_variables(string):
     """
@@ -55,8 +57,6 @@ def _format_string_with_environment_variables(string):
 
 
 def warn_or_raise(exception, permissive=False):
-    from ngs_toolkit import _LOGGER
-
     msg = exception.args[0]
     if permissive:
         _LOGGER.warning(msg)

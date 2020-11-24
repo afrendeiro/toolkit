@@ -1,8 +1,10 @@
 # ignore test files
 .tox
+.mypy_cache
 _version.py
 pytest.log
 .coverage*
+docs/html
 
 # Build-related stuff
 build/

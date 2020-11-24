@@ -23,7 +23,9 @@ jobs:
           python-version: ${{ matrix.python }}
           architecture: x64
     - name: Update pip
-      run: python3 -m pip install --upgrade pip
+      run: |
+        sudo apt-get install python3-setuptools
+        python3 -m pip install --upgrade pip
     - name: Install bedtools 2.27.1
       run: |
         wget http://ftp.br.debian.org/debian/pool/main/b/bedtools/bedtools_2.27.1+dfsg-4_amd64.deb
@@ -35,13 +37,7 @@ jobs:
     - name: Install bioconductor libraries
       run: |
         sudo apt-get update
-        sudo apt-get -y install \
-          r-bioc-deseq2 \
-          r-bioc-preprocesscore
-    - name: Update pip
-      run: |
-        sudo apt-get install python3-setuptools
-        python3 -m pip install pip --upgrade
+        sudo apt-get -y install r-bioc-deseq2 r-bioc-preprocesscore
     - name: Install Combat
       run: |
         python3 -m pip install --user git+https://github.com/afrendeiro/combat.git

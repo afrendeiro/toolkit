@@ -20,6 +20,14 @@ Changed
   - More simplicity and abstraction for functions in main :class:`ngs_toolkit.analysis.Analysis` class.
 
 
+[0.25.1] - 2020-11-24
+*****************************
+
+Changed
+-----------------------------
+
+  - Fix URL to biomart used in ``ngs_toolkit.general.query_biomart``.
+
 
 [0.25.0] - 2020-05-26
 *****************************

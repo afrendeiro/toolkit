@@ -9,15 +9,15 @@ on:
 
 jobs:
   test:
-    name: ngs_toolkit - ${{ matrix.python }}
+    name: ngs_toolkit
     runs-on: ubuntu-20.04
     strategy:
       matrix:
-        python_version: ['3.6', '3.7']
+        python_version: ['3.7']
 
     steps:
     - uses: actions/checkout@v1
-    - name: Set up Python 3.7
+    - name: Set up Python
       uses: actions/setup-python@v1
       with:
           python-version: ${{ matrix.python }}
@@ -34,12 +34,16 @@ jobs:
         sudo apt-get -y install r-base
     - name: Install bioconductor libraries
       run: |
+        sudo apt-get update
         sudo apt-get -y install \
           r-bioc-deseq2 \
           r-bioc-preprocesscore
-    - name: Install Combat
+    - name: Update pip
       run: |
         sudo apt-get install python3-setuptools
+        python3 -m pip install pip --upgrade
+    - name: Install Combat
+      run: |
         python3 -m pip install --user git+https://github.com/afrendeiro/combat.git
     - name: Install ngs-toolkit
       run: python3 -m pip install --user .[testing]

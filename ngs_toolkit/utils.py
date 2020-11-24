@@ -36,7 +36,9 @@ def _format_string_with_environment_variables(string):
     to_format = pd.Series(string).str.extractall(r"\${(.*?)}")[0].values
     attrs = os.environ
     if not all([x in attrs for x in to_format]):
-        msg = "Not all required patterns were found in the environment variables."
+        msg = (
+            "Not all required patterns were found in the environment variables."
+        )
         _LOGGER.error(msg)
         raise ValueError(msg)
     # first, make sure there are no unintended strings being formatted
@@ -103,7 +105,11 @@ def filter_kwargs_by_callable(kwargs, callabl, exclude=None):
     from inspect import signature
 
     args = signature(callabl).parameters.keys()
-    return {k: v for k, v in kwargs.items() if (k in args) and k not in (exclude or [])}
+    return {
+        k: v
+        for k, v in kwargs.items()
+        if (k in args) and k not in (exclude or [])
+    }
 
 
 def get_timestamp(fmt="%Y-%m-%d-%H:%M:%S"):
@@ -148,7 +154,11 @@ def get_this_file_or_timestamped(file, permissive=True):
     end = split[-1]
 
     res = sorted_nicely(glob(body + "*" + end))
-    res = [x for x in res if re.search(body + r"\.\d{4}-\d{2}-\d{2}-\d{2}:\d{2}:\d{2}\.", x)]
+    res = [
+        x
+        for x in res
+        if re.search(body + r"\.\d{4}-\d{2}-\d{2}-\d{2}:\d{2}:\d{2}\.", x)
+    ]
     if len(res) > 1:
         _LOGGER.warning(
             "Could not get unequivocal timestamped file for '{}'.".format(file)
@@ -299,7 +309,11 @@ def submit_job(
         return subprocess.check_output(check_cmd).split(sep).__len__()
 
     def submit_job_if_possible(
-        cmd, check_cmd="squeue", total_job_lim=800, refresh_time=10, in_between_time=5
+        cmd,
+        check_cmd="squeue",
+        total_job_lim=800,
+        refresh_time=10,
+        in_between_time=5,
     ):
         submit = count_jobs_running(check_cmd) < total_job_lim
         while not submit:
@@ -314,7 +328,9 @@ def submit_job(
     # Get computing configuration from config
     if computing_configuration is None:
         try:
-            computing_configuration = _CONFIG["preferences"]["computing_configuration"]
+            computing_configuration = _CONFIG["preferences"][
+                "computing_configuration"
+            ]
         except KeyError:
             msg = "'computing_configuration' was not given"
             msg += " and default could not be get from config."
@@ -513,7 +529,9 @@ def bed_to_index(df):
         df = pybedtools.BedTool(df).to_dataframe()
     cols = ["chrom", "start", "end"]
     if not all([x in df.columns for x in cols]):
-        raise AttributeError("DataFrame does not have '{}' columns.".format("', '".join(cols)))
+        raise AttributeError(
+            "DataFrame does not have '{}' columns.".format("', '".join(cols))
+        )
     index = (
         df["chrom"].astype(str)
         + ":"
@@ -535,7 +553,9 @@ def bedtool_to_index(bedtool):
     else:
         msg = "Input not pybedtools.BedTool or string to BED file."
         raise ValueError(msg)
-    return [str(i.chrom) + ":" + str(i.start) + "-" + str(i.stop) for i in bedtool]
+    return [
+        str(i.chrom) + ":" + str(i.start) + "-" + str(i.stop) for i in bedtool
+    ]
 
 
 def to_bed_index(sites):
@@ -759,7 +779,9 @@ def r2pandas_df(r_df):
 
 def recarray2pandas_df(recarray):
     """Make :class:`pandas.DataFrame` from :class:`numpy.recarray`."""
-    df = pd.DataFrame.from_records(recarray, index=list(range(recarray.shape[0])))
+    df = pd.DataFrame.from_records(
+        recarray, index=list(range(recarray.shape[0]))
+    )
     return df
 
 
@@ -931,7 +953,9 @@ def decompress_file(file, output_file=None):
 
     if output_file is None:
         if not file.endswith(".gz"):
-            msg = "`output_file` not given and input_file does not end in '.gz'."
+            msg = (
+                "`output_file` not given and input_file does not end in '.gz'."
+            )
             _LOGGER.error(msg)
             raise ValueError(msg)
         output_file = file.replace(".gz", "")
@@ -1010,7 +1034,9 @@ def download_gzip_file(url, output_file, decompress=True, **kwargs):
     if not decompress:
         return
     decompress_file(output_file)
-    if os.path.exists(output_file) and os.path.exists(output_file.replace(".gz", "")):
+    if os.path.exists(output_file) and os.path.exists(
+        output_file.replace(".gz", "")
+    ):
         os.remove(output_file)
 
 
@@ -1041,7 +1067,11 @@ def deseq_results_to_bed_file(
         df = df.sort_values("log2FoldChange", ascending=ascending)
 
     if significant_only is True:
-        df = df.loc[(df["padj"] < alpha) & (df["log2FoldChange"].abs() > abs_fold_change), :]
+        df = df.loc[
+            (df["padj"] < alpha)
+            & (df["log2FoldChange"].abs() > abs_fold_change),
+            :,
+        ]
 
     # decompose index string (chrom:start-end) into columns
     df["chrom"] = map(lambda x: x[0], df.index.str.split(":"))
@@ -1050,7 +1080,9 @@ def deseq_results_to_bed_file(
     df["end"] = map(lambda x: x[1], r.str.split("-"))
     df["name"] = df.index
     if normalize:
-        MinMaxScaler(feature_range=(0, 1000)).fit_transform(df["log2FoldChange"])
+        MinMaxScaler(feature_range=(0, 1000)).fit_transform(
+            df["log2FoldChange"]
+        )
     df["score"] = df["log2FoldChange"]
 
     df[["chrom", "start", "end", "name", "score"]].to_csv(
@@ -1081,7 +1113,9 @@ def homer_peaks_to_bed(homer_peaks, output_bed):
     )
 
 
-def macs2_call_chipseq_peak(signal_samples, control_samples, output_dir, name, distributed=True):
+def macs2_call_chipseq_peak(
+    signal_samples, control_samples, output_dir, name, distributed=True
+):
     """
     Call ChIP-seq peaks with MACS2 in a slurm job.
 
@@ -1144,21 +1178,35 @@ def homer_call_chipseq_peak_job(
         os.makedirs(output_dir)
 
     # make tag directory for the signal and background samples separately
-    signal_tag_directory = os.path.join(output_dir, "homer_tag_dir_" + name + "_signal")
+    signal_tag_directory = os.path.join(
+        output_dir, "homer_tag_dir_" + name + "_signal"
+    )
     fs = " ".join([s.aligned_filtered_bam for s in signal_samples])
     runnable = """makeTagDirectory {0} {1}\n""".format(signal_tag_directory, fs)
-    background_tag_directory = os.path.join(output_dir, "homer_tag_dir_" + name + "_background")
+    background_tag_directory = os.path.join(
+        output_dir, "homer_tag_dir_" + name + "_background"
+    )
     fs = " ".join([s.aligned_filtered_bam for s in control_samples])
-    runnable += """makeTagDirectory {0} {1}\n""".format(background_tag_directory, fs)
+    runnable += """makeTagDirectory {0} {1}\n""".format(
+        background_tag_directory, fs
+    )
 
     # call peaks
-    output_file = os.path.join(output_dir, name, name + "_homer_peaks.factor.narrowPeak")
-    runnable += """findPeaks {signal} -style factor -o {output_file} -i {background}\n""".format(
-        output_file=output_file, background=background_tag_directory, signal=signal_tag_directory,
+    output_file = os.path.join(
+        output_dir, name, name + "_homer_peaks.factor.narrowPeak"
     )
-    output_file = os.path.join(output_dir, name, name + "_homer_peaks.histone.narrowPeak")
+    runnable += """findPeaks {signal} -style factor -o {output_file} -i {background}\n""".format(
+        output_file=output_file,
+        background=background_tag_directory,
+        signal=signal_tag_directory,
+    )
+    output_file = os.path.join(
+        output_dir, name, name + "_homer_peaks.histone.narrowPeak"
+    )
     runnable += """findPeaks {signal} -style histone -o {output_file} -i {background}""".format(
-        output_file=output_file, background=background_tag_directory, signal=signal_tag_directory,
+        output_file=output_file,
+        background=background_tag_directory,
+        signal=signal_tag_directory,
     )
 
     if distributed:
@@ -1205,7 +1253,11 @@ def bed_to_fasta(input_bed, output_fasta, genome_file):
 def read_bed_file_three_columns(input_bed: str) -> pd.DataFrame:
     """Read BED file into dataframe, make 'name' field from location."""
     bed = pd.read_csv(
-        input_bed, sep="\t", header=None, usecols=[0, 1, 2], names=["chrom", "start", "end"]
+        input_bed,
+        sep="\t",
+        header=None,
+        usecols=[0, 1, 2],
+        names=["chrom", "start", "end"],
     )
     bed["name"] = bed_to_index(bed)
     return bed
@@ -1234,7 +1286,9 @@ def bed_to_fasta_through_2bit(input_bed, output_fasta, genome_2bit):
     bed = read_bed_file_three_columns(input_bed)
     bed.to_csv(tmp_bed, sep="\t", header=None, index=False)
 
-    cmd = "twoBitToFa {0} -bed={1} {2}".format(genome_2bit, tmp_bed, output_fasta)
+    cmd = "twoBitToFa {0} -bed={1} {2}".format(
+        genome_2bit, tmp_bed, output_fasta
+    )
     subprocess.call(cmd.split(" "))
     os.remove(tmp_bed)
 
@@ -1419,7 +1473,9 @@ def cqn(matrix, gc_content, lengths):
     y_r = cqn_out[list(cqn_out.names).index("y")]
     y = pd.DataFrame(np.array(y_r), index=matrix.index, columns=matrix.columns)
     offset_r = cqn_out[list(cqn_out.names).index("offset")]
-    offset = pd.DataFrame(np.array(offset_r), index=matrix.index, columns=matrix.columns)
+    offset = pd.DataFrame(
+        np.array(offset_r), index=matrix.index, columns=matrix.columns
+    )
 
     return y + offset
 

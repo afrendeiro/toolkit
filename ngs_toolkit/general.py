@@ -87,7 +87,7 @@ def get_genome_reference(
                 genome_file,
                 genome_file.replace(".2bit", ".fa"),
             ]
-            subprocess.check_output(args, shell=False)
+            subprocess.call(args)
             index_fasta(genome_file.replace(".2bit", ".fa"))
 
     if output_dir is None:
@@ -1613,12 +1613,9 @@ def meme_ame(
     # shuffle input in no background is provided
     if background_fasta is None:
         shuffled = input_fasta + ".shuffled"
-        cmd = """
-        fasta-dinucleotide-shuffle -c 1 -f {0} > {1}
-        """.format(
-            input_fasta, shuffled
-        )
-        subprocess.call(cmd.split(" "))
+        cmd = """fasta-dinucleotide-shuffle -c 1 -f {0}""".format(input_fasta)
+        with open(shuffled, "w") as handle:
+            subprocess.call(cmd.split(" "), stdout=handle)
 
     cmd = (
         "ame --bgformat 1 --scoring avg --method ranksum "

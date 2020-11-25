@@ -18,17 +18,19 @@ def test_region_set_frip(pep):
     # but since it has to be in inside the recipe, so we will temporarily set it
     # at the home directory level, for this test only
     config = os.path.join(os.path.expanduser("~"), ".ngs_toolkit.config.yaml")
-    yaml = pkgutil.get_data("ngs_toolkit", "config/example.yaml").decode().strip()
+    yaml = (
+        pkgutil.get_data("ngs_toolkit", "config/example.yaml").decode().strip()
+    )
     with open(config, "w") as handle:
         handle.write(yaml)
 
     cmd = (
-        "{exe} -m ngs_toolkit.recipes.region_set_frip {pep} " "--computing-configuration default"
+        "{exe} -m ngs_toolkit.recipes.region_set_frip {pep} "
+        "--computing-configuration default"
     ).format(exe=sys.executable, pep=pep)
 
-    p = subprocess.Popen(cmd.split(" "))
-    o = p.communicate()
-    assert o == (None, None)
+    o = subprocess.call(cmd.split(" "))
+    assert o == 0
 
     an = Analysis(from_pep=pep)
     for sample in an.samples:
@@ -40,7 +42,9 @@ def test_region_set_frip(pep):
             "stats.tsv",
         ]
         for f in files:
-            assert file_exists_and_not_empty(os.path.join(sample.sample_root, f))
+            assert file_exists_and_not_empty(
+                os.path.join(sample.sample_root, f)
+            )
 
     os.remove(config)
 
@@ -57,9 +61,8 @@ def test_deseq2(tmp_path, atac_analysis_with_input_files):
         sys.executable, output_prefix, comp_dir
     )
 
-    proc = subprocess.Popen(cmd.split(" "))
-    o = proc.communicate()
-    assert o == (None, None)
+    o = subprocess.call(cmd.split(" "))
+    assert o == 0
 
     files = [
         # "deseq_job.Factor_A_2vs1.log",
@@ -80,9 +83,8 @@ def test_coverage(tmp_path, atac_analysis_with_input_files):
         sys.executable, region_set, sample.aligned_filtered_bam, output
     )
 
-    p = subprocess.Popen(cmd.split(" "))
-    o = p.communicate()
-    assert o == (None, None)
+    o = subprocess.call(cmd.split(" "))
+    assert o == 0
 
     assert file_exists_and_not_empty(output)
 
@@ -100,9 +102,8 @@ def test_enrichr_good(tmp_path):
         sys.executable, input_file, output_file
     )
 
-    p = subprocess.Popen(cmd.split(" "))
-    o = p.communicate()
-    assert o == (None, None)
+    o = subprocess.call(cmd.split(" "))
+    assert o == 0
 
     assert file_exists_and_not_empty(output_file)
 
@@ -121,9 +122,8 @@ def test_enrichr_bad(tmp_path):
         sys.executable, input_file, output_file
     )
 
-    p = subprocess.Popen(cmd.split(" "))
-    o = p.communicate()
-    assert o == (None, None)
+    o = subprocess.call(cmd.split(" "))
+    assert o == 0
 
     assert file_exists_and_not_empty(output_file)
 
@@ -133,11 +133,12 @@ def test_enrichr_bad(tmp_path):
 
 @pytest.mark.skipif(CI or DEV, reason="Test too long to be performed on CI.")
 def test_ngs_analysis(pep):
-    cmd = ("{exe} -m ngs_toolkit.recipes.ngs_analysis {pep}").format(exe=sys.executable, pep=pep)
+    cmd = ("{exe} -m ngs_toolkit.recipes.ngs_analysis {pep}").format(
+        exe=sys.executable, pep=pep
+    )
 
-    p = subprocess.Popen(cmd.split(" "))
-    o = p.communicate()
-    assert o == (None, None)
+    o = subprocess.call(cmd.split(" "))
+    assert o == 0
 
 
 @pytest.mark.skipif(CI or DEV, reason="Test too long to be performed on CI.")
@@ -156,14 +157,17 @@ def test_merge_signal(pep):
     ).format(exe=sys.executable, output_dir=output_dir, pep=pep)
 
     # this requires a config with sample input files
-    file_config = os.path.join(os.path.expanduser("~"), ".ngs_toolkit.config.yaml")
-    content = pkgutil.get_data("ngs_toolkit", "config/default.yaml").decode().strip()
+    file_config = os.path.join(
+        os.path.expanduser("~"), ".ngs_toolkit.config.yaml"
+    )
+    content = (
+        pkgutil.get_data("ngs_toolkit", "config/default.yaml").decode().strip()
+    )
     with open(file_config, "w") as handle:
         handle.write(content)
 
-    p = subprocess.Popen(cmd.split(" "))
-    o = p.communicate()
-    assert o == (None, None)
+    o = subprocess.call(cmd.split(" "))
+    assert o == 0
 
     files = [
         # "A_1.bigWig",

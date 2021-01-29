@@ -305,12 +305,12 @@ trackDb {g}/trackDb.txt
                 "Finished producing trackHub!",
                 "----------------------------",
                 "Add the following URL to your UCSC trackHubs:",
-                "{url}/hub.txt".format(url=prj["trackhubs"]["url"]),
+                "{url}/hub.txt".format(url=prj.config["trackhubs"]["url"]),
                 "or alternatively follow this URL: "
                 + "http://genome-euro.ucsc.edu/cgi-bin/hgTracks?db={genome}&hubUrl={url}/hub.txt".format(
                     # the link can only point to one genome, so by default it will be the last one used.
                     genome=genome,
-                    url=prj["trackhubs"]["url"],
+                    url=prj.config["trackhubs"]["url"],
                 ),
             ]
         )
@@ -318,7 +318,7 @@ trackDb {g}/trackDb.txt
     )
 
     if "trackhubs" in prj:
-        if "url" in prj["trackhubs"]:
+        if "url" in prj.config["trackhubs"]:
             print(msg)
 
 
@@ -353,7 +353,7 @@ def make_igv_tracklink(prj, track_file, track_url):
         text += "<a href="
         text += link_header
         text += "?file=" + ",".join(
-            prj["trackhubs"]["url"] + "/{}/".format(genome) + df_g["sample_name"] + ".bigWig"
+            prj.config["trackhubs"]["url"] + "/{}/".format(genome) + df_g["sample_name"] + ".bigWig"
         )
         text += "?names=" + ",".join(df_g["sample_name"])
         text += "?genome={}".format(genome)
@@ -433,7 +433,7 @@ def main():
     )
 
     track_file = os.path.join(bigwig_dir, "igv", "index.html")
-    track_url = os.path.join(prj["trackhubs"]["url"], "igv")
+    track_url = os.path.join(prj.config["trackhubs"]["url"], "igv")
     make_igv_tracklink(prj, track_file, track_url)
 
 

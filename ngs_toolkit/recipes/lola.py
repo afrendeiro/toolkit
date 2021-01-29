@@ -33,7 +33,7 @@ def parse_arguments():
     )
     parser.add_argument(dest="genome", help="Genome assembly of the region set.")
     parser.add_argument(
-        "--no-overwrite",
+        "--overwrite",
         action="store_false",
         help="Don't overwrite existing output files.",
     )

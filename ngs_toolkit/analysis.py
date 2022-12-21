@@ -3055,7 +3055,7 @@ class Analysis(object):
         # Get experiment matrix
         # by getting any other relevant covariates as required
         if covariates is not None:
-            sample_table = pd.DataFrame([s.as_series() for s in samples])
+            sample_table = pd.DataFrame([s.to_dict() for s in samples])
             # check all covariates are in the samples and none is null
             if not all([x in sample_table.columns for x in covariates]):
                 msg = "Not all of the specified covariate variables are in the selected samples."

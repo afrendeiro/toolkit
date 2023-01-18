@@ -5902,10 +5902,10 @@ class Analysis(object):
         if enrichment_type == "homer_consensus":
             _LOGGER.info("Plotting enrichments for 'homer_consensus'")
             enrichment_table.loc[:, "enrichment_over_background"] = (
-                enrichment_table["% of Target Sequences with Motif"]
-                / enrichment_table["% of Background Sequences with Motif"]
+                enrichment_table["% of Target Sequences with Motif"].astype(float)
+                / enrichment_table["% of Background Sequences with Motif"].astype(float)
             )
-            enrichment_table.loc[:, "log_p_value"] = log_pvalues(enrichment_table["P-value"])
+            enrichment_table.loc[:, "log_p_value"] = log_pvalues(enrichment_table["P-value"].astype(float))
 
             # Plot top_n terms of each comparison in barplots
             top_n = min(
